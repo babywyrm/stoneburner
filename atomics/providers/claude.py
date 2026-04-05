@@ -8,13 +8,16 @@ import anthropic
 
 from atomics.providers.base import BaseProvider, ProviderResponse
 
-# Pricing per 1M tokens (input / output) — updated as of 2025-Q4
+# Pricing per 1M tokens (input / output)
 MODEL_PRICING: dict[str, tuple[float, float]] = {
+    "claude-opus-4-6": (5.0, 25.0),
+    "claude-sonnet-4-6": (3.0, 15.0),
+    "claude-haiku-4-5-20251001": (1.0, 5.0),
+    "claude-haiku-4-5": (1.0, 5.0),
+    "claude-sonnet-4-5-20250929": (3.0, 15.0),
+    "claude-sonnet-4-5": (3.0, 15.0),
     "claude-sonnet-4-20250514": (3.0, 15.0),
-    "claude-haiku-4-20250414": (0.80, 4.0),
-    "claude-3-5-sonnet-20241022": (3.0, 15.0),
-    "claude-3-5-haiku-20241022": (0.80, 4.0),
-    "claude-3-opus-20240229": (15.0, 75.0),
+    "claude-opus-4-20250514": (15.0, 75.0),
 }
 
 DEFAULT_PRICING = (3.0, 15.0)

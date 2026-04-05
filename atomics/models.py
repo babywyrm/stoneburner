@@ -25,10 +25,31 @@ class TaskCategory(str, Enum):
     GENERAL_QA = "general_qa"
 
 
+class BurnTier(str, Enum):
+    EZ = "ez"
+    BASELINE = "baseline"
+    MEGA = "mega"
+
+
+class TaskComplexity(str, Enum):
+    LIGHT = "light"
+    MODERATE = "moderate"
+    HEAVY = "heavy"
+
+
+# Which complexities each tier is allowed to run
+TIER_COMPLEXITY_MAP: dict[BurnTier, list[TaskComplexity]] = {
+    BurnTier.EZ: [TaskComplexity.LIGHT],
+    BurnTier.BASELINE: [TaskComplexity.LIGHT, TaskComplexity.MODERATE],
+    BurnTier.MEGA: [TaskComplexity.LIGHT, TaskComplexity.MODERATE, TaskComplexity.HEAVY],
+}
+
+
 class TaskDefinition(BaseModel):
     category: TaskCategory
     name: str
     prompt_template: str
+    complexity: TaskComplexity = TaskComplexity.MODERATE
     weight: float = Field(default=1.0, ge=0.0)
     max_output_tokens: int = Field(default=1024)
 

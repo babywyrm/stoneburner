@@ -13,7 +13,7 @@ class AtomicsSettings(BaseSettings):
 
     db_path: Path = Field(default=Path("data/atomics.db"))
     log_level: str = Field(default="INFO")
-    default_model: str = Field(default="claude-sonnet-4-20250514")
+    default_model: str = Field(default="claude-sonnet-4-6")
 
     max_tokens_per_hour: int = Field(default=100_000)
     max_requests_per_minute: int = Field(default=30)
@@ -25,7 +25,7 @@ class AtomicsSettings(BaseSettings):
     retry_backoff_base: float = Field(default=2.0)
     circuit_breaker_threshold: int = Field(default=10)
 
-    anthropic_api_key: str = Field(default="")
+    anthropic_api_key: str = Field(default="", validation_alias="ANTHROPIC_API_KEY")
 
 
 def load_settings() -> AtomicsSettings:

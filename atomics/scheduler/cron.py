@@ -1,4 +1,4 @@
-"""Cron integration helpers — generate crontab entries and systemd timers."""
+"""Cron integration helpers — generate crontab entries, systemd timers, launchd plists."""
 
 from __future__ import annotations
 
@@ -11,35 +11,39 @@ def generate_crontab_entry(
     interval_minutes: int = 30,
     max_iterations: int = 10,
     python_path: str | None = None,
+    tier: str = "baseline",
 ) -> str:
-    """Generate a crontab line that runs atomics on a schedule."""
     py = python_path or shutil.which("python3") or sys.executable
-    return f"*/{interval_minutes} * * * * cd {Path.cwd()} && {py} -m atomics run --max-iterations {max_iterations} >> logs/atomics-cron.log 2>&1"
+    return (
+        f"*/{interval_minutes} * * * * "
+        f"cd {Path.cwd()} && {py} -m atomics run --tier {tier} "
+        f"--max-iterations {max_iterations} >> logs/atomics-cron.log 2>&1"
+    )
 
 
 def generate_systemd_timer(
     interval_minutes: int = 30,
     max_iterations: int = 10,
     working_dir: str | None = None,
+    tier: str = "baseline",
 ) -> tuple[str, str]:
-    """Generate systemd service + timer unit file contents."""
     wd = working_dir or str(Path.cwd())
     py = shutil.which("python3") or sys.executable
 
     service = f"""[Unit]
-Description=Atomics token usage benchmark run
+Description=Atomics token usage benchmark run ({tier})
 After=network.target
 
 [Service]
 Type=oneshot
 WorkingDirectory={wd}
-ExecStart={py} -m atomics run --max-iterations {max_iterations}
+ExecStart={py} -m atomics run --tier {tier} --max-iterations {max_iterations}
 StandardOutput=append:{wd}/logs/atomics.log
 StandardError=append:{wd}/logs/atomics.log
 """
 
     timer = f"""[Unit]
-Description=Atomics benchmark timer
+Description=Atomics benchmark timer ({tier})
 
 [Timer]
 OnCalendar=*:0/{interval_minutes}
@@ -57,8 +61,8 @@ def generate_launchd_plist(
     max_iterations: int = 10,
     working_dir: str | None = None,
     label: str = "com.babywyrm.atomics",
+    tier: str = "baseline",
 ) -> str:
-    """Generate a macOS launchd plist for scheduled runs."""
     wd = working_dir or str(Path.cwd())
     py = shutil.which("python3") or sys.executable
     interval_seconds = interval_minutes * 60
@@ -69,7 +73,7 @@ def generate_launchd_plist(
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>{label}</string>
+    <string>{label}.{tier}</string>
     <key>WorkingDirectory</key>
     <string>{wd}</string>
     <key>ProgramArguments</key>
@@ -78,6 +82,8 @@ def generate_launchd_plist(
         <string>-m</string>
         <string>atomics</string>
         <string>run</string>
+        <string>--tier</string>
+        <string>{tier}</string>
         <string>--max-iterations</string>
         <string>{max_iterations}</string>
     </array>

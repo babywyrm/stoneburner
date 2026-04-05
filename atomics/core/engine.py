@@ -7,41 +7,55 @@ import logging
 import random
 import signal
 import uuid
-from datetime import datetime, timezone
 
 from atomics.config import AtomicsSettings
 from atomics.core.guard import GuardConfig, RateBudgetGuard
 from atomics.core.runner import execute_task
-from atomics.models import TaskStatus
+from atomics.models import BurnTier, TaskStatus
 from atomics.providers.base import BaseProvider
 from atomics.storage.repository import MetricsRepository
 from atomics.tasks import get_weighted_task
+from atomics.tiers import TierProfile, get_tier_profile
 
 logger = logging.getLogger("atomics.engine")
 
 
 class LoopEngine:
-    """Continuous benchmarking loop with rate/budget controls."""
+    """Continuous benchmarking loop with tier-based rate/budget controls."""
 
     def __init__(
         self,
         provider: BaseProvider,
         repo: MetricsRepository,
         settings: AtomicsSettings,
+        tier: BurnTier = BurnTier.BASELINE,
+        *,
+        interval_override: int | None = None,
+        budget_override: float | None = None,
     ) -> None:
         self._provider = provider
         self._repo = repo
         self._settings = settings
+        self._tier = tier
+        self._profile: TierProfile = get_tier_profile(tier)
+        self._interval = interval_override or self._profile.loop_interval_seconds
+        self._jitter = self._profile.loop_jitter_seconds
+        self._budget = budget_override if budget_override is not None else self._profile.budget_limit_usd
+
         self._guard = RateBudgetGuard(
             GuardConfig(
-                max_tokens_per_hour=settings.max_tokens_per_hour,
-                max_requests_per_minute=settings.max_requests_per_minute,
-                budget_limit_usd=settings.budget_limit_usd,
+                max_tokens_per_hour=self._profile.max_tokens_per_hour,
+                max_requests_per_minute=self._profile.max_requests_per_minute,
+                budget_limit_usd=self._budget,
                 circuit_breaker_threshold=settings.circuit_breaker_threshold,
             )
         )
         self._shutdown = asyncio.Event()
         self._run_id: str = ""
+
+    @property
+    def tier(self) -> BurnTier:
+        return self._tier
 
     async def run(self, max_iterations: int | None = None) -> None:
         """Start the benchmarking loop. Runs until shutdown signal or iteration cap."""
@@ -49,11 +63,21 @@ class LoopEngine:
         self._run_id = uuid.uuid4().hex[:12]
         self._repo.create_run(self._run_id)
 
+        model = self._profile.preferred_model or self._settings.default_model
         logger.info(
-            "Atomics engine started — run_id=%s provider=%s model=%s",
+            "Atomics engine started — run_id=%s tier=%s provider=%s model=%s",
             self._run_id,
+            self._tier.value,
             self._provider.name,
-            self._settings.default_model,
+            model,
+        )
+        logger.info(
+            "Tier profile: %s | interval=%ds budget=$%.2f tokens/hr=%d req/min=%d",
+            self._profile.description,
+            self._interval,
+            self._budget,
+            self._profile.max_tokens_per_hour,
+            self._profile.max_requests_per_minute,
         )
 
         iteration = 0
@@ -75,12 +99,14 @@ class LoopEngine:
                 except asyncio.TimeoutError:
                     continue
 
-            task_def, topic = get_weighted_task()
+            task_def, topic = get_weighted_task(self._tier)
             logger.info(
-                "[iter %d] Running %s/%s — topic: %s",
+                "[iter %d] [%s] Running %s/%s (%s) — topic: %s",
                 iteration,
+                self._tier.value,
                 task_def.category.value,
                 task_def.name,
+                task_def.complexity.value,
                 topic[:60],
             )
 
@@ -89,7 +115,7 @@ class LoopEngine:
                 topic,
                 provider=self._provider,
                 run_id=self._run_id,
-                model=self._settings.default_model,
+                model=model,
             )
 
             self._repo.save_task_result(result)
@@ -102,9 +128,9 @@ class LoopEngine:
             self._log_result(iteration, result)
             iteration += 1
 
-            interval = self._settings.loop_interval_seconds + random.uniform(
-                -self._settings.loop_jitter_seconds,
-                self._settings.loop_jitter_seconds,
+            interval = self._interval + random.uniform(
+                -self._jitter,
+                self._jitter,
             )
             interval = max(1.0, interval)
             try:
@@ -115,7 +141,8 @@ class LoopEngine:
 
         summary = self._repo.complete_run(self._run_id)
         logger.info(
-            "Run complete — tasks=%d success=%d failed=%d tokens=%d cost=$%.4f",
+            "Run complete — tier=%s tasks=%d success=%d failed=%d tokens=%d cost=$%.4f",
+            self._tier.value,
             summary.total_tasks,
             summary.successful_tasks,
             summary.failed_tasks,
