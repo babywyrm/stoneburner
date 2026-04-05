@@ -1,0 +1,22 @@
+# Conservative profile — low-cost long-duration monitoring
+
+[engine]
+loop_interval_seconds = 300
+loop_jitter_seconds = 30
+max_iterations = 0
+
+[provider]
+name = "claude"
+default_model = "claude-3-5-haiku-20241022"
+
+[rate_limits]
+max_tokens_per_hour = 25000
+max_requests_per_minute = 10
+
+[budget]
+limit_usd = 10.00
+
+[resilience]
+max_retries = 2
+retry_backoff_base = 3.0
+circuit_breaker_threshold = 5

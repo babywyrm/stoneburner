@@ -1,0 +1,22 @@
+# Aggressive profile — higher throughput for rapid token usage testing
+
+[engine]
+loop_interval_seconds = 30
+loop_jitter_seconds = 5
+max_iterations = 0
+
+[provider]
+name = "claude"
+default_model = "claude-sonnet-4-20250514"
+
+[rate_limits]
+max_tokens_per_hour = 500000
+max_requests_per_minute = 60
+
+[budget]
+limit_usd = 200.00
+
+[resilience]
+max_retries = 5
+retry_backoff_base = 1.5
+circuit_breaker_threshold = 15

@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# uv
+.python-version
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project
+.worktrees/
+*.db
+*.sqlite
+data/
+logs/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Node (optional workers)
+node_modules/
+workers/npm/node_modules/
