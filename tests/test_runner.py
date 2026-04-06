@@ -44,6 +44,15 @@ SAMPLE_TASK = TaskDefinition(
     max_output_tokens=256,
 )
 
+SAMPLE_TASK_PROMPT = TaskDefinition(
+    category=TaskCategory.GENERAL_QA,
+    name="test_prompt_task",
+    prompt_template="{prompt}",
+    complexity=TaskComplexity.LIGHT,
+    weight=1.0,
+    max_output_tokens=256,
+)
+
 
 @pytest.mark.asyncio
 async def test_execute_task_success():
@@ -78,6 +87,14 @@ async def test_execute_task_formats_prompt():
     provider = MockProvider()
     result = await execute_task(SAMPLE_TASK, "kubernetes", provider=provider, run_id="r1")
     assert result.prompt == "Tell me about kubernetes"
+
+
+@pytest.mark.asyncio
+async def test_execute_task_prebuilt_prompt():
+    provider = MockProvider()
+    full_prompt = "Explain TLS 1.3 for a senior security engineer"
+    result = await execute_task(SAMPLE_TASK_PROMPT, full_prompt, provider=provider, run_id="r1b")
+    assert result.prompt == full_prompt
 
 
 @pytest.mark.asyncio

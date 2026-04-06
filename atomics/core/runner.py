@@ -20,7 +20,10 @@ async def execute_task(
     model: str | None = None,
 ) -> TaskResult:
     """Run a single benchmark task and return the result (never raises)."""
-    prompt = task.prompt_template.format(topic=topic)
+    if "{prompt}" in task.prompt_template:
+        prompt = topic  # topic is already the fully-built prompt
+    else:
+        prompt = task.prompt_template.format(topic=topic)
     result = TaskResult(
         run_id=run_id,
         category=task.category,
