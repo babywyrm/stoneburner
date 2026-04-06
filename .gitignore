@@ -33,6 +33,15 @@ Thumbs.db
 data/
 logs/
 
+# Coverage
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# Pytest
+.pytest_cache/
+
 # Environment
 .env
 .env.*
