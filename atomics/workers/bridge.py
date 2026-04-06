@@ -33,19 +33,22 @@ async def invoke_worker(
     prompt: str,
     timeout_ms: int = 30000,
     cwd: Path | None = None,
+    *,
+    create_subprocess_exec=asyncio.create_subprocess_exec,
+    wait_for=asyncio.wait_for,
 ) -> WorkerResult:
     """Send a task to an external worker process and collect the result."""
     payload = json.dumps({"task": task_name, "prompt": prompt, "timeout_ms": timeout_ms})
 
     try:
-        proc = await asyncio.create_subprocess_exec(
+        proc = await create_subprocess_exec(
             *worker_cmd,
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             cwd=str(cwd) if cwd else None,
         )
-        stdout, stderr = await asyncio.wait_for(
+        stdout, stderr = await wait_for(
             proc.communicate(payload.encode()),
             timeout=timeout_ms / 1000 + 5,
         )
@@ -61,7 +64,7 @@ async def invoke_worker(
             output_tokens=data.get("tokens", {}).get("output", 0),
             error=data.get("error", ""),
         )
-    except asyncio.TimeoutError:
+    except TimeoutError:
         return WorkerResult(status="error", error="worker timed out")
     except Exception as exc:
         return WorkerResult(status="error", error=str(exc)[:500])

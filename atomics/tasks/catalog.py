@@ -14,11 +14,11 @@ from __future__ import annotations
 import random
 
 from atomics.models import (
+    TIER_COMPLEXITY_MAP,
     BurnTier,
     TaskCategory,
     TaskComplexity,
     TaskDefinition,
-    TIER_COMPLEXITY_MAP,
 )
 from atomics.tasks.randomizer import (
     build_combinatoric_prompt,
@@ -26,7 +26,6 @@ from atomics.tasks.randomizer import (
     get_recency_tracker,
 )
 from atomics.tasks.topics import CROSS_POLLINATION_TOPICS, TOPIC_POOLS
-
 
 # Phrasing variants per task — {topic} is the only required placeholder
 PHRASING_VARIANTS: dict[str, list[str]] = {
@@ -84,29 +83,74 @@ PHRASING_VARIANTS: dict[str, list[str]] = {
     ],
     # ── HEAVY ─────────────────────────────────────────────
     "deep_dive_topic": [
-        "Provide a detailed technical analysis of {topic} including architecture, trade-offs, and a comparison matrix of at least 3 alternatives.",
-        "Write a comprehensive technical report on {topic} covering design decisions, failure modes, and operational considerations.",
-        "Deep-dive into {topic}: cover the theory, practical implementation, performance characteristics, and security implications.",
+        (
+            "Provide a detailed technical analysis of {topic} including architecture, "
+            "trade-offs, and a comparison matrix of at least 3 alternatives."
+        ),
+        (
+            "Write a comprehensive technical report on {topic} covering design "
+            "decisions, failure modes, and operational considerations."
+        ),
+        (
+            "Deep-dive into {topic}: cover the theory, practical implementation, "
+            "performance characteristics, and security implications."
+        ),
     ],
     "threat_landscape": [
-        "Write a comprehensive threat intelligence brief on {topic} with MITRE ATT&CK mapping, detection strategies, and prioritized mitigations.",
-        "Analyze the full threat landscape around {topic}: actors, TTPs, affected systems, and defense recommendations.",
-        "Produce a threat assessment for {topic} including attack trees, probability estimates, and recommended security controls.",
+        (
+            "Write a comprehensive threat intelligence brief on {topic} with MITRE "
+            "ATT&CK mapping, detection strategies, and prioritized mitigations."
+        ),
+        (
+            "Analyze the full threat landscape around {topic}: actors, TTPs, affected "
+            "systems, and defense recommendations."
+        ),
+        (
+            "Produce a threat assessment for {topic} including attack trees, "
+            "probability estimates, and recommended security controls."
+        ),
     ],
     "architecture_review": [
-        "Design a production architecture for {topic} with component diagrams, data flow, failure modes, and scaling strategy.",
-        "Architect a secure, scalable system for {topic} — cover trust boundaries, data classification, and operational runbooks.",
-        "Create an architectural decision record for {topic} evaluating 3+ approaches with security and performance trade-offs.",
+        (
+            "Design a production architecture for {topic} with component diagrams, "
+            "data flow, failure modes, and scaling strategy."
+        ),
+        (
+            "Architect a secure, scalable system for {topic} — cover trust boundaries, "
+            "data classification, and operational runbooks."
+        ),
+        (
+            "Create an architectural decision record for {topic} evaluating 3+ "
+            "approaches with security and performance trade-offs."
+        ),
     ],
     "security_audit_patterns": [
-        "Conduct a security audit analysis of {topic}: attack surfaces, vulnerability categories, remediation priorities, and testing strategy.",
-        "Enumerate the attack surface of {topic} and propose a layered defense strategy with detection and response procedures.",
-        "Perform a systematic security review of {topic} covering injection, auth, crypto, config, and supply chain risks.",
+        (
+            "Conduct a security audit analysis of {topic}: attack surfaces, "
+            "vulnerability categories, remediation priorities, and testing strategy."
+        ),
+        (
+            "Enumerate the attack surface of {topic} and propose a layered defense "
+            "strategy with detection and response procedures."
+        ),
+        (
+            "Perform a systematic security review of {topic} covering injection, "
+            "auth, crypto, config, and supply chain risks."
+        ),
     ],
     "multi_step_reasoning": [
-        "Walk through {topic} step-by-step, showing your reasoning at each stage with edge cases and alternatives.",
-        "Solve {topic} methodically: state assumptions, derive the approach, analyze complexity, and verify correctness.",
-        "Apply first-principles reasoning to {topic} — decompose the problem, evaluate approaches, and construct a rigorous solution.",
+        (
+            "Walk through {topic} step-by-step, showing your reasoning at each stage "
+            "with edge cases and alternatives."
+        ),
+        (
+            "Solve {topic} methodically: state assumptions, derive the approach, "
+            "analyze complexity, and verify correctness."
+        ),
+        (
+            "Apply first-principles reasoning to {topic} — decompose the problem, "
+            "evaluate approaches, and construct a rigorous solution."
+        ),
     ],
 }
 

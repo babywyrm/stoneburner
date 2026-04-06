@@ -1,17 +1,17 @@
 """Tests for task catalog, weighted selection, tier filtering, and randomization."""
 
-from atomics.models import BurnTier, TaskCategory, TaskComplexity, TIER_COMPLEXITY_MAP
+from atomics.models import TIER_COMPLEXITY_MAP, BurnTier, TaskCategory, TaskComplexity
 from atomics.tasks.catalog import (
     PHRASING_VARIANTS,
     TASK_CATALOG,
     get_weighted_task,
 )
-from atomics.tasks.topics import CROSS_POLLINATION_TOPICS, TOPIC_POOLS
 from atomics.tasks.randomizer import (
     RecencyTracker,
     build_combinatoric_prompt,
     build_modified_prompt,
 )
+from atomics.tasks.topics import CROSS_POLLINATION_TOPICS, TOPIC_POOLS
 
 
 def test_catalog_is_populated():
@@ -27,7 +27,8 @@ def test_every_category_has_tasks():
 def test_every_category_has_topics():
     for cat in TaskCategory:
         assert cat in TOPIC_POOLS, f"No topics for category {cat}"
-        assert len(TOPIC_POOLS[cat]) >= 30, f"Category {cat} has too few topics ({len(TOPIC_POOLS[cat])})"
+        topic_count = len(TOPIC_POOLS[cat])
+        assert topic_count >= 30, f"Category {cat} has too few topics ({topic_count})"
 
 
 def test_get_weighted_task_returns_valid():
@@ -63,6 +64,7 @@ def test_cross_pollination_topics_populated():
 
 
 # ── Tier filtering tests ─────────────────────────────────
+
 
 def test_ez_tier_only_gets_light_tasks():
     for _ in range(100):
@@ -100,6 +102,7 @@ def test_tier_complexity_map_covers_all_tiers():
 
 # ── Randomization tests ──────────────────────────────────
 
+
 def test_prompts_vary_across_calls():
     """Same tier should produce diverse prompts."""
     prompts = set()
@@ -131,14 +134,18 @@ def test_recency_tracker_window_eviction():
 def test_build_modified_prompt_adds_content():
     base = "Explain TLS 1.3"
     modified = build_modified_prompt(
-        base, add_audience=True, add_constraint=True,
-        add_format=True, add_perspective=True,
+        base,
+        add_audience=True,
+        add_constraint=True,
+        add_format=True,
+        add_perspective=True,
     )
     assert modified.startswith(base)
     # With all flags on, at least sometimes it should be longer
     results = [
-        build_modified_prompt(base, add_audience=True, add_constraint=True,
-                              add_format=True, add_perspective=True)
+        build_modified_prompt(
+            base, add_audience=True, add_constraint=True, add_format=True, add_perspective=True
+        )
         for _ in range(20)
     ]
     longer_count = sum(1 for r in results if len(r) > len(base))

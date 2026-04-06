@@ -2,9 +2,9 @@
 
 import pytest
 
+from atomics.core.runner import execute_task
 from atomics.models import TaskCategory, TaskComplexity, TaskDefinition, TaskStatus
 from atomics.providers.base import BaseProvider, ProviderResponse
-from atomics.core.runner import execute_task
 
 
 class MockProvider(BaseProvider):

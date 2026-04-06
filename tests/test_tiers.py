@@ -33,7 +33,9 @@ def test_mega_has_highest_throughput():
     baseline = get_tier_profile(BurnTier.BASELINE)
     mega = get_tier_profile(BurnTier.MEGA)
     assert mega.max_tokens_per_hour > baseline.max_tokens_per_hour > ez.max_tokens_per_hour
-    assert mega.max_requests_per_minute > baseline.max_requests_per_minute > ez.max_requests_per_minute
+    assert (
+        mega.max_requests_per_minute > baseline.max_requests_per_minute > ez.max_requests_per_minute
+    )
 
 
 def test_ez_prefers_haiku():

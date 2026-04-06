@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from atomics.models import TaskCategory, TaskDefinition, TaskResult, TaskStatus
+from atomics.models import TaskDefinition, TaskResult, TaskStatus
 from atomics.providers.base import BaseProvider
 
 logger = logging.getLogger("atomics.runner")
@@ -54,7 +54,12 @@ async def execute_task(
         result.status = TaskStatus.FAILED
         result.error_class = type(exc).__name__
         result.error_message = str(exc)[:500]
-        logger.warning("Task %s failed: %s — %s", task.name, result.error_class, result.error_message)
+        logger.warning(
+            "Task %s failed: %s — %s",
+            task.name,
+            result.error_class,
+            result.error_message,
+        )
 
-    result.completed_at = datetime.now(timezone.utc)
+    result.completed_at = datetime.now(UTC)
     return result

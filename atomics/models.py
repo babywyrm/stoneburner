@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
-from enum import Enum
+from datetime import UTC, datetime
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
 
-class TaskStatus(str, Enum):
+class TaskStatus(StrEnum):
     PENDING = "pending"
     RUNNING = "running"
     SUCCESS = "success"
@@ -17,7 +17,7 @@ class TaskStatus(str, Enum):
     SKIPPED = "skipped"
 
 
-class TaskCategory(str, Enum):
+class TaskCategory(StrEnum):
     WEB_SUMMARY = "web_summary"
     RESEARCH = "research"
     SECURITY_NEWS = "security_news"
@@ -25,13 +25,13 @@ class TaskCategory(str, Enum):
     GENERAL_QA = "general_qa"
 
 
-class BurnTier(str, Enum):
+class BurnTier(StrEnum):
     EZ = "ez"
     BASELINE = "baseline"
     MEGA = "mega"
 
 
-class TaskComplexity(str, Enum):
+class TaskComplexity(StrEnum):
     LIGHT = "light"
     MODERATE = "moderate"
     HEAVY = "heavy"
@@ -71,7 +71,7 @@ class TaskResult(BaseModel):
     estimated_cost_usd: float = 0.0
     error_class: str = ""
     error_message: str = ""
-    started_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    started_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     completed_at: datetime | None = None
 
 

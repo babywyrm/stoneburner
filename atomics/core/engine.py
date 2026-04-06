@@ -38,9 +38,17 @@ class LoopEngine:
         self._settings = settings
         self._tier = tier
         self._profile: TierProfile = get_tier_profile(tier)
-        self._interval = interval_override if interval_override is not None else self._profile.loop_interval_seconds
-        self._jitter = min(self._profile.loop_jitter_seconds, self._interval // 2) if self._interval > 0 else 0
-        self._budget = budget_override if budget_override is not None else self._profile.budget_limit_usd
+        self._interval = (
+            interval_override
+            if interval_override is not None
+            else self._profile.loop_interval_seconds
+        )
+        self._jitter = (
+            min(self._profile.loop_jitter_seconds, self._interval // 2) if self._interval > 0 else 0
+        )
+        self._budget = (
+            budget_override if budget_override is not None else self._profile.budget_limit_usd
+        )
 
         self._guard = RateBudgetGuard(
             GuardConfig(
@@ -96,7 +104,7 @@ class LoopEngine:
                 try:
                     await asyncio.wait_for(self._shutdown.wait(), timeout=wait)
                     break
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     continue
 
             task_def, topic = get_weighted_task(self._tier)
@@ -137,7 +145,7 @@ class LoopEngine:
                 try:
                     await asyncio.wait_for(self._shutdown.wait(), timeout=interval)
                     break
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     pass
             else:
                 await asyncio.sleep(0)

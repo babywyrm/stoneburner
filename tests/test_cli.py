@@ -1,5 +1,7 @@
 """Tests for CLI commands (non-network)."""
 
+from types import SimpleNamespace
+
 from click.testing import CliRunner
 
 from atomics.cli import cli
@@ -64,3 +66,138 @@ def test_cli_report(tmp_path):
     result = runner.invoke(cli, ["report"])
     assert result.exit_code == 0
     assert "No runs" in result.output
+
+
+def test_cli_schedule_install_and_uninstall(monkeypatch):
+    runner = CliRunner()
+
+    monkeypatch.setattr(
+        "atomics.scheduler.cron.install_crontab", lambda _: "Crontab entry installed"
+    )
+    monkeypatch.setattr(
+        "atomics.scheduler.cron.uninstall_crontab",
+        lambda: "Atomics crontab entries removed",
+    )
+
+    install = runner.invoke(
+        cli,
+        ["schedule", "--format", "crontab", "--install", "--tier", "ez"],
+    )
+    assert install.exit_code == 0
+    assert "installed" in install.output.lower()
+
+    uninstall = runner.invoke(
+        cli,
+        ["schedule", "--format", "crontab", "--uninstall", "--tier", "ez"],
+    )
+    assert uninstall.exit_code == 0
+    assert "removed" in uninstall.output.lower()
+
+
+def test_cli_run_with_mocked_claude(monkeypatch, tmp_path):
+    runner = CliRunner(
+        env={
+            "ANTHROPIC_API_KEY": "fake",
+            "ATOMICS_DB_PATH": str(tmp_path / "db.sqlite"),
+        }
+    )
+    calls = {"ran": False}
+
+    class DummyEngine:
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+
+        async def run(self, max_iterations=None):
+            calls["ran"] = True
+            calls["max_iterations"] = max_iterations
+
+    class DummyRepo:
+        def __init__(self, _):
+            pass
+
+        def close(self):
+            pass
+
+    class DummyClaude:
+        def __init__(self, api_key, default_model):
+            self.api_key = api_key
+            self.default_model = default_model
+            self.name = "claude"
+
+    monkeypatch.setattr("atomics.core.engine.LoopEngine", DummyEngine)
+    monkeypatch.setattr("atomics.storage.repository.MetricsRepository", DummyRepo)
+    monkeypatch.setattr("atomics.providers.claude.ClaudeProvider", DummyClaude)
+
+    result = runner.invoke(
+        cli,
+        ["run", "--tier", "ez", "--provider", "claude", "-n", "2", "-i", "1"],
+    )
+    assert result.exit_code == 0
+    assert calls["ran"] is True
+    assert calls["max_iterations"] == 2
+
+
+def test_cli_run_with_mocked_bedrock(monkeypatch, tmp_path):
+    runner = CliRunner(env={"ATOMICS_DB_PATH": str(tmp_path / "db.sqlite")})
+    calls = {"ran": False}
+
+    class DummyEngine:
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+
+        async def run(self, max_iterations=None):
+            calls["ran"] = True
+
+    class DummyRepo:
+        def __init__(self, _):
+            pass
+
+        def close(self):
+            pass
+
+    class DummyBedrock:
+        name = "bedrock"
+
+        def __init__(self, region, model_id):
+            self.region = region
+            self.model_id = model_id
+
+    monkeypatch.setattr("atomics.core.engine.LoopEngine", DummyEngine)
+    monkeypatch.setattr("atomics.storage.repository.MetricsRepository", DummyRepo)
+    monkeypatch.setattr("atomics.providers.bedrock.BedrockProvider", DummyBedrock)
+
+    result = runner.invoke(
+        cli,
+        ["run", "--provider", "bedrock", "--region", "us-east-1", "-n", "1"],
+    )
+    assert result.exit_code == 0
+    assert calls["ran"] is True
+
+
+def test_cli_provider_test_success(monkeypatch):
+    runner = CliRunner(env={"ANTHROPIC_API_KEY": "fake"})
+
+    class DummyProvider:
+        name = "claude"
+
+        def __init__(self, api_key, default_model):
+            self.api_key = api_key
+            self.default_model = default_model
+
+        async def health_check(self):
+            return True
+
+        async def generate(self, *_args, **_kwargs):
+            return SimpleNamespace(
+                text="4",
+                input_tokens=1,
+                output_tokens=1,
+                total_tokens=2,
+                latency_ms=1.0,
+                estimated_cost_usd=0.0,
+            )
+
+    monkeypatch.setattr("atomics.providers.claude.ClaudeProvider", DummyProvider)
+    result = runner.invoke(cli, ["provider-test"])
+    assert result.exit_code == 0
+    assert "passed" in result.output.lower()

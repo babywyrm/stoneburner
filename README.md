@@ -58,7 +58,7 @@ stoneburner/
 │   ├── cli.py            # Click CLI entry point
 │   └── reporting.py      # Rich table trend reports
 ├── configs/              # Rate/budget profiles (default, aggressive, conservative)
-├── tests/                # 63 tests at 73% coverage
+├── tests/                # 89 tests at 93% coverage
 └── workers/npm/          # Optional Node.js workers (Phase 3)
 ```
 

@@ -1,7 +1,7 @@
 """Tests for the reporting module."""
 
 import tempfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from atomics.models import TaskCategory, TaskResult, TaskStatus
@@ -26,8 +26,8 @@ def _seeded_repo() -> MetricsRepository:
             total_tokens=50 + 100 * (i + 1),
             latency_ms=500.0 + i * 100,
             estimated_cost_usd=0.01 * (i + 1),
-            started_at=datetime.now(timezone.utc),
-            completed_at=datetime.now(timezone.utc),
+            started_at=datetime.now(UTC),
+            completed_at=datetime.now(UTC),
         )
         repo.save_task_result(result)
     repo.complete_run("rpt-001")

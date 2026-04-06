@@ -1,12 +1,16 @@
 """Tests for the rate/budget guard."""
 
-import time
-
 from atomics.core.guard import GuardConfig, RateBudgetGuard
 
 
 def test_guard_allows_when_under_limits():
-    guard = RateBudgetGuard(GuardConfig(max_requests_per_minute=10, max_tokens_per_hour=10000, budget_limit_usd=100.0))
+    guard = RateBudgetGuard(
+        GuardConfig(
+            max_requests_per_minute=10,
+            max_tokens_per_hour=10000,
+            budget_limit_usd=100.0,
+        )
+    )
     allowed, reason = guard.can_proceed()
     assert allowed is True
     assert reason == "ok"

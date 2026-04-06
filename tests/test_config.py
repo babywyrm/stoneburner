@@ -1,7 +1,5 @@
 """Tests for configuration loading."""
 
-import os
-
 from atomics.config import AtomicsSettings, load_settings
 
 

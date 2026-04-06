@@ -1,7 +1,7 @@
 """Tests for the SQLite metrics storage layer."""
 
 import tempfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from atomics.models import TaskCategory, TaskResult, TaskStatus
@@ -38,8 +38,8 @@ def test_save_and_query_task_result():
         total_tokens=150,
         latency_ms=500.0,
         estimated_cost_usd=0.001,
-        started_at=datetime.now(timezone.utc),
-        completed_at=datetime.now(timezone.utc),
+        started_at=datetime.now(UTC),
+        completed_at=datetime.now(UTC),
     )
     repo.save_task_result(result)
 
@@ -59,7 +59,8 @@ def test_usage_by_category():
     repo = _tmp_repo()
     repo.create_run("run-003")
 
-    for i, cat in enumerate([TaskCategory.RESEARCH, TaskCategory.RESEARCH, TaskCategory.SECURITY_NEWS]):
+    categories = [TaskCategory.RESEARCH, TaskCategory.RESEARCH, TaskCategory.SECURITY_NEWS]
+    for i, cat in enumerate(categories):
         result = TaskResult(
             task_id=f"t{i}",
             run_id="run-003",
@@ -70,8 +71,8 @@ def test_usage_by_category():
             status=TaskStatus.SUCCESS,
             total_tokens=100 * (i + 1),
             estimated_cost_usd=0.001 * (i + 1),
-            started_at=datetime.now(timezone.utc),
-            completed_at=datetime.now(timezone.utc),
+            started_at=datetime.now(UTC),
+            completed_at=datetime.now(UTC),
         )
         repo.save_task_result(result)
 

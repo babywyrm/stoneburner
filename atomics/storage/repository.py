@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-import sqlite3
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from atomics.models import RunSummary, TaskResult, TaskStatus
@@ -20,7 +19,7 @@ class MetricsRepository:
     # ── Runs ──────────────────────────────────────────────
 
     def create_run(self, run_id: str) -> None:
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         self._conn.execute(
             "INSERT INTO runs (run_id, started_at) VALUES (?, ?)",
             (run_id, now),
@@ -28,7 +27,7 @@ class MetricsRepository:
         self._conn.commit()
 
     def complete_run(self, run_id: str) -> RunSummary:
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         rows = self._conn.execute(
             """
             SELECT

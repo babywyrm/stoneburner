@@ -1,4 +1,4 @@
-"""Cron integration helpers — generate and install crontab entries, systemd timers, launchd plists."""
+"""Helpers to generate crontab, systemd timer, and launchd plist entries."""
 
 from __future__ import annotations
 
@@ -6,7 +6,6 @@ import platform
 import shutil
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
 
 
@@ -106,39 +105,33 @@ def generate_launchd_plist(
 # ── Installation helpers ──────────────────────────────────
 
 
-def install_crontab(entry: str) -> str:
+def install_crontab(entry: str, *, run_cmd=subprocess.run) -> str:
     """Append an atomics crontab entry, avoiding duplicates."""
-    result = subprocess.run(["crontab", "-l"], capture_output=True, text=True)
+    result = run_cmd(["crontab", "-l"], capture_output=True, text=True)
     existing = result.stdout if result.returncode == 0 else ""
 
     marker = "# atomics-managed"
-    clean_lines = [
-        line for line in existing.splitlines() if marker not in line
-    ]
+    clean_lines = [line for line in existing.splitlines() if marker not in line]
     clean_lines.append(f"{entry}  {marker}")
     new_crontab = "\n".join(clean_lines) + "\n"
 
-    proc = subprocess.run(
-        ["crontab", "-"], input=new_crontab, capture_output=True, text=True
-    )
+    proc = run_cmd(["crontab", "-"], input=new_crontab, capture_output=True, text=True)
     if proc.returncode != 0:
         raise RuntimeError(f"Failed to install crontab: {proc.stderr}")
     return "Crontab entry installed"
 
 
-def uninstall_crontab() -> str:
+def uninstall_crontab(*, run_cmd=subprocess.run) -> str:
     """Remove all atomics-managed crontab entries."""
-    result = subprocess.run(["crontab", "-l"], capture_output=True, text=True)
+    result = run_cmd(["crontab", "-l"], capture_output=True, text=True)
     if result.returncode != 0:
         return "No crontab found"
 
     marker = "# atomics-managed"
-    clean_lines = [
-        line for line in result.stdout.splitlines() if marker not in line
-    ]
+    clean_lines = [line for line in result.stdout.splitlines() if marker not in line]
     new_crontab = "\n".join(clean_lines) + "\n"
 
-    subprocess.run(["crontab", "-"], input=new_crontab, capture_output=True, text=True)
+    run_cmd(["crontab", "-"], input=new_crontab, capture_output=True, text=True)
     return "Atomics crontab entries removed"
 
 
@@ -146,21 +139,26 @@ def install_launchd(
     plist_content: str,
     label: str = "com.babywyrm.atomics",
     tier: str = "baseline",
+    *,
+    run_cmd=subprocess.run,
+    home_dir: Path | None = None,
 ) -> str:
     """Write plist and load it via launchctl."""
-    plist_dir = Path.home() / "Library" / "LaunchAgents"
+    home = home_dir or Path.home()
+    plist_dir = home / "Library" / "LaunchAgents"
     plist_dir.mkdir(parents=True, exist_ok=True)
     plist_path = plist_dir / f"{label}.{tier}.plist"
 
-    subprocess.run(
+    run_cmd(
         ["launchctl", "unload", str(plist_path)],
         capture_output=True,
     )
 
     plist_path.write_text(plist_content)
-    proc = subprocess.run(
+    proc = run_cmd(
         ["launchctl", "load", str(plist_path)],
-        capture_output=True, text=True,
+        capture_output=True,
+        text=True,
     )
     if proc.returncode != 0:
         raise RuntimeError(f"Failed to load launchd plist: {proc.stderr}")
@@ -170,13 +168,17 @@ def install_launchd(
 def uninstall_launchd(
     label: str = "com.babywyrm.atomics",
     tier: str = "baseline",
+    *,
+    run_cmd=subprocess.run,
+    home_dir: Path | None = None,
 ) -> str:
     """Unload and remove launchd plist."""
-    plist_path = Path.home() / "Library" / "LaunchAgents" / f"{label}.{tier}.plist"
+    home = home_dir or Path.home()
+    plist_path = home / "Library" / "LaunchAgents" / f"{label}.{tier}.plist"
     if not plist_path.exists():
         return f"No plist found at {plist_path}"
 
-    subprocess.run(["launchctl", "unload", str(plist_path)], capture_output=True)
+    run_cmd(["launchctl", "unload", str(plist_path)], capture_output=True)
     plist_path.unlink()
     return f"LaunchAgent removed: {plist_path}"
 
@@ -185,9 +187,13 @@ def install_systemd(
     service_content: str,
     timer_content: str,
     tier: str = "baseline",
+    *,
+    run_cmd=subprocess.run,
+    home_dir: Path | None = None,
 ) -> str:
     """Write systemd user units and enable the timer."""
-    unit_dir = Path.home() / ".config" / "systemd" / "user"
+    home = home_dir or Path.home()
+    unit_dir = home / ".config" / "systemd" / "user"
     unit_dir.mkdir(parents=True, exist_ok=True)
 
     service_path = unit_dir / f"atomics-{tier}.service"
@@ -195,35 +201,42 @@ def install_systemd(
     service_path.write_text(service_content)
     timer_path.write_text(timer_content)
 
-    subprocess.run(["systemctl", "--user", "daemon-reload"], capture_output=True)
-    proc = subprocess.run(
+    run_cmd(["systemctl", "--user", "daemon-reload"], capture_output=True)
+    proc = run_cmd(
         ["systemctl", "--user", "enable", "--now", f"atomics-{tier}.timer"],
-        capture_output=True, text=True,
+        capture_output=True,
+        text=True,
     )
     if proc.returncode != 0:
         raise RuntimeError(f"Failed to enable systemd timer: {proc.stderr}")
     return f"Systemd timer enabled: atomics-{tier}.timer"
 
 
-def uninstall_systemd(tier: str = "baseline") -> str:
+def uninstall_systemd(
+    tier: str = "baseline",
+    *,
+    run_cmd=subprocess.run,
+    home_dir: Path | None = None,
+) -> str:
     """Disable and remove systemd user units."""
-    subprocess.run(
+    run_cmd(
         ["systemctl", "--user", "disable", "--now", f"atomics-{tier}.timer"],
         capture_output=True,
     )
-    unit_dir = Path.home() / ".config" / "systemd" / "user"
+    home = home_dir or Path.home()
+    unit_dir = home / ".config" / "systemd" / "user"
     for suffix in (".service", ".timer"):
         path = unit_dir / f"atomics-{tier}{suffix}"
         if path.exists():
             path.unlink()
-    subprocess.run(["systemctl", "--user", "daemon-reload"], capture_output=True)
+    run_cmd(["systemctl", "--user", "daemon-reload"], capture_output=True)
     return f"Systemd units removed: atomics-{tier}"
 
 
-def detect_best_scheduler() -> str:
+def detect_best_scheduler(*, system_name=platform.system, which=shutil.which) -> str:
     """Auto-detect the best scheduler for this platform."""
-    if platform.system() == "Darwin":
+    if system_name() == "Darwin":
         return "launchd"
-    if shutil.which("systemctl"):
+    if which("systemctl"):
         return "systemd"
     return "crontab"

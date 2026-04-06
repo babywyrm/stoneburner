@@ -6,7 +6,6 @@ Auth: uses standard AWS credential chain (env vars, ~/.aws/credentials, IAM role
 
 from __future__ import annotations
 
-import json
 import time
 
 from atomics.providers.base import BaseProvider, ProviderResponse
@@ -33,16 +32,20 @@ class BedrockProvider(BaseProvider):
         self,
         region: str = "us-east-1",
         model_id: str = "anthropic.claude-3-5-sonnet-20241022-v2:0",
+        *,
+        client: object | None = None,
     ) -> None:
-        try:
-            import boto3
-        except ImportError as exc:
-            raise ImportError(
-                "boto3 is required for the Bedrock provider. "
-                "Install with: uv sync --extra bedrock"
-            ) from exc
-
-        self._client = boto3.client("bedrock-runtime", region_name=region)
+        if client is not None:
+            self._client = client
+        else:
+            try:
+                import boto3
+            except ImportError as exc:
+                raise ImportError(
+                    "boto3 is required for the Bedrock provider. "
+                    "Install with: uv sync --extra bedrock"
+                ) from exc
+            self._client = boto3.client("bedrock-runtime", region_name=region)
         self._model_id = model_id
         self._region = region
 
@@ -90,9 +93,7 @@ class BedrockProvider(BaseProvider):
             raw=response,
         )
 
-    def _converse(
-        self, prompt: str, *, system: str, model_id: str, max_tokens: int
-    ) -> dict:
+    def _converse(self, prompt: str, *, system: str, model_id: str, max_tokens: int) -> dict:
         kwargs: dict = {
             "modelId": model_id,
             "messages": [{"role": "user", "content": [{"text": prompt}]}],

@@ -29,8 +29,14 @@ def _estimate_cost(model: str, input_tokens: int, output_tokens: int) -> float:
 
 
 class ClaudeProvider(BaseProvider):
-    def __init__(self, api_key: str, default_model: str = "claude-sonnet-4-20250514") -> None:
-        self._client = anthropic.AsyncAnthropic(api_key=api_key)
+    def __init__(
+        self,
+        api_key: str,
+        default_model: str = "claude-sonnet-4-20250514",
+        *,
+        client: object | None = None,
+    ) -> None:
+        self._client = client or anthropic.AsyncAnthropic(api_key=api_key)
         self._default_model = default_model
 
     @property

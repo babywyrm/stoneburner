@@ -37,9 +37,28 @@ PROVIDER_CHOICES = click.Choice(["claude", "bedrock"], case_sensitive=False)
 
 
 @cli.command()
-@click.option("--tier", "-t", type=TIER_CHOICES, default="baseline", help="Burn tier (ez/baseline/mega)")
-@click.option("--provider", "-p", "provider_name", type=PROVIDER_CHOICES, default="claude", help="LLM provider")
-@click.option("--max-iterations", "-n", type=int, default=None, help="Stop after N tasks (omit for continuous)")
+@click.option(
+    "--tier",
+    "-t",
+    type=TIER_CHOICES,
+    default="baseline",
+    help="Burn tier (ez/baseline/mega)",
+)
+@click.option(
+    "--provider",
+    "-p",
+    "provider_name",
+    type=PROVIDER_CHOICES,
+    default="claude",
+    help="LLM provider",
+)
+@click.option(
+    "--max-iterations",
+    "-n",
+    type=int,
+    default=None,
+    help="Stop after N tasks (omit for continuous)",
+)
 @click.option("--model", "-m", type=str, default=None, help="Override default model")
 @click.option("--budget", "-b", type=float, default=None, help="Override budget limit (USD)")
 @click.option("--interval", "-i", type=int, default=None, help="Override loop interval (seconds)")
@@ -139,7 +158,11 @@ def provider_test(model: str | None) -> None:
     )
 
     async def _test() -> None:
-        console.print(f"Testing provider [cyan]{provider.name}[/cyan] with model [cyan]{model or settings.default_model}[/cyan]...")
+        model_label = model or settings.default_model
+        console.print(
+            f"Testing provider [cyan]{provider.name}[/cyan] with model "
+            f"[cyan]{model_label}[/cyan]..."
+        )
         ok = await provider.health_check()
         if ok:
             console.print("[green]Provider health check passed.[/green]")
@@ -153,7 +176,9 @@ def provider_test(model: str | None) -> None:
             max_tokens=32,
         )
         console.print(f"Response: {resp.text.strip()}")
-        console.print(f"Tokens: in={resp.input_tokens} out={resp.output_tokens} total={resp.total_tokens}")
+        console.print(
+            f"Tokens: in={resp.input_tokens} out={resp.output_tokens} total={resp.total_tokens}"
+        )
         console.print(f"Latency: {resp.latency_ms:.0f}ms")
         console.print(f"Cost: ${resp.estimated_cost_usd:.6f}")
 
@@ -164,10 +189,22 @@ def provider_test(model: str | None) -> None:
 @click.option("--tier", "-t", type=TIER_CHOICES, default="baseline", help="Burn tier")
 @click.option("--interval", "-i", type=int, default=30, help="Minutes between runs")
 @click.option("--max-iterations", "-n", type=int, default=10, help="Tasks per scheduled run")
-@click.option("--format", "fmt", type=click.Choice(["crontab", "systemd", "launchd", "auto"]), default="auto")
+@click.option(
+    "--format",
+    "fmt",
+    type=click.Choice(["crontab", "systemd", "launchd", "auto"]),
+    default="auto",
+)
 @click.option("--install", is_flag=True, help="Install the schedule on this system")
 @click.option("--uninstall", is_flag=True, help="Remove installed atomics schedule")
-def schedule(tier: str, interval: int, max_iterations: int, fmt: str, install: bool, uninstall: bool) -> None:
+def schedule(
+    tier: str,
+    interval: int,
+    max_iterations: int,
+    fmt: str,
+    install: bool,
+    uninstall: bool,
+) -> None:
     """Generate or install scheduler config (crontab, systemd timer, or launchd plist)."""
     from atomics.scheduler.cron import (
         detect_best_scheduler,
@@ -224,7 +261,9 @@ def schedule(tier: str, interval: int, max_iterations: int, fmt: str, install: b
             msg = install_launchd(plist, tier=tier)
             console.print(f"[green]{msg}[/green]")
         else:
-            console.print("[bold]Save to ~/Library/LaunchAgents/com.babywyrm.atomics.plist:[/bold]\n")
+            console.print(
+                "[bold]Save to ~/Library/LaunchAgents/com.babywyrm.atomics.plist:[/bold]\n"
+            )
             console.print(plist)
 
 

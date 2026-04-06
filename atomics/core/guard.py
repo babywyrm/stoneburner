@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import time
 from collections import deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 @dataclass
@@ -39,7 +39,11 @@ class RateBudgetGuard:
             return False, f"circuit breaker open ({self._consecutive_errors} consecutive errors)"
 
         if self._total_cost >= self._config.budget_limit_usd:
-            return False, f"budget exhausted (${self._total_cost:.2f} >= ${self._config.budget_limit_usd:.2f})"
+            return (
+                False,
+                f"budget exhausted (${self._total_cost:.2f} >= "
+                f"${self._config.budget_limit_usd:.2f})",
+            )
 
         now = time.monotonic()
         self._prune_timestamps(now)

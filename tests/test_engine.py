@@ -1,5 +1,8 @@
 """Tests for the loop engine using a mock provider."""
 
+import tempfile
+from pathlib import Path
+
 import pytest
 
 from atomics.config import AtomicsSettings
@@ -7,9 +10,6 @@ from atomics.core.engine import LoopEngine
 from atomics.models import BurnTier
 from atomics.providers.base import BaseProvider, ProviderResponse
 from atomics.storage.repository import MetricsRepository
-
-import tempfile
-from pathlib import Path
 
 
 class MockProvider(BaseProvider):
