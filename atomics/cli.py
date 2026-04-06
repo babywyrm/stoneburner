@@ -164,31 +164,68 @@ def provider_test(model: str | None) -> None:
 @click.option("--tier", "-t", type=TIER_CHOICES, default="baseline", help="Burn tier")
 @click.option("--interval", "-i", type=int, default=30, help="Minutes between runs")
 @click.option("--max-iterations", "-n", type=int, default=10, help="Tasks per scheduled run")
-@click.option("--format", "fmt", type=click.Choice(["crontab", "systemd", "launchd"]), default="crontab")
-def schedule(tier: str, interval: int, max_iterations: int, fmt: str) -> None:
-    """Generate scheduler config (crontab, systemd timer, or launchd plist)."""
+@click.option("--format", "fmt", type=click.Choice(["crontab", "systemd", "launchd", "auto"]), default="auto")
+@click.option("--install", is_flag=True, help="Install the schedule on this system")
+@click.option("--uninstall", is_flag=True, help="Remove installed atomics schedule")
+def schedule(tier: str, interval: int, max_iterations: int, fmt: str, install: bool, uninstall: bool) -> None:
+    """Generate or install scheduler config (crontab, systemd timer, or launchd plist)."""
     from atomics.scheduler.cron import (
+        detect_best_scheduler,
         generate_crontab_entry,
         generate_launchd_plist,
         generate_systemd_timer,
+        install_crontab,
+        install_launchd,
+        install_systemd,
+        uninstall_crontab,
+        uninstall_launchd,
+        uninstall_systemd,
     )
 
     console = Console()
 
+    if fmt == "auto":
+        fmt = detect_best_scheduler()
+        console.print(f"[dim]Auto-detected scheduler: {fmt}[/dim]")
+
+    if uninstall:
+        if fmt == "crontab":
+            msg = uninstall_crontab()
+        elif fmt == "systemd":
+            msg = uninstall_systemd(tier=tier)
+        elif fmt == "launchd":
+            msg = uninstall_launchd(tier=tier)
+        else:
+            msg = "Unknown format"
+        console.print(f"[green]{msg}[/green]")
+        return
+
     if fmt == "crontab":
         entry = generate_crontab_entry(interval, max_iterations, tier=tier)
-        console.print("[bold]Add this to your crontab (crontab -e):[/bold]\n")
-        console.print(entry)
+        if install:
+            msg = install_crontab(entry)
+            console.print(f"[green]{msg}[/green]")
+        else:
+            console.print("[bold]Add this to your crontab (crontab -e):[/bold]\n")
+            console.print(entry)
     elif fmt == "systemd":
         service, timer = generate_systemd_timer(interval, max_iterations, tier=tier)
-        console.print("[bold]atomics.service:[/bold]")
-        console.print(service)
-        console.print("[bold]atomics.timer:[/bold]")
-        console.print(timer)
+        if install:
+            msg = install_systemd(service, timer, tier=tier)
+            console.print(f"[green]{msg}[/green]")
+        else:
+            console.print("[bold]atomics.service:[/bold]")
+            console.print(service)
+            console.print("[bold]atomics.timer:[/bold]")
+            console.print(timer)
     elif fmt == "launchd":
         plist = generate_launchd_plist(interval, max_iterations, tier=tier)
-        console.print("[bold]Save to ~/Library/LaunchAgents/com.babywyrm.atomics.plist:[/bold]\n")
-        console.print(plist)
+        if install:
+            msg = install_launchd(plist, tier=tier)
+            console.print(f"[green]{msg}[/green]")
+        else:
+            console.print("[bold]Save to ~/Library/LaunchAgents/com.babywyrm.atomics.plist:[/bold]\n")
+            console.print(plist)
 
 
 @cli.command("tiers")

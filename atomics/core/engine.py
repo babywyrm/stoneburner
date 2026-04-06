@@ -38,8 +38,8 @@ class LoopEngine:
         self._settings = settings
         self._tier = tier
         self._profile: TierProfile = get_tier_profile(tier)
-        self._interval = interval_override or self._profile.loop_interval_seconds
-        self._jitter = self._profile.loop_jitter_seconds
+        self._interval = interval_override if interval_override is not None else self._profile.loop_interval_seconds
+        self._jitter = min(self._profile.loop_jitter_seconds, self._interval // 2) if self._interval > 0 else 0
         self._budget = budget_override if budget_override is not None else self._profile.budget_limit_usd
 
         self._guard = RateBudgetGuard(
@@ -88,8 +88,8 @@ class LoopEngine:
 
             allowed, reason = self._guard.can_proceed()
             if not allowed:
-                if self._guard.circuit_open:
-                    logger.error("Circuit breaker open: %s — stopping run.", reason)
+                if self._guard.circuit_open or "budget" in reason:
+                    logger.error("Stopping run: %s", reason)
                     break
                 wait = max(self._guard.seconds_until_allowed(), 5.0)
                 logger.info("Guard blocked: %s — waiting %.1fs", reason, wait)
@@ -132,12 +132,15 @@ class LoopEngine:
                 -self._jitter,
                 self._jitter,
             )
-            interval = max(1.0, interval)
-            try:
-                await asyncio.wait_for(self._shutdown.wait(), timeout=interval)
-                break
-            except asyncio.TimeoutError:
-                pass
+            interval = max(0.0, interval)
+            if interval > 0:
+                try:
+                    await asyncio.wait_for(self._shutdown.wait(), timeout=interval)
+                    break
+                except asyncio.TimeoutError:
+                    pass
+            else:
+                await asyncio.sleep(0)
 
         summary = self._repo.complete_run(self._run_id)
         logger.info(
