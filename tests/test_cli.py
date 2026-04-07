@@ -2,6 +2,7 @@
 
 from types import SimpleNamespace
 
+import pytest
 from click.testing import CliRunner
 
 from atomics.cli import cli
@@ -172,6 +173,54 @@ def test_cli_run_with_mocked_bedrock(monkeypatch, tmp_path):
     )
     assert result.exit_code == 0
     assert calls["ran"] is True
+
+
+@pytest.mark.unit
+def test_cli_provider_test_missing_api_key():
+    runner = CliRunner(env={"ANTHROPIC_API_KEY": ""})
+    result = runner.invoke(cli, ["provider-test"])
+    assert result.exit_code != 0
+    assert "ANTHROPIC_API_KEY" in result.output
+
+
+@pytest.mark.unit
+def test_cli_run_keyboard_interrupt(monkeypatch, tmp_path):
+    """KeyboardInterrupt during the async loop should print the friendly message."""
+    runner = CliRunner(
+        env={
+            "ANTHROPIC_API_KEY": "fake",
+            "ATOMICS_DB_PATH": str(tmp_path / "db.sqlite"),
+        }
+    )
+
+    class InterruptEngine:
+        def __init__(self, **_kwargs):
+            pass
+
+        async def run(self, max_iterations=None):
+            raise KeyboardInterrupt
+
+    class DummyRepo:
+        def __init__(self, _):
+            pass
+
+        def close(self):
+            pass
+
+    class DummyClaude:
+        name = "claude"
+
+        def __init__(self, api_key, default_model):
+            self.api_key = api_key
+            self.default_model = default_model
+
+    monkeypatch.setattr("atomics.core.engine.LoopEngine", InterruptEngine)
+    monkeypatch.setattr("atomics.storage.repository.MetricsRepository", DummyRepo)
+    monkeypatch.setattr("atomics.providers.claude.ClaudeProvider", DummyClaude)
+
+    result = runner.invoke(cli, ["run", "-n", "1"])
+    assert result.exit_code == 0
+    assert "Interrupted" in result.output
 
 
 def test_cli_provider_test_success(monkeypatch):

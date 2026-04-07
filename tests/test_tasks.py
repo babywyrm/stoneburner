@@ -131,6 +131,23 @@ def test_recency_tracker_window_eviction():
     assert tracker.is_recent("d")
 
 
+def test_recency_tracker_seen_count():
+    tracker = RecencyTracker(window=10)
+    assert tracker.seen_count == 0
+    tracker.record("x")
+    tracker.record("y")
+    assert tracker.seen_count == 2
+
+
+def test_get_weighted_task_fallback_when_catalog_empty_for_tier(monkeypatch):
+    import atomics.tasks.catalog as catalog
+
+    monkeypatch.setattr(catalog, "TIER_COMPLEXITY_MAP", {BurnTier.EZ: ()})
+    task, prompt = get_weighted_task(BurnTier.EZ)
+    assert task.complexity == TaskComplexity.LIGHT
+    assert prompt
+
+
 def test_build_modified_prompt_adds_content():
     base = "Explain TLS 1.3"
     modified = build_modified_prompt(

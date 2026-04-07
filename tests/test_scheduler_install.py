@@ -2,7 +2,21 @@
 
 from types import SimpleNamespace
 
+import pytest
+
 from atomics.scheduler import cron
+
+
+def test_install_crontab_write_failure():
+    def fake_run(cmd, **kwargs):
+        if cmd == ["crontab", "-l"]:
+            return SimpleNamespace(returncode=0, stdout="old\n", stderr="")
+        if cmd == ["crontab", "-"]:
+            return SimpleNamespace(returncode=1, stdout="", stderr="nope")
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    with pytest.raises(RuntimeError, match="Failed to install crontab"):
+        cron.install_crontab("*/5 * * * * echo hi", run_cmd=fake_run)
 
 
 def test_install_crontab():
@@ -68,6 +82,26 @@ def test_install_uninstall_systemd(tmp_path):
 
     remove_msg = cron.uninstall_systemd(tier="mega", run_cmd=fake_run, home_dir=tmp_path)
     assert "removed" in remove_msg.lower()
+
+
+def test_install_launchd_load_failure(tmp_path):
+    def fake_run(cmd, **_kwargs):
+        if cmd[:2] == ["launchctl", "load"]:
+            return SimpleNamespace(returncode=1, stdout="", stderr="load failed")
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    with pytest.raises(RuntimeError, match="Failed to load launchd"):
+        cron.install_launchd("<plist/>", tier="baseline", run_cmd=fake_run, home_dir=tmp_path)
+
+
+def test_install_systemd_enable_failure(tmp_path):
+    def fake_run(cmd, **_kwargs):
+        if "enable" in cmd:
+            return SimpleNamespace(returncode=1, stdout="", stderr="enable failed")
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    with pytest.raises(RuntimeError, match="Failed to enable systemd"):
+        cron.install_systemd("svc", "tmr", tier="ez", run_cmd=fake_run, home_dir=tmp_path)
 
 
 def test_detect_best_scheduler():

@@ -93,3 +93,26 @@ def test_recent_runs():
     runs = repo.get_recent_runs(limit=3)
     assert len(runs) == 3
     repo.close()
+
+
+def test_get_hourly_token_rate_sums_recent_tasks():
+    repo = _tmp_repo()
+    repo.create_run("hourly-run")
+    result = TaskResult(
+        run_id="hourly-run",
+        category=TaskCategory.GENERAL_QA,
+        task_name="t1",
+        provider="claude",
+        model="test",
+        status=TaskStatus.SUCCESS,
+        total_tokens=42,
+        estimated_cost_usd=0.0,
+        started_at=datetime.now(UTC),
+        completed_at=datetime.now(UTC),
+    )
+    repo.save_task_result(result)
+    repo.complete_run("hourly-run")
+
+    rate = repo.get_hourly_token_rate()
+    assert rate == 42.0
+    repo.close()

@@ -42,3 +42,13 @@ select = ["E", "F", "I", "N", "W", "UP"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+markers = [
+    "unit: isolated tests without network or external services",
+    "integration: tests that span multiple subsystems (still local)",
+    "network: tests that hit real network or external APIs (opt-in)",
+]
+addopts = [
+    "--cov=atomics",
+    "--cov-report=term-missing",
+    "--cov-fail-under=90",
+]
