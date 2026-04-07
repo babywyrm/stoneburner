@@ -167,3 +167,23 @@ class MetricsRepository:
             """
         ).fetchone()
         return float(row[0])
+
+    def query_task_results(
+        self,
+        *,
+        since_hours: float | None = None,
+        limit: int | None = None,
+    ) -> list[dict]:
+        """Return task rows for export, newest first."""
+        clauses: list[str] = []
+        params: list = []
+        if since_hours is not None:
+            clauses.append("started_at >= datetime('now', ?)")
+            params.append(f"-{since_hours} hours")
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        sql = f"SELECT * FROM task_results {where} ORDER BY started_at DESC"
+        if limit is not None:
+            sql += " LIMIT ?"
+            params.append(limit)
+        rows = self._conn.execute(sql, params).fetchall()
+        return [dict(r) for r in rows]

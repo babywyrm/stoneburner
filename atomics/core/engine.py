@@ -11,7 +11,7 @@ import uuid
 from atomics.config import AtomicsSettings
 from atomics.core.guard import GuardConfig, RateBudgetGuard
 from atomics.core.runner import execute_task
-from atomics.models import BurnTier, TaskStatus
+from atomics.models import BurnTier, RunSummary, TaskStatus
 from atomics.providers.base import BaseProvider
 from atomics.storage.repository import MetricsRepository
 from atomics.tasks import get_weighted_task
@@ -65,7 +65,7 @@ class LoopEngine:
     def tier(self) -> BurnTier:
         return self._tier
 
-    async def run(self, max_iterations: int | None = None) -> None:
+    async def run(self, max_iterations: int | None = None) -> RunSummary | None:
         """Start the benchmarking loop. Runs until shutdown signal or iteration cap."""
         self._install_signal_handlers()
         self._run_id = uuid.uuid4().hex[:12]
@@ -160,6 +160,7 @@ class LoopEngine:
             summary.total_tokens,
             summary.total_cost_usd,
         )
+        return summary
 
     def stop(self) -> None:
         self._shutdown.set()

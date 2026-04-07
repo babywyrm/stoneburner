@@ -63,6 +63,19 @@ PROVIDER_CHOICES = click.Choice(["claude", "bedrock"], case_sensitive=False)
 @click.option("--budget", "-b", type=float, default=None, help="Override budget limit (USD)")
 @click.option("--interval", "-i", type=int, default=None, help="Override loop interval (seconds)")
 @click.option("--region", type=str, default="us-east-1", help="AWS region for Bedrock")
+@click.option(
+    "--hook",
+    "hook_cmd",
+    type=str,
+    default=None,
+    help="Shell command after a finished run (overrides ATOMICS_POST_RUN_HOOK)",
+)
+@click.option(
+    "--notify/--no-notify",
+    "notify_flag",
+    default=None,
+    help="Desktop notification when the run completes (default: ATOMICS_NOTIFY)",
+)
 def run(
     tier: str,
     provider_name: str,
@@ -71,6 +84,8 @@ def run(
     budget: float | None,
     interval: int | None,
     region: str,
+    hook_cmd: str | None,
+    notify_flag: bool | None,
 ) -> None:
     """Start the benchmarking loop."""
     settings = load_settings()
@@ -112,11 +127,24 @@ def run(
         budget_override=budget,
     )
 
+    from atomics.hooks import hook_env, notify_run_complete, run_post_hook
+
+    summary = None
     try:
-        asyncio.run(engine.run(max_iterations=max_iterations))
+        summary = asyncio.run(engine.run(max_iterations=max_iterations))
     except KeyboardInterrupt:
         console.print("\n[yellow]Interrupted — finalizing run...[/yellow]")
     finally:
+        if summary is not None:
+            do_notify = settings.notify_on_finish if notify_flag is None else notify_flag
+            if do_notify:
+                notify_run_complete(summary)
+            eff_hook = (hook_cmd or "").strip() or (settings.post_run_hook.strip() or None)
+            if eff_hook:
+                env = hook_env(summary, tier=burn_tier.value, provider=provider_name)
+                rc = run_post_hook(eff_hook, env)
+                if rc != 0:
+                    console.print(f"[yellow]Post-run hook exited with code {rc}[/yellow]")
         repo.close()
 
 
@@ -265,6 +293,67 @@ def schedule(
                 "[bold]Save to ~/Library/LaunchAgents/com.babywyrm.atomics.plist:[/bold]\n"
             )
             console.print(plist)
+
+
+@cli.command()
+def doctor() -> None:
+    """Check Python, database, API keys, optional deps, and scheduler tooling."""
+    from atomics.doctor import run_doctor
+
+    sys.exit(run_doctor())
+
+
+@cli.command("export")
+@click.option(
+    "--since-hours",
+    type=float,
+    default=None,
+    help="Only include tasks started in the last N hours",
+)
+@click.option("--limit", "-n", type=int, default=None, help="Maximum rows to export")
+@click.option(
+    "--format",
+    "fmt",
+    type=click.Choice(["jsonl", "csv"]),
+    default="jsonl",
+    help="Output format",
+)
+@click.option(
+    "--output",
+    "-o",
+    "out_file",
+    type=click.File("w", encoding="utf-8"),
+    default="-",
+    help="Output file (default: stdout)",
+)
+def export_tasks(
+    since_hours: float | None,
+    limit: int | None,
+    fmt: str,
+    out_file,
+) -> None:
+    """Export stored task metrics as JSON lines or CSV."""
+    settings = load_settings()
+    from atomics.exporters import write_tasks_export
+    from atomics.storage.repository import MetricsRepository
+
+    repo = MetricsRepository(settings.db_path)
+    try:
+        rows = repo.query_task_results(since_hours=since_hours, limit=limit)
+        write_tasks_export(rows, fmt, out_file)
+    finally:
+        repo.close()
+
+
+@cli.command()
+@click.argument("shell", type=click.Choice(["bash", "zsh", "fish"]))
+def completion(shell: str) -> None:
+    """Print shell tab-completion script. Example: eval \"$(atomics completion zsh)\"."""
+    from click.shell_completion import get_completion_class
+
+    cls = get_completion_class(shell)
+    comp = cls(cli, {}, "atomics", "_ATOMICS_COMPLETE")
+    click.echo(comp.source())
 
 
 @cli.command("tiers")

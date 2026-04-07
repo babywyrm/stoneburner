@@ -7,11 +7,13 @@ from pathlib import Path
 from pydantic import Field
 from pydantic_settings import BaseSettings
 
+from atomics.paths import default_db_path
+
 
 class AtomicsSettings(BaseSettings):
     model_config = {"env_prefix": "ATOMICS_", "env_file": ".env", "extra": "ignore"}
 
-    db_path: Path = Field(default=Path("data/atomics.db"))
+    db_path: Path = Field(default_factory=default_db_path)
     log_level: str = Field(default="INFO")
     default_model: str = Field(default="claude-sonnet-4-6")
 
@@ -26,6 +28,9 @@ class AtomicsSettings(BaseSettings):
     circuit_breaker_threshold: int = Field(default=10)
 
     anthropic_api_key: str = Field(default="", validation_alias="ANTHROPIC_API_KEY")
+
+    post_run_hook: str = Field(default="")
+    notify_on_finish: bool = Field(default=False)
 
 
 def load_settings() -> AtomicsSettings:

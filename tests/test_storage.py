@@ -95,6 +95,28 @@ def test_recent_runs():
     repo.close()
 
 
+def test_query_task_results_since_hours():
+    repo = _tmp_repo()
+    repo.create_run("exp-1")
+    result = TaskResult(
+        run_id="exp-1",
+        category=TaskCategory.GENERAL_QA,
+        task_name="t1",
+        provider="claude",
+        model="m",
+        status=TaskStatus.SUCCESS,
+        total_tokens=10,
+        estimated_cost_usd=0.0,
+        started_at=datetime.now(UTC),
+        completed_at=datetime.now(UTC),
+    )
+    repo.save_task_result(result)
+    rows = repo.query_task_results(since_hours=24.0, limit=10)
+    assert len(rows) == 1
+    assert rows[0]["task_name"] == "t1"
+    repo.close()
+
+
 def test_get_hourly_token_rate_sums_recent_tasks():
     repo = _tmp_repo()
     repo.create_run("hourly-run")

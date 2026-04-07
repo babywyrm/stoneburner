@@ -223,6 +223,118 @@ def test_cli_run_keyboard_interrupt(monkeypatch, tmp_path):
     assert "Interrupted" in result.output
 
 
+def test_cli_doctor(tmp_path):
+    runner = CliRunner(env={"ATOMICS_DB_PATH": str(tmp_path / "doctor.db")})
+    result = runner.invoke(cli, ["doctor"])
+    assert result.exit_code == 0
+    assert "Python" in result.output
+
+
+def test_cli_export_jsonl_empty_db(tmp_path):
+    runner = CliRunner(env={"ATOMICS_DB_PATH": str(tmp_path / "empty.db")})
+    result = runner.invoke(cli, ["export", "--format", "jsonl"])
+    assert result.exit_code == 0
+
+
+def test_cli_export_csv_with_row(tmp_path):
+    from datetime import UTC, datetime
+
+    from atomics.models import TaskCategory, TaskResult, TaskStatus
+    from atomics.storage.repository import MetricsRepository
+
+    db = tmp_path / "e.db"
+    repo = MetricsRepository(db)
+    repo.create_run("r1")
+    repo.save_task_result(
+        TaskResult(
+            run_id="r1",
+            category=TaskCategory.GENERAL_QA,
+            task_name="x",
+            provider="claude",
+            model="m",
+            status=TaskStatus.SUCCESS,
+            total_tokens=5,
+            estimated_cost_usd=0.0,
+            started_at=datetime.now(UTC),
+            completed_at=datetime.now(UTC),
+        )
+    )
+    repo.close()
+    runner = CliRunner(env={"ATOMICS_DB_PATH": str(db)})
+    result = runner.invoke(cli, ["export", "--format", "csv"])
+    assert result.exit_code == 0
+    assert "task_name" in result.output
+
+
+def test_cli_completion_zsh():
+    runner = CliRunner()
+    result = runner.invoke(cli, ["completion", "zsh"])
+    assert result.exit_code == 0
+    assert "compdef" in result.output or "_atomics_completion" in result.output
+
+
+def test_cli_run_post_hook(monkeypatch, tmp_path):
+    runner = CliRunner(
+        env={
+            "ANTHROPIC_API_KEY": "fake",
+            "ATOMICS_DB_PATH": str(tmp_path / "db.sqlite"),
+        }
+    )
+    hook_fired: list[tuple[str, dict]] = []
+
+    def capture_hook(cmd, env):
+        hook_fired.append((cmd, dict(env)))
+        return 0
+
+    class DummyEngine:
+        def __init__(self, **kwargs):
+            pass
+
+        async def run(self, max_iterations=None):
+            from datetime import UTC, datetime
+
+            from atomics.models import RunSummary
+
+            return RunSummary(
+                run_id="hookrun",
+                started_at=datetime.now(UTC),
+                completed_at=datetime.now(UTC),
+                total_tasks=1,
+                successful_tasks=1,
+                failed_tasks=0,
+                total_tokens=1,
+                total_cost_usd=0.0,
+            )
+
+    class DummyRepo:
+        def __init__(self, _):
+            pass
+
+        def close(self):
+            pass
+
+    class DummyClaude:
+        name = "claude"
+
+        def __init__(self, api_key, default_model):
+            pass
+
+    monkeypatch.setattr("atomics.core.engine.LoopEngine", DummyEngine)
+    monkeypatch.setattr("atomics.storage.repository.MetricsRepository", DummyRepo)
+    monkeypatch.setattr("atomics.providers.claude.ClaudeProvider", DummyClaude)
+    monkeypatch.setattr("atomics.hooks.run_post_hook", capture_hook)
+    monkeypatch.setattr("atomics.hooks.notify_run_complete", lambda *_a, **_k: None)
+
+    result = runner.invoke(
+        cli,
+        ["run", "--tier", "ez", "--provider", "claude", "-n", "1", "-i", "1", "--hook", "echo ok"],
+    )
+    assert result.exit_code == 0
+    assert hook_fired
+    assert hook_fired[0][0] == "echo ok"
+    assert hook_fired[0][1]["ATOMICS_RUN_ID"] == "hookrun"
+
+
 def test_cli_provider_test_success(monkeypatch):
     runner = CliRunner(env={"ANTHROPIC_API_KEY": "fake"})
 
