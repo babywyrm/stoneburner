@@ -72,3 +72,60 @@ async def test_bedrock_generate_and_health():
     assert resp.text == "ok"
     assert resp.total_tokens == 10
     assert await provider.health_check() is True
+
+
+class _FakeOpenAIChoice:
+    def __init__(self, text: str):
+        self.message = type("Msg", (), {"content": text})()
+
+
+class _FakeOpenAIUsage:
+    def __init__(self, prompt_tokens: int, completion_tokens: int):
+        self.prompt_tokens = prompt_tokens
+        self.completion_tokens = completion_tokens
+
+
+class _FakeOpenAIResp:
+    def __init__(self):
+        self.choices = [_FakeOpenAIChoice("world")]
+        self.usage = _FakeOpenAIUsage(prompt_tokens=8, completion_tokens=12)
+
+    def model_dump(self):
+        return {"ok": True}
+
+
+@pytest.mark.asyncio
+async def test_openai_generate_and_health():
+    class FakeCompletions:
+        async def create(self, **_kwargs):
+            return _FakeOpenAIResp()
+
+    fake_client = type(
+        "FakeClient", (), {"chat": type("Chat", (), {"completions": FakeCompletions()})()}
+    )()
+
+    from atomics.providers.openai import OpenAIProvider
+
+    provider = OpenAIProvider(api_key="fake", client=fake_client)
+    resp = await provider.generate("hello", model="gpt-4o")
+    assert isinstance(resp, ProviderResponse)
+    assert resp.text == "world"
+    assert resp.total_tokens == 20
+    assert resp.model == "gpt-4o"
+    assert await provider.health_check() is True
+
+
+@pytest.mark.asyncio
+async def test_openai_health_failure():
+    class BadCompletions:
+        async def create(self, **_kwargs):
+            raise RuntimeError("boom")
+
+    fake_client = type(
+        "Bad", (), {"chat": type("Chat", (), {"completions": BadCompletions()})()}
+    )()
+
+    from atomics.providers.openai import OpenAIProvider
+
+    provider = OpenAIProvider(api_key="fake", client=fake_client)
+    assert await provider.health_check() is False

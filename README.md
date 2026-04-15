@@ -10,7 +10,7 @@ A continuous, cron-schedulable benchmarking harness that runs realistic everyday
 # Install with uv
 uv sync
 
-# Set your API key
+# Set your API key (Claude is the default provider)
 export ANTHROPIC_API_KEY=sk-ant-...
 
 # Test the provider connection
@@ -21,6 +21,13 @@ uv run atomics run -n 5
 
 # View reports
 uv run atomics report
+
+# Use OpenAI instead
+export OPENAI_API_KEY=sk-...
+uv run atomics run --provider openai -n 5
+
+# Use AWS Bedrock
+uv run atomics run --provider bedrock --region us-east-1 -n 5
 ```
 
 ## Burn Tiers
@@ -49,7 +56,7 @@ uv run atomics tiers
 stoneburner/
 ├── atomics/              # Core Python package
 │   ├── core/             # Loop engine, task runner, rate/budget guard
-│   ├── providers/        # LLM adapters (Claude, Bedrock)
+│   ├── providers/        # LLM adapters (Claude, Bedrock, OpenAI)
 │   ├── tasks/            # Task catalog with weighted, tiered selection
 │   ├── storage/          # SQLite metrics persistence
 │   ├── scheduler/        # Cron/systemd/launchd generation and installation
@@ -73,25 +80,30 @@ stoneburner/
 | `atomics run -i 10` | Override interval to 10 seconds |
 | `atomics report` | Display usage reports and trends |
 | `atomics tiers` | Show available burn tiers and their profiles |
+| `atomics run --provider openai` | Use OpenAI / Codex |
 | `atomics provider-test` | Health check the configured provider |
+| `atomics provider-test -p bedrock` | Health check Bedrock |
+| `atomics provider-test -p openai` | Health check OpenAI |
 | `atomics schedule` | Generate scheduler configs |
 | `atomics schedule --install` | Install schedule on this system |
 | `atomics schedule --uninstall` | Remove installed schedule |
 
 ## Providers
 
-| Provider | Status | Flag |
-|----------|--------|------|
-| **Claude** (Anthropic API) | Production-ready | `--provider claude` (default) |
-| **Bedrock** (AWS) | Implemented | `--provider bedrock --region us-east-1` |
-
-Bedrock requires `boto3`: `uv sync --extra bedrock`
+| Provider | Status | Flag | Install |
+|----------|--------|------|---------|
+| **Claude** (Anthropic API) | Default | `--provider claude` | `uv sync` (included) |
+| **Bedrock** (AWS) | Supported | `--provider bedrock --region us-east-1` | `uv sync --extra bedrock` |
+| **OpenAI / Codex** | Supported | `--provider openai` | `uv sync --extra openai` |
 
 ## Scheduling
 
 ```bash
 # Auto-detect best scheduler for this OS and install
 uv run atomics schedule --tier ez -n 5 -i 15 --install
+
+# Schedule with a specific provider
+uv run atomics schedule --tier baseline --provider bedrock -i 30 --install
 
 # Generate without installing (preview)
 uv run atomics schedule --tier baseline --format crontab
@@ -104,6 +116,8 @@ uv run atomics schedule --tier ez --uninstall
 
 Supports crontab (Linux/macOS), systemd timers (Linux), and launchd (macOS). Auto-detection picks the best option for the current platform.
 
+> **Linux note:** For headless systemd user timers, run `loginctl enable-linger $USER` to keep timers active after logout.
+
 ## Configuration
 
 Set via environment variables (prefix `ATOMICS_`) or `.env` file:
@@ -111,12 +125,19 @@ Set via environment variables (prefix `ATOMICS_`) or `.env` file:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `ANTHROPIC_API_KEY` | — | Required for Claude provider |
+| `OPENAI_API_KEY` | — | Required for OpenAI provider |
 | `ATOMICS_DEFAULT_MODEL` | `claude-sonnet-4-6` | Model to benchmark |
 | `ATOMICS_LOOP_INTERVAL_SECONDS` | `120` | Seconds between tasks |
 | `ATOMICS_MAX_TOKENS_PER_HOUR` | `100000` | Hourly token cap |
 | `ATOMICS_MAX_REQUESTS_PER_MINUTE` | `30` | Request rate limit |
 | `ATOMICS_BUDGET_LIMIT_USD` | `50.00` | Total cost cap per run |
-| `ATOMICS_DB_PATH` | `data/atomics.db` | SQLite database location |
+| `ATOMICS_DB_PATH` | (platform) | SQLite database location (see below) |
+
+**Database path defaults:**
+- **macOS:** `data/atomics.db` (project-local)
+- **Linux:** `~/.local/share/atomics/atomics.db` (XDG-compliant, `$XDG_DATA_HOME/atomics/`)
+
+Override with `ATOMICS_DB_PATH` on any platform.
 
 CLI flags (`--tier`, `--budget`, `--interval`) override these defaults at runtime.
 

@@ -11,10 +11,14 @@ import time
 from atomics.providers.base import BaseProvider, ProviderResponse
 
 BEDROCK_PRICING: dict[str, tuple[float, float]] = {
+    "us.anthropic.claude-sonnet-4-6": (3.0, 15.0),
+    "us.anthropic.claude-haiku-4-5-20251001-v1:0": (1.0, 5.0),
+    "us.anthropic.claude-opus-4-6-v1": (5.0, 25.0),
+    "us.anthropic.claude-sonnet-4-20250514-v1:0": (3.0, 15.0),
+    "us.anthropic.claude-sonnet-4-5-20250929-v1:0": (3.0, 15.0),
+    "anthropic.claude-sonnet-4-20250514-v1:0": (3.0, 15.0),
     "anthropic.claude-3-5-sonnet-20241022-v2:0": (3.0, 15.0),
     "anthropic.claude-3-5-haiku-20241022-v1:0": (0.80, 4.0),
-    "anthropic.claude-3-opus-20240229-v1:0": (15.0, 75.0),
-    "anthropic.claude-sonnet-4-20250514-v1:0": (3.0, 15.0),
 }
 
 DEFAULT_PRICING = (3.0, 15.0)
@@ -31,7 +35,7 @@ class BedrockProvider(BaseProvider):
     def __init__(
         self,
         region: str = "us-east-1",
-        model_id: str = "anthropic.claude-3-5-sonnet-20241022-v2:0",
+        model_id: str = "us.anthropic.claude-sonnet-4-6",
         *,
         client: object | None = None,
     ) -> None:

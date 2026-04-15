@@ -50,8 +50,33 @@ def run_doctor(settings: AtomicsSettings | None = None) -> int:
             "[yellow]ANTHROPIC_API_KEY[/yellow] not set (required for Claude / provider-test)"
         )
 
+    if settings.openai_api_key:
+        console.print("[green]OPENAI_API_KEY[/green] set")
+    else:
+        console.print("[yellow]OPENAI_API_KEY[/yellow] not set (optional; needed for OpenAI)")
+
+    if importlib.util.find_spec("openai") is not None:
+        console.print("[green]openai[/green] SDK available (OpenAI / Codex)")
+    else:
+        console.print(
+            "[yellow]openai[/yellow] SDK not installed (optional; uv sync --extra openai)"
+        )
+
     if importlib.util.find_spec("boto3") is not None:
         console.print("[green]boto3[/green] available (Bedrock)")
+        try:
+            import boto3
+
+            sts = boto3.client("sts")
+            identity = sts.get_caller_identity()
+            console.print(
+                f"[green]AWS credentials[/green] valid (account {identity.get('Account', '?')})"
+            )
+        except Exception:
+            console.print(
+                "[yellow]AWS credentials[/yellow] not configured or invalid "
+                "(check AWS_ACCESS_KEY_ID / AWS_PROFILE)"
+            )
     else:
         console.print("[yellow]boto3[/yellow] not installed (optional; needed for Bedrock)")
 
@@ -73,8 +98,8 @@ def run_doctor(settings: AtomicsSettings | None = None) -> int:
         ("osascript", "macOS notifications"),
         ("notify-send", "Linux notifications"),
     )
-    for name, binary in notify_bins:
-        if shutil.which(name):
-            console.print(f"[green]{name}[/green] found ({binary})")
+    for binary, desc in notify_bins:
+        if shutil.which(binary):
+            console.print(f"[green]{binary}[/green] found ({desc})")
 
     return 1 if errors else 0

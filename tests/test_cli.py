@@ -62,6 +62,18 @@ def test_cli_run_no_api_key():
     assert "ANTHROPIC_API_KEY" in result.output
 
 
+def test_cli_run_openai_no_api_key(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        "atomics.auth.codex._default_codex_auth_path",
+        lambda: tmp_path / "nonexistent.json",
+    )
+    monkeypatch.setattr("atomics.auth.store._default_auth_dir", lambda: tmp_path)
+    runner = CliRunner(env={"OPENAI_API_KEY": ""})
+    result = runner.invoke(cli, ["run", "--provider", "openai", "-n", "1"])
+    assert result.exit_code != 0
+    assert "No OpenAI credentials" in result.output
+
+
 def test_cli_report(tmp_path):
     runner = CliRunner(env={"ATOMICS_DB_PATH": str(tmp_path / "test.db")})
     result = runner.invoke(cli, ["report"])
@@ -264,6 +276,145 @@ def test_cli_export_csv_with_row(tmp_path):
     result = runner.invoke(cli, ["export", "--format", "csv"])
     assert result.exit_code == 0
     assert "task_name" in result.output
+
+
+def test_cli_run_with_mocked_openai(monkeypatch, tmp_path):
+    runner = CliRunner(
+        env={
+            "OPENAI_API_KEY": "fake",
+            "ATOMICS_DB_PATH": str(tmp_path / "db.sqlite"),
+        }
+    )
+    calls = {"ran": False}
+
+    class DummyEngine:
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+
+        async def run(self, max_iterations=None):
+            calls["ran"] = True
+            calls["max_iterations"] = max_iterations
+
+    class DummyRepo:
+        def __init__(self, _):
+            pass
+
+        def close(self):
+            pass
+
+    class DummyOpenAI:
+        name = "openai"
+
+        def __init__(self, api_key, default_model):
+            self.api_key = api_key
+            self.default_model = default_model
+
+    monkeypatch.setattr("atomics.core.engine.LoopEngine", DummyEngine)
+    monkeypatch.setattr("atomics.storage.repository.MetricsRepository", DummyRepo)
+    monkeypatch.setattr("atomics.providers.openai.OpenAIProvider", DummyOpenAI)
+
+    result = runner.invoke(
+        cli,
+        ["run", "--provider", "openai", "--tier", "ez", "-n", "3", "-i", "1"],
+    )
+    assert result.exit_code == 0
+    assert calls["ran"] is True
+    assert calls["max_iterations"] == 3
+
+
+def test_cli_provider_test_openai_missing_key(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        "atomics.auth.codex._default_codex_auth_path",
+        lambda: tmp_path / "nonexistent.json",
+    )
+    monkeypatch.setattr("atomics.auth.store._default_auth_dir", lambda: tmp_path)
+    runner = CliRunner(env={"OPENAI_API_KEY": ""})
+    result = runner.invoke(cli, ["provider-test", "--provider", "openai"])
+    assert result.exit_code != 0
+    assert "No OpenAI credentials" in result.output
+
+
+def test_cli_provider_test_bedrock_success(monkeypatch):
+    runner = CliRunner()
+
+    class DummyProvider:
+        name = "bedrock"
+
+        def __init__(self, region, model_id):
+            pass
+
+        async def health_check(self):
+            return True
+
+        async def generate(self, *_args, **_kwargs):
+            return SimpleNamespace(
+                text="4",
+                input_tokens=1,
+                output_tokens=1,
+                total_tokens=2,
+                latency_ms=1.0,
+                estimated_cost_usd=0.0,
+            )
+
+    monkeypatch.setattr("atomics.providers.bedrock.BedrockProvider", DummyProvider)
+    result = runner.invoke(cli, ["provider-test", "--provider", "bedrock"])
+    assert result.exit_code == 0
+    assert "passed" in result.output.lower()
+
+
+def test_cli_provider_test_openai_success(monkeypatch):
+    runner = CliRunner(env={"OPENAI_API_KEY": "fake"})
+
+    class DummyProvider:
+        name = "openai"
+
+        def __init__(self, api_key, default_model):
+            pass
+
+        async def health_check(self):
+            return True
+
+        async def generate(self, *_args, **_kwargs):
+            return SimpleNamespace(
+                text="4",
+                input_tokens=1,
+                output_tokens=1,
+                total_tokens=2,
+                latency_ms=1.0,
+                estimated_cost_usd=0.0,
+            )
+
+    monkeypatch.setattr("atomics.providers.openai.OpenAIProvider", DummyProvider)
+    result = runner.invoke(cli, ["provider-test", "--provider", "openai"])
+    assert result.exit_code == 0
+    assert "passed" in result.output.lower()
+
+
+def test_cli_schedule_crontab_with_provider():
+    runner = CliRunner()
+    result = runner.invoke(
+        cli, ["schedule", "--format", "crontab", "--tier", "ez", "--provider", "openai"]
+    )
+    assert result.exit_code == 0
+    assert "--provider openai" in result.output
+
+
+def test_cli_schedule_systemd_with_provider():
+    runner = CliRunner()
+    result = runner.invoke(
+        cli, ["schedule", "--format", "systemd", "--tier", "baseline", "--provider", "bedrock"]
+    )
+    assert result.exit_code == 0
+    assert "--provider bedrock" in result.output
+
+
+def test_cli_schedule_launchd_with_provider():
+    runner = CliRunner()
+    result = runner.invoke(
+        cli, ["schedule", "--format", "launchd", "--provider", "openai"]
+    )
+    assert result.exit_code == 0
+    assert "openai" in result.output
 
 
 def test_cli_completion_zsh():

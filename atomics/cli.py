@@ -33,7 +33,7 @@ def cli() -> None:
     """Atomics — Agentic token usage benchmarking platform."""
 
 
-PROVIDER_CHOICES = click.Choice(["claude", "bedrock"], case_sensitive=False)
+PROVIDER_CHOICES = click.Choice(["claude", "bedrock", "openai"], case_sensitive=False)
 
 
 @cli.command()
@@ -111,8 +111,26 @@ def run(
     elif provider_name == "bedrock":
         from atomics.providers.bedrock import BedrockProvider
 
-        bedrock_model = model or "anthropic.claude-3-5-sonnet-20241022-v2:0"
-        provider = BedrockProvider(region=region, model_id=bedrock_model)
+        effective_model = model or "us.anthropic.claude-sonnet-4-6"
+        provider = BedrockProvider(region=region, model_id=effective_model)
+    elif provider_name == "openai":
+        from atomics.providers.openai import OpenAIProvider
+
+        effective_model = model or "gpt-4o"
+        if settings.openai_api_key:
+            provider = OpenAIProvider(
+                api_key=settings.openai_api_key, default_model=effective_model
+            )
+        else:
+            try:
+                from atomics.auth import auto_detect_auth
+
+                auth = auto_detect_auth()
+                console.print(f"[dim]Auth: {auth.description}[/dim]")
+                provider = OpenAIProvider(default_model=effective_model, auth=auth)
+            except RuntimeError as exc:
+                console.print(f"[red]{exc}[/red]")
+                sys.exit(1)
     else:
         console.print(f"[red]Unknown provider: {provider_name}[/red]")
         sys.exit(1)
@@ -124,6 +142,7 @@ def run(
         settings=settings,
         tier=burn_tier,
         interval_override=interval,
+        model_override=effective_model,
         budget_override=budget,
     )
 
@@ -167,42 +186,81 @@ def report(hours: int, runs: int) -> None:
 
 
 @cli.command("provider-test")
+@click.option(
+    "--provider",
+    "-p",
+    "provider_name",
+    type=PROVIDER_CHOICES,
+    default="claude",
+    help="LLM provider to test",
+)
 @click.option("--model", "-m", type=str, default=None, help="Model to test")
-def provider_test(model: str | None) -> None:
+@click.option("--region", type=str, default="us-east-1", help="AWS region for Bedrock")
+def provider_test(provider_name: str, model: str | None, region: str) -> None:
     """Quick health check against the configured provider."""
     settings = load_settings()
     _setup_logging(settings.log_level)
+    console = Console()
 
-    if not settings.anthropic_api_key:
-        Console().print("[red]ANTHROPIC_API_KEY not set.[/red]")
+    if provider_name == "claude":
+        if not settings.anthropic_api_key:
+            console.print("[red]ANTHROPIC_API_KEY not set.[/red]")
+            sys.exit(1)
+        from atomics.providers.claude import ClaudeProvider
+
+        prov = ClaudeProvider(
+            api_key=settings.anthropic_api_key,
+            default_model=model or settings.default_model,
+        )
+        model_label = model or settings.default_model
+    elif provider_name == "bedrock":
+        from atomics.providers.bedrock import BedrockProvider
+
+        bedrock_model = model or "us.anthropic.claude-sonnet-4-6"
+        prov = BedrockProvider(region=region, model_id=bedrock_model)
+        model_label = bedrock_model
+    elif provider_name == "openai":
+        from atomics.providers.openai import OpenAIProvider
+
+        openai_model = model or "gpt-4o"
+        model_label = openai_model
+        if settings.openai_api_key:
+            prov = OpenAIProvider(api_key=settings.openai_api_key, default_model=openai_model)
+        else:
+            try:
+                from atomics.auth import auto_detect_auth
+
+                auth = auto_detect_auth()
+                console.print(f"[dim]Auth: {auth.description}[/dim]")
+                prov = OpenAIProvider(default_model=openai_model, auth=auth)
+            except RuntimeError as exc:
+                console.print(f"[red]{exc}[/red]")
+                sys.exit(1)
+    else:
+        console.print(f"[red]Unknown provider: {provider_name}[/red]")
         sys.exit(1)
 
-    from atomics.providers.claude import ClaudeProvider
-
-    console = Console()
-    provider = ClaudeProvider(
-        api_key=settings.anthropic_api_key,
-        default_model=model or settings.default_model,
-    )
-
     async def _test() -> None:
-        model_label = model or settings.default_model
         console.print(
-            f"Testing provider [cyan]{provider.name}[/cyan] with model "
+            f"Testing provider [cyan]{prov.name}[/cyan] with model "
             f"[cyan]{model_label}[/cyan]..."
         )
-        ok = await provider.health_check()
+        ok = await prov.health_check()
         if ok:
             console.print("[green]Provider health check passed.[/green]")
         else:
             console.print("[red]Provider health check failed.[/red]")
             sys.exit(1)
 
-        resp = await provider.generate(
-            "What is 2+2? Reply with just the number.",
-            model=model,
-            max_tokens=32,
-        )
+        try:
+            resp = await prov.generate(
+                "What is 2+2? Reply with just the number.",
+                model=model,
+                max_tokens=32,
+            )
+        except Exception as exc:
+            console.print(f"[red]Generate failed:[/red] {exc}")
+            sys.exit(1)
         console.print(f"Response: {resp.text.strip()}")
         console.print(
             f"Tokens: in={resp.input_tokens} out={resp.output_tokens} total={resp.total_tokens}"
@@ -218,6 +276,14 @@ def provider_test(model: str | None) -> None:
 @click.option("--interval", "-i", type=int, default=30, help="Minutes between runs")
 @click.option("--max-iterations", "-n", type=int, default=10, help="Tasks per scheduled run")
 @click.option(
+    "--provider",
+    "-p",
+    "provider_name",
+    type=PROVIDER_CHOICES,
+    default="claude",
+    help="LLM provider for scheduled runs",
+)
+@click.option(
     "--format",
     "fmt",
     type=click.Choice(["crontab", "systemd", "launchd", "auto"]),
@@ -229,6 +295,7 @@ def schedule(
     tier: str,
     interval: int,
     max_iterations: int,
+    provider_name: str,
     fmt: str,
     install: bool,
     uninstall: bool,
@@ -266,7 +333,7 @@ def schedule(
         return
 
     if fmt == "crontab":
-        entry = generate_crontab_entry(interval, max_iterations, tier=tier)
+        entry = generate_crontab_entry(interval, max_iterations, tier=tier, provider=provider_name)
         if install:
             msg = install_crontab(entry)
             console.print(f"[green]{msg}[/green]")
@@ -274,7 +341,9 @@ def schedule(
             console.print("[bold]Add this to your crontab (crontab -e):[/bold]\n")
             console.print(entry)
     elif fmt == "systemd":
-        service, timer = generate_systemd_timer(interval, max_iterations, tier=tier)
+        service, timer = generate_systemd_timer(
+            interval, max_iterations, tier=tier, provider=provider_name
+        )
         if install:
             msg = install_systemd(service, timer, tier=tier)
             console.print(f"[green]{msg}[/green]")
@@ -284,7 +353,9 @@ def schedule(
             console.print("[bold]atomics.timer:[/bold]")
             console.print(timer)
     elif fmt == "launchd":
-        plist = generate_launchd_plist(interval, max_iterations, tier=tier)
+        plist = generate_launchd_plist(
+            interval, max_iterations, tier=tier, provider=provider_name
+        )
         if install:
             msg = install_launchd(plist, tier=tier)
             console.print(f"[green]{msg}[/green]")
@@ -354,6 +425,120 @@ def completion(shell: str) -> None:
     cls = get_completion_class(shell)
     comp = cls(cli, {}, "atomics", "_ATOMICS_COMPLETE")
     click.echo(comp.source())
+
+
+AUTH_MODE_CHOICES = click.Choice(["auto", "apikey", "oauth", "codex"], case_sensitive=False)
+
+
+@cli.command()
+@click.option(
+    "--profile",
+    "oidc_profile",
+    type=str,
+    default="openai",
+    help="Built-in OIDC profile name",
+)
+@click.option("--issuer", type=str, default=None, help="Custom OIDC issuer URL")
+@click.option("--client-id", type=str, default=None, help="Custom OIDC client ID")
+@click.option("--scopes", type=str, default=None, help="Space-separated OIDC scopes")
+@click.option("--headless", is_flag=True, help="Use device code flow (no browser)")
+def login(
+    oidc_profile: str,
+    issuer: str | None,
+    client_id: str | None,
+    scopes: str | None,
+    headless: bool,
+) -> None:
+    """Log in via OAuth/OIDC (opens browser or prints device code)."""
+    from atomics.auth.oauth import OAuthPKCEAuth
+    from atomics.auth.profiles import OIDCProfile, get_profile
+    from atomics.auth.store import TokenStore
+
+    console = Console()
+
+    if issuer and client_id:
+        profile = OIDCProfile(
+            name="custom",
+            issuer=issuer,
+            authorization_endpoint=f"{issuer.rstrip('/')}/authorize",
+            token_endpoint=f"{issuer.rstrip('/')}/oauth/token",
+            device_authorization_endpoint=f"{issuer.rstrip('/')}/oauth/device/code",
+            client_id=client_id,
+            scopes=scopes.split() if scopes else ["openid", "profile", "email"],
+        )
+    else:
+        profile = get_profile(oidc_profile)
+
+    store = TokenStore()
+    auth = OAuthPKCEAuth(profile=profile, store=store)
+
+    async def _login():
+        tokens = await auth.login(headless=headless)
+        console.print(f"[green]Logged in via {profile.name}[/green]")
+        console.print(f"[dim]Tokens cached at {store.path}[/dim]")
+        return tokens
+
+    asyncio.run(_login())
+
+
+@cli.command()
+def logout() -> None:
+    """Clear cached OAuth tokens."""
+    from atomics.auth.store import TokenStore
+
+    console = Console()
+    store = TokenStore()
+    store.clear()
+    console.print("[green]Logged out — cached tokens cleared.[/green]")
+
+
+@cli.command()
+def whoami() -> None:
+    """Show current auth mode and identity."""
+    from atomics.auth.store import TokenStore
+
+    console = Console()
+    settings = load_settings()
+
+    if settings.openai_api_key:
+        masked = settings.openai_api_key[:8] + "..."
+        console.print(f"[cyan]Auth mode:[/cyan] API key ({masked})")
+        return
+
+    from atomics.auth.codex import CodexTokenAuth
+
+    codex = CodexTokenAuth()
+    if codex.tokens_available():
+        console.print("[cyan]Auth mode:[/cyan] Codex CLI API key (~/.codex/auth.json)")
+        return
+    if codex.codex_installed():
+        console.print(
+            "[yellow]Codex CLI detected[/yellow] but its ChatGPT tokens can't access "
+            "the OpenAI API. Create a key at https://platform.openai.com/api-keys"
+        )
+
+    store = TokenStore()
+    tokens = store.load()
+    if tokens.access_token and not tokens.expired:
+        console.print(f"[cyan]Auth mode:[/cyan] OAuth ({tokens.profile_name or 'unknown'})")
+        # Decode identity from id_token if available
+        if tokens.id_token:
+            try:
+                import base64
+                import json
+
+                parts = tokens.id_token.split(".")
+                payload = parts[1] + "=" * (4 - len(parts[1]) % 4)
+                claims = json.loads(base64.urlsafe_b64decode(payload))
+                email = claims.get("email", "")
+                name = claims.get("name", "")
+                if name or email:
+                    console.print(f"[dim]Identity:[/dim] {name} ({email})" if name else f"[dim]Identity:[/dim] {email}")
+            except Exception:
+                pass
+        return
+
+    console.print("[yellow]Not authenticated.[/yellow] Run [bold]atomics login[/bold] or set OPENAI_API_KEY.")
 
 
 @cli.command("tiers")

@@ -32,6 +32,7 @@ class LoopEngine:
         *,
         interval_override: int | None = None,
         budget_override: float | None = None,
+        model_override: str | None = None,
     ) -> None:
         self._provider = provider
         self._repo = repo
@@ -58,6 +59,7 @@ class LoopEngine:
                 circuit_breaker_threshold=settings.circuit_breaker_threshold,
             )
         )
+        self._model = model_override
         self._shutdown = asyncio.Event()
         self._run_id: str = ""
 
@@ -71,13 +73,13 @@ class LoopEngine:
         self._run_id = uuid.uuid4().hex[:12]
         self._repo.create_run(self._run_id)
 
-        model = self._profile.preferred_model or self._settings.default_model
+        model = self._model
         logger.info(
             "Atomics engine started — run_id=%s tier=%s provider=%s model=%s",
             self._run_id,
             self._tier.value,
             self._provider.name,
-            model,
+            model or "(provider default)",
         )
         logger.info(
             "Tier profile: %s | interval=%ds budget=$%.2f tokens/hr=%d req/min=%d",

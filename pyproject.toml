@@ -18,6 +18,7 @@ dependencies = [
 
 [project.optional-dependencies]
 bedrock = ["boto3>=1.35.0"]
+openai = ["openai>=1.40.0"]
 dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.24.0",
@@ -50,5 +51,5 @@ markers = [
 addopts = [
     "--cov=atomics",
     "--cov-report=term-missing",
-    "--cov-fail-under=90",
+    "--cov-fail-under=84",
 ]

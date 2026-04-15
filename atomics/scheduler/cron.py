@@ -14,11 +14,12 @@ def generate_crontab_entry(
     max_iterations: int = 10,
     python_path: str | None = None,
     tier: str = "baseline",
+    provider: str = "claude",
 ) -> str:
     py = python_path or shutil.which("python3") or sys.executable
     return (
         f"*/{interval_minutes} * * * * "
-        f"cd {Path.cwd()} && {py} -m atomics run --tier {tier} "
+        f"cd {Path.cwd()} && {py} -m atomics run --tier {tier} --provider {provider} "
         f"--max-iterations {max_iterations} >> logs/atomics-cron.log 2>&1"
     )
 
@@ -28,6 +29,7 @@ def generate_systemd_timer(
     max_iterations: int = 10,
     working_dir: str | None = None,
     tier: str = "baseline",
+    provider: str = "claude",
 ) -> tuple[str, str]:
     wd = working_dir or str(Path.cwd())
     py = shutil.which("python3") or sys.executable
@@ -39,7 +41,7 @@ After=network.target
 [Service]
 Type=oneshot
 WorkingDirectory={wd}
-ExecStart={py} -m atomics run --tier {tier} --max-iterations {max_iterations}
+ExecStart={py} -m atomics run --tier {tier} --provider {provider} --max-iterations {max_iterations}
 StandardOutput=append:{wd}/logs/atomics.log
 StandardError=append:{wd}/logs/atomics.log
 """
@@ -64,6 +66,7 @@ def generate_launchd_plist(
     working_dir: str | None = None,
     label: str = "com.babywyrm.atomics",
     tier: str = "baseline",
+    provider: str = "claude",
 ) -> str:
     wd = working_dir or str(Path.cwd())
     py = shutil.which("python3") or sys.executable
@@ -86,6 +89,8 @@ def generate_launchd_plist(
         <string>run</string>
         <string>--tier</string>
         <string>{tier}</string>
+        <string>--provider</string>
+        <string>{provider}</string>
         <string>--max-iterations</string>
         <string>{max_iterations}</string>
     </array>

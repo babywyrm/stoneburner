@@ -28,6 +28,12 @@ class AtomicsSettings(BaseSettings):
     circuit_breaker_threshold: int = Field(default=10)
 
     anthropic_api_key: str = Field(default="", validation_alias="ANTHROPIC_API_KEY")
+    openai_api_key: str = Field(default="", validation_alias="OPENAI_API_KEY")
+
+    auth_mode: str = Field(default="auto")
+    oidc_issuer: str = Field(default="")
+    oidc_client_id: str = Field(default="")
+    oidc_scopes: str = Field(default="")
 
     post_run_hook: str = Field(default="")
     notify_on_finish: bool = Field(default=False)

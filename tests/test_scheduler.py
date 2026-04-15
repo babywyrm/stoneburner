@@ -77,3 +77,35 @@ def test_all_formats_include_tier():
 
         plist = generate_launchd_plist(tier=tier)
         assert f"<string>{tier}</string>" in plist
+
+
+def test_crontab_includes_provider():
+    entry = generate_crontab_entry(provider="bedrock")
+    assert "--provider bedrock" in entry
+
+
+def test_crontab_default_provider_is_claude():
+    entry = generate_crontab_entry()
+    assert "--provider claude" in entry
+
+
+def test_systemd_includes_provider():
+    service, _ = generate_systemd_timer(provider="openai")
+    assert "--provider openai" in service
+
+
+def test_launchd_includes_provider():
+    plist = generate_launchd_plist(provider="bedrock")
+    assert "<string>bedrock</string>" in plist
+
+
+def test_all_formats_include_provider():
+    for provider in ("claude", "bedrock", "openai"):
+        entry = generate_crontab_entry(provider=provider)
+        assert f"--provider {provider}" in entry
+
+        service, _ = generate_systemd_timer(provider=provider)
+        assert f"--provider {provider}" in service
+
+        plist = generate_launchd_plist(provider=provider)
+        assert f"<string>{provider}</string>" in plist
