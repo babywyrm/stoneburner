@@ -18,6 +18,9 @@ def print_recent_runs(repo: MetricsRepository, limit: int = 10) -> None:
     table = Table(title="Recent Runs", show_lines=True)
     table.add_column("Run ID", style="cyan")
     table.add_column("Started", style="green")
+    table.add_column("Provider", style="magenta")
+    table.add_column("Tier")
+    table.add_column("Trigger", style="dim")
     table.add_column("Tasks", justify="right")
     table.add_column("OK", justify="right", style="green")
     table.add_column("Fail", justify="right", style="red")
@@ -29,6 +32,9 @@ def print_recent_runs(repo: MetricsRepository, limit: int = 10) -> None:
         table.add_row(
             r["run_id"],
             r["started_at"][:19] if r["started_at"] else "—",
+            r.get("provider", "—"),
+            r.get("tier", "—"),
+            r.get("trigger", "—"),
             str(r["total_tasks"]),
             str(r["successful_tasks"]),
             str(r["failed_tasks"]),
@@ -87,5 +93,36 @@ def print_category_breakdown(repo: MetricsRepository) -> None:
             f"{r['total_tokens']:,}",
             f"${r['total_cost']:.4f}",
             f"{r['avg_latency']:.0f}ms",
+        )
+    console.print(table)
+
+
+def print_provider_summary(
+    repo: MetricsRepository, *, since_hours: float | None = None
+) -> None:
+    console = Console()
+    rows = repo.get_runs_by_provider(since_hours=since_hours)
+    if not rows:
+        console.print("[dim]No provider data yet.[/dim]")
+        return
+
+    table = Table(title="Runs by Provider", show_lines=True)
+    table.add_column("Provider", style="magenta bold")
+    table.add_column("Runs", justify="right")
+    table.add_column("Tasks", justify="right")
+    table.add_column("OK", justify="right", style="green")
+    table.add_column("Tokens", justify="right")
+    table.add_column("Cost", justify="right", style="yellow")
+    table.add_column("Avg Latency", justify="right")
+
+    for r in rows:
+        table.add_row(
+            r["provider"],
+            str(r["run_count"]),
+            str(r["total_tasks"]),
+            str(r["successful_tasks"]),
+            f"{r['total_tokens']:,}",
+            f"${r['total_cost']:.4f}",
+            f"{r['avg_latency_ms']:.0f}ms",
         )
     console.print(table)

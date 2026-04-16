@@ -76,6 +76,12 @@ PROVIDER_CHOICES = click.Choice(["claude", "bedrock", "openai"], case_sensitive=
     default=None,
     help="Desktop notification when the run completes (default: ATOMICS_NOTIFY)",
 )
+@click.option(
+    "--trigger",
+    type=click.Choice(["manual", "scheduled", "test"], case_sensitive=False),
+    default="manual",
+    help="How this run was triggered (set automatically by scheduled runs)",
+)
 def run(
     tier: str,
     provider_name: str,
@@ -86,6 +92,7 @@ def run(
     region: str,
     hook_cmd: str | None,
     notify_flag: bool | None,
+    trigger: str,
 ) -> None:
     """Start the benchmarking loop."""
     settings = load_settings()
@@ -144,6 +151,7 @@ def run(
         interval_override=interval,
         model_override=effective_model,
         budget_override=budget,
+        trigger=trigger,
     )
 
     from atomics.hooks import hook_env, notify_run_complete, run_post_hook
@@ -173,12 +181,18 @@ def run(
 def report(hours: int, runs: int) -> None:
     """Show usage reports and trends."""
     settings = load_settings()
-    from atomics.reporting import print_category_breakdown, print_hourly_usage, print_recent_runs
+    from atomics.reporting import (
+        print_category_breakdown,
+        print_hourly_usage,
+        print_provider_summary,
+        print_recent_runs,
+    )
     from atomics.storage.repository import MetricsRepository
 
     repo = MetricsRepository(settings.db_path)
     try:
         print_recent_runs(repo, limit=runs)
+        print_provider_summary(repo, since_hours=hours)
         print_hourly_usage(repo, hours=hours)
         print_category_breakdown(repo)
     finally:
@@ -313,12 +327,16 @@ def schedule(
         uninstall_launchd,
         uninstall_systemd,
     )
+    from atomics.storage.repository import MetricsRepository
 
+    settings = load_settings()
     console = Console()
 
     if fmt == "auto":
         fmt = detect_best_scheduler()
         console.print(f"[dim]Auto-detected scheduler: {fmt}[/dim]")
+
+    schedule_id = f"{fmt}.{tier}.{provider_name}"
 
     if uninstall:
         if fmt == "crontab":
@@ -329,6 +347,9 @@ def schedule(
             msg = uninstall_launchd(tier=tier)
         else:
             msg = "Unknown format"
+        repo = MetricsRepository(settings.db_path)
+        repo.remove_schedule(schedule_id)
+        repo.close()
         console.print(f"[green]{msg}[/green]")
         return
 
@@ -336,6 +357,13 @@ def schedule(
         entry = generate_crontab_entry(interval, max_iterations, tier=tier, provider=provider_name)
         if install:
             msg = install_crontab(entry)
+            repo = MetricsRepository(settings.db_path)
+            repo.save_schedule(
+                schedule_id=schedule_id, format=fmt, tier=tier,
+                provider=provider_name, model=None,
+                interval_minutes=interval, max_iterations=max_iterations,
+            )
+            repo.close()
             console.print(f"[green]{msg}[/green]")
         else:
             console.print("[bold]Add this to your crontab (crontab -e):[/bold]\n")
@@ -346,6 +374,13 @@ def schedule(
         )
         if install:
             msg = install_systemd(service, timer, tier=tier)
+            repo = MetricsRepository(settings.db_path)
+            repo.save_schedule(
+                schedule_id=schedule_id, format=fmt, tier=tier,
+                provider=provider_name, model=None,
+                interval_minutes=interval, max_iterations=max_iterations,
+            )
+            repo.close()
             console.print(f"[green]{msg}[/green]")
         else:
             console.print("[bold]atomics.service:[/bold]")
@@ -358,12 +393,136 @@ def schedule(
         )
         if install:
             msg = install_launchd(plist, tier=tier)
+            repo = MetricsRepository(settings.db_path)
+            repo.save_schedule(
+                schedule_id=schedule_id, format=fmt, tier=tier,
+                provider=provider_name, model=None,
+                interval_minutes=interval, max_iterations=max_iterations,
+            )
+            repo.close()
             console.print(f"[green]{msg}[/green]")
         else:
             console.print(
                 "[bold]Save to ~/Library/LaunchAgents/com.babywyrm.atomics.plist:[/bold]\n"
             )
             console.print(plist)
+
+
+@cli.command("schedule-status")
+def schedule_status() -> None:
+    """Show installed schedules and their health."""
+    from atomics.scheduler.cron import check_schedule_health
+    from atomics.storage.repository import MetricsRepository
+
+    settings = load_settings()
+    console = Console()
+    repo = MetricsRepository(settings.db_path)
+    try:
+        schedules = repo.get_schedules()
+        if not schedules:
+            console.print("[dim]No schedules installed. Use [bold]atomics schedule --install[/bold].[/dim]")
+            return
+
+        table = Table(title="Installed Schedules", show_lines=True)
+        table.add_column("ID", style="cyan")
+        table.add_column("Format")
+        table.add_column("Tier")
+        table.add_column("Provider", style="magenta")
+        table.add_column("Interval", justify="right")
+        table.add_column("Tasks/Run", justify="right")
+        table.add_column("Installed", style="green")
+        table.add_column("Last Run")
+        table.add_column("Status")
+        table.add_column("OS Health")
+
+        for s in schedules:
+            health = check_schedule_health(
+                s["format"], s["tier"],
+            )
+            status_style = (
+                "[green]success[/green]" if s.get("last_status") == "success"
+                else "[red]failed[/red]" if s.get("last_status") == "failed"
+                else "[dim]—[/dim]"
+            )
+            health_style = (
+                "[green]alive[/green]" if health
+                else "[red]missing[/red]"
+            )
+            table.add_row(
+                s["schedule_id"],
+                s["format"],
+                s["tier"],
+                s["provider"],
+                f"{s['interval_minutes']}m",
+                str(s["max_iterations"]),
+                s["installed_at"][:19] if s.get("installed_at") else "—",
+                s["last_run_at"][:19] if s.get("last_run_at") else "—",
+                status_style,
+                health_style,
+            )
+        console.print(table)
+    finally:
+        repo.close()
+
+
+@cli.command()
+@click.option(
+    "--by",
+    type=click.Choice(["provider", "model"], case_sensitive=False),
+    default="provider",
+    help="Group comparison by provider or model",
+)
+@click.option("--since-hours", type=float, default=None, help="Only include recent data")
+@click.option("--tier", "-t", type=TIER_CHOICES, default=None, help="Filter by tier")
+@click.option("--category", type=str, default=None, help="Filter by task category")
+def compare(by: str, since_hours: float | None, tier: str | None, category: str | None) -> None:
+    """Compare providers or models side-by-side."""
+    settings = load_settings()
+    from atomics.storage.repository import MetricsRepository
+
+    console = Console()
+    repo = MetricsRepository(settings.db_path)
+    try:
+        rows = repo.compare_providers(
+            since_hours=since_hours,
+            tier=tier,
+            category=category,
+            group_by=by,
+        )
+        if not rows:
+            console.print("[dim]No data to compare. Run benchmarks with multiple providers first.[/dim]")
+            return
+
+        label = "Provider" if by == "provider" else "Model"
+        detail_label = "Model(s)" if by == "provider" else "Provider"
+        table = Table(title=f"Comparison by {label}", show_lines=True)
+        table.add_column(label, style="magenta bold")
+        table.add_column(detail_label, style="dim")
+        table.add_column("Tasks", justify="right")
+        table.add_column("Success %", justify="right", style="green")
+        table.add_column("Avg Tokens", justify="right")
+        table.add_column("Avg Latency", justify="right")
+        table.add_column("Avg Cost/Task", justify="right", style="yellow")
+        table.add_column("Total Cost", justify="right", style="yellow bold")
+
+        for r in rows:
+            success_pct = (
+                f"{r['successes'] / r['task_count'] * 100:.0f}%"
+                if r["task_count"] > 0 else "—"
+            )
+            table.add_row(
+                r["group_key"],
+                r.get("models_used", "—") or "—",
+                str(r["task_count"]),
+                success_pct,
+                f"{r['avg_tokens']:.0f}",
+                f"{r['avg_latency_ms']:.0f}ms",
+                f"${r['avg_cost_per_task']:.6f}",
+                f"${r['total_cost']:.4f}",
+            )
+        console.print(table)
+    finally:
+        repo.close()
 
 
 @cli.command()

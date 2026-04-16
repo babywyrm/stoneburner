@@ -33,6 +33,7 @@ class LoopEngine:
         interval_override: int | None = None,
         budget_override: float | None = None,
         model_override: str | None = None,
+        trigger: str = "manual",
     ) -> None:
         self._provider = provider
         self._repo = repo
@@ -60,6 +61,7 @@ class LoopEngine:
             )
         )
         self._model = model_override
+        self._trigger = trigger
         self._shutdown = asyncio.Event()
         self._run_id: str = ""
 
@@ -71,7 +73,13 @@ class LoopEngine:
         """Start the benchmarking loop. Runs until shutdown signal or iteration cap."""
         self._install_signal_handlers()
         self._run_id = uuid.uuid4().hex[:12]
-        self._repo.create_run(self._run_id)
+        self._repo.create_run(
+            self._run_id,
+            tier=self._tier.value,
+            provider=self._provider.name,
+            model=self._model or "",
+            trigger=self._trigger,
+        )
 
         model = self._model
         logger.info(
@@ -153,6 +161,13 @@ class LoopEngine:
                 await asyncio.sleep(0)
 
         summary = self._repo.complete_run(self._run_id)
+        if self._trigger == "scheduled":
+            schedule_id = f"%.{self._tier.value}.{self._provider.name}"
+            status = "success" if summary.failed_tasks == 0 else "failed"
+            for sched in self._repo.get_schedules():
+                if sched["tier"] == self._tier.value and sched["provider"] == self._provider.name:
+                    self._repo.update_schedule_last_run(sched["schedule_id"], status)
+                    break
         logger.info(
             "Run complete — tier=%s tasks=%d success=%d failed=%d tokens=%d cost=$%.4f",
             self._tier.value,

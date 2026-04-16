@@ -20,6 +20,7 @@ def generate_crontab_entry(
     return (
         f"*/{interval_minutes} * * * * "
         f"cd {Path.cwd()} && {py} -m atomics run --tier {tier} --provider {provider} "
+        f"--trigger scheduled "
         f"--max-iterations {max_iterations} >> logs/atomics-cron.log 2>&1"
     )
 
@@ -41,7 +42,7 @@ After=network.target
 [Service]
 Type=oneshot
 WorkingDirectory={wd}
-ExecStart={py} -m atomics run --tier {tier} --provider {provider} --max-iterations {max_iterations}
+ExecStart={py} -m atomics run --tier {tier} --provider {provider} --trigger scheduled --max-iterations {max_iterations}
 StandardOutput=append:{wd}/logs/atomics.log
 StandardError=append:{wd}/logs/atomics.log
 """
@@ -91,6 +92,8 @@ def generate_launchd_plist(
         <string>{tier}</string>
         <string>--provider</string>
         <string>{provider}</string>
+        <string>--trigger</string>
+        <string>scheduled</string>
         <string>--max-iterations</string>
         <string>{max_iterations}</string>
     </array>
@@ -245,3 +248,35 @@ def detect_best_scheduler(*, system_name=platform.system, which=shutil.which) ->
     if which("systemctl"):
         return "systemd"
     return "crontab"
+
+
+def check_schedule_health(
+    fmt: str,
+    tier: str,
+    *,
+    label: str = "com.babywyrm.atomics",
+    run_cmd=subprocess.run,
+    home_dir: Path | None = None,
+) -> bool:
+    """Check whether the OS-level schedule is actually active."""
+    if fmt == "launchd":
+        result = run_cmd(
+            ["launchctl", "list", f"{label}.{tier}"],
+            capture_output=True, text=True,
+        )
+        return result.returncode == 0
+    elif fmt == "systemd":
+        result = run_cmd(
+            ["systemctl", "--user", "is-active", f"atomics-{tier}.timer"],
+            capture_output=True, text=True,
+        )
+        return result.returncode == 0 and "active" in result.stdout
+    elif fmt == "crontab":
+        result = run_cmd(
+            ["crontab", "-l"],
+            capture_output=True, text=True,
+        )
+        if result.returncode != 0:
+            return False
+        return "atomics-managed" in result.stdout and f"--tier {tier}" in result.stdout
+    return False

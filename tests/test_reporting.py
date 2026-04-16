@@ -5,21 +5,26 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from atomics.models import TaskCategory, TaskResult, TaskStatus
-from atomics.reporting import print_category_breakdown, print_hourly_usage, print_recent_runs
+from atomics.reporting import (
+    print_category_breakdown,
+    print_hourly_usage,
+    print_provider_summary,
+    print_recent_runs,
+)
 from atomics.storage.repository import MetricsRepository
 
 
 def _seeded_repo() -> MetricsRepository:
     repo = MetricsRepository(Path(tempfile.mktemp(suffix=".db")))
-    repo.create_run("rpt-001")
+    repo.create_run("rpt-001", tier="ez", provider="bedrock", model="us.anthropic.claude-sonnet-4-6")
     for i in range(3):
         result = TaskResult(
             task_id=f"rpt-t{i}",
             run_id="rpt-001",
             category=TaskCategory.RESEARCH if i < 2 else TaskCategory.SECURITY_NEWS,
             task_name=f"task_{i}",
-            provider="claude",
-            model="test",
+            provider="bedrock",
+            model="us.anthropic.claude-sonnet-4-6",
             status=TaskStatus.SUCCESS,
             input_tokens=50,
             output_tokens=100 * (i + 1),
@@ -38,8 +43,10 @@ def test_print_recent_runs(capsys):
     repo = _seeded_repo()
     print_recent_runs(repo, limit=5)
     captured = capsys.readouterr()
-    assert "rpt-001" in captured.out
-    assert "3" in captured.out
+    assert "rpt" in captured.out
+    assert "bedr" in captured.out
+    assert "ez" in captured.out
+    assert "Recent Runs" in captured.out
     repo.close()
 
 
@@ -81,4 +88,21 @@ def test_print_category_breakdown_empty(capsys):
     print_category_breakdown(repo)
     captured = capsys.readouterr()
     assert "No category" in captured.out
+    repo.close()
+
+
+def test_print_provider_summary(capsys):
+    repo = _seeded_repo()
+    print_provider_summary(repo)
+    captured = capsys.readouterr()
+    assert "bedrock" in captured.out
+    assert "Runs by Provider" in captured.out
+    repo.close()
+
+
+def test_print_provider_summary_empty(capsys):
+    repo = MetricsRepository(Path(tempfile.mktemp(suffix=".db")))
+    print_provider_summary(repo)
+    captured = capsys.readouterr()
+    assert "No provider" in captured.out
     repo.close()

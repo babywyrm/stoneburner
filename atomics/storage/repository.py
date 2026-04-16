@@ -18,11 +18,20 @@ class MetricsRepository:
 
     # ── Runs ──────────────────────────────────────────────
 
-    def create_run(self, run_id: str) -> None:
+    def create_run(
+        self,
+        run_id: str,
+        *,
+        tier: str = "baseline",
+        provider: str = "claude",
+        model: str = "",
+        trigger: str = "manual",
+    ) -> None:
         now = datetime.now(UTC).isoformat()
         self._conn.execute(
-            "INSERT INTO runs (run_id, started_at) VALUES (?, ?)",
-            (run_id, now),
+            "INSERT INTO runs (run_id, started_at, tier, provider, model, trigger) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (run_id, now, tier, provider, model, trigger),
         )
         self._conn.commit()
 
@@ -187,3 +196,125 @@ class MetricsRepository:
             params.append(limit)
         rows = self._conn.execute(sql, params).fetchall()
         return [dict(r) for r in rows]
+
+    # ── Provider comparison ───────────────────────────────
+
+    def compare_providers(
+        self,
+        *,
+        since_hours: float | None = None,
+        tier: str | None = None,
+        category: str | None = None,
+        group_by: str = "provider",
+    ) -> list[dict]:
+        """Aggregate task metrics grouped by provider or model."""
+        clauses: list[str] = []
+        params: list = []
+        if since_hours is not None:
+            clauses.append("started_at >= datetime('now', ?)")
+            params.append(f"-{since_hours} hours")
+        if tier is not None:
+            clauses.append(
+                "run_id IN (SELECT run_id FROM runs WHERE tier = ?)"
+            )
+            params.append(tier)
+        if category is not None:
+            clauses.append("category = ?")
+            params.append(category)
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        col = "provider" if group_by == "provider" else "model"
+        other = "model" if group_by == "provider" else "provider"
+        sql = f"""
+            SELECT
+                {col} as group_key,
+                GROUP_CONCAT(DISTINCT {other}) as models_used,
+                COUNT(*) as task_count,
+                COALESCE(SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END), 0) as successes,
+                COALESCE(AVG(total_tokens), 0) as avg_tokens,
+                COALESCE(AVG(latency_ms), 0) as avg_latency_ms,
+                COALESCE(AVG(estimated_cost_usd), 0) as avg_cost_per_task,
+                COALESCE(SUM(estimated_cost_usd), 0) as total_cost,
+                COALESCE(SUM(total_tokens), 0) as total_tokens
+            FROM task_results {where}
+            GROUP BY {col}
+            ORDER BY avg_cost_per_task ASC
+        """
+        rows = self._conn.execute(sql, params).fetchall()
+        return [dict(r) for r in rows]
+
+    def get_runs_by_provider(
+        self,
+        *,
+        since_hours: float | None = None,
+    ) -> list[dict]:
+        """Aggregate run-level metrics grouped by provider."""
+        clauses: list[str] = []
+        params: list = []
+        if since_hours is not None:
+            clauses.append("started_at >= datetime('now', ?)")
+            params.append(f"-{since_hours} hours")
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        sql = f"""
+            SELECT
+                provider,
+                COUNT(*) as run_count,
+                COALESCE(SUM(total_tasks), 0) as total_tasks,
+                COALESCE(SUM(successful_tasks), 0) as successful_tasks,
+                COALESCE(SUM(total_tokens), 0) as total_tokens,
+                COALESCE(SUM(total_cost_usd), 0) as total_cost,
+                COALESCE(AVG(avg_latency_ms), 0) as avg_latency_ms
+            FROM runs {where}
+            GROUP BY provider
+            ORDER BY total_cost DESC
+        """
+        rows = self._conn.execute(sql, params).fetchall()
+        return [dict(r) for r in rows]
+
+    # ── Schedule registry ─────────────────────────────────
+
+    def save_schedule(
+        self,
+        *,
+        schedule_id: str,
+        format: str,
+        tier: str,
+        provider: str,
+        model: str | None,
+        interval_minutes: int,
+        max_iterations: int,
+    ) -> None:
+        now = datetime.now(UTC).isoformat()
+        self._conn.execute(
+            """
+            INSERT OR REPLACE INTO schedules
+                (schedule_id, format, tier, provider, model,
+                 interval_minutes, max_iterations, installed_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (schedule_id, format, tier, provider, model,
+             interval_minutes, max_iterations, now),
+        )
+        self._conn.commit()
+
+    def remove_schedule(self, schedule_id: str) -> None:
+        self._conn.execute(
+            "DELETE FROM schedules WHERE schedule_id = ?", (schedule_id,)
+        )
+        self._conn.commit()
+
+    def get_schedules(self) -> list[dict]:
+        rows = self._conn.execute(
+            "SELECT * FROM schedules ORDER BY installed_at DESC"
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def update_schedule_last_run(
+        self, schedule_id: str, status: str
+    ) -> None:
+        now = datetime.now(UTC).isoformat()
+        self._conn.execute(
+            "UPDATE schedules SET last_run_at = ?, last_status = ? "
+            "WHERE schedule_id = ?",
+            (now, status, schedule_id),
+        )
+        self._conn.commit()
