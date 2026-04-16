@@ -1,6 +1,7 @@
 """Tests for scheduler config generation."""
 
 from atomics.scheduler.cron import (
+    check_schedule_health,
     generate_crontab_entry,
     generate_launchd_plist,
     generate_systemd_timer,
@@ -109,3 +110,66 @@ def test_all_formats_include_provider():
 
         plist = generate_launchd_plist(provider=provider)
         assert f"<string>{provider}</string>" in plist
+
+
+def test_all_formats_include_trigger_scheduled():
+    entry = generate_crontab_entry()
+    assert "--trigger scheduled" in entry
+
+    service, _ = generate_systemd_timer()
+    assert "--trigger scheduled" in service
+
+    plist = generate_launchd_plist()
+    assert "<string>scheduled</string>" in plist
+
+
+def _fake_run(returncode=0, stdout="", stderr=""):
+    import subprocess
+    import types
+
+    def _run(cmd, **kwargs):
+        return types.SimpleNamespace(returncode=returncode, stdout=stdout, stderr=stderr)
+    return _run
+
+
+def test_check_schedule_health_launchd_alive():
+    assert check_schedule_health(
+        "launchd", "ez", run_cmd=_fake_run(returncode=0)
+    ) is True
+
+
+def test_check_schedule_health_launchd_missing():
+    assert check_schedule_health(
+        "launchd", "ez", run_cmd=_fake_run(returncode=1)
+    ) is False
+
+
+def test_check_schedule_health_systemd_active():
+    assert check_schedule_health(
+        "systemd", "baseline", run_cmd=_fake_run(returncode=0, stdout="active\n")
+    ) is True
+
+
+def test_check_schedule_health_systemd_inactive():
+    assert check_schedule_health(
+        "systemd", "baseline", run_cmd=_fake_run(returncode=3, stdout="inactive\n")
+    ) is False
+
+
+def test_check_schedule_health_crontab_present():
+    crontab_content = "*/30 * * * * ... --tier ez ... # atomics-managed"
+    assert check_schedule_health(
+        "crontab", "ez", run_cmd=_fake_run(returncode=0, stdout=crontab_content)
+    ) is True
+
+
+def test_check_schedule_health_crontab_absent():
+    assert check_schedule_health(
+        "crontab", "ez", run_cmd=_fake_run(returncode=1)
+    ) is False
+
+
+def test_check_schedule_health_unknown_format():
+    assert check_schedule_health(
+        "windows", "ez", run_cmd=_fake_run(returncode=0)
+    ) is False

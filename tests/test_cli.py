@@ -417,6 +417,122 @@ def test_cli_schedule_launchd_with_provider():
     assert "openai" in result.output
 
 
+def test_cli_schedule_status_empty(tmp_path):
+    runner = CliRunner(env={"ATOMICS_DB_PATH": str(tmp_path / "status.db")})
+    result = runner.invoke(cli, ["schedule-status"])
+    assert result.exit_code == 0
+    assert "No schedules" in result.output
+
+
+def test_cli_schedule_status_with_entries(tmp_path, monkeypatch):
+    from atomics.storage.repository import MetricsRepository
+
+    db_path = tmp_path / "status2.db"
+    repo = MetricsRepository(db_path)
+    repo.save_schedule(
+        schedule_id="launchd.ez.bedrock",
+        format="launchd",
+        tier="ez",
+        provider="bedrock",
+        model=None,
+        interval_minutes=30,
+        max_iterations=10,
+    )
+    repo.close()
+
+    monkeypatch.setattr(
+        "atomics.scheduler.cron.check_schedule_health",
+        lambda fmt, tier, **kw: True,
+    )
+    runner = CliRunner(env={"ATOMICS_DB_PATH": str(db_path)})
+    result = runner.invoke(cli, ["schedule-status"])
+    assert result.exit_code == 0
+    assert "Installed Schedules" in result.output
+    assert "bedrock" in result.output or "bedr" in result.output
+
+
+def test_cli_compare_empty(tmp_path):
+    runner = CliRunner(env={"ATOMICS_DB_PATH": str(tmp_path / "cmp.db")})
+    result = runner.invoke(cli, ["compare"])
+    assert result.exit_code == 0
+    assert "No data" in result.output
+
+
+def test_cli_compare_with_data(tmp_path):
+    from datetime import UTC, datetime
+
+    from atomics.models import TaskCategory, TaskResult, TaskStatus
+    from atomics.storage.repository import MetricsRepository
+
+    db_path = tmp_path / "cmp2.db"
+    repo = MetricsRepository(db_path)
+    for provider, run_id in [("claude", "c1"), ("bedrock", "c2")]:
+        repo.create_run(run_id, provider=provider, tier="ez")
+        for i in range(2):
+            result = TaskResult(
+                task_id=f"{run_id}-t{i}",
+                run_id=run_id,
+                category=TaskCategory.GENERAL_QA,
+                task_name="q",
+                provider=provider,
+                model="m",
+                status=TaskStatus.SUCCESS,
+                total_tokens=100,
+                latency_ms=200.0,
+                estimated_cost_usd=0.01,
+                started_at=datetime.now(UTC),
+                completed_at=datetime.now(UTC),
+            )
+            repo.save_task_result(result)
+        repo.complete_run(run_id)
+    repo.close()
+
+    runner = CliRunner(env={"ATOMICS_DB_PATH": str(db_path)})
+    result = runner.invoke(cli, ["compare"])
+    assert result.exit_code == 0
+    assert "Comparison" in result.output
+
+
+def test_cli_compare_by_model(tmp_path):
+    from datetime import UTC, datetime
+
+    from atomics.models import TaskCategory, TaskResult, TaskStatus
+    from atomics.storage.repository import MetricsRepository
+
+    db_path = tmp_path / "cmp3.db"
+    repo = MetricsRepository(db_path)
+    repo.create_run("m1", provider="openai")
+    for model, tid in [("gpt-4o", "t1"), ("gpt-4o-mini", "t2")]:
+        result = TaskResult(
+            task_id=tid,
+            run_id="m1",
+            category=TaskCategory.GENERAL_QA,
+            task_name="q",
+            provider="openai",
+            model=model,
+            status=TaskStatus.SUCCESS,
+            total_tokens=50,
+            latency_ms=100.0,
+            estimated_cost_usd=0.005,
+            started_at=datetime.now(UTC),
+            completed_at=datetime.now(UTC),
+        )
+        repo.save_task_result(result)
+    repo.complete_run("m1")
+    repo.close()
+
+    runner = CliRunner(env={"ATOMICS_DB_PATH": str(db_path)})
+    result = runner.invoke(cli, ["compare", "--by", "model"])
+    assert result.exit_code == 0
+    assert "Model" in result.output
+
+
+def test_cli_compare_with_filters(tmp_path):
+    runner = CliRunner(env={"ATOMICS_DB_PATH": str(tmp_path / "cmpf.db")})
+    result = runner.invoke(cli, ["compare", "--since-hours", "24", "--tier", "ez"])
+    assert result.exit_code == 0
+
+
 def test_cli_completion_zsh():
     runner = CliRunner()
     result = runner.invoke(cli, ["completion", "zsh"])
