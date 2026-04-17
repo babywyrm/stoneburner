@@ -65,7 +65,7 @@ stoneburner/
 │   ├── cli.py            # Click CLI entry point
 │   └── reporting.py      # Rich table trend reports
 ├── configs/              # Rate/budget profiles (default, aggressive, conservative)
-├── tests/                # 89 tests at 93% coverage
+├── tests/                # 232+ tests at 87% coverage
 └── workers/npm/          # Optional Node.js workers (Phase 3)
 ```
 
@@ -76,17 +76,23 @@ stoneburner/
 | `atomics run` | Start the benchmarking loop (continuous or bounded) |
 | `atomics run --tier mega -n 10` | Run 10 mega-tier tasks |
 | `atomics run --provider bedrock` | Use AWS Bedrock instead of Claude API |
+| `atomics run --provider openai` | Use OpenAI / Codex |
 | `atomics run -b 5.0` | Run with $5 budget cap |
 | `atomics run -i 10` | Override interval to 10 seconds |
+| `atomics compare` | Compare providers side-by-side (cost, latency, tokens) |
+| `atomics compare --by model` | Compare individual models across providers |
 | `atomics report` | Display usage reports and trends |
 | `atomics tiers` | Show available burn tiers and their profiles |
-| `atomics run --provider openai` | Use OpenAI / Codex |
 | `atomics provider-test` | Health check the configured provider |
 | `atomics provider-test -p bedrock` | Health check Bedrock |
 | `atomics provider-test -p openai` | Health check OpenAI |
 | `atomics schedule` | Generate scheduler configs |
 | `atomics schedule --install` | Install schedule on this system |
 | `atomics schedule --uninstall` | Remove installed schedule |
+| `atomics schedule-status` | Show installed schedules and OS health |
+| `atomics login` | OAuth/OIDC login (browser or device code) |
+| `atomics logout` | Clear cached OAuth tokens |
+| `atomics whoami` | Show current auth mode and identity |
 
 ## Providers
 
@@ -140,6 +146,34 @@ Set via environment variables (prefix `ATOMICS_`) or `.env` file:
 Override with `ATOMICS_DB_PATH` on any platform.
 
 CLI flags (`--tier`, `--budget`, `--interval`) override these defaults at runtime.
+
+## Provider Comparison
+
+Run benchmarks with multiple providers, then compare them side-by-side:
+
+```bash
+uv run atomics run --provider claude --tier ez -n 3 -i 5
+uv run atomics run --provider bedrock --tier ez -n 3 -i 5
+uv run atomics run --provider openai --tier ez -n 3 -i 5
+
+# Compare by provider (shows model(s), class, P50/P95 latency, $/1K tokens)
+uv run atomics compare
+
+# Compare by individual model
+uv run atomics compare --by model
+
+# Filter by time window or tier
+uv run atomics compare --since-hours 24 --tier ez
+```
+
+Models are tagged by class (light/mid/heavy) so you can spot apples-to-oranges
+comparisons. A warning is shown when mixed classes are detected.
+
+| Class | Claude | OpenAI | Bedrock |
+|-------|--------|--------|---------|
+| **light** | Haiku 4.5 | gpt-4o-mini, gpt-4.1-nano | Haiku on Bedrock |
+| **mid** | Sonnet 4.6 | gpt-4o, gpt-4.1, o4-mini | Sonnet on Bedrock |
+| **heavy** | Opus 4.6 | o3 | Opus on Bedrock |
 
 ## Running Tests
 

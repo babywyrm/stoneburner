@@ -478,6 +478,7 @@ def schedule_status() -> None:
 def compare(by: str, since_hours: float | None, tier: str | None, category: str | None) -> None:
     """Compare providers or models side-by-side."""
     settings = load_settings()
+    from atomics.model_classes import classify_model
     from atomics.storage.repository import MetricsRepository
 
     console = Console()
@@ -498,6 +499,7 @@ def compare(by: str, since_hours: float | None, tier: str | None, category: str 
         table = Table(title=f"Comparison by {label}", show_lines=True)
         table.add_column(label, style="magenta bold")
         table.add_column(detail_label, style="dim")
+        table.add_column("Class", style="cyan")
         table.add_column("Tasks", justify="right")
         table.add_column("Success %", justify="right", style="green")
         table.add_column("Avg Tokens", justify="right")
@@ -507,14 +509,20 @@ def compare(by: str, since_hours: float | None, tier: str | None, category: str 
         table.add_column("Avg $/Task", justify="right", style="yellow")
         table.add_column("Total $", justify="right", style="yellow bold")
 
+        classes_seen: set[str] = set()
         for r in rows:
             success_pct = (
                 f"{r['successes'] / r['task_count'] * 100:.0f}%"
                 if r["task_count"] > 0 else "—"
             )
+            models = (r.get("models_used") or "").split(",")
+            model_classes = {classify_model(m.strip()) for m in models if m.strip()}
+            cls_label = ", ".join(sorted({c.value for c in model_classes})) or "—"
+            classes_seen.update(c.value for c in model_classes)
             table.add_row(
                 r["group_key"],
                 r.get("models_used", "—") or "—",
+                cls_label,
                 str(r["task_count"]),
                 success_pct,
                 f"{r['avg_tokens']:.0f}",
@@ -525,6 +533,13 @@ def compare(by: str, since_hours: float | None, tier: str | None, category: str 
                 f"${r['total_cost']:.4f}",
             )
         console.print(table)
+
+        if len(classes_seen) > 1:
+            console.print(
+                "\n[yellow]⚠ Mixed model classes detected.[/yellow] "
+                "For a fair comparison, run the same tier with equivalent models "
+                "(e.g. all light-class or all mid-class)."
+            )
     finally:
         repo.close()
 
