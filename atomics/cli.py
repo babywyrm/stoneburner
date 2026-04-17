@@ -501,9 +501,11 @@ def compare(by: str, since_hours: float | None, tier: str | None, category: str 
         table.add_column("Tasks", justify="right")
         table.add_column("Success %", justify="right", style="green")
         table.add_column("Avg Tokens", justify="right")
-        table.add_column("Avg Latency", justify="right")
-        table.add_column("Avg Cost/Task", justify="right", style="yellow")
-        table.add_column("Total Cost", justify="right", style="yellow bold")
+        table.add_column("P50 Lat.", justify="right")
+        table.add_column("P95 Lat.", justify="right")
+        table.add_column("$/1K tok", justify="right", style="yellow")
+        table.add_column("Avg $/Task", justify="right", style="yellow")
+        table.add_column("Total $", justify="right", style="yellow bold")
 
         for r in rows:
             success_pct = (
@@ -516,7 +518,9 @@ def compare(by: str, since_hours: float | None, tier: str | None, category: str 
                 str(r["task_count"]),
                 success_pct,
                 f"{r['avg_tokens']:.0f}",
-                f"{r['avg_latency_ms']:.0f}ms",
+                f"{r['p50_latency_ms']:.0f}ms",
+                f"{r['p95_latency_ms']:.0f}ms",
+                f"${r['cost_per_1k_tokens']:.4f}",
                 f"${r['avg_cost_per_task']:.6f}",
                 f"${r['total_cost']:.4f}",
             )

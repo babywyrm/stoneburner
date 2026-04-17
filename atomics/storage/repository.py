@@ -9,6 +9,18 @@ from atomics.models import RunSummary, TaskResult, TaskStatus
 from atomics.storage.schema import init_db
 
 
+def _percentile(sorted_values: list[float], pct: float) -> float:
+    """Compute a percentile from a pre-sorted list."""
+    if not sorted_values:
+        return 0.0
+    k = (len(sorted_values) - 1) * (pct / 100)
+    f = int(k)
+    c = f + 1
+    if c >= len(sorted_values):
+        return sorted_values[f]
+    return sorted_values[f] + (k - f) * (sorted_values[c] - sorted_values[f])
+
+
 class MetricsRepository:
     def __init__(self, db_path: Path) -> None:
         self._conn = init_db(db_path)
@@ -207,7 +219,11 @@ class MetricsRepository:
         category: str | None = None,
         group_by: str = "provider",
     ) -> list[dict]:
-        """Aggregate task metrics grouped by provider or model."""
+        """Aggregate task metrics grouped by provider or model.
+
+        Returns dicts with aggregates plus latency percentiles (p50, p95)
+        and cost_per_1k_tokens for fairer cross-model comparison.
+        """
         clauses: list[str] = []
         params: list = []
         if since_hours is not None:
@@ -239,8 +255,37 @@ class MetricsRepository:
             GROUP BY {col}
             ORDER BY avg_cost_per_task ASC
         """
-        rows = self._conn.execute(sql, params).fetchall()
-        return [dict(r) for r in rows]
+        agg_rows = self._conn.execute(sql, params).fetchall()
+
+        detail_sql = f"""
+            SELECT {col} as group_key, latency_ms, estimated_cost_usd, total_tokens
+            FROM task_results {where}
+            ORDER BY {col}
+        """
+        detail_rows = self._conn.execute(detail_sql, params).fetchall()
+
+        from collections import defaultdict
+        latencies: dict[str, list[float]] = defaultdict(list)
+        costs_tokens: dict[str, tuple[float, int]] = defaultdict(lambda: (0.0, 0))
+        for dr in detail_rows:
+            key = dr["group_key"]
+            latencies[key].append(dr["latency_ms"])
+            cost, toks = costs_tokens[key]
+            costs_tokens[key] = (cost + dr["estimated_cost_usd"], toks + dr["total_tokens"])
+
+        results = []
+        for row in agg_rows:
+            d = dict(row)
+            key = d["group_key"]
+            lats = sorted(latencies.get(key, []))
+            d["p50_latency_ms"] = _percentile(lats, 50)
+            d["p95_latency_ms"] = _percentile(lats, 95)
+            total_cost, total_toks = costs_tokens.get(key, (0.0, 0))
+            d["cost_per_1k_tokens"] = (
+                (total_cost / total_toks * 1000) if total_toks > 0 else 0.0
+            )
+            results.append(d)
+        return results
 
     def get_runs_by_provider(
         self,

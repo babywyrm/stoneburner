@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from atomics.models import TaskCategory, TaskResult, TaskStatus
-from atomics.storage.repository import MetricsRepository
+from atomics.storage.repository import MetricsRepository, _percentile
 from atomics.storage.schema import SCHEMA_VERSION, init_db
 
 
@@ -205,7 +205,7 @@ def test_compare_providers():
                 model="m",
                 status=TaskStatus.SUCCESS,
                 total_tokens=100,
-                latency_ms=200.0,
+                latency_ms=200.0 + i * 100,
                 estimated_cost_usd=0.01,
                 started_at=datetime.now(UTC),
                 completed_at=datetime.now(UTC),
@@ -221,6 +221,11 @@ def test_compare_providers():
     for r in rows:
         assert r["task_count"] == 3
         assert r["successes"] == 3
+        assert "p50_latency_ms" in r
+        assert "p95_latency_ms" in r
+        assert "cost_per_1k_tokens" in r
+        assert r["p50_latency_ms"] > 0
+        assert r["cost_per_1k_tokens"] > 0
     repo.close()
 
 
@@ -293,4 +298,74 @@ def test_schedule_crud():
 
     repo.remove_schedule("launchd.ez.bedrock")
     assert len(repo.get_schedules()) == 0
+    repo.close()
+
+
+def test_percentile_basic():
+    assert _percentile([], 50) == 0.0
+    assert _percentile([10.0], 50) == 10.0
+    assert _percentile([10.0, 20.0], 50) == 15.0
+    assert _percentile([10.0, 20.0, 30.0, 40.0, 50.0], 50) == 30.0
+
+
+def test_percentile_p95():
+    vals = sorted([100, 200, 300, 400, 500, 600, 700, 800, 900, 1000])
+    p95 = _percentile(vals, 95)
+    assert 900 < p95 <= 1000
+
+
+def test_compare_cost_per_1k_tokens():
+    repo = _tmp_repo()
+    repo.create_run("cost-run", provider="openai")
+    result = TaskResult(
+        task_id="cost-t1",
+        run_id="cost-run",
+        category=TaskCategory.GENERAL_QA,
+        task_name="q",
+        provider="openai",
+        model="gpt-4o",
+        status=TaskStatus.SUCCESS,
+        total_tokens=1000,
+        latency_ms=500.0,
+        estimated_cost_usd=0.01,
+        started_at=datetime.now(UTC),
+        completed_at=datetime.now(UTC),
+    )
+    repo.save_task_result(result)
+    repo.complete_run("cost-run")
+
+    rows = repo.compare_providers()
+    assert len(rows) == 1
+    assert abs(rows[0]["cost_per_1k_tokens"] - 0.01) < 0.0001
+    repo.close()
+
+
+def test_compare_latency_percentiles():
+    repo = _tmp_repo()
+    repo.create_run("lat-run", provider="claude")
+    latencies = [100, 150, 200, 250, 300, 350, 400, 450, 500, 1000]
+    for i, lat in enumerate(latencies):
+        result = TaskResult(
+            task_id=f"lat-t{i}",
+            run_id="lat-run",
+            category=TaskCategory.GENERAL_QA,
+            task_name="q",
+            provider="claude",
+            model="m",
+            status=TaskStatus.SUCCESS,
+            total_tokens=100,
+            latency_ms=float(lat),
+            estimated_cost_usd=0.001,
+            started_at=datetime.now(UTC),
+            completed_at=datetime.now(UTC),
+        )
+        repo.save_task_result(result)
+    repo.complete_run("lat-run")
+
+    rows = repo.compare_providers()
+    assert len(rows) == 1
+    r = rows[0]
+    assert 200 < r["p50_latency_ms"] < 400
+    assert r["p95_latency_ms"] > r["p50_latency_ms"]
+    assert r["p95_latency_ms"] >= 500
     repo.close()
