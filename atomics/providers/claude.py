@@ -67,6 +67,8 @@ class ClaudeProvider(BaseProvider):
         inp = response.usage.input_tokens
         out = response.usage.output_tokens
 
+        tps = out / (latency / 1000) if latency > 0 and out > 0 else None
+
         return ProviderResponse(
             text=text,
             input_tokens=inp,
@@ -75,6 +77,7 @@ class ClaudeProvider(BaseProvider):
             model=model,
             latency_ms=round(latency, 2),
             estimated_cost_usd=round(_estimate_cost(model, inp, out), 6),
+            tokens_per_second=round(tps, 2) if tps is not None else None,
             raw=response.model_dump() if hasattr(response, "model_dump") else None,
         )
 

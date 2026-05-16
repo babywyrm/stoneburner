@@ -43,6 +43,17 @@ MODEL_CLASS_MAP: dict[str, ModelClass] = {
     "o3-mini": ModelClass.MID,
     "o4-mini": ModelClass.MID,
     "codex-mini-latest": ModelClass.LIGHT,
+    # Ollama / local models
+    "qwen2.5:1.5b": ModelClass.LIGHT,
+    "qwen3:1.7b": ModelClass.LIGHT,
+    "qwen3.5:0.8b": ModelClass.LIGHT,
+    "qwen2.5:3b": ModelClass.MID,
+    "qwen3:4b": ModelClass.MID,
+    "qwen2.5:7b": ModelClass.MID,
+    "llama3.2:3b": ModelClass.MID,
+    "llama3.1:8b": ModelClass.MID,
+    "mistral:7b": ModelClass.MID,
+    "codellama:7b": ModelClass.MID,
 }
 
 

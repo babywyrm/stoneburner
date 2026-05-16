@@ -15,6 +15,7 @@ class ProviderResponse:
     model: str
     latency_ms: float
     estimated_cost_usd: float
+    tokens_per_second: float | None = None
     raw: dict | None = None
 
 

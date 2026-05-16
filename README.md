@@ -2,7 +2,7 @@
 
 > **Atomics** — Agentic token usage benchmarking platform
 
-A continuous, cron-schedulable benchmarking harness that runs realistic everyday tasks against LLM providers to measure token consumption, cost, and performance trends over time. Supports tiered usage profiles and multiple providers.
+A continuous, cron-schedulable benchmarking harness that runs realistic everyday tasks against LLM providers to measure token consumption, cost, throughput (tok/s), and performance trends over time. Supports tiered usage profiles and multiple providers including local Ollama inference.
 
 ## Quick Start
 
@@ -28,6 +28,10 @@ uv run atomics run --provider openai -n 5
 
 # Use AWS Bedrock
 uv run atomics run --provider bedrock --region us-east-1 -n 5
+
+# Use local Ollama (zero cost, measures tok/s)
+uv run atomics run --provider ollama -n 5
+uv run atomics run --provider ollama --ollama-host http://gpu-box:11434 -m qwen3:4b -n 5
 ```
 
 ## Burn Tiers
@@ -56,7 +60,7 @@ uv run atomics tiers
 stoneburner/
 ├── atomics/              # Core Python package
 │   ├── core/             # Loop engine, task runner, rate/budget guard
-│   ├── providers/        # LLM adapters (Claude, Bedrock, OpenAI)
+│   ├── providers/        # LLM adapters (Claude, Bedrock, OpenAI, Ollama)
 │   ├── tasks/            # Task catalog with weighted, tiered selection
 │   ├── storage/          # SQLite metrics persistence
 │   ├── scheduler/        # Cron/systemd/launchd generation and installation
@@ -77,6 +81,8 @@ stoneburner/
 | `atomics run --tier mega -n 10` | Run 10 mega-tier tasks |
 | `atomics run --provider bedrock` | Use AWS Bedrock instead of Claude API |
 | `atomics run --provider openai` | Use OpenAI / Codex |
+| `atomics run --provider ollama` | Use local Ollama inference |
+| `atomics run --provider ollama --ollama-host http://gpu:11434` | Use remote Ollama |
 | `atomics run -b 5.0` | Run with $5 budget cap |
 | `atomics run -i 10` | Override interval to 10 seconds |
 | `atomics compare` | Compare providers side-by-side (cost, latency, tokens) |
@@ -86,6 +92,7 @@ stoneburner/
 | `atomics provider-test` | Health check the configured provider |
 | `atomics provider-test -p bedrock` | Health check Bedrock |
 | `atomics provider-test -p openai` | Health check OpenAI |
+| `atomics provider-test -p ollama` | Health check Ollama |
 | `atomics schedule` | Generate scheduler configs |
 | `atomics schedule --install` | Install schedule on this system |
 | `atomics schedule --uninstall` | Remove installed schedule |
@@ -101,6 +108,7 @@ stoneburner/
 | **Claude** (Anthropic API) | Default | `--provider claude` | `uv sync` (included) |
 | **Bedrock** (AWS) | Supported | `--provider bedrock --region us-east-1` | `uv sync --extra bedrock` |
 | **OpenAI / Codex** | Supported | `--provider openai` | `uv sync --extra openai` |
+| **Ollama** (local) | Supported | `--provider ollama` | `uv sync` (included, uses httpx) |
 
 ## Scheduling
 
@@ -137,6 +145,8 @@ Set via environment variables (prefix `ATOMICS_`) or `.env` file:
 | `ATOMICS_MAX_TOKENS_PER_HOUR` | `100000` | Hourly token cap |
 | `ATOMICS_MAX_REQUESTS_PER_MINUTE` | `30` | Request rate limit |
 | `ATOMICS_BUDGET_LIMIT_USD` | `50.00` | Total cost cap per run |
+| `ATOMICS_OLLAMA_HOST` | `http://localhost:11434` | Ollama endpoint URL |
+| `ATOMICS_OLLAMA_MODEL` | `qwen2.5:7b` | Default model for Ollama runs |
 | `ATOMICS_DB_PATH` | (platform) | SQLite database location (see below) |
 
 **Database path defaults:**
@@ -155,8 +165,9 @@ Run benchmarks with multiple providers, then compare them side-by-side:
 uv run atomics run --provider claude --tier ez -n 3 -i 5
 uv run atomics run --provider bedrock --tier ez -n 3 -i 5
 uv run atomics run --provider openai --tier ez -n 3 -i 5
+uv run atomics run --provider ollama --tier ez -n 3 -i 5
 
-# Compare by provider (shows model(s), class, P50/P95 latency, $/1K tokens)
+# Compare by provider (shows model(s), class, tok/s, P50/P95 latency, $/1K tokens)
 uv run atomics compare
 
 # Compare by individual model
@@ -169,11 +180,11 @@ uv run atomics compare --since-hours 24 --tier ez
 Models are tagged by class (light/mid/heavy) so you can spot apples-to-oranges
 comparisons. A warning is shown when mixed classes are detected.
 
-| Class | Claude | OpenAI | Bedrock |
-|-------|--------|--------|---------|
-| **light** | Haiku 4.5 | gpt-4o-mini, gpt-4.1-nano | Haiku on Bedrock |
-| **mid** | Sonnet 4.6 | gpt-4o, gpt-4.1, o4-mini | Sonnet on Bedrock |
-| **heavy** | Opus 4.6 | o3 | Opus on Bedrock |
+| Class | Claude | OpenAI | Bedrock | Ollama |
+|-------|--------|--------|---------|--------|
+| **light** | Haiku 4.5 | gpt-4o-mini, gpt-4.1-nano | Haiku on Bedrock | qwen2.5:1.5b, qwen3:1.7b |
+| **mid** | Sonnet 4.6 | gpt-4o, gpt-4.1, o4-mini | Sonnet on Bedrock | qwen2.5:7b, llama3.2:3b |
+| **heavy** | Opus 4.6 | o3 | Opus on Bedrock | — |
 
 ## Running Tests
 

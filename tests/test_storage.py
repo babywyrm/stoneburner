@@ -14,8 +14,8 @@ def _tmp_repo() -> MetricsRepository:
     return MetricsRepository(Path(tmp))
 
 
-def test_schema_version_is_2():
-    assert SCHEMA_VERSION == 2
+def test_schema_version_is_3():
+    assert SCHEMA_VERSION == 3
 
 
 def test_schema_fresh_start_on_version_mismatch(tmp_path):

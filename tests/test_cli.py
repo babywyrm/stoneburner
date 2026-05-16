@@ -19,7 +19,7 @@ def test_cli_version():
     runner = CliRunner()
     result = runner.invoke(cli, ["--version"])
     assert result.exit_code == 0
-    assert "0.1.0" in result.output
+    assert "0.2.0" in result.output
 
 
 def test_cli_tiers_command():
@@ -354,6 +354,7 @@ def test_cli_provider_test_bedrock_success(monkeypatch):
                 total_tokens=2,
                 latency_ms=1.0,
                 estimated_cost_usd=0.0,
+                tokens_per_second=None,
             )
 
     monkeypatch.setattr("atomics.providers.bedrock.BedrockProvider", DummyProvider)
@@ -382,6 +383,7 @@ def test_cli_provider_test_openai_success(monkeypatch):
                 total_tokens=2,
                 latency_ms=1.0,
                 estimated_cost_usd=0.0,
+                tokens_per_second=None,
             )
 
     monkeypatch.setattr("atomics.providers.openai.OpenAIProvider", DummyProvider)
@@ -623,6 +625,7 @@ def test_cli_provider_test_success(monkeypatch):
                 total_tokens=2,
                 latency_ms=1.0,
                 estimated_cost_usd=0.0,
+                tokens_per_second=None,
             )
 
     monkeypatch.setattr("atomics.providers.claude.ClaudeProvider", DummyProvider)

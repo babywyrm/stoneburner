@@ -80,6 +80,34 @@ def run_doctor(settings: AtomicsSettings | None = None) -> int:
     else:
         console.print("[yellow]boto3[/yellow] not installed (optional; needed for Bedrock)")
 
+    ollama_host = settings.ollama_host
+    console.print(f"[dim]Ollama endpoint:[/dim] {ollama_host}")
+    try:
+        import httpx
+
+        r = httpx.get(f"{ollama_host.rstrip('/')}/api/tags", timeout=5)
+        models = r.json().get("models", [])
+        names = [m["name"] for m in models[:5]]
+        console.print(f"[green]Ollama[/green] reachable — {len(models)} model(s): {', '.join(names)}")
+    except Exception:
+        console.print("[yellow]Ollama[/yellow] not reachable (optional; needed for --provider ollama)")
+
+    ollama_host = settings.ollama_host
+    console.print(f"[dim]Ollama endpoint:[/dim] {ollama_host}")
+    try:
+        import httpx
+
+        r = httpx.get(f"{ollama_host.rstrip('/')}/api/tags", timeout=5)
+        models = r.json().get("models", [])
+        names = [m["name"] for m in models[:5]]
+        console.print(
+            f"[green]Ollama[/green] reachable — {len(models)} model(s): {', '.join(names)}"
+        )
+    except Exception:
+        console.print(
+            "[yellow]Ollama[/yellow] not reachable (optional; needed for --provider ollama)"
+        )
+
     sched = detect_best_scheduler()
     console.print(f"[dim]Preferred scheduler:[/dim] [cyan]{sched}[/cyan]")
     if sched == "crontab" and not shutil.which("crontab"):

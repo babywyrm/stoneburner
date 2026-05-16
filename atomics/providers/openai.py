@@ -115,6 +115,8 @@ class OpenAIProvider(BaseProvider):
         inp = usage.prompt_tokens if usage else 0
         out = usage.completion_tokens if usage else 0
 
+        tps = out / (latency / 1000) if latency > 0 and out > 0 else None
+
         return ProviderResponse(
             text=text,
             input_tokens=inp,
@@ -123,6 +125,7 @@ class OpenAIProvider(BaseProvider):
             model=model,
             latency_ms=round(latency, 2),
             estimated_cost_usd=round(_estimate_cost(model, inp, out), 6),
+            tokens_per_second=round(tps, 2) if tps is not None else None,
             raw=response.model_dump() if hasattr(response, "model_dump") else None,
         )
 
@@ -157,6 +160,8 @@ class OpenAIProvider(BaseProvider):
         inp = getattr(usage, "input_tokens", 0) if usage else 0
         out = getattr(usage, "output_tokens", 0) if usage else 0
 
+        tps = out / (latency / 1000) if latency > 0 and out > 0 else None
+
         return ProviderResponse(
             text=text,
             input_tokens=inp,
@@ -165,6 +170,7 @@ class OpenAIProvider(BaseProvider):
             model=model,
             latency_ms=round(latency, 2),
             estimated_cost_usd=round(_estimate_cost(model, inp, out), 6),
+            tokens_per_second=round(tps, 2) if tps is not None else None,
             raw=response.model_dump() if hasattr(response, "model_dump") else None,
         )
 

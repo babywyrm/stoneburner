@@ -33,7 +33,7 @@ def cli() -> None:
     """Atomics — Agentic token usage benchmarking platform."""
 
 
-PROVIDER_CHOICES = click.Choice(["claude", "bedrock", "openai"], case_sensitive=False)
+PROVIDER_CHOICES = click.Choice(["claude", "bedrock", "openai", "ollama"], case_sensitive=False)
 
 
 @cli.command()
@@ -63,6 +63,7 @@ PROVIDER_CHOICES = click.Choice(["claude", "bedrock", "openai"], case_sensitive=
 @click.option("--budget", "-b", type=float, default=None, help="Override budget limit (USD)")
 @click.option("--interval", "-i", type=int, default=None, help="Override loop interval (seconds)")
 @click.option("--region", type=str, default="us-east-1", help="AWS region for Bedrock")
+@click.option("--ollama-host", type=str, default=None, help="Ollama endpoint (default: ATOMICS_OLLAMA_HOST or http://localhost:11434)")
 @click.option(
     "--hook",
     "hook_cmd",
@@ -90,6 +91,7 @@ def run(
     budget: float | None,
     interval: int | None,
     region: str,
+    ollama_host: str | None,
     hook_cmd: str | None,
     notify_flag: bool | None,
     trigger: str,
@@ -138,6 +140,12 @@ def run(
             except RuntimeError as exc:
                 console.print(f"[red]{exc}[/red]")
                 sys.exit(1)
+    elif provider_name == "ollama":
+        from atomics.providers.ollama import OllamaProvider
+
+        host = ollama_host or settings.ollama_host
+        effective_model = model or settings.ollama_model
+        provider = OllamaProvider(host=host, default_model=effective_model)
     else:
         console.print(f"[red]Unknown provider: {provider_name}[/red]")
         sys.exit(1)
@@ -210,7 +218,8 @@ def report(hours: int, runs: int) -> None:
 )
 @click.option("--model", "-m", type=str, default=None, help="Model to test")
 @click.option("--region", type=str, default="us-east-1", help="AWS region for Bedrock")
-def provider_test(provider_name: str, model: str | None, region: str) -> None:
+@click.option("--ollama-host", type=str, default=None, help="Ollama endpoint")
+def provider_test(provider_name: str, model: str | None, region: str, ollama_host: str | None) -> None:
     """Quick health check against the configured provider."""
     settings = load_settings()
     _setup_logging(settings.log_level)
@@ -250,6 +259,13 @@ def provider_test(provider_name: str, model: str | None, region: str) -> None:
             except RuntimeError as exc:
                 console.print(f"[red]{exc}[/red]")
                 sys.exit(1)
+    elif provider_name == "ollama":
+        from atomics.providers.ollama import OllamaProvider
+
+        host = ollama_host or settings.ollama_host
+        ollama_model_name = model or settings.ollama_model
+        prov = OllamaProvider(host=host, default_model=ollama_model_name)
+        model_label = ollama_model_name
     else:
         console.print(f"[red]Unknown provider: {provider_name}[/red]")
         sys.exit(1)
@@ -281,6 +297,8 @@ def provider_test(provider_name: str, model: str | None, region: str) -> None:
         )
         console.print(f"Latency: {resp.latency_ms:.0f}ms")
         console.print(f"Cost: ${resp.estimated_cost_usd:.6f}")
+        if resp.tokens_per_second is not None:
+            console.print(f"Throughput: {resp.tokens_per_second:.1f} tok/s")
 
     asyncio.run(_test())
 
@@ -303,6 +321,7 @@ def provider_test(provider_name: str, model: str | None, region: str) -> None:
     type=click.Choice(["crontab", "systemd", "launchd", "auto"]),
     default="auto",
 )
+@click.option("--ollama-host", type=str, default=None, help="Ollama endpoint for scheduled runs")
 @click.option("--install", is_flag=True, help="Install the schedule on this system")
 @click.option("--uninstall", is_flag=True, help="Remove installed atomics schedule")
 def schedule(
@@ -311,6 +330,7 @@ def schedule(
     max_iterations: int,
     provider_name: str,
     fmt: str,
+    ollama_host: str | None,
     install: bool,
     uninstall: bool,
 ) -> None:
@@ -505,6 +525,7 @@ def compare(by: str, since_hours: float | None, tier: str | None, category: str 
         table.add_column("Avg Tokens", justify="right")
         table.add_column("P50 Lat.", justify="right")
         table.add_column("P95 Lat.", justify="right")
+        table.add_column("Avg tok/s", justify="right", style="blue")
         table.add_column("$/1K tok", justify="right", style="yellow")
         table.add_column("Avg $/Task", justify="right", style="yellow")
         table.add_column("Total $", justify="right", style="yellow bold")
@@ -519,6 +540,8 @@ def compare(by: str, since_hours: float | None, tier: str | None, category: str 
             model_classes = {classify_model(m.strip()) for m in models if m.strip()}
             cls_label = ", ".join(sorted({c.value for c in model_classes})) or "—"
             classes_seen.update(c.value for c in model_classes)
+            avg_tps = r.get("avg_tokens_per_second")
+            tps_label = f"{avg_tps:.1f}" if avg_tps else "—"
             table.add_row(
                 r["group_key"],
                 r.get("models_used", "—") or "—",
@@ -528,6 +551,7 @@ def compare(by: str, since_hours: float | None, tier: str | None, category: str 
                 f"{r['avg_tokens']:.0f}",
                 f"{r['p50_latency_ms']:.0f}ms",
                 f"{r['p95_latency_ms']:.0f}ms",
+                tps_label,
                 f"${r['cost_per_1k_tokens']:.4f}",
                 f"${r['avg_cost_per_task']:.6f}",
                 f"${r['total_cost']:.4f}",

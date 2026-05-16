@@ -104,9 +104,10 @@ class MetricsRepository:
             INSERT OR REPLACE INTO task_results (
                 task_id, run_id, category, task_name, provider, model, status,
                 prompt, response, input_tokens, output_tokens, total_tokens,
-                latency_ms, estimated_cost_usd, error_class, error_message,
+                latency_ms, estimated_cost_usd, tokens_per_second,
+                error_class, error_message,
                 started_at, completed_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 result.task_id,
@@ -123,6 +124,7 @@ class MetricsRepository:
                 result.total_tokens,
                 result.latency_ms,
                 result.estimated_cost_usd,
+                result.tokens_per_second,
                 result.error_class,
                 result.error_message,
                 result.started_at.isoformat(),
@@ -250,7 +252,8 @@ class MetricsRepository:
                 COALESCE(AVG(latency_ms), 0) as avg_latency_ms,
                 COALESCE(AVG(estimated_cost_usd), 0) as avg_cost_per_task,
                 COALESCE(SUM(estimated_cost_usd), 0) as total_cost,
-                COALESCE(SUM(total_tokens), 0) as total_tokens
+                COALESCE(SUM(total_tokens), 0) as total_tokens,
+                AVG(tokens_per_second) as avg_tokens_per_second
             FROM task_results {where}
             GROUP BY {col}
             ORDER BY avg_cost_per_task ASC

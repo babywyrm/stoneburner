@@ -7,6 +7,7 @@ __all__ = [
     "BaseProvider",
     "BedrockProvider",
     "ClaudeProvider",
+    "OllamaProvider",
     "OpenAIProvider",
     "ProviderResponse",
 ]
@@ -17,6 +18,10 @@ def __getattr__(name: str):
         from atomics.providers.bedrock import BedrockProvider
 
         return BedrockProvider
+    if name == "OllamaProvider":
+        from atomics.providers.ollama import OllamaProvider
+
+        return OllamaProvider
     if name == "OpenAIProvider":
         from atomics.providers.openai import OpenAIProvider
 
