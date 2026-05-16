@@ -88,18 +88,6 @@ def run_doctor(settings: AtomicsSettings | None = None) -> int:
         r = httpx.get(f"{ollama_host.rstrip('/')}/api/tags", timeout=5)
         models = r.json().get("models", [])
         names = [m["name"] for m in models[:5]]
-        console.print(f"[green]Ollama[/green] reachable — {len(models)} model(s): {', '.join(names)}")
-    except Exception:
-        console.print("[yellow]Ollama[/yellow] not reachable (optional; needed for --provider ollama)")
-
-    ollama_host = settings.ollama_host
-    console.print(f"[dim]Ollama endpoint:[/dim] {ollama_host}")
-    try:
-        import httpx
-
-        r = httpx.get(f"{ollama_host.rstrip('/')}/api/tags", timeout=5)
-        models = r.json().get("models", [])
-        names = [m["name"] for m in models[:5]]
         console.print(
             f"[green]Ollama[/green] reachable — {len(models)} model(s): {', '.join(names)}"
         )
