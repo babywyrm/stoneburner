@@ -536,8 +536,11 @@ def compare(by: str, since_hours: float | None, tier: str | None, category: str 
                 f"{r['successes'] / r['task_count'] * 100:.0f}%"
                 if r["task_count"] > 0 else "—"
             )
-            models = (r.get("models_used") or "").split(",")
-            model_classes = {classify_model(m.strip()) for m in models if m.strip()}
+            if by == "model":
+                model_classes = {classify_model(r["group_key"])}
+            else:
+                models = (r.get("models_used") or "").split(",")
+                model_classes = {classify_model(m.strip()) for m in models if m.strip()}
             cls_label = ", ".join(sorted({c.value for c in model_classes})) or "—"
             classes_seen.update(c.value for c in model_classes)
             avg_tps = r.get("avg_tokens_per_second")
