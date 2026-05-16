@@ -572,6 +572,103 @@ def compare(by: str, since_hours: float | None, tier: str | None, category: str 
 
 
 @cli.command()
+@click.option("--model", "-m", type=str, default=None, help="Model to stress (default: ATOMICS_OLLAMA_MODEL)")
+@click.option("--ollama-host", type=str, default=None, help="Ollama endpoint")
+@click.option("--max-concurrency", "-c", type=int, default=8, help="Max parallel requests (ramps 1→2→4→...)")
+@click.option("--phase-seconds", "-s", type=float, default=15.0, help="Seconds at each concurrency level")
+@click.option("--num-predict", type=int, default=2048, help="Max output tokens per request")
+def stress(
+    model: str | None,
+    ollama_host: str | None,
+    max_concurrency: int,
+    phase_seconds: float,
+    num_predict: int,
+) -> None:
+    """GPU stress test — ramp concurrency to find saturation point (Ollama only)."""
+    settings = load_settings()
+    _setup_logging(settings.log_level)
+    console = Console()
+
+    host = ollama_host or settings.ollama_host
+    effective_model = model or settings.ollama_model
+
+    console.print(
+        f"[bold]Stress test[/bold] — {effective_model} @ {host}\n"
+        f"Ramp: 1→{max_concurrency} concurrent | "
+        f"{phase_seconds:.0f}s per phase | "
+        f"{num_predict} max tokens/request\n"
+    )
+
+    def _on_phase(phase):
+        uplift = ""
+        if len(phases_so_far) > 0:
+            base = phases_so_far[0].aggregate_tps
+            if base > 0:
+                pct = (phase.aggregate_tps - base) / base * 100
+                uplift = f"  ({pct:+.0f}%)" if pct != 0 else ""
+        phases_so_far.append(phase)
+        fail_tag = f" [red]({phase.failed} failed)[/red]" if phase.failed else ""
+        console.print(
+            f"  concurrent({phase.concurrency}): "
+            f"[cyan]{phase.aggregate_tps:6.1f}[/cyan] tok/s  "
+            f"P50 {phase.avg_latency_ms / 1000:.1f}s  "
+            f"P95 {phase.p95_latency_ms / 1000:.1f}s  "
+            f"({phase.requests} reqs, {phase.total_output_tokens:,} tokens)"
+            f"[dim]{uplift}[/dim]{fail_tag}"
+        )
+
+    phases_so_far: list = []
+
+    from atomics.stress import run_stress
+
+    console.print("[bold]Throughput by concurrency:[/bold]")
+    result = asyncio.run(run_stress(
+        host=host,
+        model=effective_model,
+        max_concurrency=max_concurrency,
+        phase_seconds=phase_seconds,
+        num_predict=num_predict,
+        on_phase=_on_phase,
+    ))
+
+    console.print()
+
+    summary = Table(title="Stress Test Summary", show_lines=True, title_style="bold")
+    summary.add_column("Metric", style="dim")
+    summary.add_column("Value", style="cyan bold")
+
+    if result.gpu_name:
+        summary.add_row("GPU", result.gpu_name)
+    summary.add_row("Model", result.model)
+    summary.add_row("Duration", f"{result.duration_seconds:.0f}s")
+    summary.add_row("Total requests", f"{result.total_requests} ({result.total_failed} failed)")
+    summary.add_row("Total tokens", f"{result.total_tokens:,}")
+    summary.add_row("Peak throughput", f"{result.peak_tps:.1f} tok/s @ concurrency={result.saturation_concurrency}")
+
+    if result.vram_peak_mb is not None:
+        vram_str = f"{result.vram_peak_mb:.0f} MB"
+        if result.vram_total_mb:
+            pct = result.vram_peak_mb / result.vram_total_mb * 100
+            vram_str += f" / {result.vram_total_mb:.0f} MB ({pct:.0f}%)"
+        summary.add_row("Peak VRAM", vram_str)
+
+    if len(result.phases) >= 2:
+        base = result.phases[0].aggregate_tps
+        peak = result.peak_tps
+        if base > 0:
+            scaling = peak / base
+            summary.add_row("Scaling", f"{scaling:.2f}x (1→{result.saturation_concurrency})")
+
+    last = result.phases[-1] if result.phases else None
+    if last and last.aggregate_tps < result.peak_tps * 0.95:
+        summary.add_row("Throttling", "[yellow]Possible — throughput dropped at max concurrency[/yellow]")
+    else:
+        summary.add_row("Throttling", "[green]None detected[/green]")
+
+    console.print(summary)
+
+
+@cli.command()
 def doctor() -> None:
     """Check Python, database, API keys, optional deps, and scheduler tooling."""
     from atomics.doctor import run_doctor
