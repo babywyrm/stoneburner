@@ -38,6 +38,11 @@ _MAX_COMPLETION_TOKENS_MODELS = {
     "gpt-5", "gpt-5-turbo", "gpt-5.3", "gpt-5.5", "o3", "o3-pro", "o3-mini", "o4-mini",
 }
 
+# Reasoning models burn internal thinking tokens before producing visible output.
+# Multiply the requested max_tokens by this factor so thinking doesn't consume
+# the entire budget and leave the visible response empty.
+_REASONING_TOKEN_MULTIPLIER = 8
+
 DEFAULT_PRICING = (2.50, 10.0)
 
 
@@ -111,12 +116,13 @@ class OpenAIProvider(BaseProvider):
             messages.append({"role": "system", "content": "You are a helpful assistant."})
         messages.append({"role": "user", "content": prompt})
 
-        # Newer models (o3, gpt-5 family) require max_completion_tokens
-        token_param = (
-            {"max_completion_tokens": max_tokens}
-            if model in _MAX_COMPLETION_TOKENS_MODELS
-            else {"max_tokens": max_tokens}
-        )
+        # Newer reasoning models require max_completion_tokens and need a much
+        # larger budget because they consume tokens internally before producing
+        # visible output — multiply to prevent empty responses.
+        if model in _MAX_COMPLETION_TOKENS_MODELS:
+            token_param = {"max_completion_tokens": max_tokens * _REASONING_TOKEN_MULTIPLIER}
+        else:
+            token_param = {"max_tokens": max_tokens}
         t0 = time.monotonic()
         response = await self._client.chat.completions.create(
             model=model,
