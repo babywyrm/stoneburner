@@ -748,11 +748,31 @@ def eval(
     result_table.add_column("Cost", justify="right", style="yellow")
     result_table.add_column("Rationale", no_wrap=False, max_width=40, style="dim")
 
+    # Pre-allocate a run_id and create the parent row so FK constraints are satisfied
+    import uuid as _uuid
+    eval_run_id = _uuid.uuid4().hex[:12]
+    effective_model = model or settings.ollama_model if provider_name == "ollama" else (model or settings.default_model)
+    if repo:
+        repo.create_run(
+            eval_run_id,
+            tier="eval",
+            provider=provider_name,
+            model=effective_model,
+            trigger="eval",
+        )
+
     def on_done(fr) -> None:
         judge = fr.judge
         tr = fr.task_result
-        quality = f"{judge.score * 100:.0f}%" if judge and not judge.parse_failed else "[red]err[/red]"
-        rationale = judge.rationale[:80] if judge else "—"
+        if tr.status.value == "failed":
+            quality = "[red]FAIL[/red]"
+            rationale = tr.error_message[:80]
+        elif judge and not judge.parse_failed:
+            quality = f"{judge.score * 100:.0f}%"
+            rationale = judge.rationale[:80]
+        else:
+            quality = "[yellow]?[/yellow]"
+            rationale = "judge parse failed"
         result_table.add_row(
             fr.fixture.id,
             fr.fixture.complexity.value,
@@ -771,6 +791,7 @@ def eval(
         judge_provider=judge_provider,
         model=model,
         judge_model=judge_model,
+        run_id=eval_run_id,
         on_fixture_done=on_done,
     ))
 
