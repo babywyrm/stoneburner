@@ -617,7 +617,12 @@ def _print_narrative(console: Console, rows: list[dict], by: str) -> None:
             f"versus [magenta]{best_paid['group_key']}[/magenta] at "
             f"[green]{paid_acc:.1f}%[/green] for [yellow]${paid_cost:.4f}[/yellow] total spend."
         )
-        if gap_pp < 10:
+        if gap_pp <= 0:
+            console.print(
+                f"  → Self-hosted [bold]matches or exceeds[/bold] API quality "
+                f"([bold]{abs(gap_pp):.1f}pp ahead[/bold]). The case for self-hosting is clear."
+            )
+        elif gap_pp < 10:
             console.print(
                 f"  → Quality gap is only [bold]{gap_pp:.1f} percentage points[/bold]. "
                 "Self-hosted delivers near-equivalent output at a fraction of the cost."
@@ -722,7 +727,8 @@ def eval(
         sys.exit(1)
 
     test_provider = _build_provider(provider_name, model, ollama_host)
-    judge_provider = _build_provider(judge_provider_name, judge_model, judge_host or ollama_host)
+    # Judge host falls back to: --judge-host → --ollama-host → ATOMICS_OLLAMA_HOST env/.env
+    judge_provider = _build_provider(judge_provider_name, judge_model, judge_host or ollama_host or settings.ollama_host)
 
     console.print(
         f"\n[bold]Eval run[/bold] — model under test: [cyan]{provider_name}[/cyan] "
