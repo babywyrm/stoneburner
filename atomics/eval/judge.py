@@ -49,7 +49,7 @@ RATIONALE: <one concise sentence explaining the score>
 """
 
 _SCORE_RE = re.compile(
-    r"ACCURACY:\s*(\d)\s*\nCOMPLETENESS:\s*(\d)\s*\nFORMAT:\s*(\d)\s*\nRATIONALE:\s*(.+)",
+    r"ACCURACY:\s*(\d)\s*\nCOMPLETE\w*:\s*(\d)\s*\nFORMAT:\s*(\d)\s*\nRATIONALE:\s*(.+)",
     re.IGNORECASE,
 )
 
