@@ -74,6 +74,9 @@ class TaskResult(BaseModel):
     error_message: str = ""
     started_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     completed_at: datetime | None = None
+    accuracy_score: float | None = None
+    judge_model: str = ""
+    quality_rationale: str = ""
 
 
 class RunSummary(BaseModel):

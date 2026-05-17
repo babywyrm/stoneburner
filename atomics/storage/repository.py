@@ -106,8 +106,9 @@ class MetricsRepository:
                 prompt, response, input_tokens, output_tokens, total_tokens,
                 latency_ms, estimated_cost_usd, tokens_per_second,
                 error_class, error_message,
-                started_at, completed_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                started_at, completed_at,
+                accuracy_score, judge_model, quality_rationale
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 result.task_id,
@@ -129,6 +130,9 @@ class MetricsRepository:
                 result.error_message,
                 result.started_at.isoformat(),
                 result.completed_at.isoformat() if result.completed_at else None,
+                result.accuracy_score,
+                result.judge_model,
+                result.quality_rationale,
             ),
         )
         self._conn.commit()
@@ -253,7 +257,9 @@ class MetricsRepository:
                 COALESCE(AVG(estimated_cost_usd), 0) as avg_cost_per_task,
                 COALESCE(SUM(estimated_cost_usd), 0) as total_cost,
                 COALESCE(SUM(total_tokens), 0) as total_tokens,
-                AVG(tokens_per_second) as avg_tokens_per_second
+                AVG(tokens_per_second) as avg_tokens_per_second,
+                AVG(accuracy_score) as avg_accuracy_score,
+                COUNT(accuracy_score) as scored_tasks
             FROM task_results {where}
             GROUP BY {col}
             ORDER BY avg_cost_per_task ASC
@@ -287,6 +293,13 @@ class MetricsRepository:
             d["cost_per_1k_tokens"] = (
                 (total_cost / total_toks * 1000) if total_toks > 0 else 0.0
             )
+            # value_score = accuracy / cost_per_1k (ε prevents div-by-zero for free local runs)
+            acc = d.get("avg_accuracy_score")
+            if acc is not None:
+                eps = 0.001  # ~$1 per million tokens as floor so local isn't literally infinite
+                d["value_score"] = acc / max(d["cost_per_1k_tokens"], eps)
+            else:
+                d["value_score"] = None
             results.append(d)
         return results
 

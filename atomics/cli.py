@@ -495,8 +495,15 @@ def schedule_status() -> None:
 @click.option("--since-hours", type=float, default=None, help="Only include recent data")
 @click.option("--tier", "-t", type=TIER_CHOICES, default=None, help="Filter by tier")
 @click.option("--category", type=str, default=None, help="Filter by task category")
-def compare(by: str, since_hours: float | None, tier: str | None, category: str | None) -> None:
-    """Compare providers or models side-by-side."""
+@click.option("--narrative", is_flag=True, default=False, help="Print a plain-English business-case summary")
+def compare(
+    by: str,
+    since_hours: float | None,
+    tier: str | None,
+    category: str | None,
+    narrative: bool,
+) -> None:
+    """Compare providers or models side-by-side (add --narrative for a business-case summary)."""
     settings = load_settings()
     from atomics.model_classes import classify_model
     from atomics.storage.repository import MetricsRepository
@@ -521,21 +528,16 @@ def compare(by: str, since_hours: float | None, tier: str | None, category: str 
         table.add_column(detail_label, style="dim")
         table.add_column("Class", style="cyan")
         table.add_column("Tasks", justify="right")
-        table.add_column("Success %", justify="right", style="green")
-        table.add_column("Avg Tokens", justify="right")
+        table.add_column("Quality", justify="right", style="green bold")
         table.add_column("P50 Lat.", justify="right")
         table.add_column("P95 Lat.", justify="right")
         table.add_column("Avg tok/s", justify="right", style="blue")
         table.add_column("$/1K tok", justify="right", style="yellow")
-        table.add_column("Avg $/Task", justify="right", style="yellow")
+        table.add_column("Value Score", justify="right", style="cyan bold")
         table.add_column("Total $", justify="right", style="yellow bold")
 
         classes_seen: set[str] = set()
         for r in rows:
-            success_pct = (
-                f"{r['successes'] / r['task_count'] * 100:.0f}%"
-                if r["task_count"] > 0 else "—"
-            )
             if by == "model":
                 model_classes = {classify_model(r["group_key"])}
             else:
@@ -545,18 +547,21 @@ def compare(by: str, since_hours: float | None, tier: str | None, category: str 
             classes_seen.update(c.value for c in model_classes)
             avg_tps = r.get("avg_tokens_per_second")
             tps_label = f"{avg_tps:.1f}" if avg_tps else "—"
+            acc = r.get("avg_accuracy_score")
+            quality_label = f"{acc * 100:.1f}%" if acc is not None else "—"
+            val = r.get("value_score")
+            value_label = f"{val:.1f}" if val is not None else "—"
             table.add_row(
                 r["group_key"],
                 r.get("models_used", "—") or "—",
                 cls_label,
                 str(r["task_count"]),
-                success_pct,
-                f"{r['avg_tokens']:.0f}",
+                quality_label,
                 f"{r['p50_latency_ms']:.0f}ms",
                 f"{r['p95_latency_ms']:.0f}ms",
                 tps_label,
                 f"${r['cost_per_1k_tokens']:.4f}",
-                f"${r['avg_cost_per_task']:.6f}",
+                value_label,
                 f"${r['total_cost']:.4f}",
             )
         console.print(table)
@@ -567,8 +572,230 @@ def compare(by: str, since_hours: float | None, tier: str | None, category: str 
                 "For a fair comparison, run the same tier with equivalent models "
                 "(e.g. all light-class or all mid-class)."
             )
+
+        if narrative:
+            _print_narrative(console, rows, by)
     finally:
         repo.close()
+
+
+def _print_narrative(console: Console, rows: list[dict], by: str) -> None:
+    """Print a plain-English business-case summary of the comparison data."""
+    scored = [r for r in rows if r.get("avg_accuracy_score") is not None]
+    if not scored:
+        console.print(
+            "\n[dim]No accuracy scores yet. Run [bold]atomics eval[/bold] to generate quality scores.[/dim]"
+        )
+        return
+
+    scored_sorted = sorted(scored, key=lambda r: r.get("avg_accuracy_score", 0), reverse=True)
+    best = scored_sorted[0]
+    free_options = [r for r in scored if r.get("cost_per_1k_tokens", 1) < 0.0001]
+    paid_options = [r for r in scored if r.get("cost_per_1k_tokens", 0) >= 0.0001]
+
+    console.print("\n[bold cyan]── Business Case Summary ──────────────────────────────[/bold cyan]")
+
+    best_acc = best["avg_accuracy_score"] * 100
+    console.print(
+        f"\n[bold]{best['group_key']}[/bold] leads on quality at "
+        f"[green]{best_acc:.1f}%[/green] accuracy "
+        f"(cost: [yellow]${best['cost_per_1k_tokens']:.4f}/1K tokens[/yellow])."
+    )
+
+    if free_options and paid_options:
+        best_free = max(free_options, key=lambda r: r.get("avg_accuracy_score", 0))
+        best_paid = max(paid_options, key=lambda r: r.get("avg_accuracy_score", 0))
+        free_acc = best_free["avg_accuracy_score"] * 100
+        paid_acc = best_paid["avg_accuracy_score"] * 100
+        gap_pp = paid_acc - free_acc
+        paid_cost = best_paid["total_cost"]
+
+        console.print(
+            f"\n[bold]Self-hosted vs API:[/bold] "
+            f"[cyan]{best_free['group_key']}[/cyan] achieves [green]{free_acc:.1f}%[/green] quality "
+            f"at [green]$0 marginal cost[/green], "
+            f"versus [magenta]{best_paid['group_key']}[/magenta] at "
+            f"[green]{paid_acc:.1f}%[/green] for [yellow]${paid_cost:.4f}[/yellow] total spend."
+        )
+        if gap_pp < 10:
+            console.print(
+                f"  → Quality gap is only [bold]{gap_pp:.1f} percentage points[/bold]. "
+                "Self-hosted delivers near-equivalent output at a fraction of the cost."
+            )
+        else:
+            console.print(
+                f"  → Quality gap is [yellow]{gap_pp:.1f} percentage points[/yellow]. "
+                "Consider a larger local model to close the gap before switching."
+            )
+
+    all_costs = [r["total_cost"] for r in paid_options]
+    if all_costs:
+        total_api_spend = sum(all_costs)
+        console.print(
+            f"\n[bold]Data privacy:[/bold] Every token sent to an external API "
+            "transits third-party infrastructure. Self-hosted inference eliminates "
+            "this exposure entirely — critical for regulated industries or sensitive workloads."
+        )
+        console.print(
+            f"\n[bold]Total API spend in this comparison:[/bold] "
+            f"[yellow]${total_api_spend:.4f}[/yellow] "
+            f"across {len(paid_options)} paid provider(s)."
+        )
+
+    console.print(
+        "\n[dim]Value Score = quality / cost-per-1K-tokens. "
+        "Higher is better. Local inference uses $0.001 as a floor (not literally free).[/dim]"
+    )
+
+
+@cli.command()
+@click.option(
+    "--provider", "-p", "provider_name",
+    type=PROVIDER_CHOICES,
+    default="ollama",
+    help="Provider to evaluate (model under test)",
+)
+@click.option("--model", "-m", type=str, default=None, help="Model override for the provider under test")
+@click.option("--ollama-host", type=str, default=None, help="Ollama endpoint for model under test")
+@click.option("--region", type=str, default="us-east-1", help="AWS region for Bedrock")
+@click.option(
+    "--judge-provider", "judge_provider_name",
+    type=PROVIDER_CHOICES,
+    default="ollama",
+    help="Provider to use as judge (default: ollama — $0 cost)",
+)
+@click.option("--judge-model", type=str, default=None, help="Model override for the judge")
+@click.option("--judge-host", type=str, default=None, help="Ollama host for the judge (if different)")
+@click.option("--save/--no-save", "save_results", default=True, help="Persist results to the database")
+def eval(
+    provider_name: str,
+    model: str | None,
+    ollama_host: str | None,
+    region: str,
+    judge_provider_name: str,
+    judge_model: str | None,
+    judge_host: str | None,
+    save_results: bool,
+) -> None:
+    """Run the fixed eval fixture set and score quality with an LLM judge.
+
+    Produces an accuracy score (0-100%) for each fixture and an overall quality
+    rating. Run against multiple providers then use 'atomics compare --narrative'
+    to generate the business-case comparison.
+
+    Example:
+      atomics eval --provider ollama --model qwen2.5:7b
+      atomics eval --provider claude
+      atomics eval --provider openai --model gpt-4o
+      atomics compare --narrative
+    """
+    settings = load_settings()
+    _setup_logging(settings.log_level)
+    console = Console()
+
+    def _build_provider(name: str, mdl: str | None, host: str | None):
+        if name == "claude":
+            if not settings.anthropic_api_key:
+                console.print("[red]ANTHROPIC_API_KEY not set.[/red]")
+                sys.exit(1)
+            from atomics.providers.claude import ClaudeProvider
+            return ClaudeProvider(
+                api_key=settings.anthropic_api_key,
+                default_model=mdl or settings.default_model,
+            )
+        elif name == "bedrock":
+            from atomics.providers.bedrock import BedrockProvider
+            return BedrockProvider(region=region, model_id=mdl or "us.anthropic.claude-sonnet-4-6")
+        elif name == "openai":
+            from atomics.providers.openai import OpenAIProvider
+            if settings.openai_api_key:
+                return OpenAIProvider(api_key=settings.openai_api_key, default_model=mdl or "gpt-4o")
+            console.print("[red]OPENAI_API_KEY not set.[/red]")
+            sys.exit(1)
+        elif name == "ollama":
+            from atomics.providers.ollama import OllamaProvider
+            return OllamaProvider(
+                host=host or settings.ollama_host,
+                default_model=mdl or settings.ollama_model,
+            )
+        console.print(f"[red]Unknown provider: {name}[/red]")
+        sys.exit(1)
+
+    test_provider = _build_provider(provider_name, model, ollama_host)
+    judge_provider = _build_provider(judge_provider_name, judge_model, judge_host or ollama_host)
+
+    console.print(
+        f"\n[bold]Eval run[/bold] — model under test: [cyan]{provider_name}[/cyan] "
+        f"({model or 'default'})\n"
+        f"Judge: [cyan]{judge_provider_name}[/cyan] ({judge_model or 'default'})\n"
+        f"Fixtures: [bold]{15}[/bold] | Results saved: [bold]{'yes' if save_results else 'no'}[/bold]\n"
+    )
+
+    repo = None
+    if save_results:
+        from atomics.storage.repository import MetricsRepository
+        repo = MetricsRepository(settings.db_path)
+
+    from atomics.eval.runner import run_eval
+
+    result_table = Table(title="Eval Results", show_lines=True)
+    result_table.add_column("ID", style="dim")
+    result_table.add_column("Complexity", style="cyan")
+    result_table.add_column("Prompt (truncated)", no_wrap=False, max_width=45)
+    result_table.add_column("Quality", justify="right", style="green bold")
+    result_table.add_column("Latency", justify="right")
+    result_table.add_column("Tokens", justify="right")
+    result_table.add_column("Cost", justify="right", style="yellow")
+    result_table.add_column("Rationale", no_wrap=False, max_width=40, style="dim")
+
+    def on_done(fr) -> None:
+        judge = fr.judge
+        tr = fr.task_result
+        quality = f"{judge.score * 100:.0f}%" if judge and not judge.parse_failed else "[red]err[/red]"
+        rationale = judge.rationale[:80] if judge else "—"
+        result_table.add_row(
+            fr.fixture.id,
+            fr.fixture.complexity.value,
+            fr.fixture.prompt[:60] + "…",
+            quality,
+            f"{tr.latency_ms:.0f}ms",
+            str(tr.total_tokens),
+            f"${tr.estimated_cost_usd:.6f}",
+            rationale,
+        )
+        if repo:
+            repo.save_task_result(tr)
+
+    summary = asyncio.run(run_eval(
+        test_provider,
+        judge_provider=judge_provider,
+        model=model,
+        judge_model=judge_model,
+        on_fixture_done=on_done,
+    ))
+
+    console.print(result_table)
+
+    overall = summary.overall_accuracy
+    quality_str = f"{overall * 100:.1f}%" if overall is not None else "—"
+    value_str = f"{summary.value_score:.1f}" if summary.value_score is not None else "—"
+
+    summary_table = Table(title="Eval Summary", show_lines=True)
+    summary_table.add_column("Metric", style="dim")
+    summary_table.add_column("Value", style="bold")
+    summary_table.add_row("Provider", provider_name)
+    summary_table.add_row("Model", model or "default")
+    summary_table.add_row("Overall Quality", f"[green]{quality_str}[/green]")
+    summary_table.add_row("Value Score", f"[cyan]{value_str}[/cyan]")
+    summary_table.add_row("Avg Latency", f"{summary.avg_latency_ms:.0f}ms")
+    summary_table.add_row("Total Tokens", f"{summary.total_tokens:,}")
+    summary_table.add_row("Total Cost", f"${summary.total_cost_usd:.6f}")
+    summary_table.add_row("Fixtures Run", str(len(summary.fixture_results)))
+    console.print(summary_table)
+
+    if repo:
+        repo.close()
+        console.print(f"\n[dim]Results saved to database. Run [bold]atomics compare --narrative[/bold] after evaluating multiple providers.[/dim]")
 
 
 @cli.command()
