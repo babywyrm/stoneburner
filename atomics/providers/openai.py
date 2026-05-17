@@ -22,10 +22,20 @@ MODEL_PRICING: dict[str, tuple[float, float]] = {
     "gpt-4.1": (2.00, 8.00),
     "gpt-4.1-mini": (0.40, 1.60),
     "gpt-4.1-nano": (0.10, 0.40),
+    "gpt-5": (15.0, 60.0),
+    "gpt-5-turbo": (5.00, 20.0),
+    "gpt-5.3": (10.0, 40.0),
+    "gpt-5.5": (15.0, 60.0),
     "o3": (2.00, 8.00),
     "o3-mini": (1.10, 4.40),
+    "o3-pro": (20.0, 80.0),
     "o4-mini": (1.10, 4.40),
     "codex-mini-latest": (1.50, 6.00),
+}
+
+# Models that require max_completion_tokens instead of max_tokens
+_MAX_COMPLETION_TOKENS_MODELS = {
+    "gpt-5", "gpt-5-turbo", "gpt-5.3", "gpt-5.5", "o3", "o3-pro", "o3-mini", "o4-mini",
 }
 
 DEFAULT_PRICING = (2.50, 10.0)
@@ -101,11 +111,17 @@ class OpenAIProvider(BaseProvider):
             messages.append({"role": "system", "content": "You are a helpful assistant."})
         messages.append({"role": "user", "content": prompt})
 
+        # Newer models (o3, gpt-5 family) require max_completion_tokens
+        token_param = (
+            {"max_completion_tokens": max_tokens}
+            if model in _MAX_COMPLETION_TOKENS_MODELS
+            else {"max_tokens": max_tokens}
+        )
         t0 = time.monotonic()
         response = await self._client.chat.completions.create(
             model=model,
             messages=messages,
-            max_tokens=max_tokens,
+            **token_param,
         )
         latency = (time.monotonic() - t0) * 1000
 
