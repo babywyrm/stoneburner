@@ -126,7 +126,29 @@ class OpenAIProvider(BaseProvider):
         latency = (time.monotonic() - t0) * 1000
 
         choice = response.choices[0] if response.choices else None
-        text = choice.message.content or "" if choice else ""
+        raw_content = choice.message.content if choice else None
+
+        # Newer models (gpt-5 family) may return content as a list of blocks
+        # or put text in refusal/reasoning fields — extract whatever we can find
+        if isinstance(raw_content, list):
+            text = "".join(
+                block.get("text", "") if isinstance(block, dict) else getattr(block, "text", "")
+                for block in raw_content
+                if (isinstance(block, dict) and block.get("type") == "text")
+                or getattr(block, "type", "") == "text"
+            )
+        elif raw_content:
+            text = raw_content
+        else:
+            # Fallback: check reasoning_content (o-series models)
+            text = getattr(getattr(choice, "message", None), "reasoning_content", "") or ""
+            if not text:
+                import logging as _logging
+                _logging.getLogger("atomics.providers.openai").warning(
+                    "Empty response content for model %s — raw choices: %s",
+                    model,
+                    str(response.choices)[:300],
+                )
         usage = response.usage
         inp = usage.prompt_tokens if usage else 0
         out = usage.completion_tokens if usage else 0
