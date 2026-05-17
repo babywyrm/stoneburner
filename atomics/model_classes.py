@@ -21,7 +21,9 @@ MODEL_CLASS_MAP: dict[str, ModelClass] = {
     "claude-haiku-4-5-20251001": ModelClass.LIGHT,
     "claude-sonnet-4-6": ModelClass.MID,
     "claude-sonnet-4-20250514": ModelClass.MID,
+    "claude-opus-4-5": ModelClass.HEAVY,
     "claude-opus-4-6": ModelClass.HEAVY,
+    "claude-opus-4-7": ModelClass.HEAVY,
     # Claude via Bedrock (inference profiles)
     "us.anthropic.claude-haiku-4-5-20251001-v1:0": ModelClass.LIGHT,
     "us.anthropic.claude-sonnet-4-6": ModelClass.MID,
