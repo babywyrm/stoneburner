@@ -65,6 +65,35 @@ def test_score_regex_fails_on_missing_field():
     assert _SCORE_RE.search(raw) is None
 
 
+def test_score_regex_handles_crlf():
+    """Judges behind Windows-style APIs may return CRLF — must not parse-fail."""
+    raw = "ACCURACY: 3\r\nCOMPLETENESS: 2\r\nFORMAT: 2\r\nRATIONALE: CRLF response."
+    m = _SCORE_RE.search(raw)
+    assert m is not None
+    assert int(m.group(1)) == 3
+
+
+def test_score_regex_handles_completness_typo():
+    """Qwen-14b occasionally misspells COMPLETENESS — the COMPLETE\\w* pattern absorbs it."""
+    raw = "ACCURACY: 4\nCOMPLETNESS: 3\nFORMAT: 3\nRATIONALE: Typo in field name."
+    m = _SCORE_RE.search(raw)
+    assert m is not None
+    assert int(m.group(2)) == 3
+
+
+def test_score_regex_captures_multiline_rationale():
+    """Multi-line rationales from verbose judges should be captured in full."""
+    raw = (
+        "ACCURACY: 2\nCOMPLETENESS: 1\nFORMAT: 2\n"
+        "RATIONALE: The answer is partially correct.\nHowever, it omits key details."
+    )
+    m = _SCORE_RE.search(raw)
+    assert m is not None
+    # Both lines should appear in group(4)
+    assert "partially correct" in m.group(4)
+    assert "omits key details" in m.group(4)
+
+
 # ── Judge scoring ─────────────────────────────────────────────────────────────
 
 
@@ -234,6 +263,26 @@ def test_run_eval_provider_failure_recorded():
     failed = [r for r in summary.fixture_results if r.task_result.status.value == "failed"]
     assert len(failed) == len(EVAL_FIXTURES)
     assert summary.overall_accuracy is None
+
+
+def test_run_eval_on_fixture_done_called_for_failures():
+    """Callback must fire even when the provider under test raises an exception.
+
+    Regression: before the fix the ``continue`` after the failure block skipped
+    the callback, so failed fixtures were invisible in the live CLI table and
+    were never saved to the database.
+    """
+    provider = MagicMock()
+    provider.name = "failing"
+    provider.generate = AsyncMock(side_effect=ConnectionError("down"))
+    judge = _make_good_judge()
+    calls = []
+    summary = asyncio.run(
+        run_eval(provider, judge_provider=judge, on_fixture_done=lambda fr: calls.append(fr))
+    )
+    # Every fixture (all failed) must have triggered the callback
+    assert len(calls) == len(EVAL_FIXTURES)
+    assert all(c.task_result.status.value == "failed" for c in calls)
 
 
 # ── TaskResult model ─────────────────────────────────────────────────────────

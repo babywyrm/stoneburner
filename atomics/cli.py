@@ -387,7 +387,7 @@ def schedule(
             console.print(f"[green]{msg}[/green]")
         else:
             console.print("[bold]Add this to your crontab (crontab -e):[/bold]\n")
-            console.print(entry)
+            click.echo(entry)
     elif fmt == "systemd":
         service, timer = generate_systemd_timer(
             interval, max_iterations, tier=tier, provider=provider_name
@@ -403,10 +403,12 @@ def schedule(
             repo.close()
             console.print(f"[green]{msg}[/green]")
         else:
-            console.print("[bold]atomics.service:[/bold]")
-            console.print(service)
-            console.print("[bold]atomics.timer:[/bold]")
-            console.print(timer)
+            # Use click.echo for raw config files — Rich wraps long lines
+            # which can break embedded flags like --provider across lines
+            click.echo("atomics.service:")
+            click.echo(service)
+            click.echo("atomics.timer:")
+            click.echo(timer)
     elif fmt == "launchd":
         plist = generate_launchd_plist(
             interval, max_iterations, tier=tier, provider=provider_name
@@ -425,7 +427,7 @@ def schedule(
             console.print(
                 "[bold]Save to ~/Library/LaunchAgents/com.babywyrm.atomics.plist:[/bold]\n"
             )
-            console.print(plist)
+            click.echo(plist)
 
 
 @cli.command("schedule-status")

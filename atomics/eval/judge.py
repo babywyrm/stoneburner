@@ -49,7 +49,10 @@ RATIONALE: <one concise sentence explaining the score>
 """
 
 _SCORE_RE = re.compile(
-    r"ACCURACY:\s*(\d)\s*\nCOMPLETE\w*:\s*(\d)\s*\nFORMAT:\s*(\d)\s*\nRATIONALE:\s*(.+)",
+    # [\r\n]+ handles both CRLF (Windows / some APIs) and LF.
+    # COMPLET\w* absorbs both "COMPLETENESS" and "COMPLETNESS" (qwen typo).
+    # RATIONALE uses [\s\S]+ so multi-line rationales are captured in full.
+    r"ACCURACY:\s*(\d+)[\r\n]+COMPLET\w*:\s*(\d+)[\r\n]+FORMAT:\s*(\d+)[\r\n]+RATIONALE:\s*([\s\S]+)",
     re.IGNORECASE,
 )
 
@@ -140,7 +143,8 @@ async def score_response(
     acc = min(int(match.group(1)), 4)
     comp = min(int(match.group(2)), 3)
     fmt = min(int(match.group(3)), 3)
-    rationale = match.group(4).strip()
+    # Collapse multi-line rationales to one line; strip trailing whitespace
+    rationale = " ".join(match.group(4).strip().splitlines()).strip()
     raw_score = acc + comp + fmt          # 0-10
     normalised = round(raw_score / 10.0, 3)
 

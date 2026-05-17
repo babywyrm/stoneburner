@@ -118,8 +118,15 @@ async def run_eval(
             task_result.error_class = type(exc).__name__
             task_result.error_message = str(exc)[:500]
             task_result.completed_at = datetime.now(UTC)
-            fixture_results.append(FixtureResult(fixture=fixture, task_result=task_result, judge=None))
+            fr = FixtureResult(fixture=fixture, task_result=task_result, judge=None)
+            fixture_results.append(fr)
             logger.warning("[eval] %s failed: %s", fixture.id, exc)
+            if on_fixture_done is not None:
+                import asyncio
+                if asyncio.iscoroutinefunction(on_fixture_done):
+                    await on_fixture_done(fr)
+                else:
+                    on_fixture_done(fr)
             continue
 
         task_result.completed_at = datetime.now(UTC)

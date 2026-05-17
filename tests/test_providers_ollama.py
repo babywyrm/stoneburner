@@ -190,7 +190,13 @@ def test_ollama_model_classes():
     assert classify_model("llama3.2:3b") == ModelClass.MID
 
 
-def test_ollama_config_defaults():
+def test_ollama_config_defaults(monkeypatch, tmp_path):
+    # Clear any process-level env vars AND chdir to a tmp dir so that the
+    # project's .env file (which points to the GPU_HOST) is not loaded.
+    monkeypatch.delenv("ATOMICS_OLLAMA_HOST", raising=False)
+    monkeypatch.delenv("ATOMICS_OLLAMA_MODEL", raising=False)
+    monkeypatch.chdir(tmp_path)
+
     from atomics.config import AtomicsSettings
 
     s = AtomicsSettings()
