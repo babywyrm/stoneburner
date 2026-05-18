@@ -1,0 +1,9 @@
+# TruffleHog v3 configuration for stoneburner
+
+exclude_paths:
+  - 1/        # Python venv — third-party library examples
+
+exclude_detectors:
+  - Polygon
+  - Pastebin
+  - URI
