@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.3.0 — Accuracy Scoring, LLM-as-Judge, and Business-Case Narrative
+
+### Added
+- **`atomics eval` command** — run a fixed set of 15 reproducible eval fixtures against any provider and score quality with an LLM judge
+  - Each fixture has gold criteria (key concepts a correct answer must cover) that are injected into the judge's rubric
+  - Fixtures span security, cloud/infra, LLM/AI, and general engineering at light / moderate / heavy complexity
+- **LLM-as-judge** (`atomics/eval/judge.py`) — rubric-based scoring (Accuracy 0–4, Completeness 0–3, Format 0–3) normalized to 0.0–1.0
+  - Defaults to local Ollama so judging never adds API spend
+  - Tolerates CRLF line endings and common judge model spelling variations (`COMPLETNESS` etc.)
+  - Multi-line rationales collapsed to a single stored sentence
+- **`accuracy_score`, `judge_model`, `quality_rationale`** fields on `task_results` (schema v4)
+- **`avg_accuracy_score` and `value_score`** columns in `atomics compare` — value score = accuracy / cost-per-1K-tokens, with a $0.001 floor so free local runs have a finite (large) score rather than infinity
+- **`atomics compare --narrative`** — plain-English business-case summary comparing self-hosted vs cloud API options: quality gap, cost delta, privacy posture, and total API spend
+- **`--judge-host`** option on `atomics eval`; falls back to `--ollama-host` → `ATOMICS_OLLAMA_HOST` so the judge always routes to the right Ollama instance
+- **Reasoning-model support** in the OpenAI provider: `gpt-5` and related models use `max_completion_tokens` (not `max_tokens`) with an 8× multiplier for internal reasoning budget
+- **Model pricing** for `gpt-5`, `gpt-5-turbo`, `gpt-5.3`, `gpt-5.5`, `o3-pro`
+- **Model class entries** for `qwen2.5:14b`, `qwen2.5:32b`, `qwen2.5:72b`, `gpt-5*`, `o3-pro`
+
+### Fixed
+- `on_fixture_done` callback now fires for **failed** fixtures too — previously provider failures were invisible in the live eval table and were never saved to the database
+- `_SCORE_RE` regex uses `[\r\n]+` instead of `\n` to handle CRLF responses from OpenAI and other APIs
+- `COMPLET\w*` pattern absorbs both `COMPLETENESS` and `COMPLETNESS` (qwen spelling variant)
+- Schedule command used Rich's `Console.print` for raw config text, causing word-wrap to split long `ExecStart` lines and break embedded flags
+- `test_ollama_config_defaults` isolated from project `.env` so it does not fail when `ATOMICS_OLLAMA_HOST` is set to a non-default value
+
+### Changed
+- `atomics compare` table now includes Quality and Value Score columns alongside existing latency/cost columns
+- Schema bumped from v3 → v4; existing databases are migrated automatically on first open
+- 289 tests, 0 failures
+
 ## 0.2.0 — Ollama Provider + Throughput Metrics
 
 ### Added
