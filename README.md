@@ -60,16 +60,23 @@ uv run atomics tiers
 stoneburner/
 ├── atomics/              # Core Python package
 │   ├── core/             # Loop engine, task runner, rate/budget guard
+│   ├── eval/             # Evaluation framework
+│   │   ├── fixtures.py
+│   │   └── judge.py
 │   ├── providers/        # LLM adapters (Claude, Bedrock, OpenAI, Ollama)
 │   ├── tasks/            # Task catalog with weighted, tiered selection
 │   ├── storage/          # SQLite metrics persistence
 │   ├── scheduler/        # Cron/systemd/launchd generation and installation
 │   ├── workers/          # Optional npm worker bridge (Phase 3)
-│   ├── tiers.py          # Burn tier profiles (ez/baseline/mega)
 │   ├── cli.py            # Click CLI entry point
-│   └── reporting.py      # Rich table trend reports
+│   ├── exporters.py      # Data export helpers
+│   ├── hooks.py          # Lifecycle hooks
+│   ├── model_classes.py  # Model class definitions
+│   ├── reporting.py      # Rich table trend reports
+│   ├── stress.py         # Stress test runner
+│   └── tiers.py          # Burn tier profiles (ez/baseline/mega)
 ├── configs/              # Rate/budget profiles (default, aggressive, conservative)
-├── tests/                # 232+ tests at 87% coverage
+├── tests/                # 289 tests at 80% coverage
 └── workers/npm/          # Optional Node.js workers (Phase 3)
 ```
 
@@ -97,6 +104,10 @@ stoneburner/
 | `atomics schedule --install` | Install schedule on this system |
 | `atomics schedule --uninstall` | Remove installed schedule |
 | `atomics schedule-status` | Show installed schedules and OS health |
+| `atomics eval` | Run evaluation suite against a provider |
+| `atomics stress` | Run stress tests with configurable concurrency |
+| `atomics export` | Export benchmark data (CSV, JSON) |
+| `atomics completion` | Generate shell completion scripts |
 | `atomics login` | OAuth/OIDC login (browser or device code) |
 | `atomics logout` | Clear cached OAuth tokens |
 | `atomics whoami` | Show current auth mode and identity |
