@@ -18,10 +18,12 @@ async def execute_task(
     provider: BaseProvider,
     run_id: str,
     model: str | None = None,
+    thinking: bool | None = None,
+    thinking_budget: int | None = None,
 ) -> TaskResult:
     """Run a single benchmark task and return the result (never raises)."""
     if "{prompt}" in task.prompt_template:
-        prompt = topic  # topic is already the fully-built prompt
+        prompt = topic
     else:
         prompt = task.prompt_template.format(topic=topic)
     result = TaskResult(
@@ -31,6 +33,7 @@ async def execute_task(
         provider=provider.name,
         model=model or "default",
         prompt=prompt,
+        thinking_enabled=thinking is True,
     )
 
     try:
@@ -40,12 +43,15 @@ async def execute_task(
             system="You are a knowledgeable technical assistant.",
             model=model,
             max_tokens=task.max_output_tokens,
+            thinking=thinking,
+            thinking_budget=thinking_budget,
         )
         result.status = TaskStatus.SUCCESS
         result.response = resp.text
         result.input_tokens = resp.input_tokens
         result.output_tokens = resp.output_tokens
         result.total_tokens = resp.total_tokens
+        result.thinking_tokens = resp.thinking_tokens
         result.model = resp.model
         result.latency_ms = resp.latency_ms
         result.estimated_cost_usd = resp.estimated_cost_usd

@@ -92,6 +92,8 @@ class OpenAIProvider(BaseProvider):
         system: str = "",
         model: str | None = None,
         max_tokens: int = 1024,
+        thinking: bool | None = None,
+        thinking_budget: int | None = None,
     ) -> ProviderResponse:
         model = model or self._default_model
 
@@ -102,11 +104,12 @@ class OpenAIProvider(BaseProvider):
                 self._client.api_key = token
 
         if self._use_responses_api:
-            return await self._generate_responses(prompt, system=system, model=model, max_tokens=max_tokens)
-        return await self._generate_completions(prompt, system=system, model=model, max_tokens=max_tokens)
+            return await self._generate_responses(prompt, system=system, model=model, max_tokens=max_tokens, thinking=thinking, thinking_budget=thinking_budget)
+        return await self._generate_completions(prompt, system=system, model=model, max_tokens=max_tokens, thinking=thinking, thinking_budget=thinking_budget)
 
     async def _generate_completions(
-        self, prompt: str, *, system: str, model: str, max_tokens: int
+        self, prompt: str, *, system: str, model: str, max_tokens: int,
+        thinking: bool | None = None, thinking_budget: int | None = None,
     ) -> ProviderResponse:
         """Chat Completions API — used with static API keys."""
         messages: list[dict] = []
@@ -116,11 +119,10 @@ class OpenAIProvider(BaseProvider):
             messages.append({"role": "system", "content": "You are a helpful assistant."})
         messages.append({"role": "user", "content": prompt})
 
-        # Newer reasoning models require max_completion_tokens and need a much
-        # larger budget because they consume tokens internally before producing
-        # visible output — multiply to prevent empty responses.
-        if model in _MAX_COMPLETION_TOKENS_MODELS:
-            token_param = {"max_completion_tokens": max_tokens * _REASONING_TOKEN_MULTIPLIER}
+        is_reasoning = model in _MAX_COMPLETION_TOKENS_MODELS
+        if is_reasoning:
+            multiplier = _REASONING_TOKEN_MULTIPLIER if thinking is not False else 2
+            token_param = {"max_completion_tokens": max_tokens * multiplier}
         else:
             token_param = {"max_tokens": max_tokens}
         t0 = time.monotonic()
@@ -134,8 +136,6 @@ class OpenAIProvider(BaseProvider):
         choice = response.choices[0] if response.choices else None
         raw_content = choice.message.content if choice else None
 
-        # Newer models (gpt-5 family) may return content as a list of blocks
-        # or put text in refusal/reasoning fields — extract whatever we can find
         if isinstance(raw_content, list):
             text = "".join(
                 block.get("text", "") if isinstance(block, dict) else getattr(block, "text", "")
@@ -146,7 +146,6 @@ class OpenAIProvider(BaseProvider):
         elif raw_content:
             text = raw_content
         else:
-            # Fallback: check reasoning_content (o-series models)
             text = getattr(getattr(choice, "message", None), "reasoning_content", "") or ""
             if not text:
                 import logging as _logging
@@ -159,7 +158,13 @@ class OpenAIProvider(BaseProvider):
         inp = usage.prompt_tokens if usage else 0
         out = usage.completion_tokens if usage else 0
 
-        tps = out / (latency / 1000) if latency > 0 and out > 0 else None
+        reasoning_tokens = 0
+        if usage and hasattr(usage, "completion_tokens_details"):
+            details = usage.completion_tokens_details
+            reasoning_tokens = getattr(details, "reasoning_tokens", 0) or 0
+
+        visible_out = out - reasoning_tokens
+        tps = visible_out / (latency / 1000) if latency > 0 and visible_out > 0 else None
 
         return ProviderResponse(
             text=text,
@@ -170,11 +175,13 @@ class OpenAIProvider(BaseProvider):
             latency_ms=round(latency, 2),
             estimated_cost_usd=round(_estimate_cost(model, inp, out), 6),
             tokens_per_second=round(tps, 2) if tps is not None else None,
+            thinking_tokens=reasoning_tokens,
             raw=response.model_dump() if hasattr(response, "model_dump") else None,
         )
 
     async def _generate_responses(
-        self, prompt: str, *, system: str, model: str, max_tokens: int
+        self, prompt: str, *, system: str, model: str, max_tokens: int,
+        thinking: bool | None = None, thinking_budget: int | None = None,
     ) -> ProviderResponse:
         """Responses API — used with OAuth tokens (ChatGPT OAuth scopes)."""
         input_items: list[dict] = []
@@ -182,12 +189,18 @@ class OpenAIProvider(BaseProvider):
             input_items.append({"role": "system", "content": system})
         input_items.append({"role": "user", "content": prompt})
 
+        is_reasoning = model in _MAX_COMPLETION_TOKENS_MODELS
+        if is_reasoning and thinking is not False:
+            effective_max = max_tokens * _REASONING_TOKEN_MULTIPLIER
+        else:
+            effective_max = max_tokens
+
         t0 = time.monotonic()
         response = await self._client.responses.create(
             model=model,
             input=input_items,
             instructions=system or "You are a helpful assistant.",
-            max_output_tokens=max_tokens,
+            max_output_tokens=effective_max,
             store=False,
         )
         latency = (time.monotonic() - t0) * 1000
@@ -203,8 +216,10 @@ class OpenAIProvider(BaseProvider):
         usage = getattr(response, "usage", None)
         inp = getattr(usage, "input_tokens", 0) if usage else 0
         out = getattr(usage, "output_tokens", 0) if usage else 0
+        reasoning_tokens = getattr(usage, "reasoning_tokens", 0) or 0
 
-        tps = out / (latency / 1000) if latency > 0 and out > 0 else None
+        visible_out = out - reasoning_tokens
+        tps = visible_out / (latency / 1000) if latency > 0 and visible_out > 0 else None
 
         return ProviderResponse(
             text=text,
@@ -215,6 +230,7 @@ class OpenAIProvider(BaseProvider):
             latency_ms=round(latency, 2),
             estimated_cost_usd=round(_estimate_cost(model, inp, out), 6),
             tokens_per_second=round(tps, 2) if tps is not None else None,
+            thinking_tokens=reasoning_tokens,
             raw=response.model_dump() if hasattr(response, "model_dump") else None,
         )
 

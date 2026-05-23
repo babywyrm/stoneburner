@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass
@@ -16,7 +16,9 @@ class ProviderResponse:
     latency_ms: float
     estimated_cost_usd: float
     tokens_per_second: float | None = None
-    raw: dict | None = None
+    thinking_tokens: int = 0
+    thinking_text: str = ""
+    raw: dict | None = field(default=None, repr=False)
 
 
 class BaseProvider(ABC):
@@ -34,6 +36,8 @@ class BaseProvider(ABC):
         system: str = "",
         model: str | None = None,
         max_tokens: int = 1024,
+        thinking: bool | None = None,
+        thinking_budget: int | None = None,
     ) -> ProviderResponse: ...
 
     @abstractmethod

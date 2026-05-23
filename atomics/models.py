@@ -67,9 +67,11 @@ class TaskResult(BaseModel):
     input_tokens: int = 0
     output_tokens: int = 0
     total_tokens: int = 0
+    thinking_tokens: int = 0
     latency_ms: float = 0.0
     estimated_cost_usd: float = 0.0
     tokens_per_second: float | None = None
+    thinking_enabled: bool = False
     error_class: str = ""
     error_message: str = ""
     started_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
