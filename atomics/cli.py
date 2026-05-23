@@ -1209,7 +1209,7 @@ def _make_provider(name: str, mdl: str | None, host: str | None, settings):
     """Build a provider instance — mirrors the pattern inside eval()."""
     if name == "claude":
         if not settings.anthropic_api_key:
-            console.print("[red]ANTHROPIC_API_KEY not set.[/red]")
+            click.echo("Error: ANTHROPIC_API_KEY not set.", err=True)
             sys.exit(1)
         from atomics.providers.claude import ClaudeProvider
         return ClaudeProvider(api_key=settings.anthropic_api_key, default_model=mdl or settings.default_model)
@@ -1218,7 +1218,7 @@ def _make_provider(name: str, mdl: str | None, host: str | None, settings):
         return BedrockProvider(region="us-east-1", model_id=mdl or "us.anthropic.claude-sonnet-4-6")
     if name == "openai":
         if not settings.openai_api_key:
-            console.print("[red]OPENAI_API_KEY not set.[/red]")
+            click.echo("Error: OPENAI_API_KEY not set.", err=True)
             sys.exit(1)
         from atomics.providers.openai import OpenAIProvider
         return OpenAIProvider(api_key=settings.openai_api_key, default_model=mdl or "gpt-4o")
@@ -1262,6 +1262,7 @@ def adversarial(
     from atomics.eval.adversarial.runner import run_adversarial
     from atomics.eval.adversarial.fixtures import ADVERSARIAL_FIXTURES
 
+    console = Console()
     settings = load_settings()
     provider = _make_provider(provider_name, model, ollama_host, settings)
     judge = _make_provider(judge_provider_name, judge_model, judge_host or ollama_host, settings)
@@ -1356,6 +1357,7 @@ def redblue(
     from atomics.eval.redblue.runner import run_redblue
     from atomics.eval.redblue.fixtures import RED_FIXTURES, BLUE_FIXTURES, ALL_FIXTURES
 
+    console = Console()
     fixture_count = {"red": len(RED_FIXTURES), "blue": len(BLUE_FIXTURES), "all": len(ALL_FIXTURES)}[mode]
     settings = load_settings()
     provider = _make_provider(provider_name, model, ollama_host, settings)
@@ -1452,6 +1454,7 @@ def probe(
     from atomics.probe.config import load_probe_config, ProbeTarget
     from atomics.probe.runner import run_probe
 
+    console = Console()
     settings = load_settings()
     provider = _make_provider(provider_name, model, ollama_host, settings)
     judge = _make_provider(judge_provider_name, judge_model, judge_host or ollama_host, settings)
