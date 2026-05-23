@@ -84,6 +84,18 @@ PROVIDER_CHOICES = click.Choice(["claude", "bedrock", "openai", "ollama", "brain
     default="manual",
     help="How this run was triggered (set automatically by scheduled runs)",
 )
+@click.option(
+    "--thinking/--no-thinking",
+    "thinking_flag",
+    default=None,
+    help="Enable/disable extended thinking for capable models (auto-detects if omitted)",
+)
+@click.option(
+    "--thinking-budget",
+    type=int,
+    default=None,
+    help="Max thinking tokens to allocate (provider-specific defaults if omitted)",
+)
 def run(
     tier: str,
     provider_name: str,
@@ -97,6 +109,8 @@ def run(
     hook_cmd: str | None,
     notify_flag: bool | None,
     trigger: str,
+    thinking_flag: bool | None,
+    thinking_budget: int | None,
 ) -> None:
     """Start the benchmarking loop."""
     settings = load_settings()
@@ -158,6 +172,12 @@ def run(
         console.print(f"[red]Unknown provider: {provider_name}[/red]")
         sys.exit(1)
 
+    # Auto-detect thinking capability when not explicitly set
+    if thinking_flag is None and effective_model:
+        from atomics.model_classes import supports_thinking
+        if supports_thinking(effective_model):
+            thinking_flag = True
+
     repo = MetricsRepository(settings.db_path)
     engine = LoopEngine(
         provider=provider,
@@ -168,6 +188,8 @@ def run(
         model_override=effective_model,
         budget_override=budget,
         trigger=trigger,
+        thinking=thinking_flag,
+        thinking_budget=thinking_budget,
     )
 
     from atomics.hooks import hook_env, notify_run_complete, run_post_hook
@@ -228,7 +250,9 @@ def report(hours: int, runs: int) -> None:
 @click.option("--region", type=str, default="us-east-1", help="AWS region for Bedrock")
 @click.option("--ollama-host", type=str, default=None, help="Ollama endpoint")
 @click.option("--gateway-url", type=str, default=None, help="Brain-gateway endpoint")
-def provider_test(provider_name: str, model: str | None, region: str, ollama_host: str | None, gateway_url: str | None) -> None:
+@click.option("--thinking/--no-thinking", "thinking_flag", default=None, help="Enable/disable thinking mode")
+@click.option("--thinking-budget", type=int, default=None, help="Max thinking tokens")
+def provider_test(provider_name: str, model: str | None, region: str, ollama_host: str | None, gateway_url: str | None, thinking_flag: bool | None, thinking_budget: int | None) -> None:
     """Quick health check against the configured provider."""
     settings = load_settings()
     _setup_logging(settings.log_level)
@@ -285,10 +309,22 @@ def provider_test(provider_name: str, model: str | None, region: str, ollama_hos
         console.print(f"[red]Unknown provider: {provider_name}[/red]")
         sys.exit(1)
 
+    # Auto-detect thinking if not explicitly set
+    eff_thinking = thinking_flag
+    if eff_thinking is None and model:
+        from atomics.model_classes import supports_thinking
+        if supports_thinking(model):
+            eff_thinking = True
+
     async def _test() -> None:
+        thinking_label = ""
+        if eff_thinking is True:
+            thinking_label = " [magenta](thinking ON)[/magenta]"
+        elif eff_thinking is False:
+            thinking_label = " [dim](thinking OFF)[/dim]"
         console.print(
             f"Testing provider [cyan]{prov.name}[/cyan] with model "
-            f"[cyan]{model_label}[/cyan]..."
+            f"[cyan]{model_label}[/cyan]{thinking_label}..."
         )
         ok = await prov.health_check()
         if ok:
@@ -302,6 +338,8 @@ def provider_test(provider_name: str, model: str | None, region: str, ollama_hos
                 "What is 2+2? Reply with just the number.",
                 model=model,
                 max_tokens=32,
+                thinking=eff_thinking,
+                thinking_budget=thinking_budget,
             )
         except Exception as exc:
             console.print(f"[red]Generate failed:[/red] {exc}")
@@ -310,6 +348,8 @@ def provider_test(provider_name: str, model: str | None, region: str, ollama_hos
         console.print(
             f"Tokens: in={resp.input_tokens} out={resp.output_tokens} total={resp.total_tokens}"
         )
+        if resp.thinking_tokens:
+            console.print(f"Thinking tokens: {resp.thinking_tokens}")
         console.print(f"Latency: {resp.latency_ms:.0f}ms")
         console.print(f"Cost: ${resp.estimated_cost_usd:.6f}")
         if resp.tokens_per_second is not None:
@@ -689,6 +729,8 @@ def _print_narrative(console: Console, rows: list[dict], by: str) -> None:
 @click.option("--judge-model", type=str, default=None, help="Model override for the judge")
 @click.option("--judge-host", type=str, default=None, help="Ollama host for the judge (if different)")
 @click.option("--save/--no-save", "save_results", default=True, help="Persist results to the database")
+@click.option("--thinking/--no-thinking", "thinking_flag", default=None, help="Enable/disable thinking for capable models")
+@click.option("--thinking-budget", type=int, default=None, help="Max thinking tokens")
 def eval(
     provider_name: str,
     model: str | None,
@@ -698,6 +740,8 @@ def eval(
     judge_model: str | None,
     judge_host: str | None,
     save_results: bool,
+    thinking_flag: bool | None,
+    thinking_budget: int | None,
 ) -> None:
     """Run the fixed eval fixture set and score quality with an LLM judge.
 
@@ -753,11 +797,13 @@ def eval(
     # Judge host falls back to: --judge-host → --ollama-host → ATOMICS_OLLAMA_HOST env/.env
     judge_provider = _build_provider(judge_provider_name, judge_model, judge_host or ollama_host or settings.ollama_host)
 
+    from atomics.eval.fixtures import EVAL_FIXTURES
+
     console.print(
         f"\n[bold]Eval run[/bold] — model under test: [cyan]{provider_name}[/cyan] "
         f"({model or 'default'})\n"
         f"Judge: [cyan]{judge_provider_name}[/cyan] ({judge_model or 'default'})\n"
-        f"Fixtures: [bold]{15}[/bold] | Results saved: [bold]{'yes' if save_results else 'no'}[/bold]\n"
+        f"Fixtures: [bold]{len(EVAL_FIXTURES)}[/bold] | Results saved: [bold]{'yes' if save_results else 'no'}[/bold]\n"
     )
 
     repo = None
@@ -815,6 +861,13 @@ def eval(
         if repo:
             repo.save_task_result(tr)
 
+    # Auto-detect thinking if not explicitly set
+    eff_thinking = thinking_flag
+    if eff_thinking is None and model:
+        from atomics.model_classes import supports_thinking
+        if supports_thinking(model):
+            eff_thinking = True
+
     summary = asyncio.run(run_eval(
         test_provider,
         judge_provider=judge_provider,
@@ -822,6 +875,8 @@ def eval(
         judge_model=judge_model,
         run_id=eval_run_id,
         on_fixture_done=on_done,
+        thinking=eff_thinking,
+        thinking_budget=thinking_budget,
     ))
 
     console.print(result_table)
@@ -1146,3 +1201,322 @@ def show_tiers() -> None:
             profile.preferred_model or "(default)",
         )
     console.print(table)
+
+
+# ── Shared provider builder for new suites ────────────────────────────────────
+
+def _make_provider(name: str, mdl: str | None, host: str | None, settings):
+    """Build a provider instance — mirrors the pattern inside eval()."""
+    if name == "claude":
+        if not settings.anthropic_api_key:
+            console.print("[red]ANTHROPIC_API_KEY not set.[/red]")
+            sys.exit(1)
+        from atomics.providers.claude import ClaudeProvider
+        return ClaudeProvider(api_key=settings.anthropic_api_key, default_model=mdl or settings.default_model)
+    if name == "bedrock":
+        from atomics.providers.bedrock import BedrockProvider
+        return BedrockProvider(region="us-east-1", model_id=mdl or "us.anthropic.claude-sonnet-4-6")
+    if name == "openai":
+        if not settings.openai_api_key:
+            console.print("[red]OPENAI_API_KEY not set.[/red]")
+            sys.exit(1)
+        from atomics.providers.openai import OpenAIProvider
+        return OpenAIProvider(api_key=settings.openai_api_key, default_model=mdl or "gpt-4o")
+    if name == "brain-gateway":
+        from atomics.providers.brain_gateway import BrainGatewayProvider
+        return BrainGatewayProvider(url=host or settings.brain_gateway_url, default_model=mdl)
+    from atomics.providers.ollama import OllamaProvider
+    return OllamaProvider(host=host or settings.ollama_host, default_model=mdl or settings.ollama_model)
+
+
+# ── atomics adversarial ───────────────────────────────────────────────────────
+
+@cli.command("adversarial")
+@click.option("--provider", "-p", "provider_name", type=PROVIDER_CHOICES, default="ollama", show_default=True)
+@click.option("--model", "-m", type=str, default=None, help="Model override for the provider under test.")
+@click.option("--ollama-host", type=str, default=None, help="Ollama base URL for the model under test.")
+@click.option("--judge-provider", "judge_provider_name", type=PROVIDER_CHOICES, default="ollama", show_default=True)
+@click.option("--judge-model", type=str, default=None, help="Judge model override.")
+@click.option("--judge-host", type=str, default=None, help="Ollama base URL for the judge.")
+@click.option("--category", type=str, default=None,
+              help="Comma-separated categories to run (default: all). "
+                   "Options: prompt_injection,role_confusion,context_escape,"
+                   "instruction_override,social_engineering,data_exfil_attempt")
+@click.option("--thinking/--no-thinking", "thinking_flag", default=None,
+              help="Force thinking mode on or off (default: auto-detect).")
+@click.option("--thinking-budget", type=int, default=8000, show_default=True)
+@click.option("--save/--no-save", "save_results", default=True, show_default=True)
+def adversarial(
+    provider_name: str,
+    model: str | None,
+    ollama_host: str | None,
+    judge_provider_name: str,
+    judge_model: str | None,
+    judge_host: str | None,
+    category: str | None,
+    thinking_flag: bool | None,
+    thinking_budget: int,
+    save_results: bool,
+) -> None:
+    """Run adversarial LLM resilience eval — measures resistance to manipulation."""
+    from atomics.eval.adversarial.runner import run_adversarial
+    from atomics.eval.adversarial.fixtures import ADVERSARIAL_FIXTURES
+
+    settings = load_settings()
+    provider = _make_provider(provider_name, model, ollama_host, settings)
+    judge = _make_provider(judge_provider_name, judge_model, judge_host or ollama_host, settings)
+    categories = [c.strip() for c in category.split(",")] if category else None
+
+    console.print(
+        f"\n[bold]Adversarial eval[/bold] — model under test: [cyan]{provider_name}[/cyan] "
+        f"({model or 'default'})\n"
+        f"Judge: [cyan]{judge_provider_name}[/cyan] ({judge_model or 'default'})\n"
+        f"Fixtures: [bold]{len(ADVERSARIAL_FIXTURES)}[/bold] | "
+        f"Categories: [bold]{category or 'all'}[/bold]\n"
+    )
+
+    repo = None
+    if save_results:
+        from atomics.storage.repository import MetricsRepository
+        repo = MetricsRepository(settings.db_path)
+
+    run_id = __import__("uuid").uuid4().hex[:12]
+
+    def on_done(fr):
+        res = fr.resistance
+        if res:
+            color = "green" if res.label == "resisted" else ("yellow" if res.label == "partial" else "red")
+            icon = "✓" if res.label == "resisted" else ("~" if res.label == "partial" else "✗")
+            console.print(
+                f" [{icon}] [bold]{fr.fixture.id}[/bold] "
+                f"[{color}]{res.label}[/] ({res.score:.2f}) — {res.rationale[:80]}"
+            )
+        if repo and res:
+            repo.save_adversarial_result(run_id, fr, thinking_enabled=thinking_flag is True)
+
+    summary = asyncio.run(run_adversarial(
+        provider,
+        judge_provider=judge,
+        model=model,
+        judge_model=judge_model,
+        categories=categories,
+        run_id=run_id,
+        thinking=thinking_flag,
+        thinking_budget=thinking_budget,
+        on_fixture_done=on_done,
+    ))
+
+    table = Table(title="Adversarial Resilience Summary")
+    table.add_column("Metric")
+    table.add_column("Value")
+    table.add_row("Provider", provider_name)
+    table.add_row("Model", model or "default")
+    table.add_row("Overall Resilience", f"{summary.overall_resilience * 100:.1f}%")
+    table.add_row("Fixtures Run", str(summary.total_fixtures))
+    table.add_row("Critical Failures", str(len(summary.critical_failures)))
+    for cat, score in sorted(summary.category_scores.items()):
+        table.add_row(f"  {cat}", f"{score * 100:.1f}%")
+    console.print(table)
+
+    if summary.critical_failures:
+        console.print(
+            f"\n[bold red]⚠ {len(summary.critical_failures)} CRITICAL/HIGH fixture(s) where model complied:[/bold red]"
+        )
+        for fr in summary.critical_failures:
+            console.print(f"  • {fr.fixture.id} [{fr.fixture.severity}] {fr.fixture.category}")
+
+
+# ── atomics redblue ───────────────────────────────────────────────────────────
+
+@cli.command("redblue")
+@click.option("--provider", "-p", "provider_name", type=PROVIDER_CHOICES, default="ollama", show_default=True)
+@click.option("--model", "-m", type=str, default=None)
+@click.option("--ollama-host", type=str, default=None)
+@click.option("--judge-provider", "judge_provider_name", type=PROVIDER_CHOICES, default="ollama", show_default=True)
+@click.option("--judge-model", type=str, default=None)
+@click.option("--judge-host", type=str, default=None)
+@click.option("--mode", type=click.Choice(["red", "blue", "all"]), default="all", show_default=True,
+              help="Which fixture set to run.")
+@click.option("--thinking/--no-thinking", "thinking_flag", default=None)
+@click.option("--thinking-budget", type=int, default=8000, show_default=True)
+@click.option("--save/--no-save", "save_results", default=True, show_default=True)
+def redblue(
+    provider_name: str,
+    model: str | None,
+    ollama_host: str | None,
+    judge_provider_name: str,
+    judge_model: str | None,
+    judge_host: str | None,
+    mode: str,
+    thinking_flag: bool | None,
+    thinking_budget: int,
+    save_results: bool,
+) -> None:
+    """Run red/blue team LLM capability eval — offensive and defensive security tasks."""
+    from atomics.eval.redblue.runner import run_redblue
+    from atomics.eval.redblue.fixtures import RED_FIXTURES, BLUE_FIXTURES, ALL_FIXTURES
+
+    fixture_count = {"red": len(RED_FIXTURES), "blue": len(BLUE_FIXTURES), "all": len(ALL_FIXTURES)}[mode]
+    settings = load_settings()
+    provider = _make_provider(provider_name, model, ollama_host, settings)
+    judge = _make_provider(judge_provider_name, judge_model, judge_host or ollama_host, settings)
+
+    console.print(
+        f"\n[bold]Red/Blue eval[/bold] — model: [cyan]{provider_name}[/cyan] ({model or 'default'})\n"
+        f"Judge: [cyan]{judge_provider_name}[/cyan] | Mode: [bold]{mode}[/bold] | "
+        f"Fixtures: [bold]{fixture_count}[/bold]\n"
+    )
+
+    repo = None
+    if save_results:
+        from atomics.storage.repository import MetricsRepository
+        repo = MetricsRepository(settings.db_path)
+
+    def on_done(fr):
+        j = fr.judge
+        if j:
+            pct = int(j.score * 100)
+            color = "green" if pct >= 80 else ("yellow" if pct >= 60 else "red")
+            console.print(
+                f" [{fr.fixture.team.upper()}] [bold]{fr.fixture.id}[/bold] "
+                f"[{color}]{pct}%[/] ({fr.fixture.category}) — {j.rationale[:80]}"
+            )
+        if repo:
+            repo.save_task_result(fr.task_result, suite=f"redblue-{fr.fixture.team}")
+
+    summary = asyncio.run(run_redblue(
+        provider,
+        judge_provider=judge,
+        mode=mode,
+        model=model,
+        judge_model=judge_model,
+        thinking=thinking_flag,
+        thinking_budget=thinking_budget,
+        on_fixture_done=on_done,
+    ))
+
+    table = Table(title=f"Red/Blue Eval Summary ({mode})")
+    table.add_column("Metric")
+    table.add_column("Value")
+    table.add_row("Provider", provider_name)
+    table.add_row("Model", model or "default")
+    table.add_row("Mode", mode)
+    table.add_row("Overall Quality", f"{(summary.overall_quality or 0) * 100:.1f}%")
+    table.add_row("Fixtures Run", str(summary.total_fixtures))
+    table.add_row("Avg Latency", f"{summary.avg_latency_ms:.0f}ms")
+    table.add_row("Total Cost", f"${summary.total_cost_usd:.6f}")
+    for cat, score in sorted(summary.category_scores.items()):
+        table.add_row(f"  {cat}", f"{score * 100:.1f}%")
+    console.print(table)
+
+
+# ── atomics probe ─────────────────────────────────────────────────────────────
+
+@cli.command("probe")
+@click.option("--provider", "-p", "provider_name", type=PROVIDER_CHOICES, default="ollama", show_default=True)
+@click.option("--model", "-m", type=str, default=None)
+@click.option("--ollama-host", type=str, default=None)
+@click.option("--judge-provider", "judge_provider_name", type=PROVIDER_CHOICES, default="ollama", show_default=True)
+@click.option("--judge-model", type=str, default=None)
+@click.option("--judge-host", type=str, default=None)
+@click.option("--probes-file", type=click.Path(exists=True), default=None,
+              help="Path to probes.yaml config file.")
+@click.option("--artifact", type=click.Choice([
+    "json-security-report", "inference-api", "access-log",
+    "k8s-audit-log", "config-file", "api-response",
+]), default=None, help="Artifact type for single-file mode.")
+@click.option("--file", "artifact_file", type=click.Path(exists=True), default=None,
+              help="Artifact file path for single-file mode (use with --artifact).")
+@click.option("--thinking/--no-thinking", "thinking_flag", default=None)
+@click.option("--thinking-budget", type=int, default=8000, show_default=True)
+@click.option("--alert-on-regression/--no-alert-on-regression", default=False,
+              help="Warn if any check score drops >10% from last run.")
+@click.option("--save/--no-save", "save_results", default=True, show_default=True)
+def probe(
+    provider_name: str,
+    model: str | None,
+    ollama_host: str | None,
+    judge_provider_name: str,
+    judge_model: str | None,
+    judge_host: str | None,
+    probes_file: str | None,
+    artifact: str | None,
+    artifact_file: str | None,
+    thinking_flag: bool | None,
+    thinking_budget: int,
+    alert_on_regression: bool,
+    save_results: bool,
+) -> None:
+    """Run LLM-evaluated live ecosystem health probes against configured artifact targets."""
+    from pathlib import Path
+    from atomics.probe.config import load_probe_config, ProbeTarget
+    from atomics.probe.runner import run_probe
+
+    settings = load_settings()
+    provider = _make_provider(provider_name, model, ollama_host, settings)
+    judge = _make_provider(judge_provider_name, judge_model, judge_host or ollama_host, settings)
+
+    targets = []
+    if probes_file:
+        targets = load_probe_config(Path(probes_file))
+    elif artifact and artifact_file:
+        targets = [ProbeTarget(
+            name=Path(artifact_file).name,
+            artifact_type=artifact,
+            source="file",
+            path=artifact_file,
+        )]
+    else:
+        console.print("[red]Provide --probes-file or both --artifact and --file.[/red]")
+        raise SystemExit(2)
+
+    console.print(
+        f"\n[bold]Ecosystem probe[/bold] — model: [cyan]{provider_name}[/cyan] ({model or 'default'})\n"
+        f"Judge: [cyan]{judge_provider_name}[/cyan] | Targets: [bold]{len(targets)}[/bold]\n"
+    )
+
+    repo = None
+    if save_results:
+        from atomics.storage.repository import MetricsRepository
+        repo = MetricsRepository(settings.db_path)
+
+    run_id = __import__("uuid").uuid4().hex[:12]
+
+    def on_result(r):
+        color = "green" if (r.score or 0) >= 0.8 else ("yellow" if (r.score or 0) >= 0.6 else "red")
+        reg_tag = " [bold red][REGRESSION][/bold red]" if r.regressed else ""
+        console.print(
+            f" [bold]{r.target_name}[/bold] ({r.artifact_type}) "
+            f"[{color}]{(r.score or 0) * 100:.1f}%[/]{reg_tag} — {r.judge_rationale[:80]}"
+        )
+        if repo:
+            repo.save_probe_result(run_id, r)
+
+    summary = asyncio.run(run_probe(
+        provider,
+        judge_provider=judge,
+        targets=targets,
+        model=model,
+        judge_model=judge_model,
+        thinking=thinking_flag,
+        thinking_budget=thinking_budget,
+        regression_threshold=0.10,
+        on_result=on_result,
+    ))
+
+    table = Table(title="Probe Summary")
+    table.add_column("Metric")
+    table.add_column("Value")
+    table.add_row("Provider", provider_name)
+    table.add_row("Targets", str(len(summary.results)))
+    table.add_row("Overall Score", f"{(summary.overall_score or 0) * 100:.1f}%")
+    if summary.regressions:
+        table.add_row("[red]Regressions[/red]", str(len(summary.regressions)))
+    console.print(table)
+
+    if alert_on_regression and summary.regressions:
+        console.print(
+            f"\n[bold red]⚠ {len(summary.regressions)} probe(s) regressed >10% from last run[/bold red]"
+        )
+        for r in summary.regressions:
+            console.print(f"  • {r.target_name}: {(r.prev_score or 0)*100:.1f}% → {(r.score or 0)*100:.1f}%")
