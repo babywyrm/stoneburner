@@ -18,7 +18,7 @@ class MockProvider(BaseProvider):
     def name(self) -> str:
         return "mock"
 
-    async def generate(self, prompt, *, system="", model=None, max_tokens=1024):
+    async def generate(self, prompt, *, system="", model=None, max_tokens=1024, thinking=None, thinking_budget=None):
         if self._fail:
             raise ConnectionError("mock failure")
         return ProviderResponse(

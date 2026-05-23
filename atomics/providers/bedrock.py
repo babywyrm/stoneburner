@@ -64,6 +64,8 @@ class BedrockProvider(BaseProvider):
         system: str = "",
         model: str | None = None,
         max_tokens: int = 1024,
+        thinking: bool | None = None,
+        thinking_budget: int | None = None,
     ) -> ProviderResponse:
         import asyncio
 

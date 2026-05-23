@@ -19,7 +19,7 @@ class FailingThenMockProvider(BaseProvider):
     def name(self) -> str:
         return "flaky"
 
-    async def generate(self, prompt, *, system="", model=None, max_tokens=1024):
+    async def generate(self, prompt, *, system="", model=None, max_tokens=1024, thinking=None, thinking_budget=None):
         self.attempts += 1
         if self.attempts == 1:
             raise RuntimeError("simulated provider failure")

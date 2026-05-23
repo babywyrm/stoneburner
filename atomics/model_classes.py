@@ -68,6 +68,46 @@ MODEL_CLASS_MAP: dict[str, ModelClass] = {
 }
 
 
+THINKING_CAPABLE: frozenset[str] = frozenset({
+    # Claude — extended thinking via API
+    "claude-opus-4-6",
+    "claude-opus-4-7",
+    "claude-sonnet-4-6",
+    "claude-sonnet-4-20250514",
+    "claude-opus-4-5",
+    "claude-sonnet-4-5-20250929",
+    "claude-sonnet-4-5",
+    # Claude via Bedrock
+    "us.anthropic.claude-sonnet-4-6",
+    "us.anthropic.claude-sonnet-4-20250514-v1:0",
+    "us.anthropic.claude-opus-4-6-v1",
+    # OpenAI reasoning models
+    "o3", "o3-mini", "o3-pro", "o4-mini",
+    "gpt-5", "gpt-5-turbo", "gpt-5.3", "gpt-5.5",
+    # Ollama — qwen3 family and deepseek-r1 use <think> tags
+    "qwen3:1.7b", "qwen3:4b", "qwen3:14b", "qwen3:32b", "qwen3:72b",
+    "qwen3.5:0.8b",
+    "deepseek-r1:14b", "deepseek-r1:32b", "deepseek-r1:70b",
+})
+
+# Default thinking budget (tokens) per provider family
+THINKING_BUDGET_DEFAULTS: dict[str, int] = {
+    "claude": 10_000,
+    "openai": 8_192,
+    "ollama": 4_096,
+}
+
+
+def supports_thinking(model_id: str) -> bool:
+    """Check if a model supports thinking/reasoning mode."""
+    if model_id in THINKING_CAPABLE:
+        return True
+    for prefix in ("qwen3", "o3", "o4", "deepseek-r1"):
+        if model_id.startswith(prefix):
+            return True
+    return False
+
+
 def classify_model(model_id: str) -> ModelClass:
     """Return the class for a model ID, or UNKNOWN if not in the registry."""
     return MODEL_CLASS_MAP.get(model_id, ModelClass.UNKNOWN)

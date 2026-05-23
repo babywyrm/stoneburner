@@ -24,7 +24,7 @@ class MockProvider(BaseProvider):
     def name(self) -> str:
         return "mock"
 
-    async def generate(self, prompt, *, system="", model=None, max_tokens=1024):
+    async def generate(self, prompt, *, system="", model=None, max_tokens=1024, thinking=None, thinking_budget=None):
         self.call_count += 1
         return ProviderResponse(
             text=f"response #{self.call_count}",

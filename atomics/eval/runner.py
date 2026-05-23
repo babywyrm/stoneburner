@@ -70,6 +70,8 @@ async def run_eval(
     judge_model: str | None = None,
     run_id: str | None = None,
     on_fixture_done: object | None = None,
+    thinking: bool | None = None,
+    thinking_budget: int | None = None,
 ) -> EvalRunSummary:
     """Run all eval fixtures against provider, score each with judge_provider.
 
@@ -103,16 +105,20 @@ async def run_eval(
                 system="You are a knowledgeable technical assistant. Be accurate and concise.",
                 model=model,
                 max_tokens=fixture.max_output_tokens,
+                thinking=thinking,
+                thinking_budget=thinking_budget,
             )
             task_result.status = TaskStatus.SUCCESS
             task_result.response = resp.text
             task_result.input_tokens = resp.input_tokens
             task_result.output_tokens = resp.output_tokens
             task_result.total_tokens = resp.total_tokens
+            task_result.thinking_tokens = resp.thinking_tokens
             task_result.model = resp.model
             task_result.latency_ms = resp.latency_ms
             task_result.estimated_cost_usd = resp.estimated_cost_usd
             task_result.tokens_per_second = resp.tokens_per_second
+            task_result.thinking_enabled = thinking is True
         except Exception as exc:
             task_result.status = TaskStatus.FAILED
             task_result.error_class = type(exc).__name__

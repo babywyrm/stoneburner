@@ -34,6 +34,8 @@ class LoopEngine:
         budget_override: float | None = None,
         model_override: str | None = None,
         trigger: str = "manual",
+        thinking: bool | None = None,
+        thinking_budget: int | None = None,
     ) -> None:
         self._provider = provider
         self._repo = repo
@@ -62,6 +64,8 @@ class LoopEngine:
         )
         self._model = model_override
         self._trigger = trigger
+        self._thinking = thinking
+        self._thinking_budget = thinking_budget
         self._shutdown = asyncio.Event()
         self._run_id: str = ""
 
@@ -134,6 +138,8 @@ class LoopEngine:
                 provider=self._provider,
                 run_id=self._run_id,
                 model=model,
+                thinking=self._thinking,
+                thinking_budget=self._thinking_budget,
             )
 
             self._repo.save_task_result(result)

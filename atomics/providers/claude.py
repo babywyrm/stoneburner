@@ -28,6 +28,9 @@ def _estimate_cost(model: str, input_tokens: int, output_tokens: int) -> float:
     return (input_tokens * inp_price + output_tokens * out_price) / 1_000_000
 
 
+_DEFAULT_THINKING_BUDGET = 10_000
+
+
 class ClaudeProvider(BaseProvider):
     def __init__(
         self,
@@ -50,24 +53,50 @@ class ClaudeProvider(BaseProvider):
         system: str = "",
         model: str | None = None,
         max_tokens: int = 1024,
+        thinking: bool | None = None,
+        thinking_budget: int | None = None,
     ) -> ProviderResponse:
         model = model or self._default_model
         messages = [{"role": "user", "content": prompt}]
 
+        use_thinking = thinking if thinking is not None else False
+
+        kwargs: dict = {
+            "model": model,
+            "messages": messages,
+        }
+
+        if use_thinking:
+            budget = thinking_budget or _DEFAULT_THINKING_BUDGET
+            kwargs["max_tokens"] = max_tokens + budget
+            kwargs["thinking"] = {"type": "enabled", "budget_tokens": budget}
+            if system:
+                kwargs["system"] = system
+        else:
+            kwargs["max_tokens"] = max_tokens
+            kwargs["system"] = system or "You are a helpful assistant."
+
         t0 = time.monotonic()
-        response = await self._client.messages.create(
-            model=model,
-            max_tokens=max_tokens,
-            system=system or "You are a helpful assistant.",
-            messages=messages,
-        )
+        response = await self._client.messages.create(**kwargs)
         latency = (time.monotonic() - t0) * 1000
 
-        text = response.content[0].text if response.content else ""
+        text = ""
+        thinking_text = ""
+        for block in response.content:
+            if getattr(block, "type", "") == "thinking":
+                thinking_text += getattr(block, "thinking", "")
+            elif getattr(block, "type", "") == "text":
+                text += getattr(block, "text", "")
+
+        if not text and response.content:
+            text = getattr(response.content[0], "text", "")
+
         inp = response.usage.input_tokens
         out = response.usage.output_tokens
+        thinking_tokens = getattr(response.usage, "thinking_tokens", 0) or 0
 
-        tps = out / (latency / 1000) if latency > 0 and out > 0 else None
+        visible_out = out - thinking_tokens
+        tps = visible_out / (latency / 1000) if latency > 0 and visible_out > 0 else None
 
         return ProviderResponse(
             text=text,
@@ -78,6 +107,8 @@ class ClaudeProvider(BaseProvider):
             latency_ms=round(latency, 2),
             estimated_cost_usd=round(_estimate_cost(model, inp, out), 6),
             tokens_per_second=round(tps, 2) if tps is not None else None,
+            thinking_tokens=thinking_tokens,
+            thinking_text=thinking_text,
             raw=response.model_dump() if hasattr(response, "model_dump") else None,
         )
 
