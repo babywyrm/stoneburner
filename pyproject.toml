@@ -1,6 +1,6 @@
 [project]
 name = "atomics"
-version = "0.3.0"
+version = "0.4.0"
 description = "Agentic token usage benchmarking platform"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -13,6 +13,7 @@ dependencies = [
     "httpx>=0.27.0",
     "pydantic>=2.0.0",
     "pydantic-settings>=2.0.0",
+    "pyyaml>=6.0.3",
     "rich>=13.0.0",
 ]
 
