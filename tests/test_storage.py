@@ -14,8 +14,46 @@ def _tmp_repo() -> MetricsRepository:
     return MetricsRepository(Path(tmp))
 
 
-def test_schema_version_is_4():
-    assert SCHEMA_VERSION == 4
+def test_schema_version_is_5():
+    assert SCHEMA_VERSION == 6
+
+
+def test_adversarial_results_table_exists(tmp_path):
+    conn = init_db(tmp_path / "test.db")
+    conn.execute(
+        "INSERT INTO adversarial_results "
+        "(result_id, run_id, fixture_id, category, severity, provider, model, timestamp) "
+        "VALUES ('r1','run1','f1','prompt_injection','HIGH','ollama','qwen3:14b','2026-01-01')"
+    )
+    row = conn.execute("SELECT fixture_id FROM adversarial_results WHERE result_id='r1'").fetchone()
+    assert row[0] == "f1"
+
+
+def test_probe_results_table_exists(tmp_path):
+    conn = init_db(tmp_path / "test.db")
+    conn.execute(
+        "INSERT INTO probe_results "
+        "(result_id, run_id, target_name, artifact_type, check_id, provider, model, timestamp) "
+        "VALUES ('p1','run1','my-target','access-log','ioc_analysis','ollama','qwen3:14b','2026-01-01')"
+    )
+    row = conn.execute("SELECT target_name FROM probe_results WHERE result_id='p1'").fetchone()
+    assert row[0] == "my-target"
+
+
+def test_task_results_has_suite_column(tmp_path):
+    conn = init_db(tmp_path / "test.db")
+    conn.execute(
+        "INSERT INTO runs (run_id, started_at, provider, model, tier, trigger) "
+        "VALUES ('run1','2026-01-01','ollama','qwen3:14b','baseline','manual')"
+    )
+    conn.execute(
+        "INSERT INTO task_results "
+        "(task_id, run_id, category, task_name, provider, model, status, started_at, suite) "
+        "VALUES ('t1','run1','general_qa','ev-01','ollama','qwen3:14b','success','2026-01-01','redblue-red')"
+    )
+    conn.commit()
+    row = conn.execute("SELECT suite FROM task_results WHERE task_id='t1'").fetchone()
+    assert row[0] == "redblue-red"
 
 
 def test_schema_fresh_start_on_version_mismatch(tmp_path):
