@@ -34,6 +34,35 @@ uv run atomics run --provider ollama -n 5
 uv run atomics run --provider ollama --ollama-host http://gpu-box:11434 -m qwen3:4b -n 5
 ```
 
+## Thinking Mode
+
+Stoneburner auto-detects models with thinking/reasoning capabilities and handles them transparently. Thinking tokens are tracked separately from visible output so benchmarks measure what users actually see.
+
+```bash
+# Auto-detect: qwen3 models enable thinking automatically
+uv run atomics run --provider ollama -m qwen3:14b -n 5
+
+# Explicit control
+uv run atomics run --provider claude -m claude-sonnet-4-20250514 --thinking -n 5
+uv run atomics run --provider openai -m o3 --no-thinking -n 5
+
+# Custom thinking budget (Claude)
+uv run atomics run --provider claude --thinking --thinking-budget 20000 -n 5
+
+# Provider test shows thinking token breakdown
+uv run atomics provider-test -p ollama -m qwen3:14b --thinking
+```
+
+**Supported thinking models:**
+
+| Provider | Models | Mechanism |
+|----------|--------|-----------|
+| **Claude** | Opus 4.x, Sonnet 4.x | Extended thinking API (`budget_tokens`) |
+| **OpenAI** | o3, o3-mini, o3-pro, o4-mini, gpt-5.x | Reasoning tokens (`completion_tokens_details`) |
+| **Ollama** | qwen3 family | `<think>` tag parsing, auto-stripped from output |
+
+When `--thinking` / `--no-thinking` is omitted, stoneburner checks the model against its capability registry and enables thinking automatically for known models. Use `--no-thinking` to force it off for A/B comparisons.
+
 ## Burn Tiers
 
 Atomics supports three usage tiers that control task complexity, model selection, cadence, and budget:
@@ -54,6 +83,83 @@ uv run atomics run --tier mega -n 3 -i 5
 uv run atomics tiers
 ```
 
+## Security Evaluation Suites
+
+Stoneburner includes three purpose-built security testing suites. These complement tools like `mcpnuke` (infrastructure scanning) by focusing on *LLM reasoning quality and resilience* rather than raw infrastructure probing.
+
+### `atomics adversarial` — Resilience Eval
+
+Tests whether a model resists adversarial manipulation: prompt injection, role confusion, jailbreaks, social engineering, and data exfiltration attempts. Uses an inverted scoring model — higher scores mean better resistance.
+
+```bash
+# Run all 13 adversarial fixtures, judge with local Ollama
+uv run atomics adversarial --provider ollama -m qwen3:14b --judge-model qwen2.5:14b
+
+# Target specific attack categories
+uv run atomics adversarial --provider claude --category prompt_injection,role_confusion
+
+# With thinking enabled
+uv run atomics adversarial --provider ollama -m qwen3:14b --thinking
+```
+
+Categories: `prompt_injection` · `role_confusion` · `context_escape` · `instruction_override` · `social_engineering` · `data_exfil_attempt`
+
+### `atomics redblue` — Offensive/Defensive Capability Eval
+
+Benchmarks LLM performance on real security domain tasks — OSINT, vulnerability analysis, privilege escalation, incident response, hardening, threat modelling, and detection engineering. Uses the same quality judge as `atomics eval`.
+
+```bash
+# All 10 fixtures (5 red + 5 blue)
+uv run atomics redblue --provider ollama -m qwen3:14b
+
+# Red team only (offensive tasks)
+uv run atomics redblue --provider claude --mode red
+
+# Blue team only (defensive tasks)
+uv run atomics redblue --provider openai -m gpt-4o --mode blue
+
+# Persist results to DB with suite tag
+uv run atomics redblue --provider ollama -m qwen3:14b --save
+```
+
+### `atomics probe` — Live Ecosystem Probe
+
+Fetches real artifacts from your infrastructure (logs, API responses, scan reports, configs) and uses an LLM to analyse them for security issues. Targets are defined in a user-provided `probes.yaml` — nothing is hardcoded.
+
+```bash
+# Run against a probes.yaml config file
+uv run atomics probe --probes-file /path/to/probes.yaml
+
+# Single-file mode (no YAML needed)
+uv run atomics probe --artifact access-log --file /var/log/nginx/access.log
+
+# Alert when any check score drops >10% from last run
+uv run atomics probe --probes-file probes.yaml --alert-on-regression
+```
+
+**probes.yaml example:**
+```yaml
+targets:
+  - name: nginx-access-logs
+    artifact_type: access-log
+    source: file
+    path: /var/log/nginx/access.log
+
+  - name: ollama-api
+    artifact_type: inference-api
+    source: http
+    url: http://ollama-host:11434/api/tags
+
+  - name: k8s-cluster-audit
+    artifact_type: k8s-audit-log
+    source: file
+    path: /var/log/kubernetes/audit.log
+```
+
+**Supported artifact types:** `json-security-report` · `inference-api` · `access-log` · `k8s-audit-log` · `config-file` · `api-response`
+
+---
+
 ## Architecture
 
 ```
@@ -61,11 +167,14 @@ stoneburner/
 ├── atomics/              # Core Python package
 │   ├── core/             # Loop engine, task runner, rate/budget guard
 │   ├── eval/             # Evaluation framework
-│   │   ├── fixtures.py
-│   │   └── judge.py
+│   │   ├── fixtures.py   # Standard eval fixtures (25 prompts)
+│   │   ├── judge.py      # Quality scorer (0–1 scale)
+│   │   ├── adversarial/  # Adversarial resilience eval suite
+│   │   └── redblue/      # Red/Blue team capability eval suite
+│   ├── probe/            # Live ecosystem probe suite
 │   ├── providers/        # LLM adapters (Claude, Bedrock, OpenAI, Ollama, brain-gateway)
 │   ├── tasks/            # Task catalog with weighted, tiered selection
-│   ├── storage/          # SQLite metrics persistence
+│   ├── storage/          # SQLite metrics persistence (schema v6)
 │   ├── scheduler/        # Cron/systemd/launchd generation and installation
 │   ├── workers/          # Optional npm worker bridge (Phase 3)
 │   ├── cli.py            # Click CLI entry point
@@ -76,7 +185,7 @@ stoneburner/
 │   ├── stress.py         # Stress test runner
 │   └── tiers.py          # Burn tier profiles (ez/baseline/mega)
 ├── configs/              # Rate/budget profiles (default, aggressive, conservative)
-├── tests/                # 301 tests at 80% coverage
+├── tests/                # Full pytest coverage
 └── workers/npm/          # Optional Node.js workers (Phase 3)
 ```
 
@@ -92,6 +201,9 @@ stoneburner/
 | `atomics run --provider ollama --ollama-host http://gpu:11434` | Use remote Ollama |
 | `atomics run --provider brain-gateway` | Use camazotz brain-gateway |
 | `atomics run --provider brain-gateway --gateway-url http://nuc:30080` | Use remote brain-gateway |
+| `atomics run --thinking` | Enable thinking/reasoning mode for capable models |
+| `atomics run --no-thinking` | Force thinking off (A/B comparison) |
+| `atomics run --thinking-budget 20000` | Set max thinking tokens (provider-specific default otherwise) |
 | `atomics run -b 5.0` | Run with $5 budget cap |
 | `atomics run -i 10` | Override interval to 10 seconds |
 | `atomics compare` | Compare providers side-by-side (cost, latency, tokens) |
