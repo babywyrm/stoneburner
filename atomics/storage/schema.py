@@ -8,7 +8,7 @@ from pathlib import Path
 
 logger = logging.getLogger("atomics.schema")
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 6
 
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -41,14 +41,17 @@ CREATE TABLE IF NOT EXISTS task_results (
     provider        TEXT NOT NULL,
     model           TEXT NOT NULL,
     status          TEXT NOT NULL,
+    suite           TEXT NOT NULL DEFAULT 'eval',
     prompt          TEXT DEFAULT '',
     response        TEXT DEFAULT '',
     input_tokens    INTEGER DEFAULT 0,
     output_tokens   INTEGER DEFAULT 0,
     total_tokens    INTEGER DEFAULT 0,
+    thinking_tokens INTEGER DEFAULT 0,
     latency_ms      REAL DEFAULT 0.0,
     estimated_cost_usd REAL DEFAULT 0.0,
     tokens_per_second REAL DEFAULT NULL,
+    thinking_enabled INTEGER DEFAULT 0,
     error_class     TEXT DEFAULT '',
     error_message   TEXT DEFAULT '',
     started_at      TEXT NOT NULL,
@@ -57,6 +60,46 @@ CREATE TABLE IF NOT EXISTS task_results (
     judge_model     TEXT DEFAULT '',
     quality_rationale TEXT DEFAULT '',
     FOREIGN KEY (run_id) REFERENCES runs(run_id)
+);
+
+CREATE TABLE IF NOT EXISTS adversarial_results (
+    result_id           TEXT PRIMARY KEY,
+    run_id              TEXT NOT NULL,
+    fixture_id          TEXT NOT NULL,
+    category            TEXT NOT NULL,
+    severity            TEXT NOT NULL,
+    provider            TEXT NOT NULL,
+    model               TEXT NOT NULL,
+    prompt              TEXT DEFAULT '',
+    response            TEXT DEFAULT '',
+    attack_goal         TEXT DEFAULT '',
+    resistance_score    REAL DEFAULT NULL,
+    resistance_label    TEXT DEFAULT '',
+    judge_model         TEXT DEFAULT '',
+    judge_rationale     TEXT DEFAULT '',
+    thinking_enabled    INTEGER DEFAULT 0,
+    thinking_tokens     INTEGER DEFAULT 0,
+    latency_ms          REAL DEFAULT 0.0,
+    estimated_cost_usd  REAL DEFAULT 0.0,
+    timestamp           TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS probe_results (
+    result_id           TEXT PRIMARY KEY,
+    run_id              TEXT NOT NULL,
+    target_name         TEXT NOT NULL,
+    artifact_type       TEXT NOT NULL,
+    check_id            TEXT NOT NULL,
+    score               REAL DEFAULT NULL,
+    prev_score          REAL DEFAULT NULL,
+    regressed           INTEGER DEFAULT 0,
+    provider            TEXT NOT NULL,
+    model               TEXT NOT NULL,
+    judge_model         TEXT DEFAULT '',
+    judge_rationale     TEXT DEFAULT '',
+    thinking_enabled    INTEGER DEFAULT 0,
+    thinking_tokens     INTEGER DEFAULT 0,
+    timestamp           TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS schedules (
@@ -74,10 +117,13 @@ CREATE TABLE IF NOT EXISTS schedules (
 
 CREATE INDEX IF NOT EXISTS idx_task_results_run_id ON task_results(run_id);
 CREATE INDEX IF NOT EXISTS idx_task_results_category ON task_results(category);
+CREATE INDEX IF NOT EXISTS idx_task_results_suite ON task_results(suite);
 CREATE INDEX IF NOT EXISTS idx_task_results_started_at ON task_results(started_at);
 CREATE INDEX IF NOT EXISTS idx_runs_provider ON runs(provider);
 CREATE INDEX IF NOT EXISTS idx_runs_tier ON runs(tier);
 CREATE INDEX IF NOT EXISTS idx_runs_trigger ON runs(trigger);
+CREATE INDEX IF NOT EXISTS idx_adversarial_results_run_id ON adversarial_results(run_id);
+CREATE INDEX IF NOT EXISTS idx_probe_results_run_id ON probe_results(run_id);
 """
 
 
@@ -110,6 +156,8 @@ def init_db(db_path: Path) -> sqlite3.Connection:
         )
         conn.executescript(
             "DROP TABLE IF EXISTS task_results;"
+            "DROP TABLE IF EXISTS adversarial_results;"
+            "DROP TABLE IF EXISTS probe_results;"
             "DROP TABLE IF EXISTS runs;"
             "DROP TABLE IF EXISTS schedules;"
             "DROP TABLE IF EXISTS schema_version;"
