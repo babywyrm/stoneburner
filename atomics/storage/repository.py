@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -98,17 +99,20 @@ class MetricsRepository:
 
     # ── Task results ──────────────────────────────────────
 
-    def save_task_result(self, result: TaskResult) -> None:
+    def save_task_result(self, result: TaskResult, *, suite: str = "eval") -> None:
         self._conn.execute(
             """
             INSERT OR REPLACE INTO task_results (
                 task_id, run_id, category, task_name, provider, model, status,
+                suite,
                 prompt, response, input_tokens, output_tokens, total_tokens,
+                thinking_tokens,
                 latency_ms, estimated_cost_usd, tokens_per_second,
+                thinking_enabled,
                 error_class, error_message,
                 started_at, completed_at,
                 accuracy_score, judge_model, quality_rationale
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 result.task_id,
@@ -118,14 +122,17 @@ class MetricsRepository:
                 result.provider,
                 result.model,
                 result.status.value,
+                suite,
                 result.prompt,
                 result.response,
                 result.input_tokens,
                 result.output_tokens,
                 result.total_tokens,
+                result.thinking_tokens,
                 result.latency_ms,
                 result.estimated_cost_usd,
                 result.tokens_per_second,
+                int(result.thinking_enabled),
                 result.error_class,
                 result.error_message,
                 result.started_at.isoformat(),
@@ -133,6 +140,80 @@ class MetricsRepository:
                 result.accuracy_score,
                 result.judge_model,
                 result.quality_rationale,
+            ),
+        )
+        self._conn.commit()
+
+    def save_adversarial_result(
+        self,
+        run_id: str,
+        result: object,
+        *,
+        thinking_enabled: bool = False,
+    ) -> None:
+        r = result
+        res = r.resistance  # type: ignore[attr-defined]
+        self._conn.execute(
+            """
+            INSERT OR REPLACE INTO adversarial_results (
+                result_id, run_id, fixture_id, category, severity,
+                provider, model, prompt, response, attack_goal,
+                resistance_score, resistance_label, judge_model, judge_rationale,
+                thinking_enabled, thinking_tokens, latency_ms, estimated_cost_usd,
+                timestamp
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                uuid.uuid4().hex,
+                run_id,
+                r.fixture.id,  # type: ignore[attr-defined]
+                r.fixture.category,  # type: ignore[attr-defined]
+                r.fixture.severity,  # type: ignore[attr-defined]
+                "",
+                "",
+                r.fixture.prompt,  # type: ignore[attr-defined]
+                r.response,  # type: ignore[attr-defined]
+                r.fixture.attack_goal,  # type: ignore[attr-defined]
+                res.score if res else None,
+                res.label if res else None,
+                res.judge_model if res else None,
+                res.rationale if res else None,
+                int(thinking_enabled),
+                r.thinking_tokens,  # type: ignore[attr-defined]
+                r.latency_ms,  # type: ignore[attr-defined]
+                r.estimated_cost_usd,  # type: ignore[attr-defined]
+                datetime.now(UTC).isoformat(),
+            ),
+        )
+        self._conn.commit()
+
+    def save_probe_result(self, run_id: str, result: object) -> None:
+        r = result
+        self._conn.execute(
+            """
+            INSERT OR REPLACE INTO probe_results (
+                result_id, run_id, target_name, artifact_type, check_id,
+                score, prev_score, regressed,
+                provider, model, judge_model, judge_rationale,
+                thinking_enabled, thinking_tokens, timestamp
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                uuid.uuid4().hex,
+                run_id,
+                r.target_name,  # type: ignore[attr-defined]
+                r.artifact_type,  # type: ignore[attr-defined]
+                r.check_id,  # type: ignore[attr-defined]
+                r.score,  # type: ignore[attr-defined]
+                r.prev_score,  # type: ignore[attr-defined]
+                int(r.regressed),  # type: ignore[attr-defined]
+                "",
+                "",
+                r.judge_model,  # type: ignore[attr-defined]
+                r.judge_rationale,  # type: ignore[attr-defined]
+                int(r.thinking_enabled),  # type: ignore[attr-defined]
+                r.thinking_tokens,  # type: ignore[attr-defined]
+                datetime.now(UTC).isoformat(),
             ),
         )
         self._conn.commit()
