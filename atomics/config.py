@@ -33,6 +33,8 @@ class AtomicsSettings(BaseSettings):
     ollama_host: str = Field(default="http://localhost:11434", validation_alias="ATOMICS_OLLAMA_HOST")
     ollama_model: str = Field(default="qwen2.5:7b", validation_alias="ATOMICS_OLLAMA_MODEL")
 
+    brain_gateway_url: str = Field(default="http://localhost:8080", validation_alias="ATOMICS_BRAIN_GATEWAY_URL")
+
     auth_mode: str = Field(default="auto")
     oidc_issuer: str = Field(default="")
     oidc_client_id: str = Field(default="")

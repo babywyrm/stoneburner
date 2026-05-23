@@ -6,6 +6,7 @@ from atomics.providers.claude import ClaudeProvider
 __all__ = [
     "BaseProvider",
     "BedrockProvider",
+    "BrainGatewayProvider",
     "ClaudeProvider",
     "OllamaProvider",
     "OpenAIProvider",
@@ -18,6 +19,10 @@ def __getattr__(name: str):
         from atomics.providers.bedrock import BedrockProvider
 
         return BedrockProvider
+    if name == "BrainGatewayProvider":
+        from atomics.providers.brain_gateway import BrainGatewayProvider
+
+        return BrainGatewayProvider
     if name == "OllamaProvider":
         from atomics.providers.ollama import OllamaProvider
 
