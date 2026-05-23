@@ -33,7 +33,7 @@ def cli() -> None:
     """Atomics — Agentic token usage benchmarking platform."""
 
 
-PROVIDER_CHOICES = click.Choice(["claude", "bedrock", "openai", "ollama"], case_sensitive=False)
+PROVIDER_CHOICES = click.Choice(["claude", "bedrock", "openai", "ollama", "brain-gateway"], case_sensitive=False)
 
 
 @cli.command()
@@ -64,6 +64,7 @@ PROVIDER_CHOICES = click.Choice(["claude", "bedrock", "openai", "ollama"], case_
 @click.option("--interval", "-i", type=int, default=None, help="Override loop interval (seconds)")
 @click.option("--region", type=str, default="us-east-1", help="AWS region for Bedrock")
 @click.option("--ollama-host", type=str, default=None, help="Ollama endpoint (default: ATOMICS_OLLAMA_HOST or http://localhost:11434)")
+@click.option("--gateway-url", type=str, default=None, help="Brain-gateway endpoint (default: ATOMICS_BRAIN_GATEWAY_URL or http://localhost:8080)")
 @click.option(
     "--hook",
     "hook_cmd",
@@ -92,6 +93,7 @@ def run(
     interval: int | None,
     region: str,
     ollama_host: str | None,
+    gateway_url: str | None,
     hook_cmd: str | None,
     notify_flag: bool | None,
     trigger: str,
@@ -146,6 +148,12 @@ def run(
         host = ollama_host or settings.ollama_host
         effective_model = model or settings.ollama_model
         provider = OllamaProvider(host=host, default_model=effective_model)
+    elif provider_name == "brain-gateway":
+        from atomics.providers.brain_gateway import BrainGatewayProvider
+
+        url = gateway_url or settings.brain_gateway_url
+        effective_model = model or profile.preferred_model or settings.default_model
+        provider = BrainGatewayProvider(url=url, default_model=effective_model)
     else:
         console.print(f"[red]Unknown provider: {provider_name}[/red]")
         sys.exit(1)
@@ -219,7 +227,8 @@ def report(hours: int, runs: int) -> None:
 @click.option("--model", "-m", type=str, default=None, help="Model to test")
 @click.option("--region", type=str, default="us-east-1", help="AWS region for Bedrock")
 @click.option("--ollama-host", type=str, default=None, help="Ollama endpoint")
-def provider_test(provider_name: str, model: str | None, region: str, ollama_host: str | None) -> None:
+@click.option("--gateway-url", type=str, default=None, help="Brain-gateway endpoint")
+def provider_test(provider_name: str, model: str | None, region: str, ollama_host: str | None, gateway_url: str | None) -> None:
     """Quick health check against the configured provider."""
     settings = load_settings()
     _setup_logging(settings.log_level)
@@ -266,6 +275,12 @@ def provider_test(provider_name: str, model: str | None, region: str, ollama_hos
         ollama_model_name = model or settings.ollama_model
         prov = OllamaProvider(host=host, default_model=ollama_model_name)
         model_label = ollama_model_name
+    elif provider_name == "brain-gateway":
+        from atomics.providers.brain_gateway import BrainGatewayProvider
+
+        url = gateway_url or settings.brain_gateway_url
+        prov = BrainGatewayProvider(url=url, default_model=model)
+        model_label = model or "(gateway default)"
     else:
         console.print(f"[red]Unknown provider: {provider_name}[/red]")
         sys.exit(1)
@@ -724,6 +739,12 @@ def eval(
             return OllamaProvider(
                 host=host or settings.ollama_host,
                 default_model=mdl or settings.ollama_model,
+            )
+        elif name == "brain-gateway":
+            from atomics.providers.brain_gateway import BrainGatewayProvider
+            return BrainGatewayProvider(
+                url=host or settings.brain_gateway_url,
+                default_model=mdl,
             )
         console.print(f"[red]Unknown provider: {name}[/red]")
         sys.exit(1)

@@ -63,7 +63,7 @@ stoneburner/
 │   ├── eval/             # Evaluation framework
 │   │   ├── fixtures.py
 │   │   └── judge.py
-│   ├── providers/        # LLM adapters (Claude, Bedrock, OpenAI, Ollama)
+│   ├── providers/        # LLM adapters (Claude, Bedrock, OpenAI, Ollama, brain-gateway)
 │   ├── tasks/            # Task catalog with weighted, tiered selection
 │   ├── storage/          # SQLite metrics persistence
 │   ├── scheduler/        # Cron/systemd/launchd generation and installation
@@ -76,7 +76,7 @@ stoneburner/
 │   ├── stress.py         # Stress test runner
 │   └── tiers.py          # Burn tier profiles (ez/baseline/mega)
 ├── configs/              # Rate/budget profiles (default, aggressive, conservative)
-├── tests/                # 289 tests at 80% coverage
+├── tests/                # 301 tests at 80% coverage
 └── workers/npm/          # Optional Node.js workers (Phase 3)
 ```
 
@@ -90,6 +90,8 @@ stoneburner/
 | `atomics run --provider openai` | Use OpenAI / Codex |
 | `atomics run --provider ollama` | Use local Ollama inference |
 | `atomics run --provider ollama --ollama-host http://gpu:11434` | Use remote Ollama |
+| `atomics run --provider brain-gateway` | Use camazotz brain-gateway |
+| `atomics run --provider brain-gateway --gateway-url http://nuc:30080` | Use remote brain-gateway |
 | `atomics run -b 5.0` | Run with $5 budget cap |
 | `atomics run -i 10` | Override interval to 10 seconds |
 | `atomics compare` | Compare providers side-by-side (cost, latency, tokens) |
@@ -100,6 +102,7 @@ stoneburner/
 | `atomics provider-test -p bedrock` | Health check Bedrock |
 | `atomics provider-test -p openai` | Health check OpenAI |
 | `atomics provider-test -p ollama` | Health check Ollama |
+| `atomics provider-test -p brain-gateway` | Health check brain-gateway |
 | `atomics schedule` | Generate scheduler configs |
 | `atomics schedule --install` | Install schedule on this system |
 | `atomics schedule --uninstall` | Remove installed schedule |
@@ -120,6 +123,7 @@ stoneburner/
 | **Bedrock** (AWS) | Supported | `--provider bedrock --region us-east-1` | `uv sync --extra bedrock` |
 | **OpenAI / Codex** | Supported | `--provider openai` | `uv sync --extra openai` |
 | **Ollama** (local) | Supported | `--provider ollama` | `uv sync` (included, uses httpx) |
+| **brain-gateway** (camazotz) | Supported | `--provider brain-gateway` | `uv sync` (included, uses httpx) |
 
 ## Scheduling
 
@@ -158,6 +162,7 @@ Set via environment variables (prefix `ATOMICS_`) or `.env` file:
 | `ATOMICS_BUDGET_LIMIT_USD` | `50.00` | Total cost cap per run |
 | `ATOMICS_OLLAMA_HOST` | `http://localhost:11434` | Ollama endpoint URL |
 | `ATOMICS_OLLAMA_MODEL` | `qwen2.5:7b` | Default model for Ollama runs |
+| `ATOMICS_BRAIN_GATEWAY_URL` | `http://localhost:8080` | Camazotz brain-gateway endpoint |
 | `ATOMICS_DB_PATH` | (platform) | SQLite database location (see below) |
 
 **Database path defaults:**
@@ -177,6 +182,7 @@ uv run atomics run --provider claude --tier ez -n 3 -i 5
 uv run atomics run --provider bedrock --tier ez -n 3 -i 5
 uv run atomics run --provider openai --tier ez -n 3 -i 5
 uv run atomics run --provider ollama --tier ez -n 3 -i 5
+uv run atomics run --provider brain-gateway --tier ez -n 3 -i 5
 
 # Compare by provider (shows model(s), class, tok/s, P50/P95 latency, $/1K tokens)
 uv run atomics compare
