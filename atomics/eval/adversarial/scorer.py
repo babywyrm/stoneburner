@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import logging
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from atomics.providers.base import BaseProvider
 
@@ -68,6 +68,11 @@ class ResistanceResult:
     rationale: str
     judge_model: str
     parse_failed: bool = False
+    judge_scores: list[float] = field(default_factory=list)
+
+    def __post_init__(self):
+        if not self.judge_scores:
+            self.judge_scores = [self.score]
 
 
 def _normalise_resistance(raw: int) -> float:

@@ -1236,8 +1236,14 @@ def _make_provider(name: str, mdl: str | None, host: str | None, settings):
 @click.option("--model", "-m", type=str, default=None, help="Model override for the provider under test.")
 @click.option("--ollama-host", type=str, default=None, help="Ollama base URL for the model under test.")
 @click.option("--judge-provider", "judge_provider_name", type=PROVIDER_CHOICES, default="ollama", show_default=True)
-@click.option("--judge-model", type=str, default=None, help="Judge model override.")
-@click.option("--judge-host", type=str, default=None, help="Ollama base URL for the judge.")
+@click.option("--judge-model", type=str, default=None, help="Primary judge model override.")
+@click.option("--judge-host", type=str, default=None, help="Ollama base URL for the primary judge.")
+@click.option("--extra-judges", type=str, default=None,
+              help="Comma-separated extra judges for consensus scoring. "
+                   "Format: provider:model or provider:model@host. "
+                   "Example: ollama:deepseek-r1:14b,claude:claude-sonnet-4-20250514")
+@click.option("--runs", type=int, default=1, show_default=True,
+              help="Run each fixture N times and report mean ± stddev (use 3+ for variance analysis).")
 @click.option("--category", type=str, default=None,
               help="Comma-separated categories to run (default: all). "
                    "Options: prompt_injection,role_confusion,context_escape,"
@@ -1253,12 +1259,23 @@ def adversarial(
     judge_provider_name: str,
     judge_model: str | None,
     judge_host: str | None,
+    extra_judges: str | None,
+    runs: int,
     category: str | None,
     thinking_flag: bool | None,
     thinking_budget: int,
     save_results: bool,
 ) -> None:
-    """Run adversarial LLM resilience eval — measures resistance to manipulation."""
+    """Run adversarial LLM resilience eval — measures resistance to manipulation.
+
+    Use --runs 3 for variance-aware scoring. Use --extra-judges for consensus.
+
+    \b
+    Examples:
+      atomics adversarial --provider ollama -m qwen3:14b --runs 3
+      atomics adversarial --judge-model deepseek-r1:14b --extra-judges "claude:claude-sonnet-4-20250514"
+      atomics adversarial --runs 3 --extra-judges "ollama:deepseek-r1:14b@http://ollama-host:11434"
+    """
     from atomics.eval.adversarial.runner import run_adversarial
     from atomics.eval.adversarial.fixtures import ADVERSARIAL_FIXTURES
 
@@ -1268,10 +1285,29 @@ def adversarial(
     judge = _make_provider(judge_provider_name, judge_model, judge_host or ollama_host, settings)
     categories = [c.strip() for c in category.split(",")] if category else None
 
+    # Parse --extra-judges "ollama:deepseek-r1:14b@http://host:port,claude:model"
+    extra_judge_pairs: list[tuple] = []
+    if extra_judges:
+        for spec in extra_judges.split(","):
+            spec = spec.strip()
+            host_override = None
+            if "@" in spec:
+                spec, host_override = spec.rsplit("@", 1)
+            parts = spec.split(":", 1)
+            ej_provider_name = parts[0]
+            ej_model = parts[1] if len(parts) > 1 else None
+            ej_provider = _make_provider(ej_provider_name, ej_model, host_override or judge_host or ollama_host, settings)
+            extra_judge_pairs.append((ej_provider, ej_model))
+
+    judge_label = judge_model or "default"
+    if extra_judge_pairs:
+        judge_label += f" + {len(extra_judge_pairs)} extra"
+
     console.print(
         f"\n[bold]Adversarial eval[/bold] — model under test: [cyan]{provider_name}[/cyan] "
         f"({model or 'default'})\n"
-        f"Judge: [cyan]{judge_provider_name}[/cyan] ({judge_model or 'default'})\n"
+        f"Judge: [cyan]{judge_provider_name}[/cyan] ({judge_label}) | "
+        f"Runs per fixture: [bold]{runs}[/bold]\n"
         f"Fixtures: [bold]{len(ADVERSARIAL_FIXTURES)}[/bold] | "
         f"Categories: [bold]{category or 'all'}[/bold]\n"
     )
@@ -1288,9 +1324,11 @@ def adversarial(
         if res:
             color = "green" if res.label == "resisted" else ("yellow" if res.label == "partial" else "red")
             icon = "✓" if res.label == "resisted" else ("~" if res.label == "partial" else "✗")
+            run_tag = f" ×{runs}" if runs > 1 else ""
+            judge_tag = f" [{len(fr.run_scores)} scores]" if fr.run_scores else ""
             console.print(
-                f" [{icon}] [bold]{fr.fixture.id}[/bold] "
-                f"[{color}]{res.label}[/] ({res.score:.2f}) — {res.rationale[:80]}"
+                f" [{icon}] [bold]{fr.fixture.id}[/bold]{run_tag} "
+                f"[{color}]{res.label}[/] ({res.score:.2f}){judge_tag} — {res.rationale[:70]}"
             )
         if repo and res:
             repo.save_adversarial_result(run_id, fr, thinking_enabled=thinking_flag is True)
@@ -1300,19 +1338,27 @@ def adversarial(
         judge_provider=judge,
         model=model,
         judge_model=judge_model,
+        extra_judges=extra_judge_pairs,
         categories=categories,
+        runs=runs,
         run_id=run_id,
         thinking=thinking_flag,
         thinking_budget=thinking_budget,
         on_fixture_done=on_done,
     ))
 
-    table = Table(title="Adversarial Resilience Summary")
+    title = f"Adversarial Resilience Summary (runs={summary.runs}, judges={len(summary.judges)})"
+    table = Table(title=title)
     table.add_column("Metric")
     table.add_column("Value")
     table.add_row("Provider", provider_name)
     table.add_row("Model", model or "default")
-    table.add_row("Overall Resilience", f"{summary.overall_resilience * 100:.1f}%")
+    resilience_str = f"{summary.overall_resilience * 100:.1f}%"
+    if summary.resilience_stddev is not None:
+        resilience_str += f"  ±{summary.resilience_stddev * 100:.1f}%"
+    table.add_row("Overall Resilience", resilience_str)
+    table.add_row("Runs per fixture", str(summary.runs))
+    table.add_row("Judges", ", ".join(summary.judges))
     table.add_row("Fixtures Run", str(summary.total_fixtures))
     table.add_row("Critical Failures", str(len(summary.critical_failures)))
     for cat, score in sorted(summary.category_scores.items()):

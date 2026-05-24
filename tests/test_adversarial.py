@@ -171,3 +171,128 @@ def test_cli_adversarial_help():
     result = runner.invoke(cli, ["adversarial", "--help"])
     assert result.exit_code == 0
     assert "adversarial" in result.output.lower() or "resistance" in result.output.lower()
+
+
+# ── Multi-run (--runs N) tests ─────────────────────────────────────────────
+
+def test_run_adversarial_multi_run_mean():
+    """--runs N: fixture result scores are averaged across runs."""
+    from atomics.eval.adversarial.runner import run_adversarial
+
+    # Alternate complied/resisted — mean should be ~0.5
+    call_count = 0
+    def _side_effect(*args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        score = 0 if call_count % 2 == 0 else 10
+        label = "complied" if score == 0 else "resisted"
+        import asyncio
+        from types import SimpleNamespace
+        async def _inner(*a, **kw):
+            return SimpleNamespace(
+                text=f"RESISTANCE: {score}\nLABEL: {label}\nRATIONALE: varies.",
+                model="j", input_tokens=5, output_tokens=10, total_tokens=15,
+                thinking_tokens=0, latency_ms=50.0, estimated_cost_usd=0.0,
+                tokens_per_second=100.0,
+            )
+        return _inner()
+
+    judge = _make_judge()
+    judge.generate.side_effect = _side_effect
+
+    summary = asyncio.run(run_adversarial(
+        _make_provider(),
+        judge_provider=judge,
+        runs=2,
+        categories=["prompt_injection"],
+    ))
+    assert summary.runs == 2
+    # overall_resilience should be between 0 and 1
+    assert 0.0 <= summary.overall_resilience <= 1.0
+
+
+def test_run_adversarial_multi_run_stddev():
+    """Summary exposes per-fixture score stddev when runs > 1."""
+    from atomics.eval.adversarial.runner import run_adversarial
+
+    summary = asyncio.run(run_adversarial(
+        _make_provider(),
+        judge_provider=_make_judge(score=8),
+        runs=3,
+        categories=["prompt_injection"],
+    ))
+    assert summary.runs == 3
+    assert hasattr(summary, "resilience_stddev")
+    # All scores same → stddev should be 0.0
+    assert summary.resilience_stddev == 0.0
+
+
+def test_run_adversarial_single_run_stddev_is_none():
+    """stddev is None when runs == 1 (no variance meaningful)."""
+    from atomics.eval.adversarial.runner import run_adversarial
+
+    summary = asyncio.run(run_adversarial(
+        _make_provider(),
+        judge_provider=_make_judge(),
+        runs=1,
+        categories=["prompt_injection"],
+    ))
+    assert summary.runs == 1
+    assert summary.resilience_stddev is None
+
+
+# ── Multi-judge (--extra-judges) tests ────────────────────────────────────
+
+def test_run_adversarial_multi_judge_averages_scores():
+    """Two judges with different scores → mean is taken."""
+    from atomics.eval.adversarial.runner import run_adversarial
+
+    judge_a = _make_judge(score=10, label="resisted")   # 1.0
+    judge_b = _make_judge(score=0, label="complied")    # 0.0
+    # Mean should be 0.5 → "partial"
+
+    summary = asyncio.run(run_adversarial(
+        _make_provider(),
+        judge_provider=judge_a,
+        extra_judges=[(judge_b, None)],
+        categories=["prompt_injection"],
+    ))
+    for fr in summary.fixture_results:
+        if fr.resistance:
+            assert abs(fr.resistance.score - 0.5) < 0.01
+            assert fr.resistance.label == "partial"
+
+
+def test_run_adversarial_multi_judge_judge_scores_tracked():
+    """Per-judge scores are stored in resistance.judge_scores."""
+    from atomics.eval.adversarial.runner import run_adversarial
+
+    judge_a = _make_judge(score=10, label="resisted", rationale="Resisted.")
+    judge_b = _make_judge(score=6, label="resisted", rationale="Mostly resisted.")
+
+    summary = asyncio.run(run_adversarial(
+        _make_provider(),
+        judge_provider=judge_a,
+        extra_judges=[(judge_b, None)],
+        categories=["prompt_injection"],
+    ))
+    for fr in summary.fixture_results:
+        if fr.resistance:
+            assert hasattr(fr.resistance, "judge_scores")
+            assert len(fr.resistance.judge_scores) == 2
+
+
+def test_cli_adversarial_runs_option():
+    from click.testing import CliRunner
+    from atomics.cli import cli
+    runner = CliRunner()
+    result = runner.invoke(cli, ["adversarial", "--help"])
+    assert "--runs" in result.output
+
+
+def test_cli_adversarial_extra_judges_option():
+    from click.testing import CliRunner
+    from atomics.cli import cli
+    runner = CliRunner()
+    result = runner.invoke(cli, ["adversarial", "--help"])
+    assert "--extra-judges" in result.output
