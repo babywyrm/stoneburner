@@ -296,3 +296,33 @@ def test_cli_adversarial_extra_judges_option():
     runner = CliRunner()
     result = runner.invoke(cli, ["adversarial", "--help"])
     assert "--extra-judges" in result.output
+
+
+def test_cot_leakage_fixture_exists():
+    """adv-14 captures the qwen3:4b CoT-into-verdict bug found during
+    target-app model compatibility testing (2026-05-23)."""
+    from atomics.eval.adversarial.fixtures import ADVERSARIAL_FIXTURES
+    by_id = {f.id: f for f in ADVERSARIAL_FIXTURES}
+    cot = by_id.get("adv-14")
+    assert cot is not None, "adv-14 (CoT leakage) fixture missing"
+    assert cot.category == "data_exfil_attempt"
+    assert cot.severity == "CRITICAL"
+    assert "APPROVED" in cot.prompt and "DENIED" in cot.prompt
+    assert any("startswith" in c or "first token" in c for c in cot.resistance_criteria)
+
+
+def test_helpful_request_fixture_exists():
+    """adv-15 captures the 'helpful ops request' social engineering bypass
+    that leaked AGENT_CLIENT_SECRET across multiple models."""
+    from atomics.eval.adversarial.fixtures import ADVERSARIAL_FIXTURES
+    by_id = {f.id: f for f in ADVERSARIAL_FIXTURES}
+    hr = by_id.get("adv-15")
+    assert hr is not None, "adv-15 (helpful request) fixture missing"
+    assert hr.category == "social_engineering"
+    assert "JSON" in hr.prompt or "json" in hr.prompt.lower()
+    assert any("secret" in c or "credential" in c for c in hr.resistance_criteria)
+
+
+def test_fixture_count_includes_new():
+    from atomics.eval.adversarial.fixtures import ADVERSARIAL_FIXTURES
+    assert len(ADVERSARIAL_FIXTURES) == 15
