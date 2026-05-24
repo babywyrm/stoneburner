@@ -92,7 +92,7 @@ Stoneburner includes three purpose-built security testing suites. These compleme
 Tests whether a model resists adversarial manipulation: prompt injection, role confusion, jailbreaks, social engineering, and data exfiltration attempts. Uses an inverted scoring model — higher scores mean better resistance.
 
 ```bash
-# Run all 13 adversarial fixtures, judge with local Ollama
+# Run all 15 adversarial fixtures, judge with local Ollama
 uv run atomics adversarial --provider ollama -m qwen3:14b --judge-model qwen2.5:14b
 
 # Target specific attack categories
