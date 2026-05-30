@@ -158,6 +158,46 @@ targets:
 
 **Supported artifact types:** `json-security-report` · `inference-api` · `access-log` · `k8s-audit-log` · `config-file` · `api-response`
 
+### `atomics models` — Model Discovery
+
+List all models available on an Ollama host with class taxonomy and thinking support annotations.
+
+```bash
+uv run atomics models --host http://gpu-host:11434
+```
+
+### `atomics sweep` — Multi-Model Comparison
+
+Sweep the eval fixture set across multiple models and produce a ranked comparison table. Works with any provider — local Ollama, Claude, OpenAI, Bedrock, or brain-gateway.
+
+```bash
+# Sweep all local models on the gpu-host
+uv run atomics sweep --all-local --host http://gpu-host:11434
+
+# Sweep specific local models
+uv run atomics sweep --models qwen2.5:1.5b,qwen2.5:3b,mistral:7b
+
+# Sweep cloud providers
+uv run atomics sweep --provider claude --models claude-sonnet-4-6,claude-haiku-4-5-20251001
+uv run atomics sweep --provider openai --models gpt-4o,gpt-4o-mini
+
+# See full model replies as they come in
+uv run atomics sweep --provider claude --models claude-sonnet-4-6 --verbose
+
+# Run a subset of fixtures
+uv run atomics sweep --all-local --fixtures ev-01,ev-02,ev-03
+```
+
+### `atomics stress` — GPU Saturation Testing
+
+Ramp concurrent requests from 1 to N against an Ollama host to find the throughput saturation point. Reports per-phase TPS, latency percentiles, VRAM usage, and throttling detection.
+
+```bash
+uv run atomics stress --model qwen2.5:7b --max-concurrency 8
+uv run atomics stress --ollama-host http://gpu-host:11434 -c 16 -s 30
+uv run atomics stress --no-save  # skip database persistence
+```
+
 ---
 
 ## Architecture
@@ -174,7 +214,7 @@ stoneburner/
 │   ├── probe/            # Live ecosystem probe suite
 │   ├── providers/        # LLM adapters (Claude, Bedrock, OpenAI, Ollama, brain-gateway)
 │   ├── tasks/            # Task catalog with weighted, tiered selection
-│   ├── storage/          # SQLite metrics persistence (schema v6)
+│   ├── storage/          # SQLite metrics persistence (schema v7)
 │   ├── scheduler/        # Cron/systemd/launchd generation and installation
 │   ├── workers/          # Optional npm worker bridge (Phase 3)
 │   ├── cli.py            # Click CLI entry point
@@ -182,7 +222,8 @@ stoneburner/
 │   ├── hooks.py          # Lifecycle hooks
 │   ├── model_classes.py  # Model class definitions
 │   ├── reporting.py      # Rich table trend reports
-│   ├── stress.py         # Stress test runner
+│   ├── stress.py         # GPU stress test runner
+│   ├── sweep.py          # Multi-model eval sweep orchestrator
 │   └── tiers.py          # Burn tier profiles (ez/baseline/mega)
 ├── configs/              # Rate/budget profiles (default, aggressive, conservative)
 ├── tests/                # Full pytest coverage
@@ -220,6 +261,8 @@ stoneburner/
 | `atomics schedule --uninstall` | Remove installed schedule |
 | `atomics schedule-status` | Show installed schedules and OS health |
 | `atomics eval` | Run evaluation suite against a provider |
+| `atomics models` | List available models on Ollama host with class/thinking annotations |
+| `atomics sweep` | Multi-model eval sweep with ranked comparison |
 | `atomics stress` | Run stress tests with configurable concurrency |
 | `atomics export` | Export benchmark data (CSV, JSON) |
 | `atomics completion` | Generate shell completion scripts |
