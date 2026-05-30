@@ -340,3 +340,19 @@ async def test_openai_responses_api_fallback_text_extraction():
     provider = OpenAIProvider(client=client, auth=FakeAuth())
     resp = await provider.generate("test")
     assert resp.text == "fallback text"
+
+
+@pytest.mark.unit
+def test_openai_timeout_configured():
+    """OpenAI provider should set a 60s request timeout and 10s connect timeout."""
+    provider = OpenAIProvider(api_key="sk-test-key")
+    timeout = provider._client.timeout
+    assert timeout.read == 60.0
+    assert timeout.connect == 10.0
+
+
+@pytest.mark.unit
+def test_openai_max_retries_configured():
+    """OpenAI provider should cap retries at 2."""
+    provider = OpenAIProvider(api_key="sk-test-key")
+    assert provider._client.max_retries == 2
