@@ -146,3 +146,17 @@ async def test_engine_stop_sets_shutdown_event(make_engine):
     assert engine._shutdown.is_set()  # noqa: SLF001
     repo.close()
 
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_engine_saves_with_burn_suite_tag(make_engine):
+    """Continuous benchmark runs should use suite='burn', not 'eval'."""
+    engine, provider, repo = make_engine()
+    await engine.run(max_iterations=2)
+
+    rows = repo.query_task_results()
+    assert len(rows) == 2
+    for row in rows:
+        assert row["suite"] == "burn"
+    repo.close()
+
