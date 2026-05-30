@@ -788,3 +788,112 @@ def test_cli_sweep_requires_models_or_all_local(monkeypatch):
     runner = CliRunner()
     result = runner.invoke(cli, ["sweep", "--provider", "claude"])
     assert result.exit_code == 1
+
+
+def test_cli_sweep_verbose_shows_replies(monkeypatch):
+    """atomics sweep --verbose should print actual model replies."""
+    from atomics.sweep import ModelSweepResult
+    from atomics.eval.runner import EvalRunSummary, FixtureResult
+    from atomics.eval.fixtures import EvalFixture
+    from atomics.eval.judge import JudgeResult
+    from atomics.models import TaskComplexity, TaskResult, TaskCategory, TaskStatus
+    from datetime import datetime, UTC
+
+    fixture = EvalFixture(
+        id="ev-01", prompt="What is X?", complexity=TaskComplexity.LIGHT,
+        gold_criteria="Explain X", max_output_tokens=512,
+    )
+    task = TaskResult(
+        run_id="test", category=TaskCategory.GENERAL_QA,
+        task_name="ev-01", provider="claude", model="claude-sonnet-4-6",
+        prompt="What is X?", response="X is a fantastic thing that does Y and Z.",
+        status=TaskStatus.SUCCESS, input_tokens=50, output_tokens=100,
+        total_tokens=150, latency_ms=800.0, estimated_cost_usd=0.003,
+    )
+    judge = JudgeResult(score=0.9, accuracy=4, completeness=3, format_score=3,
+                        rationale="Good answer", judge_model="qwen2.5:7b")
+    fr = FixtureResult(fixture=fixture, task_result=task, judge=judge)
+    summary = EvalRunSummary(
+        run_id="test", provider="claude", model="claude-sonnet-4-6",
+        judge_provider="ollama", judge_model="qwen2.5:7b",
+        started_at=datetime.now(UTC), completed_at=datetime.now(UTC),
+        fixture_results=[fr],
+    )
+    mock_results = [
+        ModelSweepResult(
+            model="claude-sonnet-4-6", fixtures_run=1, overall_quality=0.9,
+            avg_latency_ms=800.0, total_tokens=150, total_cost_usd=0.003,
+            value_score=300.0, eval_summary=summary,
+        ),
+    ]
+
+    async def fake_sweep(**kwargs):
+        cb = kwargs.get("on_model_done")
+        for r in mock_results:
+            if cb:
+                cb(r)
+        return mock_results
+
+    monkeypatch.setattr("atomics.sweep.run_model_sweep", fake_sweep)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test-fake-key")
+    runner = CliRunner()
+    result = runner.invoke(cli, [
+        "sweep", "--provider", "claude", "--models", "claude-sonnet-4-6", "--verbose",
+    ])
+    assert result.exit_code == 0
+    assert "X is a fantastic thing" in result.output
+    assert "ev-01" in result.output
+
+
+def test_cli_sweep_no_verbose_hides_replies(monkeypatch):
+    """Without --verbose, sweep should NOT print full replies."""
+    from atomics.sweep import ModelSweepResult
+    from atomics.eval.runner import EvalRunSummary, FixtureResult
+    from atomics.eval.fixtures import EvalFixture
+    from atomics.eval.judge import JudgeResult
+    from atomics.models import TaskComplexity, TaskResult, TaskCategory, TaskStatus
+    from datetime import datetime, UTC
+
+    fixture = EvalFixture(
+        id="ev-01", prompt="What is X?", complexity=TaskComplexity.LIGHT,
+        gold_criteria="Explain X", max_output_tokens=512,
+    )
+    task = TaskResult(
+        run_id="test", category=TaskCategory.GENERAL_QA,
+        task_name="ev-01", provider="claude", model="claude-sonnet-4-6",
+        prompt="What is X?", response="X is a fantastic thing that does Y and Z.",
+        status=TaskStatus.SUCCESS, input_tokens=50, output_tokens=100,
+        total_tokens=150, latency_ms=800.0, estimated_cost_usd=0.003,
+    )
+    judge = JudgeResult(score=0.9, accuracy=4, completeness=3, format_score=3,
+                        rationale="Good answer", judge_model="qwen2.5:7b")
+    fr = FixtureResult(fixture=fixture, task_result=task, judge=judge)
+    summary = EvalRunSummary(
+        run_id="test", provider="claude", model="claude-sonnet-4-6",
+        judge_provider="ollama", judge_model="qwen2.5:7b",
+        started_at=datetime.now(UTC), completed_at=datetime.now(UTC),
+        fixture_results=[fr],
+    )
+    mock_results = [
+        ModelSweepResult(
+            model="claude-sonnet-4-6", fixtures_run=1, overall_quality=0.9,
+            avg_latency_ms=800.0, total_tokens=150, total_cost_usd=0.003,
+            value_score=300.0, eval_summary=summary,
+        ),
+    ]
+
+    async def fake_sweep(**kwargs):
+        cb = kwargs.get("on_model_done")
+        for r in mock_results:
+            if cb:
+                cb(r)
+        return mock_results
+
+    monkeypatch.setattr("atomics.sweep.run_model_sweep", fake_sweep)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test-fake-key")
+    runner = CliRunner()
+    result = runner.invoke(cli, [
+        "sweep", "--provider", "claude", "--models", "claude-sonnet-4-6",
+    ])
+    assert result.exit_code == 0
+    assert "X is a fantastic thing" not in result.output
