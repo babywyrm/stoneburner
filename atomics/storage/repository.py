@@ -460,3 +460,60 @@ class MetricsRepository:
             (now, status, schedule_id),
         )
         self._conn.commit()
+
+    # ── Stress results ─────────────────────────────────────
+
+    def save_stress_result(self, sr: object) -> None:
+        """Persist a StressResult from atomics.stress."""
+        import json as _json
+
+        result_id = uuid.uuid4().hex[:12]
+        now = datetime.now(UTC).isoformat()
+
+        phases_data = [
+            {
+                "concurrency": p.concurrency,
+                "requests": p.requests,
+                "failed": p.failed,
+                "total_output_tokens": p.total_output_tokens,
+                "aggregate_tps": round(p.aggregate_tps, 2),
+                "avg_request_tps": round(p.avg_request_tps, 2),
+                "avg_latency_ms": round(p.avg_latency_ms, 2),
+                "p95_latency_ms": round(p.p95_latency_ms, 2),
+            }
+            for p in sr.phases
+        ]
+
+        self._conn.execute(
+            """
+            INSERT INTO stress_results
+            (result_id, model, host, peak_tps, saturation_concurrency,
+             duration_seconds, total_tokens, total_requests, total_failed,
+             total_phases, gpu_name, vram_total_mb, vram_peak_mb,
+             phases_json, timestamp)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                result_id, sr.model, sr.host,
+                round(sr.peak_tps, 2), sr.saturation_concurrency,
+                round(sr.duration_seconds, 2), sr.total_tokens,
+                sr.total_requests, sr.total_failed,
+                len(sr.phases), sr.gpu_name or "",
+                sr.vram_total_mb, sr.vram_peak_mb,
+                _json.dumps(phases_data), now,
+            ),
+        )
+        self._conn.commit()
+
+    def get_stress_results(self, *, model: str | None = None) -> list[dict]:
+        """Retrieve stress results, optionally filtered by model."""
+        if model:
+            rows = self._conn.execute(
+                "SELECT * FROM stress_results WHERE model = ? ORDER BY timestamp DESC",
+                (model,),
+            ).fetchall()
+        else:
+            rows = self._conn.execute(
+                "SELECT * FROM stress_results ORDER BY timestamp DESC"
+            ).fetchall()
+        return [dict(r) for r in rows]
