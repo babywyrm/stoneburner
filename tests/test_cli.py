@@ -676,3 +676,39 @@ def test_cli_models_connection_error(monkeypatch):
     result = runner.invoke(cli, ["models", "--host", "http://fake:11434"])
     assert result.exit_code == 1
     assert "Cannot connect" in result.output
+
+
+def test_cli_sweep_command(monkeypatch):
+    """atomics sweep should run eval across multiple models."""
+    from atomics.sweep import ModelSweepResult
+
+    mock_results = [
+        ModelSweepResult(
+            model="qwen2.5:1.5b", fixtures_run=2, overall_quality=0.85,
+            avg_latency_ms=150.0, total_tokens=500, total_cost_usd=0.0,
+            value_score=850.0, eval_summary=None,
+        ),
+        ModelSweepResult(
+            model="mistral:7b", fixtures_run=2, overall_quality=0.72,
+            avg_latency_ms=300.0, total_tokens=800, total_cost_usd=0.0,
+            value_score=720.0, eval_summary=None,
+        ),
+    ]
+
+    async def fake_sweep(**kwargs):
+        cb = kwargs.get("on_model_done")
+        for r in mock_results:
+            if cb:
+                cb(r)
+        return mock_results
+
+    monkeypatch.setattr("atomics.sweep.run_model_sweep", fake_sweep)
+    runner = CliRunner()
+    result = runner.invoke(cli, [
+        "sweep", "--models", "qwen2.5:1.5b,mistral:7b",
+        "--host", "http://fake:11434",
+    ])
+    assert result.exit_code == 0
+    assert "qwen2.5:1.5b" in result.output
+    assert "mistral:7b" in result.output
+    assert "85" in result.output  # 85% quality

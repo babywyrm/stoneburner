@@ -72,8 +72,9 @@ async def run_eval(
     on_fixture_done: object | None = None,
     thinking: bool | None = None,
     thinking_budget: int | None = None,
+    fixtures: list[EvalFixture] | None = None,
 ) -> EvalRunSummary:
-    """Run all eval fixtures against provider, score each with judge_provider.
+    """Run eval fixtures against provider, score each with judge_provider.
 
     Args:
         provider: The model under test.
@@ -82,12 +83,14 @@ async def run_eval(
         judge_model: Model override for the judge.
         run_id: Optional run ID (auto-generated if omitted).
         on_fixture_done: Optional async callable(fixture_result) called after each fixture.
+        fixtures: Optional subset of fixtures to run (default: all EVAL_FIXTURES).
     """
     run_id = run_id or uuid.uuid4().hex[:12]
     started_at = datetime.now(UTC)
     fixture_results: list[FixtureResult] = []
+    effective_fixtures = fixtures if fixtures is not None else EVAL_FIXTURES
 
-    for fixture in EVAL_FIXTURES:
+    for fixture in effective_fixtures:
         logger.info("[eval] %s (%s) — %s", fixture.id, fixture.complexity.value, fixture.prompt[:60])
         task_result = TaskResult(
             run_id=run_id,
