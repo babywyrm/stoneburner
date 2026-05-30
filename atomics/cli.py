@@ -1175,6 +1175,56 @@ def whoami() -> None:
     console.print("[yellow]Not authenticated.[/yellow] Run [bold]atomics login[/bold] or set OPENAI_API_KEY.")
 
 
+@cli.command("models")
+@click.option(
+    "--host",
+    default=None,
+    help="Ollama host URL (default: ATOMICS_OLLAMA_HOST or http://localhost:11434)",
+)
+def models(host: str | None) -> None:
+    """List available models on an Ollama instance with class and thinking annotations."""
+    from atomics.providers.ollama import OllamaProvider
+
+    settings = load_settings()
+    effective_host = host or settings.ollama_host
+    provider = OllamaProvider(host=effective_host)
+    console = Console()
+
+    try:
+        result = asyncio.run(provider.list_models())
+    except ConnectionError as exc:
+        click.echo(str(exc), err=True)
+        raise SystemExit(1)
+
+    table = Table(title=f"Ollama Models — {effective_host}", show_lines=True)
+    table.add_column("Model", style="cyan bold")
+    table.add_column("Size", justify="right")
+    table.add_column("Params", justify="right")
+    table.add_column("Family", style="dim")
+    table.add_column("Class", style="yellow")
+    table.add_column("Thinking", justify="center")
+
+    for m in sorted(result, key=lambda x: x.get("size_gb", 0)):
+        cls_str = str(m["model_class"])
+        cls_style = {"light": "green", "mid": "yellow", "heavy": "red"}.get(cls_str, "dim")
+        table.add_row(
+            str(m["name"]),
+            f"{m['size_gb']:.1f} GB",
+            str(m.get("parameter_size", "")),
+            str(m.get("family", "")),
+            f"[{cls_style}]{cls_str}[/{cls_style}]",
+            "[green]yes[/green]" if m.get("thinking") else "[dim]no[/dim]",
+        )
+
+    console.print(table)
+    unknown = [m for m in result if m["model_class"] == "unknown"]
+    if unknown:
+        console.print(
+            f"\n[yellow]{len(unknown)} unregistered model(s) — "
+            f"add to model_classes.py for accurate comparison[/yellow]"
+        )
+
+
 @cli.command("tiers")
 def show_tiers() -> None:
     """Show available burn tiers and their profiles."""

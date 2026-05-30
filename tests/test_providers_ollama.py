@@ -212,3 +212,59 @@ def test_ollama_config_env_override(monkeypatch):
     s = AtomicsSettings()
     assert s.ollama_host == "http://gpu-box:11434"
     assert s.ollama_model == "qwen3:4b"
+
+
+@pytest.mark.asyncio
+async def test_ollama_list_models():
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.raise_for_status = MagicMock()
+    mock_response.json.return_value = {
+        "models": [
+            {
+                "name": "qwen2.5:7b",
+                "size": 4_700_000_000,
+                "details": {"parameter_size": "7.6B", "family": "qwen2.5"},
+            },
+            {
+                "name": "mistral:7b",
+                "size": 4_400_000_000,
+                "details": {"parameter_size": "7.2B", "family": "mistral"},
+            },
+            {
+                "name": "some-unknown:1b",
+                "size": 1_000_000_000,
+                "details": {"parameter_size": "1B", "family": "unknown"},
+            },
+        ]
+    }
+
+    mock_client = AsyncMock()
+    mock_client.get = AsyncMock(return_value=mock_response)
+
+    provider = OllamaProvider(host="http://fake:11434", client=mock_client)
+    models = await provider.list_models()
+
+    assert len(models) == 3
+    assert models[0]["name"] == "qwen2.5:7b"
+    assert models[1]["name"] == "mistral:7b"
+    assert models[2]["name"] == "some-unknown:1b"
+    for m in models:
+        assert "name" in m
+        assert "size_gb" in m
+        assert "model_class" in m
+        assert "thinking" in m
+    assert models[0]["model_class"] == "mid"
+    assert models[2]["model_class"] == "unknown"
+
+
+@pytest.mark.asyncio
+async def test_ollama_list_models_connection_error():
+    import httpx
+
+    mock_client = AsyncMock()
+    mock_client.get = AsyncMock(side_effect=httpx.ConnectError("refused"))
+
+    provider = OllamaProvider(host="http://fake:11434", client=mock_client)
+    with pytest.raises(ConnectionError, match="fake:11434"):
+        await provider.list_models()

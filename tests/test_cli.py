@@ -635,3 +635,44 @@ def test_cli_provider_test_success(monkeypatch):
     result = runner.invoke(cli, ["provider-test"])
     assert result.exit_code == 0
     assert "passed" in result.output.lower()
+
+
+def test_cli_models_command(monkeypatch):
+    """atomics models should list Ollama models with class/thinking annotations."""
+    from unittest.mock import AsyncMock
+
+    mock_models = [
+        {"name": "qwen2.5:7b", "size_gb": 4.7, "parameter_size": "7.6B",
+         "family": "qwen2.5", "model_class": "mid", "thinking": False},
+        {"name": "deepseek-r1:14b", "size_gb": 9.0, "parameter_size": "14.8B",
+         "family": "deepseek", "model_class": "mid", "thinking": True},
+    ]
+
+    class FakeOllama:
+        def __init__(self, **_kw):
+            pass
+        async def list_models(self):
+            return mock_models
+
+    monkeypatch.setattr("atomics.providers.ollama.OllamaProvider", FakeOllama)
+    runner = CliRunner()
+    result = runner.invoke(cli, ["models", "--host", "http://fake:11434"])
+    assert result.exit_code == 0
+    assert "qwen2.5:7b" in result.output
+    assert "deepseek-r1:14b" in result.output
+    assert "mid" in result.output
+
+
+def test_cli_models_connection_error(monkeypatch):
+    """atomics models should handle connection errors gracefully."""
+    class FakeOllama:
+        def __init__(self, **_kw):
+            pass
+        async def list_models(self):
+            raise ConnectionError("Cannot connect to Ollama at http://fake:11434")
+
+    monkeypatch.setattr("atomics.providers.ollama.OllamaProvider", FakeOllama)
+    runner = CliRunner()
+    result = runner.invoke(cli, ["models", "--host", "http://fake:11434"])
+    assert result.exit_code == 1
+    assert "Cannot connect" in result.output
