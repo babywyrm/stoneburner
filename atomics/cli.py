@@ -1279,6 +1279,141 @@ def _make_provider(name: str, mdl: str | None, host: str | None, settings):
     return OllamaProvider(host=host or settings.ollama_host, default_model=mdl or settings.ollama_model)
 
 
+# ── atomics sweep ─────────────────────────────────────────────────────────────
+
+@cli.command("sweep")
+@click.option(
+    "--models", type=str, default=None,
+    help="Comma-separated list of models to sweep (e.g. qwen2.5:1.5b,mistral:7b)",
+)
+@click.option(
+    "--all-local", "all_local", is_flag=True, default=False,
+    help="Discover and sweep all models on the Ollama host",
+)
+@click.option("--host", type=str, default=None, help="Ollama host URL")
+@click.option("--judge-model", type=str, default=None, help="Judge model override")
+@click.option("--judge-host", type=str, default=None, help="Ollama host for judge")
+@click.option("--fixtures", type=str, default=None, help="Comma-separated fixture IDs (default: all)")
+@click.option("--thinking/--no-thinking", "thinking_flag", default=None)
+@click.option("--thinking-budget", type=int, default=None)
+def sweep(
+    models: str | None,
+    all_local: bool,
+    host: str | None,
+    judge_model: str | None,
+    judge_host: str | None,
+    fixtures: str | None,
+    thinking_flag: bool | None,
+    thinking_budget: int | None,
+) -> None:
+    """Sweep eval fixtures across multiple local models and compare results.
+
+    Run the quality eval suite against every model on your Ollama host and produce
+    a ranked comparison table. Helps answer: "which local model gives the best
+    quality for my workload?"
+
+    Examples:
+      atomics sweep --all-local --host http://gpu-host:11434
+      atomics sweep --models qwen2.5:1.5b,qwen2.5:3b,mistral:7b
+      atomics sweep --all-local --fixtures ev-01,ev-02,ev-03
+    """
+    from atomics.sweep import ModelSweepResult, run_model_sweep
+
+    settings = load_settings()
+    _setup_logging(settings.log_level)
+    console = Console()
+    effective_host = host or settings.ollama_host
+
+    if all_local:
+        from atomics.providers.ollama import OllamaProvider
+        disc = OllamaProvider(host=effective_host)
+        try:
+            available = asyncio.run(disc.list_models())
+        except ConnectionError as exc:
+            click.echo(str(exc), err=True)
+            raise SystemExit(1)
+        model_list = [m["name"] for m in available]
+        if not model_list:
+            console.print("[red]No models found on Ollama host.[/red]")
+            raise SystemExit(1)
+        console.print(f"[bold]Discovered {len(model_list)} models on {effective_host}[/bold]\n")
+    elif models:
+        model_list = [m.strip() for m in models.split(",") if m.strip()]
+    else:
+        console.print("[red]Specify --models or --all-local[/red]")
+        raise SystemExit(1)
+
+    fixture_ids = [f.strip() for f in fixtures.split(",") if f.strip()] if fixtures else None
+
+    from atomics.providers.ollama import OllamaProvider
+
+    def provider_factory(model_name: str) -> OllamaProvider:
+        return OllamaProvider(host=effective_host, default_model=model_name)
+
+    judge_effective_host = judge_host or effective_host
+    judge_provider = OllamaProvider(
+        host=judge_effective_host,
+        default_model=judge_model or settings.ollama_model,
+    )
+
+    result_table = Table(title="Model Sweep Results", show_lines=True)
+    result_table.add_column("Model", style="cyan bold")
+    result_table.add_column("Quality", justify="right")
+    result_table.add_column("Avg Latency", justify="right")
+    result_table.add_column("Tokens", justify="right")
+    result_table.add_column("Cost", justify="right", style="yellow")
+    result_table.add_column("Fixtures", justify="right", style="dim")
+
+    def on_model_done(r: ModelSweepResult) -> None:
+        q = f"[green]{r.overall_quality * 100:.0f}%[/green]" if r.overall_quality is not None else "[red]FAIL[/red]"
+        result_table.add_row(
+            r.model,
+            q,
+            f"{r.avg_latency_ms:.0f}ms",
+            f"{r.total_tokens:,}",
+            f"${r.total_cost_usd:.6f}",
+            str(r.fixtures_run),
+        )
+        console.print(f"  [dim]Done:[/dim] {r.model}")
+
+    console.print(f"[bold]Sweeping {len(model_list)} models × "
+                  f"{'all' if fixture_ids is None else len(fixture_ids)} fixtures[/bold]\n")
+
+    results = asyncio.run(run_model_sweep(
+        provider_factory=provider_factory,
+        judge_provider=judge_provider,
+        models=model_list,
+        fixture_ids=fixture_ids,
+        judge_model=judge_model,
+        thinking=thinking_flag,
+        thinking_budget=thinking_budget,
+        on_model_done=on_model_done,
+    ))
+
+    console.print(result_table)
+
+    ranked = sorted(
+        [r for r in results if r.overall_quality is not None],
+        key=lambda r: r.overall_quality or 0,
+        reverse=True,
+    )
+    if ranked:
+        best = ranked[0]
+        console.print(
+            f"\n[bold green]Best local model:[/bold green] {best.model} "
+            f"({best.overall_quality * 100:.0f}% quality, "
+            f"{best.avg_latency_ms:.0f}ms avg latency, "
+            f"${best.total_cost_usd:.2f} total cost)"
+        )
+
+    failed = [r for r in results if r.overall_quality is None]
+    if failed:
+        console.print(
+            f"\n[yellow]{len(failed)} model(s) failed: "
+            f"{', '.join(r.model for r in failed)}[/yellow]"
+        )
+
+
 # ── atomics adversarial ───────────────────────────────────────────────────────
 
 @cli.command("adversarial")
