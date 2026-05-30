@@ -142,7 +142,7 @@ class LoopEngine:
                 thinking_budget=self._thinking_budget,
             )
 
-            self._repo.save_task_result(result)
+            self._repo.save_task_result(result, suite="burn")
             self._guard.record_request(
                 result.total_tokens,
                 result.estimated_cost_usd,
