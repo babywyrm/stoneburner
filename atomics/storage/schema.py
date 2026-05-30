@@ -8,7 +8,7 @@ from pathlib import Path
 
 logger = logging.getLogger("atomics.schema")
 
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -122,8 +122,27 @@ CREATE INDEX IF NOT EXISTS idx_task_results_started_at ON task_results(started_a
 CREATE INDEX IF NOT EXISTS idx_runs_provider ON runs(provider);
 CREATE INDEX IF NOT EXISTS idx_runs_tier ON runs(tier);
 CREATE INDEX IF NOT EXISTS idx_runs_trigger ON runs(trigger);
+CREATE TABLE IF NOT EXISTS stress_results (
+    result_id               TEXT PRIMARY KEY,
+    model                   TEXT NOT NULL,
+    host                    TEXT NOT NULL,
+    peak_tps                REAL DEFAULT 0.0,
+    saturation_concurrency  INTEGER DEFAULT 0,
+    duration_seconds        REAL DEFAULT 0.0,
+    total_tokens            INTEGER DEFAULT 0,
+    total_requests          INTEGER DEFAULT 0,
+    total_failed            INTEGER DEFAULT 0,
+    total_phases            INTEGER DEFAULT 0,
+    gpu_name                TEXT DEFAULT '',
+    vram_total_mb           REAL DEFAULT NULL,
+    vram_peak_mb            REAL DEFAULT NULL,
+    phases_json             TEXT DEFAULT '[]',
+    timestamp               TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_adversarial_results_run_id ON adversarial_results(run_id);
 CREATE INDEX IF NOT EXISTS idx_probe_results_run_id ON probe_results(run_id);
+CREATE INDEX IF NOT EXISTS idx_stress_results_model ON stress_results(model);
 """
 
 
@@ -158,6 +177,7 @@ def init_db(db_path: Path) -> sqlite3.Connection:
             "DROP TABLE IF EXISTS task_results;"
             "DROP TABLE IF EXISTS adversarial_results;"
             "DROP TABLE IF EXISTS probe_results;"
+            "DROP TABLE IF EXISTS stress_results;"
             "DROP TABLE IF EXISTS runs;"
             "DROP TABLE IF EXISTS schedules;"
             "DROP TABLE IF EXISTS schema_version;"

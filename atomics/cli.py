@@ -909,12 +909,14 @@ def eval(
 @click.option("--max-concurrency", "-c", type=int, default=8, help="Max parallel requests (ramps 1→2→4→...)")
 @click.option("--phase-seconds", "-s", type=float, default=15.0, help="Seconds at each concurrency level")
 @click.option("--num-predict", type=int, default=2048, help="Max output tokens per request")
+@click.option("--save/--no-save", "save_results", default=True, help="Persist results to database")
 def stress(
     model: str | None,
     ollama_host: str | None,
     max_concurrency: int,
     phase_seconds: float,
     num_predict: int,
+    save_results: bool,
 ) -> None:
     """GPU stress test — ramp concurrency to find saturation point (Ollama only)."""
     settings = load_settings()
@@ -998,6 +1000,13 @@ def stress(
         summary.add_row("Throttling", "[green]None detected[/green]")
 
     console.print(summary)
+
+    if save_results:
+        from atomics.storage.repository import MetricsRepository
+        repo = MetricsRepository(settings.db_path)
+        repo.save_stress_result(result)
+        repo.close()
+        console.print(f"\n[dim]Results saved to database.[/dim]")
 
 
 @cli.command()

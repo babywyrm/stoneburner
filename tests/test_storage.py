@@ -14,8 +14,8 @@ def _tmp_repo() -> MetricsRepository:
     return MetricsRepository(Path(tmp))
 
 
-def test_schema_version_is_5():
-    assert SCHEMA_VERSION == 6
+def test_schema_version_is_current():
+    assert SCHEMA_VERSION == 7
 
 
 def test_adversarial_results_table_exists(tmp_path):
@@ -406,4 +406,102 @@ def test_compare_latency_percentiles():
     assert 200 < r["p50_latency_ms"] < 400
     assert r["p95_latency_ms"] > r["p50_latency_ms"]
     assert r["p95_latency_ms"] >= 500
+    repo.close()
+
+
+# ── Stress result persistence ────────────────────────────────────────────────
+
+def test_stress_results_table_exists(tmp_path):
+    conn = init_db(tmp_path / "test.db")
+    conn.execute(
+        "INSERT INTO stress_results "
+        "(result_id, model, host, peak_tps, saturation_concurrency, "
+        "duration_seconds, total_tokens, total_requests, timestamp) "
+        "VALUES ('s1','qwen2.5:7b','http://localhost:11434',45.2,4,"
+        "60.0,5000,20,'2026-01-01')"
+    )
+    row = conn.execute("SELECT model FROM stress_results WHERE result_id='s1'").fetchone()
+    assert row[0] == "qwen2.5:7b"
+
+
+def test_save_stress_result():
+    from atomics.stress import ConcurrencyResult, StressResult
+
+    repo = _tmp_repo()
+
+    sr = StressResult(
+        model="qwen2.5:7b",
+        host="http://localhost:11434",
+        duration_seconds=60.0,
+        total_tokens=5000,
+        total_requests=20,
+        total_failed=1,
+        peak_tps=45.2,
+        saturation_concurrency=4,
+        gpu_name="RTX 5070",
+        vram_total_mb=12288.0,
+        vram_peak_mb=8500.0,
+        phases=[
+            ConcurrencyResult(
+                concurrency=1, requests=5, total_output_tokens=1000,
+                aggregate_tps=20.0, avg_request_tps=20.0,
+                avg_latency_ms=200.0, p95_latency_ms=250.0,
+            ),
+            ConcurrencyResult(
+                concurrency=4, requests=15, total_output_tokens=4000,
+                aggregate_tps=45.2, avg_request_tps=12.0,
+                avg_latency_ms=800.0, p95_latency_ms=1200.0,
+            ),
+        ],
+    )
+    repo.save_stress_result(sr)
+
+    rows = repo.get_stress_results()
+    assert len(rows) == 1
+    r = rows[0]
+    assert r["model"] == "qwen2.5:7b"
+    assert r["peak_tps"] == 45.2
+    assert r["saturation_concurrency"] == 4
+    assert r["gpu_name"] == "RTX 5070"
+    assert r["total_phases"] == 2
+    repo.close()
+
+
+def test_get_stress_results_multiple_models():
+    from atomics.stress import StressResult
+
+    repo = _tmp_repo()
+
+    for model in ["qwen2.5:1.5b", "qwen2.5:7b", "mistral:7b"]:
+        sr = StressResult(
+            model=model, host="http://localhost:11434",
+            peak_tps=30.0, saturation_concurrency=2,
+            duration_seconds=30.0, total_tokens=1000, total_requests=10,
+        )
+        repo.save_stress_result(sr)
+
+    rows = repo.get_stress_results()
+    assert len(rows) == 3
+    models = [r["model"] for r in rows]
+    assert "qwen2.5:1.5b" in models
+    assert "mistral:7b" in models
+    repo.close()
+
+
+def test_get_stress_results_by_model():
+    from atomics.stress import StressResult
+
+    repo = _tmp_repo()
+
+    for model in ["qwen2.5:1.5b", "qwen2.5:7b"]:
+        sr = StressResult(
+            model=model, host="http://localhost:11434",
+            peak_tps=30.0, saturation_concurrency=2,
+            duration_seconds=30.0, total_tokens=1000, total_requests=10,
+        )
+        repo.save_stress_result(sr)
+
+    rows = repo.get_stress_results(model="qwen2.5:7b")
+    assert len(rows) == 1
+    assert rows[0]["model"] == "qwen2.5:7b"
     repo.close()
