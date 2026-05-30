@@ -1313,6 +1313,8 @@ def _make_provider(name: str, mdl: str | None, host: str | None, settings):
 @click.option("--fixtures", type=str, default=None, help="Comma-separated fixture IDs (default: all)")
 @click.option("--thinking/--no-thinking", "thinking_flag", default=None)
 @click.option("--thinking-budget", type=int, default=None)
+@click.option("--verbose", "-v", is_flag=True, default=False,
+              help="Print each model's full reply alongside scores")
 def sweep(
     provider_name: str,
     models: str | None,
@@ -1324,6 +1326,7 @@ def sweep(
     fixtures: str | None,
     thinking_flag: bool | None,
     thinking_budget: int | None,
+    verbose: bool,
 ) -> None:
     """Sweep eval fixtures across multiple models and compare results.
 
@@ -1396,6 +1399,19 @@ def sweep(
             f"${r.total_cost_usd:.6f}",
             str(r.fixtures_run),
         )
+        if verbose and r.eval_summary:
+            for fr in r.eval_summary.fixture_results:
+                tr = fr.task_result
+                score_str = f"{fr.judge.score:.2f}" if fr.judge else "N/A"
+                console.print(f"\n  [bold cyan]{fr.fixture.id}[/bold cyan] — score {score_str}")
+                console.print(f"  [dim]prompt:[/dim] {fr.fixture.prompt[:120]}")
+                if tr.response:
+                    console.print(f"  [dim]reply:[/dim]  {tr.response}")
+                elif tr.error_message:
+                    console.print(f"  [red]error:[/red]  {tr.error_message}")
+                if fr.judge and fr.judge.rationale:
+                    console.print(f"  [dim]judge:[/dim]  {fr.judge.rationale[:200]}")
+            console.print()
         console.print(f"  [dim]Done:[/dim] {r.model}")
 
     console.print(f"[bold]Sweeping {len(model_list)} models × "
