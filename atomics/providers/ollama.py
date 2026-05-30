@@ -6,6 +6,7 @@ import re
 
 import httpx
 
+from atomics.model_classes import classify_model, supports_thinking
 from atomics.providers.base import BaseProvider, ProviderResponse
 
 _THINK_TAG_RE = re.compile(r"<think>(.*?)</think>", re.DOTALL)
@@ -115,6 +116,35 @@ class OllamaProvider(BaseProvider):
             thinking_text=thinking_text,
             raw=data,
         )
+
+    async def list_models(self) -> list[dict[str, str | float | bool]]:
+        """Fetch available models from Ollama and annotate with class/thinking metadata."""
+        try:
+            response = await self._client.get(
+                f"{self._host}/api/tags",
+                timeout=10.0,
+            )
+            response.raise_for_status()
+        except httpx.ConnectError as exc:
+            raise ConnectionError(
+                f"Cannot connect to Ollama at {self._host} — is it running?"
+            ) from exc
+
+        data = response.json()
+        results: list[dict[str, str | float | bool]] = []
+        for entry in data.get("models", []):
+            name: str = entry.get("name", "")
+            size_bytes: int = entry.get("size", 0)
+            details: dict = entry.get("details", {})
+            results.append({
+                "name": name,
+                "size_gb": round(size_bytes / 1e9, 1),
+                "parameter_size": details.get("parameter_size", ""),
+                "family": details.get("family", ""),
+                "model_class": classify_model(name).value,
+                "thinking": supports_thinking(name),
+            })
+        return results
 
     async def health_check(self) -> bool:
         try:
