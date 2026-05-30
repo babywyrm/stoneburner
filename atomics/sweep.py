@@ -49,6 +49,7 @@ async def run_model_sweep(
     thinking: bool | None = None,
     thinking_budget: int | None = None,
     on_model_done: Callable[[ModelSweepResult], None] | None = None,
+    on_fixture_done: Callable | None = None,
 ) -> list[ModelSweepResult]:
     """Run eval fixtures against each model in sequence.
 
@@ -61,6 +62,7 @@ async def run_model_sweep(
         thinking: Force thinking on/off for capable models.
         thinking_budget: Max thinking tokens.
         on_model_done: Optional callback after each model completes.
+        on_fixture_done: Optional callback after each fixture completes (for live verbose output).
     """
     fixtures = _filter_fixtures(fixture_ids)
     results: list[ModelSweepResult] = []
@@ -78,6 +80,7 @@ async def run_model_sweep(
                 thinking=thinking,
                 thinking_budget=thinking_budget,
                 fixtures=fixtures,
+                on_fixture_done=on_fixture_done,
             )
             result = ModelSweepResult(
                 model=model,
