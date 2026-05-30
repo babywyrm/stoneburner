@@ -828,10 +828,14 @@ def test_cli_sweep_verbose_shows_replies(monkeypatch):
     ]
 
     async def fake_sweep(**kwargs):
-        cb = kwargs.get("on_model_done")
+        fixture_cb = kwargs.get("on_fixture_done")
+        model_cb = kwargs.get("on_model_done")
         for r in mock_results:
-            if cb:
-                cb(r)
+            if fixture_cb and r.eval_summary:
+                for fix_r in r.eval_summary.fixture_results:
+                    fixture_cb(fix_r)
+            if model_cb:
+                model_cb(r)
         return mock_results
 
     monkeypatch.setattr("atomics.sweep.run_model_sweep", fake_sweep)
@@ -883,10 +887,14 @@ def test_cli_sweep_no_verbose_hides_replies(monkeypatch):
     ]
 
     async def fake_sweep(**kwargs):
-        cb = kwargs.get("on_model_done")
+        fixture_cb = kwargs.get("on_fixture_done")
+        model_cb = kwargs.get("on_model_done")
         for r in mock_results:
-            if cb:
-                cb(r)
+            if fixture_cb and r.eval_summary:
+                for fix_r in r.eval_summary.fixture_results:
+                    fixture_cb(fix_r)
+            if model_cb:
+                model_cb(r)
         return mock_results
 
     monkeypatch.setattr("atomics.sweep.run_model_sweep", fake_sweep)

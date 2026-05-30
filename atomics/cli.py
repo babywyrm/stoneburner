@@ -1389,6 +1389,20 @@ def sweep(
     result_table.add_column("Cost", justify="right", style="yellow")
     result_table.add_column("Fixtures", justify="right", style="dim")
 
+    def on_fixture_done_verbose(fr) -> None:
+        if not verbose:
+            return
+        tr = fr.task_result
+        score_str = f"{fr.judge.score:.2f}" if fr.judge else "N/A"
+        console.print(f"\n  [bold cyan]{fr.fixture.id}[/bold cyan] — score {score_str}")
+        console.print(f"  [dim]prompt:[/dim] {fr.fixture.prompt[:120]}")
+        if tr.response:
+            console.print(f"  [dim]reply:[/dim]  {tr.response}")
+        elif tr.error_message:
+            console.print(f"  [red]error:[/red]  {tr.error_message}")
+        if fr.judge and fr.judge.rationale:
+            console.print(f"  [dim]judge:[/dim]  {fr.judge.rationale[:200]}")
+
     def on_model_done(r: ModelSweepResult) -> None:
         q = f"[green]{r.overall_quality * 100:.0f}%[/green]" if r.overall_quality is not None else "[red]FAIL[/red]"
         result_table.add_row(
@@ -1399,20 +1413,7 @@ def sweep(
             f"${r.total_cost_usd:.6f}",
             str(r.fixtures_run),
         )
-        if verbose and r.eval_summary:
-            for fr in r.eval_summary.fixture_results:
-                tr = fr.task_result
-                score_str = f"{fr.judge.score:.2f}" if fr.judge else "N/A"
-                console.print(f"\n  [bold cyan]{fr.fixture.id}[/bold cyan] — score {score_str}")
-                console.print(f"  [dim]prompt:[/dim] {fr.fixture.prompt[:120]}")
-                if tr.response:
-                    console.print(f"  [dim]reply:[/dim]  {tr.response}")
-                elif tr.error_message:
-                    console.print(f"  [red]error:[/red]  {tr.error_message}")
-                if fr.judge and fr.judge.rationale:
-                    console.print(f"  [dim]judge:[/dim]  {fr.judge.rationale[:200]}")
-            console.print()
-        console.print(f"  [dim]Done:[/dim] {r.model}")
+        console.print(f"\n  [dim]Done:[/dim] {r.model}")
 
     console.print(f"[bold]Sweeping {len(model_list)} models × "
                   f"{'all' if fixture_ids is None else len(fixture_ids)} fixtures[/bold]\n")
@@ -1426,6 +1427,7 @@ def sweep(
         thinking=thinking_flag,
         thinking_budget=thinking_budget,
         on_model_done=on_model_done,
+        on_fixture_done=on_fixture_done_verbose,
     ))
 
     console.print(result_table)

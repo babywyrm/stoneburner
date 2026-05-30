@@ -146,3 +146,25 @@ async def test_sweep_on_model_done_callback():
     )
 
     assert completed == ["a:1b", "b:2b"]
+
+
+@pytest.mark.asyncio
+async def test_sweep_on_fixture_done_callback():
+    """on_fixture_done should fire after each fixture, not just each model."""
+    provider = _make_mock_provider()
+    judge = _make_judge_provider()
+    fixture_log: list[str] = []
+
+    def on_fixture(fr) -> None:
+        fixture_log.append(f"{fr.task_result.model}:{fr.fixture.id}")
+
+    await run_model_sweep(
+        provider_factory=lambda m: provider,
+        judge_provider=judge,
+        models=["a:1b"],
+        fixture_ids=["ev-01", "ev-02"],
+        on_fixture_done=on_fixture,
+    )
+
+    assert len(fixture_log) == 2
+    assert all("ev-0" in entry for entry in fixture_log)
