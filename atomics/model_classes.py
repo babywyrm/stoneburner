@@ -55,16 +55,29 @@ MODEL_CLASS_MAP: dict[str, ModelClass] = {
     "qwen2.5:1.5b": ModelClass.LIGHT,
     "qwen3:1.7b": ModelClass.LIGHT,
     "qwen3.5:0.8b": ModelClass.LIGHT,
+    "qwen3.5:2b": ModelClass.MID,
     "qwen2.5:3b": ModelClass.MID,
     "qwen3:4b": ModelClass.MID,
     "qwen2.5:7b": ModelClass.MID,
     "qwen2.5:14b": ModelClass.MID,
     "qwen2.5:32b": ModelClass.HEAVY,
     "qwen2.5:72b": ModelClass.HEAVY,
+    "llama3.2:1b": ModelClass.LIGHT,
     "llama3.2:3b": ModelClass.MID,
     "llama3.1:8b": ModelClass.MID,
     "mistral:7b": ModelClass.MID,
     "codellama:7b": ModelClass.MID,
+    "gemma3:4b": ModelClass.MID,
+    "gemma4:e4b": ModelClass.MID,
+    "functiongemma:latest": ModelClass.LIGHT,
+    "custom-agent:latest": ModelClass.LIGHT,
+    "ministral-3:3b": ModelClass.MID,
+    "deepseek-r1:14b": ModelClass.MID,
+    "deepseek-r1:32b": ModelClass.HEAVY,
+    "deepseek-r1:70b": ModelClass.HEAVY,
+    "phi4-mini:3.8b": ModelClass.MID,
+    "phi4:14b": ModelClass.MID,
+    "dolphin3:8b": ModelClass.MID,
 }
 
 
@@ -86,7 +99,7 @@ THINKING_CAPABLE: frozenset[str] = frozenset({
     "gpt-5", "gpt-5-turbo", "gpt-5.3", "gpt-5.5",
     # Ollama — qwen3 family and deepseek-r1 use <think> tags
     "qwen3:1.7b", "qwen3:4b", "qwen3:14b", "qwen3:32b", "qwen3:72b",
-    "qwen3.5:0.8b",
+    "qwen3.5:0.8b", "qwen3.5:2b",
     "deepseek-r1:14b", "deepseek-r1:32b", "deepseek-r1:70b",
 })
 

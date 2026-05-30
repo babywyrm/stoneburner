@@ -4,6 +4,7 @@ from atomics.model_classes import (
     ModelClass,
     classify_model,
     get_models_for_class,
+    supports_thinking,
 )
 
 
@@ -47,6 +48,46 @@ def test_get_models_for_class_heavy():
 
 def test_get_models_for_unknown_is_empty():
     assert get_models_for_class(ModelClass.UNKNOWN) == []
+
+
+def test_classify_ollama_local_models():
+    """All gpu-host models should be classified, not UNKNOWN."""
+    assert classify_model("gemma3:4b") == ModelClass.MID
+    assert classify_model("gemma4:e4b") == ModelClass.MID
+    assert classify_model("functiongemma:latest") == ModelClass.LIGHT
+    assert classify_model("llama3.2:1b") == ModelClass.LIGHT
+    assert classify_model("qwen3.5:2b") == ModelClass.MID
+    assert classify_model("ministral-3:3b") == ModelClass.MID
+    assert classify_model("phi4-mini:3.8b") == ModelClass.MID
+    assert classify_model("phi4:14b") == ModelClass.MID
+    assert classify_model("dolphin3:8b") == ModelClass.MID
+    assert classify_model("deepseek-r1:14b") == ModelClass.MID
+    assert classify_model("custom-agent:latest") == ModelClass.LIGHT
+
+
+def test_thinking_support_qwen3_5_family():
+    """qwen3.5 models should be thinking-capable."""
+    assert supports_thinking("qwen3.5:0.8b") is True
+    assert supports_thinking("qwen3.5:2b") is True
+
+
+def test_thinking_support_deepseek_r1_all_sizes():
+    """All deepseek-r1 sizes should be thinking-capable."""
+    assert supports_thinking("deepseek-r1:14b") is True
+    assert supports_thinking("deepseek-r1:32b") is True
+    assert supports_thinking("deepseek-r1:70b") is True
+
+
+def test_thinking_support_phi4_not_thinking():
+    """phi4 models don't use <think> tags."""
+    assert supports_thinking("phi4-mini:3.8b") is False
+    assert supports_thinking("phi4:14b") is False
+
+
+def test_thinking_support_gemma_not_thinking():
+    """gemma models don't use <think> tags."""
+    assert supports_thinking("gemma3:4b") is False
+    assert supports_thinking("gemma4:e4b") is False
 
 
 def test_model_class_enum_values():
