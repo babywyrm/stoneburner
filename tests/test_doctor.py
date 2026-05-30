@@ -27,7 +27,9 @@ def test_doctor_shows_openai_key_set(capsys, tmp_path):
     assert "OPENAI_API_KEY" in captured.out
 
 
-def test_doctor_shows_openai_key_missing(capsys, tmp_path):
+def test_doctor_shows_openai_key_missing(capsys, tmp_path, monkeypatch):
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.chdir(tmp_path)
     settings = AtomicsSettings(
         db_path=tmp_path / "doc.db",
         openai_api_key="",
