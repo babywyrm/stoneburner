@@ -1292,38 +1292,49 @@ def _make_provider(name: str, mdl: str | None, host: str | None, settings):
 
 @cli.command("sweep")
 @click.option(
+    "--provider", "-p", "provider_name",
+    type=PROVIDER_CHOICES,
+    default="ollama",
+    help="Provider to evaluate (default: ollama for local models)",
+)
+@click.option(
     "--models", type=str, default=None,
     help="Comma-separated list of models to sweep (e.g. qwen2.5:1.5b,mistral:7b)",
 )
 @click.option(
     "--all-local", "all_local", is_flag=True, default=False,
-    help="Discover and sweep all models on the Ollama host",
+    help="Discover and sweep all models on the Ollama host (ollama provider only)",
 )
-@click.option("--host", type=str, default=None, help="Ollama host URL")
+@click.option("--host", type=str, default=None, help="Ollama host URL (for ollama/brain-gateway)")
+@click.option("--judge-provider", "judge_provider_name", type=PROVIDER_CHOICES, default="ollama",
+              help="Provider for quality judge (default: ollama — $0)")
 @click.option("--judge-model", type=str, default=None, help="Judge model override")
 @click.option("--judge-host", type=str, default=None, help="Ollama host for judge")
 @click.option("--fixtures", type=str, default=None, help="Comma-separated fixture IDs (default: all)")
 @click.option("--thinking/--no-thinking", "thinking_flag", default=None)
 @click.option("--thinking-budget", type=int, default=None)
 def sweep(
+    provider_name: str,
     models: str | None,
     all_local: bool,
     host: str | None,
+    judge_provider_name: str,
     judge_model: str | None,
     judge_host: str | None,
     fixtures: str | None,
     thinking_flag: bool | None,
     thinking_budget: int | None,
 ) -> None:
-    """Sweep eval fixtures across multiple local models and compare results.
+    """Sweep eval fixtures across multiple models and compare results.
 
-    Run the quality eval suite against every model on your Ollama host and produce
-    a ranked comparison table. Helps answer: "which local model gives the best
-    quality for my workload?"
+    Works with any provider — local Ollama, Claude, OpenAI, Bedrock, or brain-gateway.
+    Use --all-local with ollama to auto-discover models, or --models for any provider.
 
     Examples:
       atomics sweep --all-local --host http://gpu-host:11434
       atomics sweep --models qwen2.5:1.5b,qwen2.5:3b,mistral:7b
+      atomics sweep --provider claude --models claude-sonnet-4-6,claude-haiku-4-5-20251001
+      atomics sweep --provider openai --models gpt-4o,gpt-4o-mini
       atomics sweep --all-local --fixtures ev-01,ev-02,ev-03
     """
     from atomics.sweep import ModelSweepResult, run_model_sweep
@@ -1334,6 +1345,9 @@ def sweep(
     effective_host = host or settings.ollama_host
 
     if all_local:
+        if provider_name != "ollama":
+            console.print("[red]--all-local only works with --provider ollama[/red]")
+            raise SystemExit(1)
         from atomics.providers.ollama import OllamaProvider
         disc = OllamaProvider(host=effective_host)
         try:
@@ -1354,15 +1368,14 @@ def sweep(
 
     fixture_ids = [f.strip() for f in fixtures.split(",") if f.strip()] if fixtures else None
 
-    from atomics.providers.ollama import OllamaProvider
+    def provider_factory(model_name: str):
+        return _make_provider(provider_name, model_name, host, settings)
 
-    def provider_factory(model_name: str) -> OllamaProvider:
-        return OllamaProvider(host=effective_host, default_model=model_name)
-
-    judge_effective_host = judge_host or effective_host
-    judge_provider = OllamaProvider(
-        host=judge_effective_host,
-        default_model=judge_model or settings.ollama_model,
+    judge_provider = _make_provider(
+        judge_provider_name,
+        judge_model,
+        judge_host or effective_host,
+        settings,
     )
 
     result_table = Table(title="Model Sweep Results", show_lines=True)

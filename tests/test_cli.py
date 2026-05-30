@@ -712,3 +712,79 @@ def test_cli_sweep_command(monkeypatch):
     assert "qwen2.5:1.5b" in result.output
     assert "mistral:7b" in result.output
     assert "85" in result.output  # 85% quality
+
+
+def test_cli_sweep_cloud_provider(monkeypatch):
+    """atomics sweep --provider claude should work with cloud models."""
+    from atomics.sweep import ModelSweepResult
+
+    mock_results = [
+        ModelSweepResult(
+            model="claude-sonnet-4-6", fixtures_run=2, overall_quality=0.92,
+            avg_latency_ms=800.0, total_tokens=1200, total_cost_usd=0.036,
+            value_score=30.7, eval_summary=None,
+        ),
+    ]
+
+    factory_models: list[str] = []
+
+    async def fake_sweep(**kwargs):
+        factory = kwargs["provider_factory"]
+        for m in kwargs["models"]:
+            p = factory(m)
+            factory_models.append(p._default_model if hasattr(p, "_default_model") else m)
+        cb = kwargs.get("on_model_done")
+        for r in mock_results:
+            if cb:
+                cb(r)
+        return mock_results
+
+    monkeypatch.setattr("atomics.sweep.run_model_sweep", fake_sweep)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test-fake-key")
+    runner = CliRunner()
+    result = runner.invoke(cli, [
+        "sweep", "--provider", "claude",
+        "--models", "claude-sonnet-4-6",
+    ])
+    assert result.exit_code == 0
+    assert "claude-sonnet-4-6" in result.output
+    assert "92" in result.output
+    assert "$0.036" in result.output
+
+
+def test_cli_sweep_openai_provider(monkeypatch):
+    """atomics sweep --provider openai should work with OpenAI models."""
+    from atomics.sweep import ModelSweepResult
+
+    mock_results = [
+        ModelSweepResult(
+            model="gpt-4o", fixtures_run=2, overall_quality=0.88,
+            avg_latency_ms=600.0, total_tokens=900, total_cost_usd=0.027,
+            value_score=32.6, eval_summary=None,
+        ),
+    ]
+
+    async def fake_sweep(**kwargs):
+        cb = kwargs.get("on_model_done")
+        for r in mock_results:
+            if cb:
+                cb(r)
+        return mock_results
+
+    monkeypatch.setattr("atomics.sweep.run_model_sweep", fake_sweep)
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-proj-test-fake-key")
+    runner = CliRunner()
+    result = runner.invoke(cli, [
+        "sweep", "--provider", "openai",
+        "--models", "gpt-4o",
+    ])
+    assert result.exit_code == 0
+    assert "gpt-4o" in result.output
+
+
+def test_cli_sweep_requires_models_or_all_local(monkeypatch):
+    """atomics sweep without --models or --all-local should fail."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test-fake-key")
+    runner = CliRunner()
+    result = runner.invoke(cli, ["sweep", "--provider", "claude"])
+    assert result.exit_code == 1
