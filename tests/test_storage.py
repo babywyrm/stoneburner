@@ -15,7 +15,7 @@ def _tmp_repo() -> MetricsRepository:
 
 
 def test_schema_version_is_current():
-    assert SCHEMA_VERSION == 7
+    assert SCHEMA_VERSION == 8
 
 
 def test_adversarial_results_table_exists(tmp_path):
@@ -505,3 +505,64 @@ def test_get_stress_results_by_model():
     assert len(rows) == 1
     assert rows[0]["model"] == "qwen2.5:7b"
     repo.close()
+
+
+# ── sweep_results ─────────────────────────────────────────────────────────────
+
+def _mock_sweep_result(model: str = "qwen2.5:7b", quality: float = 0.9,
+                       provider: str = "ollama") -> object:
+    from types import SimpleNamespace
+    return SimpleNamespace(
+        model=model,
+        provider=provider,
+        overall_quality=quality,
+        avg_latency_ms=1500.0,
+        total_tokens=3000,
+        total_cost_usd=0.0,
+        fixtures_run=6,
+    )
+
+
+def test_save_sweep_result_basic():
+    repo = _tmp_repo()
+    sr = _mock_sweep_result()
+    repo.save_sweep_result(sr)
+    rows = repo.get_sweep_results()
+    assert len(rows) == 1
+    assert rows[0]["model"] == "qwen2.5:7b"
+    assert rows[0]["quality"] == 0.9
+    assert rows[0]["fixtures_run"] == 6
+    repo.close()
+
+
+def test_save_sweep_result_stores_provider():
+    repo = _tmp_repo()
+    repo.save_sweep_result(_mock_sweep_result(provider="openai"))
+    rows = repo.get_sweep_results()
+    assert rows[0]["provider"] == "openai"
+    repo.close()
+
+
+def test_get_sweep_results_by_model():
+    repo = _tmp_repo()
+    for model in ["qwen2.5:7b", "gpt-4o-mini"]:
+        repo.save_sweep_result(_mock_sweep_result(model=model))
+    rows = repo.get_sweep_results(model="gpt-4o-mini")
+    assert len(rows) == 1
+    assert rows[0]["model"] == "gpt-4o-mini"
+    repo.close()
+
+
+def test_sweep_results_table_exists(tmp_path):
+    from atomics.storage.schema import init_db
+    conn = init_db(tmp_path / "db.sqlite")
+    conn.execute(
+        "INSERT INTO sweep_results "
+        "(result_id, model, provider, quality, avg_latency_ms, total_tokens, "
+        "total_cost_usd, fixtures_run, timestamp) "
+        "VALUES ('r1','test','ollama',0.9,1000.0,100,0.0,5,'2026-01-01')"
+    )
+    conn.commit()
+    row = conn.execute("SELECT model FROM sweep_results WHERE result_id='r1'").fetchone()
+    assert row[0] == "test"
+    conn.close()

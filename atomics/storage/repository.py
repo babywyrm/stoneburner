@@ -517,3 +517,42 @@ class MetricsRepository:
                 "SELECT * FROM stress_results ORDER BY timestamp DESC"
             ).fetchall()
         return [dict(r) for r in rows]
+
+    def save_sweep_result(self, sr: object) -> None:
+        """Persist a ModelSweepResult to the sweep_results table."""
+        import uuid
+        now = datetime.now(UTC).isoformat()
+        result_id = str(uuid.uuid4())
+        self._conn.execute(
+            """
+            INSERT OR REPLACE INTO sweep_results
+            (result_id, model, provider, quality, avg_latency_ms,
+             total_tokens, total_cost_usd, fixtures_run, timestamp)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                result_id,
+                getattr(sr, "model", ""),
+                getattr(sr, "provider", ""),
+                round(getattr(sr, "overall_quality", None) or 0.0, 4),
+                round(getattr(sr, "avg_latency_ms", 0.0), 2),
+                getattr(sr, "total_tokens", 0),
+                round(getattr(sr, "total_cost_usd", 0.0), 6),
+                getattr(sr, "fixtures_run", 0),
+                now,
+            ),
+        )
+        self._conn.commit()
+
+    def get_sweep_results(self, *, model: str | None = None) -> list[dict]:
+        """Retrieve sweep results, optionally filtered by model."""
+        if model:
+            rows = self._conn.execute(
+                "SELECT * FROM sweep_results WHERE model = ? ORDER BY timestamp DESC",
+                (model,),
+            ).fetchall()
+        else:
+            rows = self._conn.execute(
+                "SELECT * FROM sweep_results ORDER BY timestamp DESC"
+            ).fetchall()
+        return [dict(r) for r in rows]
