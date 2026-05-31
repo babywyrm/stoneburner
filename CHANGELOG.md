@@ -1,5 +1,30 @@
 # Changelog
 
+## Unreleased — CLI polish, SARIF, export improvements
+
+### Added (stoneburner)
+- **`atomics sweep --save`** — persist sweep results to new `sweep_results` DB table (schema v8)
+- **`atomics export --suite {tasks,stress,sweep,all}`** — export any stored suite as jsonl or CSV
+- **`atomics compare --output FILE`** — write JSON comparison alongside the Rich table
+- **`atomics doctor` documentation** — README section with full check list and CI usage guidance
+- **`configs/*.toml` removed** — orphaned profile TOMLs unreferenced by any code were deleted
+
+### Changed (stoneburner)
+- `atomics sweep --host` renamed to `--ollama-host` (hidden `--host` alias kept for backward compat)
+- `atomics capacity --think-time` shorthand changed from `-t` to `--think` (removes collision with `--tier` `-t`)
+- Schema bumped v7 → v8 (adds `sweep_results` table; existing DBs auto-migrated)
+
+### Added (mcpnuke)
+- **SARIF 2.1.0 export** via `--sarif FILE` — maps CRITICAL/HIGH → `error`, MEDIUM → `warning`, LOW → `note`; embeds `security-severity` and taxonomy tags; ready for GitHub Code Scanning upload
+- **`--fail-on {critical,high,medium,low,any,none}`** — configurable CI severity gate replacing hardcoded CRITICAL/HIGH exit; default unchanged (`high`)
+- **LICENSE** file (MIT)
+- **mcpnuke-runner** documentation in `docs/ci-cd-guide.md` — K8s/Helm deployment, env vars, manual trigger API
+
+### Fixed (mcpnuke)
+- `_raw_token` is now stripped from `auth_context` in all JSON output paths — tokens are never written to report files, PR comments, or CI artifacts
+
+---
+
 ## 0.3.0 — Accuracy Scoring, LLM-as-Judge, and Business-Case Narrative
 
 ### Added
