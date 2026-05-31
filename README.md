@@ -188,6 +188,21 @@ uv run atomics sweep --provider claude --models claude-sonnet-4-6 --verbose
 uv run atomics sweep --all-local --fixtures ev-01,ev-02,ev-03
 ```
 
+### `atomics capacity` — User Load Simulator
+
+Projects how many users your setup can handle using queueing theory and real stress test data. No live requests needed -- pure math from measured data points.
+
+```bash
+# From stress test data in the DB
+uv run atomics capacity --users 200 --model qwen2.5:7b
+
+# Manual parameters (for cloud APIs)
+uv run atomics capacity --users 100 --peak-tps 50 --single-latency 3000
+
+# Adjust user behavior
+uv run atomics capacity --users 200 --think-time 600 --model qwen2.5:7b --burst 0.3
+```
+
 ### `atomics stress` — GPU Saturation Testing
 
 Ramp concurrent requests from 1 to N against an Ollama host to find the throughput saturation point. Reports per-phase TPS, latency percentiles, VRAM usage, and throttling detection.
@@ -222,6 +237,7 @@ stoneburner/
 │   ├── hooks.py          # Lifecycle hooks
 │   ├── model_classes.py  # Model class definitions
 │   ├── reporting.py      # Rich table trend reports
+│   ├── capacity.py       # User load capacity projector
 │   ├── stress.py         # GPU stress test runner
 │   ├── sweep.py          # Multi-model eval sweep orchestrator
 │   └── tiers.py          # Burn tier profiles (ez/baseline/mega)
@@ -264,6 +280,7 @@ stoneburner/
 | `atomics models` | List available models on Ollama host with class/thinking annotations |
 | `atomics sweep` | Multi-model eval sweep with ranked comparison |
 | `atomics stress` | Run stress tests with configurable concurrency |
+| `atomics capacity` | Project user load capacity from stress data |
 | `atomics export` | Export benchmark data (CSV, JSON) |
 | `atomics completion` | Generate shell completion scripts |
 | `atomics login` | OAuth/OIDC login (browser or device code) |

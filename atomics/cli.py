@@ -1010,6 +1010,122 @@ def stress(
 
 
 @cli.command()
+@click.option("--users", "-u", type=int, required=True, help="Number of semi-active users")
+@click.option("--think-time", "-t", type=float, default=300.0, show_default=True,
+              help="Avg seconds between requests per user")
+@click.option("--response-tokens", type=int, default=400, show_default=True,
+              help="Avg output tokens per response")
+@click.option("--burst", type=float, default=0.2, show_default=True,
+              help="Burst factor — fraction of users spiking simultaneously")
+@click.option("--model", "-m", type=str, default=None,
+              help="Pull stress data from DB for this model")
+@click.option("--peak-tps", type=float, default=None,
+              help="Manual peak throughput (tok/s) — used if no DB data")
+@click.option("--single-latency", type=float, default=None,
+              help="Manual single-request latency in ms — used if no DB data")
+def capacity(
+    users: int,
+    think_time: float,
+    response_tokens: int,
+    burst: float,
+    model: str | None,
+    peak_tps: float | None,
+    single_latency: float | None,
+) -> None:
+    """Project user capacity from stress test data or manual parameters.
+
+    Uses queueing theory to estimate concurrent requests, latency, and
+    system verdict at different load levels. Feed it your stress test
+    results or manual numbers for cloud API endpoints.
+
+    Examples:
+      atomics capacity --users 200 --model qwen2.5:7b
+      atomics capacity --users 100 --peak-tps 107 --single-latency 15000
+      atomics capacity --users 50 --think-time 600 --model qwen2.5:7b
+    """
+    from atomics.capacity import CapacityProjection, LoadProfile, project_capacity
+
+    settings = load_settings()
+    console = Console()
+    phases: list[dict] = []
+    effective_peak_tps = peak_tps or 0.0
+    effective_model = model or ""
+
+    if model:
+        from atomics.storage.repository import MetricsRepository
+        repo = MetricsRepository(settings.db_path)
+        rows = repo.get_stress_results(model=model)
+        repo.close()
+
+        if not rows:
+            console.print(f"[red]No stress data for model '{model}'. Run atomics stress first, or use --peak-tps.[/red]")
+            raise SystemExit(1)
+
+        latest = rows[-1]
+        effective_peak_tps = latest["peak_tps"]
+
+        import json
+        phases_json = latest.get("phases_json")
+        if phases_json:
+            raw_phases = json.loads(phases_json) if isinstance(phases_json, str) else phases_json
+            phases = [
+                {
+                    "concurrency": p.get("concurrency", 1),
+                    "aggregate_tps": p.get("aggregate_tps", 0),
+                    "avg_latency_ms": p.get("avg_latency_ms", 0),
+                    "p95_latency_ms": p.get("p95_latency_ms", 0),
+                }
+                for p in raw_phases
+            ]
+        console.print(f"[dim]Using stress data for {model} (peak {effective_peak_tps:.1f} tok/s)[/dim]\n")
+
+    elif peak_tps and single_latency:
+        effective_peak_tps = peak_tps
+        phases = [
+            {"concurrency": 1, "aggregate_tps": peak_tps, "avg_latency_ms": single_latency, "p95_latency_ms": single_latency * 1.5},
+        ]
+
+    else:
+        console.print("[red]Specify --model (pulls from DB) or both --peak-tps and --single-latency[/red]")
+        raise SystemExit(1)
+
+    profile = LoadProfile(
+        users=users, think_time_s=think_time,
+        response_tokens=response_tokens, burst_factor=burst,
+    )
+
+    result = project_capacity(
+        profile=profile, phases=phases,
+        peak_tps=effective_peak_tps, model=effective_model,
+    )
+
+    title = f"Capacity Projection: {effective_model or 'custom'} ({effective_peak_tps:.0f} tok/s peak)"
+    table = Table(title=title, show_lines=True)
+    table.add_column("Scenario", style="cyan bold")
+    table.add_column("Concurrent", justify="right")
+    table.add_column("P50 Latency", justify="right")
+    table.add_column("P95 Latency", justify="right")
+    table.add_column("Queue", justify="right", style="dim")
+    table.add_column("Verdict", justify="center")
+
+    verdict_style = {"OK": "[green]OK[/green]", "CAUTION": "[yellow]CAUTION[/yellow]",
+                     "SLOW": "[red]SLOW[/red]", "OVERLOAD": "[bold red]OVERLOAD[/bold red]"}
+
+    for s in result.scenarios:
+        table.add_row(
+            s.name,
+            f"{s.concurrent:.1f}",
+            f"{s.p50_latency_ms / 1000:.0f}s",
+            f"{s.p95_latency_ms / 1000:.0f}s",
+            f"{s.queue_depth:.1f}",
+            verdict_style.get(s.verdict, s.verdict),
+        )
+
+    console.print(table)
+    console.print(f"\n[bold]Recommendation:[/bold] {result.recommendation}")
+
+
+@cli.command()
 def doctor() -> None:
     """Check Python, database, API keys, optional deps, and scheduler tooling."""
     from atomics.doctor import run_doctor
