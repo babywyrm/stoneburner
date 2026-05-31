@@ -904,6 +904,12 @@ def eval(
 
 
 @cli.command()
+@click.option(
+    "--provider", "-p", "provider_name",
+    type=PROVIDER_CHOICES,
+    default="ollama",
+    help="Provider to stress test (default: ollama for raw GPU stress)",
+)
 @click.option("--model", "-m", type=str, default=None, help="Model to stress (default: ATOMICS_OLLAMA_MODEL)")
 @click.option("--ollama-host", type=str, default=None, help="Ollama endpoint")
 @click.option("--max-concurrency", "-c", type=int, default=8, help="Max parallel requests (ramps 1→2→4→...)")
@@ -911,6 +917,7 @@ def eval(
 @click.option("--num-predict", type=int, default=2048, help="Max output tokens per request")
 @click.option("--save/--no-save", "save_results", default=True, help="Persist results to database")
 def stress(
+    provider_name: str,
     model: str | None,
     ollama_host: str | None,
     max_concurrency: int,
@@ -918,16 +925,31 @@ def stress(
     num_predict: int,
     save_results: bool,
 ) -> None:
-    """GPU stress test — ramp concurrency to find saturation point (Ollama only)."""
+    """Stress test — ramp concurrency to find saturation point.
+
+    Works with any provider: Ollama (raw GPU metrics), OpenAI, Claude, Bedrock.
+
+    Examples:
+      atomics stress --model qwen2.5:7b --ollama-host http://gpu-host:11434
+      atomics stress --provider openai --model gpt-4o-mini
+      atomics stress --provider claude --model claude-haiku-4-5-20251001
+    """
     settings = load_settings()
     _setup_logging(settings.log_level)
     console = Console()
 
-    host = ollama_host or settings.ollama_host
-    effective_model = model or settings.ollama_model
+    use_provider_mode = provider_name != "ollama"
+
+    if use_provider_mode:
+        effective_model = model or ("gpt-4o" if provider_name == "openai" else settings.default_model)
+        target_label = f"{provider_name} / {effective_model}"
+    else:
+        host = ollama_host or settings.ollama_host
+        effective_model = model or settings.ollama_model
+        target_label = f"{effective_model} @ {host}"
 
     console.print(
-        f"[bold]Stress test[/bold] — {effective_model} @ {host}\n"
+        f"[bold]Stress test[/bold] — {target_label}\n"
         f"Ramp: 1→{max_concurrency} concurrent | "
         f"{phase_seconds:.0f}s per phase | "
         f"{num_predict} max tokens/request\n"
@@ -942,28 +964,41 @@ def stress(
                 uplift = f"  ({pct:+.0f}%)" if pct != 0 else ""
         phases_so_far.append(phase)
         fail_tag = f" [red]({phase.failed} failed)[/red]" if phase.failed else ""
+        cost_tag = f"  ${phase.total_cost_usd:.4f}" if phase.total_cost_usd > 0 else ""
         console.print(
             f"  concurrent({phase.concurrency}): "
             f"[cyan]{phase.aggregate_tps:6.1f}[/cyan] tok/s  "
             f"P50 {phase.avg_latency_ms / 1000:.1f}s  "
             f"P95 {phase.p95_latency_ms / 1000:.1f}s  "
             f"({phase.requests} reqs, {phase.total_output_tokens:,} tokens)"
-            f"[dim]{uplift}[/dim]{fail_tag}"
+            f"[dim]{uplift}[/dim]{cost_tag}{fail_tag}"
         )
 
     phases_so_far: list = []
 
-    from atomics.stress import run_stress
-
     console.print("[bold]Throughput by concurrency:[/bold]")
-    result = asyncio.run(run_stress(
-        host=host,
-        model=effective_model,
-        max_concurrency=max_concurrency,
-        phase_seconds=phase_seconds,
-        num_predict=num_predict,
-        on_phase=_on_phase,
-    ))
+
+    if use_provider_mode:
+        provider = _make_provider(provider_name, effective_model, ollama_host, settings)
+        from atomics.stress import run_stress_provider
+        result = asyncio.run(run_stress_provider(
+            provider=provider,
+            model=effective_model,
+            max_concurrency=max_concurrency,
+            phase_seconds=phase_seconds,
+            num_predict=num_predict,
+            on_phase=_on_phase,
+        ))
+    else:
+        from atomics.stress import run_stress
+        result = asyncio.run(run_stress(
+            host=host,
+            model=effective_model,
+            max_concurrency=max_concurrency,
+            phase_seconds=phase_seconds,
+            num_predict=num_predict,
+            on_phase=_on_phase,
+        ))
 
     console.print()
 
@@ -971,6 +1006,8 @@ def stress(
     summary.add_column("Metric", style="dim")
     summary.add_column("Value", style="cyan bold")
 
+    if result.provider:
+        summary.add_row("Provider", result.provider)
     if result.gpu_name:
         summary.add_row("GPU", result.gpu_name)
     summary.add_row("Model", result.model)
@@ -978,6 +1015,9 @@ def stress(
     summary.add_row("Total requests", f"{result.total_requests} ({result.total_failed} failed)")
     summary.add_row("Total tokens", f"{result.total_tokens:,}")
     summary.add_row("Peak throughput", f"{result.peak_tps:.1f} tok/s @ concurrency={result.saturation_concurrency}")
+
+    if result.total_cost_usd > 0:
+        summary.add_row("Total cost", f"[yellow]${result.total_cost_usd:.4f}[/yellow]")
 
     if result.vram_peak_mb is not None:
         vram_str = f"{result.vram_peak_mb:.0f} MB"
