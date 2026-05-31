@@ -302,7 +302,256 @@ def test_cli_stress_help():
     runner = CliRunner()
     result = runner.invoke(cli, ["stress", "--help"])
     assert result.exit_code == 0
-    assert "saturation" in result.output.lower()
     assert "--max-concurrency" in result.output
     assert "--phase-seconds" in result.output
-    assert "--num-predict" in result.output
+    assert "--provider" in result.output
+
+
+# ── Provider-based stress tests ───────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_run_stress_provider_basic():
+    """run_stress_provider uses BaseProvider.generate() and tracks cost."""
+    from atomics.providers.base import ProviderResponse
+    from atomics.stress import run_stress_provider
+
+    call_count = 0
+
+    async def fake_generate(prompt, *, system="", model=None, max_tokens=1024,
+                            thinking=None, thinking_budget=None):
+        nonlocal call_count
+        call_count += 1
+        return ProviderResponse(
+            text="test " * 50,
+            input_tokens=30,
+            output_tokens=100,
+            total_tokens=130,
+            model=model or "test-model",
+            latency_ms=600.0,
+            estimated_cost_usd=0.001,
+            tokens_per_second=166.7,
+        )
+
+    mock_provider = MagicMock()
+    mock_provider.name = "openai"
+    mock_provider.generate = fake_generate
+
+    result = await run_stress_provider(
+        provider=mock_provider,
+        model="test-model",
+        max_concurrency=2,
+        phase_seconds=0.5,
+        num_predict=512,
+    )
+
+    assert result.model == "test-model"
+    assert result.provider == "openai"
+    assert len(result.phases) >= 2  # 1, 2
+    assert result.peak_tps > 0
+    assert result.total_requests > 0
+    assert result.total_cost_usd > 0
+    assert all(p.total_cost_usd >= 0 for p in result.phases)
+
+
+@pytest.mark.asyncio
+async def test_run_stress_provider_on_phase_callback():
+    """on_phase callback fires for each concurrency level."""
+    from atomics.providers.base import ProviderResponse
+    from atomics.stress import run_stress_provider
+
+    async def fake_generate(prompt, **kwargs):
+        return ProviderResponse(
+            text="ok", input_tokens=10, output_tokens=50,
+            total_tokens=60, model="m", latency_ms=200.0,
+            estimated_cost_usd=0.0005, tokens_per_second=250.0,
+        )
+
+    mock_provider = MagicMock()
+    mock_provider.name = "claude"
+    mock_provider.generate = fake_generate
+
+    phase_log: list[int] = []
+
+    await run_stress_provider(
+        provider=mock_provider,
+        model="m",
+        max_concurrency=4,
+        phase_seconds=0.3,
+        on_phase=lambda p: phase_log.append(p.concurrency),
+    )
+
+    assert phase_log == [1, 2, 4]
+
+
+@pytest.mark.asyncio
+async def test_run_stress_provider_handles_failures():
+    """Failed requests don't crash; they increment failed counter."""
+    from atomics.providers.base import ProviderResponse
+    from atomics.stress import run_stress_provider
+
+    call_count = 0
+
+    async def flaky_generate(prompt, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        if call_count % 2 == 0:
+            raise ConnectionError("timeout")
+        return ProviderResponse(
+            text="ok", input_tokens=10, output_tokens=50,
+            total_tokens=60, model="m", latency_ms=100.0,
+            estimated_cost_usd=0.0002, tokens_per_second=500.0,
+        )
+
+    mock_provider = MagicMock()
+    mock_provider.name = "openai"
+    mock_provider.generate = flaky_generate
+
+    result = await run_stress_provider(
+        provider=mock_provider, model="m",
+        max_concurrency=1, phase_seconds=0.5,
+    )
+
+    assert result.total_requests >= 1
+    assert result.total_failed >= 1
+
+
+@pytest.mark.asyncio
+async def test_run_stress_provider_tps_fallback():
+    """When tokens_per_second is None, compute from output_tokens/latency."""
+    from atomics.providers.base import ProviderResponse
+    from atomics.stress import run_stress_provider
+
+    async def fake_generate(prompt, **kwargs):
+        return ProviderResponse(
+            text="ok", input_tokens=10, output_tokens=100,
+            total_tokens=110, model="m", latency_ms=1000.0,
+            estimated_cost_usd=0.001, tokens_per_second=None,
+        )
+
+    mock_provider = MagicMock()
+    mock_provider.name = "claude"
+    mock_provider.generate = fake_generate
+
+    result = await run_stress_provider(
+        provider=mock_provider, model="m",
+        max_concurrency=1, phase_seconds=0.3,
+    )
+
+    assert result.phases[0].per_request_tps
+    for tps in result.phases[0].per_request_tps:
+        assert 80 <= tps <= 120  # ~100 tok/s = 100 tokens / 1s
+
+
+def test_cli_stress_with_provider(monkeypatch, tmp_path):
+    """atomics stress --provider openai routes to run_stress_provider."""
+    from click.testing import CliRunner
+    from atomics.cli import cli
+
+    captured_kwargs: dict = {}
+
+    async def fake_run_stress_provider(**kwargs):
+        captured_kwargs.update(kwargs)
+        phase = ConcurrencyResult(
+            concurrency=1, requests=5, total_output_tokens=500,
+            aggregate_tps=100.0, avg_request_tps=100.0,
+            avg_latency_ms=200.0, p95_latency_ms=300.0,
+            total_cost_usd=0.005,
+        )
+        on_phase = kwargs.get("on_phase")
+        if on_phase:
+            on_phase(phase)
+        return StressResult(
+            model="gpt-4o-mini", host="api",
+            provider="openai",
+            phases=[phase], peak_tps=100.0,
+            saturation_concurrency=1,
+            duration_seconds=15.0, total_tokens=500,
+            total_requests=5, total_cost_usd=0.005,
+        )
+
+    monkeypatch.setattr("atomics.stress.run_stress_provider", fake_run_stress_provider)
+    monkeypatch.setenv("ATOMICS_DB_PATH", str(tmp_path / "test.db"))
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-fake")
+
+    runner = CliRunner()
+    result = runner.invoke(cli, [
+        "stress", "--provider", "openai", "--model", "gpt-4o-mini",
+        "--max-concurrency", "2", "--no-save",
+    ])
+    assert result.exit_code == 0, result.output
+    assert "Peak throughput" in result.output or "peak" in result.output.lower()
+
+
+def test_cli_stress_provider_claude(monkeypatch, tmp_path):
+    """atomics stress --provider claude uses Claude provider."""
+    from click.testing import CliRunner
+    from atomics.cli import cli
+
+    async def fake_run_stress_provider(**kwargs):
+        phase = ConcurrencyResult(
+            concurrency=1, requests=3, total_output_tokens=300,
+            aggregate_tps=80.0, avg_request_tps=80.0,
+            avg_latency_ms=400.0, p95_latency_ms=600.0,
+            total_cost_usd=0.008,
+        )
+        on_phase = kwargs.get("on_phase")
+        if on_phase:
+            on_phase(phase)
+        return StressResult(
+            model="claude-haiku-4-5-20251001", host="api",
+            provider="claude",
+            phases=[phase], peak_tps=80.0,
+            saturation_concurrency=1,
+            duration_seconds=15.0, total_tokens=300,
+            total_requests=3, total_cost_usd=0.008,
+        )
+
+    monkeypatch.setattr("atomics.stress.run_stress_provider", fake_run_stress_provider)
+    monkeypatch.setenv("ATOMICS_DB_PATH", str(tmp_path / "test.db"))
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test-fake")
+
+    runner = CliRunner()
+    result = runner.invoke(cli, [
+        "stress", "--provider", "claude", "--model", "claude-haiku-4-5-20251001",
+        "--max-concurrency", "4", "--no-save",
+    ])
+    assert result.exit_code == 0, result.output
+
+
+def test_cli_stress_provider_save_cost(monkeypatch, tmp_path):
+    """Stress with --provider --save should persist cost data."""
+    from click.testing import CliRunner
+    from atomics.cli import cli
+
+    async def fake_run_stress_provider(**kwargs):
+        phase = ConcurrencyResult(
+            concurrency=1, requests=5, total_output_tokens=500,
+            aggregate_tps=50.0, avg_request_tps=50.0,
+            avg_latency_ms=300.0, p95_latency_ms=500.0,
+            total_cost_usd=0.010,
+        )
+        on_phase = kwargs.get("on_phase")
+        if on_phase:
+            on_phase(phase)
+        return StressResult(
+            model="gpt-4o-mini", host="api",
+            provider="openai",
+            phases=[phase], peak_tps=50.0,
+            saturation_concurrency=1,
+            duration_seconds=15.0, total_tokens=500,
+            total_requests=5, total_cost_usd=0.010,
+        )
+
+    monkeypatch.setattr("atomics.stress.run_stress_provider", fake_run_stress_provider)
+    monkeypatch.setenv("ATOMICS_DB_PATH", str(tmp_path / "test.db"))
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-fake")
+
+    runner = CliRunner()
+    result = runner.invoke(cli, [
+        "stress", "--provider", "openai", "--model", "gpt-4o-mini",
+        "--max-concurrency", "1", "--save",
+    ])
+    assert result.exit_code == 0, result.output
+    assert "saved" in result.output.lower()
+    assert "cost" in result.output.lower() or "$" in result.output

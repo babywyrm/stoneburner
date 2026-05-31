@@ -76,6 +76,7 @@ class ConcurrencyResult:
     p95_latency_ms: float = 0.0
     latencies: list[float] = field(default_factory=list)
     per_request_tps: list[float] = field(default_factory=list)
+    total_cost_usd: float = 0.0
 
 
 @dataclass
@@ -92,6 +93,8 @@ class StressResult:
     vram_peak_mb: float | None = None
     vram_total_mb: float | None = None
     gpu_name: str = ""
+    provider: str = ""
+    total_cost_usd: float = 0.0
 
 
 def _percentile(values: list[float], pct: float) -> float:
@@ -270,4 +273,109 @@ async def run_stress(
 
     result.duration_seconds = time.monotonic() - t0
     result.vram_peak_mb = peak_vram
+    return result
+
+
+# ── Provider-based stress (cloud + local) ─────────────────────────────────────
+
+
+async def _single_request_provider(
+    provider: object,
+    prompt: str,
+    num_predict: int,
+) -> tuple[int, int, float, float, float]:
+    """Fire one request via BaseProvider. Returns (out_tokens, in_tokens, latency_ms, tps, cost)."""
+    resp = await provider.generate(prompt, max_tokens=num_predict)  # type: ignore[union-attr]
+    tps = resp.tokens_per_second
+    if tps is None and resp.output_tokens > 0 and resp.latency_ms > 0:
+        tps = resp.output_tokens / (resp.latency_ms / 1000)
+    return resp.output_tokens, resp.input_tokens, resp.latency_ms, tps or 0.0, resp.estimated_cost_usd
+
+
+async def _run_phase_provider(
+    provider: object,
+    concurrency: int,
+    duration_seconds: float,
+    num_predict: int,
+) -> ConcurrencyResult:
+    """Run provider-based requests at a given concurrency for a fixed duration."""
+    result = ConcurrencyResult(concurrency=concurrency)
+    start = time.monotonic()
+    prompt_idx = 0
+
+    async def _worker() -> None:
+        nonlocal prompt_idx
+        while time.monotonic() - start < duration_seconds:
+            prompt = STRESS_PROMPTS[prompt_idx % len(STRESS_PROMPTS)]
+            prompt_idx += 1
+            try:
+                out, inp, lat, tps, cost = await _single_request_provider(
+                    provider, prompt, num_predict
+                )
+                result.requests += 1
+                result.total_output_tokens += out
+                result.total_input_tokens += inp
+                result.latencies.append(lat)
+                result.per_request_tps.append(tps)
+                result.total_cost_usd += cost
+            except Exception:
+                result.failed += 1
+
+    workers = [asyncio.create_task(_worker()) for _ in range(concurrency)]
+    await asyncio.gather(*workers)
+
+    result.elapsed_seconds = time.monotonic() - start
+    if result.elapsed_seconds > 0:
+        result.aggregate_tps = result.total_output_tokens / result.elapsed_seconds
+    if result.per_request_tps:
+        result.avg_request_tps = sum(result.per_request_tps) / len(result.per_request_tps)
+    if result.latencies:
+        result.avg_latency_ms = sum(result.latencies) / len(result.latencies)
+        result.p95_latency_ms = _percentile(result.latencies, 95)
+    return result
+
+
+async def run_stress_provider(
+    provider: object,
+    model: str = "",
+    max_concurrency: int = 8,
+    phase_seconds: float = 15.0,
+    num_predict: int = 2048,
+    on_phase: object = None,
+) -> StressResult:
+    """Ramp concurrency against any BaseProvider (cloud or local)."""
+    result = StressResult(
+        model=model,
+        host="api",
+        provider=getattr(provider, "name", ""),
+    )
+
+    concurrency_levels: list[int] = []
+    c = 1
+    while c <= max_concurrency:
+        concurrency_levels.append(c)
+        c *= 2
+    if max_concurrency not in concurrency_levels:
+        concurrency_levels.append(max_concurrency)
+
+    t0 = time.monotonic()
+
+    for conc in concurrency_levels:
+        phase = await _run_phase_provider(
+            provider, conc, phase_seconds, num_predict
+        )
+        result.phases.append(phase)
+        result.total_tokens += phase.total_output_tokens + phase.total_input_tokens
+        result.total_requests += phase.requests
+        result.total_failed += phase.failed
+        result.total_cost_usd += phase.total_cost_usd
+
+        if phase.aggregate_tps > result.peak_tps:
+            result.peak_tps = phase.aggregate_tps
+            result.saturation_concurrency = conc
+
+        if on_phase:
+            on_phase(phase)  # type: ignore[operator]
+
+    result.duration_seconds = time.monotonic() - t0
     return result
