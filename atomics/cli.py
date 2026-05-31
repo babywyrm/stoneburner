@@ -1051,7 +1051,7 @@ def stress(
 
 @cli.command()
 @click.option("--users", "-u", type=int, required=True, help="Number of semi-active users")
-@click.option("--think-time", "-t", type=float, default=300.0, show_default=True,
+@click.option("--think-time", "--think", type=float, default=300.0, show_default=True,
               help="Avg seconds between requests per user")
 @click.option("--response-tokens", type=int, default=400, show_default=True,
               help="Avg output tokens per response")
@@ -1461,7 +1461,10 @@ def _make_provider(name: str, mdl: str | None, host: str | None, settings):
     "--all-local", "all_local", is_flag=True, default=False,
     help="Discover and sweep all models on the Ollama host (ollama provider only)",
 )
-@click.option("--host", type=str, default=None, help="Ollama host URL (for ollama/brain-gateway)")
+@click.option("--ollama-host", "ollama_host", type=str, default=None,
+              help="Ollama host URL (default: ATOMICS_OLLAMA_HOST)")
+@click.option("--host", "ollama_host", type=str, default=None, hidden=True,
+              help="Deprecated alias for --ollama-host")
 @click.option("--judge-provider", "judge_provider_name", type=PROVIDER_CHOICES, default="ollama",
               help="Provider for quality judge (default: ollama — $0)")
 @click.option("--judge-model", type=str, default=None, help="Judge model override")
@@ -1471,11 +1474,13 @@ def _make_provider(name: str, mdl: str | None, host: str | None, settings):
 @click.option("--thinking-budget", type=int, default=None)
 @click.option("--verbose", "-v", is_flag=True, default=False,
               help="Print each model's full reply alongside scores")
+@click.option("--save/--no-save", "save_results", default=False,
+              help="Persist sweep results to database (default: off)")
 def sweep(
     provider_name: str,
     models: str | None,
     all_local: bool,
-    host: str | None,
+    ollama_host: str | None,
     judge_provider_name: str,
     judge_model: str | None,
     judge_host: str | None,
@@ -1483,6 +1488,7 @@ def sweep(
     thinking_flag: bool | None,
     thinking_budget: int | None,
     verbose: bool,
+    save_results: bool,
 ) -> None:
     """Sweep eval fixtures across multiple models and compare results.
 
@@ -1490,18 +1496,19 @@ def sweep(
     Use --all-local with ollama to auto-discover models, or --models for any provider.
 
     Examples:
-      atomics sweep --all-local --host http://gpu-host:11434
+      atomics sweep --all-local --ollama-host http://gpu-host:11434
       atomics sweep --models qwen2.5:1.5b,qwen2.5:3b,mistral:7b
       atomics sweep --provider claude --models claude-sonnet-4-6,claude-haiku-4-5-20251001
       atomics sweep --provider openai --models gpt-4o,gpt-4o-mini
       atomics sweep --all-local --fixtures ev-01,ev-02,ev-03
+      atomics sweep --all-local --save
     """
     from atomics.sweep import ModelSweepResult, run_model_sweep
 
     settings = load_settings()
     _setup_logging(settings.log_level)
     console = Console()
-    effective_host = host or settings.ollama_host
+    effective_host = ollama_host or settings.ollama_host
 
     if all_local:
         if provider_name != "ollama":
@@ -1528,7 +1535,7 @@ def sweep(
     fixture_ids = [f.strip() for f in fixtures.split(",") if f.strip()] if fixtures else None
 
     def provider_factory(model_name: str):
-        return _make_provider(provider_name, model_name, host, settings)
+        return _make_provider(provider_name, model_name, ollama_host, settings)
 
     judge_provider = _make_provider(
         judge_provider_name,
@@ -1608,6 +1615,14 @@ def sweep(
             f"\n[yellow]{len(failed)} model(s) failed: "
             f"{', '.join(r.model for r in failed)}[/yellow]"
         )
+
+    if save_results:
+        from atomics.storage.repository import MetricsRepository
+        repo = MetricsRepository(settings.db_path)
+        for r in results:
+            repo.save_sweep_result(r)
+        repo.close()
+        console.print(f"\n[dim]Sweep results saved to database.[/dim]")
 
 
 # ── atomics adversarial ───────────────────────────────────────────────────────
