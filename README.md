@@ -281,7 +281,12 @@ stoneburner/
 | `atomics sweep` | Multi-model eval sweep with ranked comparison |
 | `atomics stress` | Run stress tests with configurable concurrency |
 | `atomics capacity` | Project user load capacity from stress data |
-| `atomics export` | Export benchmark data (CSV, JSON) |
+| `atomics export` | Export benchmark data (CSV, JSON) for any suite |
+| `atomics export --suite stress` | Export stress test history |
+| `atomics export --suite sweep -o out.jsonl` | Export sweep results to file |
+| `atomics export --suite all --format csv -o all.csv` | Export all suites as CSV |
+| `atomics compare --output results.json` | Write comparison JSON alongside table |
+| `atomics doctor` | Check installation health and config |
 | `atomics completion` | Generate shell completion scripts |
 | `atomics login` | OAuth/OIDC login (browser or device code) |
 | `atomics logout` | Clear cached OAuth tokens |
@@ -374,6 +379,34 @@ comparisons. A warning is shown when mixed classes are detected.
 | **light** | Haiku 4.5 | gpt-4o-mini, gpt-4.1-nano | Haiku on Bedrock | qwen2.5:1.5b, qwen3:1.7b |
 | **mid** | Sonnet 4.6 | gpt-4o, gpt-4.1, o4-mini | Sonnet on Bedrock | qwen2.5:7b, llama3.2:3b |
 | **heavy** | Opus 4.6 | o3 | Opus on Bedrock | — |
+
+## Doctor
+
+`atomics doctor` checks your installation and configuration, and tells you what's
+missing before you run benchmarks.
+
+```bash
+uv run atomics doctor
+```
+
+What it checks:
+
+| Check | Pass | Fail |
+|-------|------|------|
+| Python version | ≥ 3.11 | upgrade needed |
+| `ANTHROPIC_API_KEY` | present | Claude provider unavailable |
+| `OPENAI_API_KEY` | present | OpenAI provider unavailable |
+| `AWS_DEFAULT_REGION` | present | Bedrock provider unavailable |
+| Ollama host reachable | HTTP 200 | set ATOMICS_OLLAMA_HOST |
+| DB path writable | writable | check ATOMICS_DB_PATH |
+| Optional packages | httpx, anthropic, openai | `uv sync --extra <name>` |
+
+Doctor exits `0` on all-green, `1` if any warning/error is found. Use in CI
+pre-flight to catch misconfiguration before a long benchmark run:
+
+```bash
+uv run atomics doctor && uv run atomics run --tier ez -n 3
+```
 
 ## Running Tests
 
