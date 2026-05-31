@@ -553,12 +553,15 @@ def schedule_status() -> None:
 @click.option("--tier", "-t", type=TIER_CHOICES, default=None, help="Filter by tier")
 @click.option("--category", type=str, default=None, help="Filter by task category")
 @click.option("--narrative", is_flag=True, default=False, help="Print a plain-English business-case summary")
+@click.option("--output", "-o", "out_file", type=click.Path(), default=None,
+              help="Write JSON summary to FILE instead of (or alongside) table output")
 def compare(
     by: str,
     since_hours: float | None,
     tier: str | None,
     category: str | None,
     narrative: bool,
+    out_file: str | None,
 ) -> None:
     """Compare providers or models side-by-side (add --narrative for a business-case summary)."""
     settings = load_settings()
@@ -632,6 +635,12 @@ def compare(
 
         if narrative:
             _print_narrative(console, rows, by)
+
+        if out_file:
+            import json as _json
+            from pathlib import Path
+            Path(out_file).write_text(_json.dumps(rows, indent=2, default=str))
+            console.print(f"\n[dim]Comparison written to {out_file}[/dim]")
     finally:
         repo.close()
 
@@ -1175,6 +1184,12 @@ def doctor() -> None:
 
 @cli.command("export")
 @click.option(
+    "--suite",
+    type=click.Choice(["tasks", "stress", "sweep", "all"]),
+    default="tasks",
+    help="Which suite to export: tasks (default), stress, sweep, or all",
+)
+@click.option(
     "--since-hours",
     type=float,
     default=None,
@@ -1197,22 +1212,75 @@ def doctor() -> None:
     help="Output file (default: stdout)",
 )
 def export_tasks(
+    suite: str,
     since_hours: float | None,
     limit: int | None,
     fmt: str,
     out_file,
 ) -> None:
-    """Export stored task metrics as JSON lines or CSV."""
+    """Export stored metrics as JSON lines or CSV.
+
+    Examples:
+      atomics export                          # task results (default)
+      atomics export --suite stress           # stress test history
+      atomics export --suite sweep -o out.jsonl
+      atomics export --suite all --format csv -o all_metrics.csv
+    """
+    import csv as _csv
+    import json as _json
+
     settings = load_settings()
     from atomics.exporters import write_tasks_export
     from atomics.storage.repository import MetricsRepository
 
     repo = MetricsRepository(settings.db_path)
     try:
-        rows = repo.query_task_results(since_hours=since_hours, limit=limit)
-        write_tasks_export(rows, fmt, out_file)
+        if suite == "tasks":
+            rows = repo.query_task_results(since_hours=since_hours, limit=limit)
+            write_tasks_export(rows, fmt, out_file)
+        elif suite == "stress":
+            rows = repo.get_stress_results()
+            if limit:
+                rows = rows[:limit]
+            _write_generic_export(rows, fmt, out_file)
+        elif suite == "sweep":
+            rows = repo.get_sweep_results()
+            if limit:
+                rows = rows[:limit]
+            _write_generic_export(rows, fmt, out_file)
+        elif suite == "all":
+            all_rows: list[dict] = []
+            task_rows = repo.query_task_results(since_hours=since_hours, limit=limit)
+            for r in task_rows:
+                r["_suite"] = "tasks"
+                all_rows.append(r)
+            for r in repo.get_stress_results():
+                r["_suite"] = "stress"
+                all_rows.append(r)
+            for r in repo.get_sweep_results():
+                r["_suite"] = "sweep"
+                all_rows.append(r)
+            if limit:
+                all_rows = all_rows[:limit]
+            _write_generic_export(all_rows, fmt, out_file)
     finally:
         repo.close()
+
+
+def _write_generic_export(rows: list[dict], fmt: str, out_file) -> None:
+    """Write arbitrary row dicts to jsonl or csv."""
+    import csv as _csv
+    import json as _json
+
+    if not rows:
+        return
+    if fmt == "jsonl":
+        for row in rows:
+            out_file.write(_json.dumps(row, default=str) + "\n")
+    elif fmt == "csv":
+        writer = _csv.DictWriter(out_file, fieldnames=list(rows[0].keys()))
+        writer.writeheader()
+        writer.writerows(rows)
 
 
 @cli.command()
