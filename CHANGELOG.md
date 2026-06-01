@@ -1,8 +1,9 @@
 # Changelog
 
-## Unreleased — CLI polish, SARIF, export improvements
+## Unreleased — scenario command, CLI polish, SARIF, export improvements
 
 ### Added (stoneburner)
+- **`atomics scenario`** — mixed-workload inference simulation. Runs multiple agentic workload profiles (gate, eval) concurrently against a shared Ollama host. Measures per-workload P50/P95 latency, SLA compliance, and cross-workload interference scores via automatic solo-baseline comparison. Supports YAML scenario files and CLI shorthand (`-w type:model:concurrency[:sla_ms]`). 8 gate prompts + 8 eval prompts built in; custom prompt files supported. 42 tests.
 - **`atomics sweep --save`** — persist sweep results to new `sweep_results` DB table (schema v8)
 - **`atomics export --suite {tasks,stress,sweep,all}`** — export any stored suite as jsonl or CSV
 - **`atomics compare --output FILE`** — write JSON comparison alongside the Rich table
@@ -12,7 +13,7 @@
 ### Changed (stoneburner)
 - `atomics sweep --host` renamed to `--ollama-host` (hidden `--host` alias kept for backward compat)
 - `atomics capacity --think-time` shorthand changed from `-t` to `--think` (removes collision with `--tier` `-t`)
-- Schema bumped v7 → v8 (adds `sweep_results` table; existing DBs auto-migrated)
+- Schema bumped v7 → v8 → v9 (adds `sweep_results` and `scenario_results` tables; existing DBs auto-migrated)
 
 ### Added (mcpnuke)
 - **SARIF 2.1.0 export** via `--sarif FILE` — maps CRITICAL/HIGH → `error`, MEDIUM → `warning`, LOW → `note`; embeds `security-severity` and taxonomy tags; ready for GitHub Code Scanning upload

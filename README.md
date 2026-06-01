@@ -213,6 +213,26 @@ uv run atomics stress --ollama-host http://gpu-host:11434 -c 16 -s 30
 uv run atomics stress --no-save  # skip database persistence
 ```
 
+### `atomics scenario` — Mixed-Workload Simulation
+
+Simulate multiple agentic services competing for one GPU. Runs heterogeneous workload profiles concurrently against a shared Ollama host, measures per-workload latency and SLA compliance, and computes cross-workload interference scores.
+
+Two built-in workload archetypes: **gate** (short admission/approval decisions, ~32 output tokens) and **eval** (structured analysis tasks, ~256 output tokens). Custom prompt files are also supported.
+
+```bash
+# CLI mode — two workloads competing (type:model:concurrency[:sla_ms])
+uv run atomics scenario -w "gate:qwen2.5:3b:2:5000" -w "eval:qwen2.5:7b:1:15000" -d 60
+
+# YAML scenario file
+uv run atomics scenario --file scenario.yaml --ollama-host http://gpu-host:11434
+
+# Single workload, quick test
+uv run atomics scenario -w "gate:qwen2.5:3b:3" -d 30
+
+# Skip baseline (faster, no interference score)
+uv run atomics scenario -w "gate:qwen2.5:3b:2" -w "eval:qwen2.5:7b:1" --skip-baseline
+```
+
 ---
 
 ## Architecture
@@ -227,6 +247,9 @@ stoneburner/
 │   │   ├── adversarial/  # Adversarial resilience eval suite
 │   │   └── redblue/      # Red/Blue team capability eval suite
 │   ├── probe/            # Live ecosystem probe suite
+│   ├── scenario.py       # Mixed-workload scenario runner
+│   ├── scenario_models.py # Scenario data models and parsers
+│   ├── scenario_prompts.py # Built-in gate/eval prompt fixtures
 │   ├── providers/        # LLM adapters (Claude, Bedrock, OpenAI, Ollama, brain-gateway)
 │   ├── tasks/            # Task catalog with weighted, tiered selection
 │   ├── storage/          # SQLite metrics persistence (schema v7)
@@ -280,6 +303,7 @@ stoneburner/
 | `atomics models` | List available models on Ollama host with class/thinking annotations |
 | `atomics sweep` | Multi-model eval sweep with ranked comparison |
 | `atomics stress` | Run stress tests with configurable concurrency |
+| `atomics scenario` | Mixed-workload simulation with SLA and interference scoring |
 | `atomics capacity` | Project user load capacity from stress data |
 | `atomics export` | Export benchmark data (CSV, JSON) for any suite |
 | `atomics export --suite stress` | Export stress test history |

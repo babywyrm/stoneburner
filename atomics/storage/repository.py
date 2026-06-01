@@ -556,3 +556,54 @@ class MetricsRepository:
                 "SELECT * FROM sweep_results ORDER BY timestamp DESC"
             ).fetchall()
         return [dict(r) for r in rows]
+
+    # ── Scenario results ──────────────────────────────────
+
+    def save_scenario_result(self, sr: object) -> None:
+        """Persist a ScenarioResult from atomics.scenario."""
+        import json as _json
+
+        result_id = uuid.uuid4().hex[:12]
+        now = datetime.now(UTC).isoformat()
+
+        workloads_data = [
+            {
+                "name": wr.spec.name,
+                "type": wr.spec.type,
+                "model": wr.spec.model,
+                "concurrency": wr.spec.concurrency,
+                "requests": wr.requests,
+                "failed": wr.failed,
+                "p50_ms": round(wr.p50_ms, 2),
+                "p95_ms": round(wr.p95_ms, 2),
+                "avg_tps": round(wr.avg_tps, 2),
+                "sla_ms": wr.spec.sla_ms,
+                "sla_compliance_pct": round(wr.sla_compliance_pct, 2),
+            }
+            for wr in sr.workloads
+        ]
+
+        max_intf = max(sr.interference.values()) if sr.interference else None
+
+        self._conn.execute(
+            """
+            INSERT INTO scenario_results
+            (result_id, duration_seconds, total_requests, total_failed,
+             workload_count, max_interference,
+             workloads_json, interference_json, baselines_json, timestamp)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                result_id,
+                round(sr.duration_seconds, 2),
+                sr.total_requests,
+                sr.total_failed,
+                len(sr.workloads),
+                round(max_intf, 4) if max_intf is not None else None,
+                _json.dumps(workloads_data),
+                _json.dumps({k: round(v, 4) for k, v in sr.interference.items()}),
+                _json.dumps({k: round(v, 2) for k, v in sr.baselines.items()}),
+                now,
+            ),
+        )
+        self._conn.commit()
