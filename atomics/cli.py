@@ -2088,6 +2088,8 @@ def probe(
               help="Persist results to the database.")
 @click.option("--verbose", "-v", is_flag=True, default=False,
               help="Show every HTTP request (httpx debug output).")
+@click.option("--think-time", type=float, default=0.0, show_default=True,
+              help="Seconds to wait between requests per worker (simulates user think time).")
 def soak(
     model: str | None,
     provider_name: str,
@@ -2099,6 +2101,7 @@ def soak(
     num_predict: int,
     save_results: bool,
     verbose: bool,
+    think_time: float,
 ) -> None:
     """Soak test — hold fixed concurrency and track degradation over time.
 
@@ -2159,6 +2162,12 @@ def soak(
         _logging.getLogger("httpx").setLevel(_logging.WARNING)
         _logging.getLogger("httpcore").setLevel(_logging.WARNING)
 
+    if think_time > 0:
+        console.print(
+            f"Think time: [bold]{think_time}s[/bold] per worker — "
+            f"simulates ~{concurrency} users with natural pauses\n"
+        )
+
     tps_label = "req/s" if profile_path else "tok/s"
     sample_count = 0
 
@@ -2186,6 +2195,7 @@ def soak(
             concurrency=concurrency,
             duration_seconds=duration_seconds,
             sample_interval=sample_interval,
+            think_time_seconds=think_time,
             on_sample=_on_sample,
         ))
     elif provider_name != "ollama":
@@ -2197,6 +2207,7 @@ def soak(
             duration_seconds=duration_seconds,
             sample_interval=sample_interval,
             num_predict=num_predict,
+            think_time_seconds=think_time,
             on_sample=_on_sample,
         ))
     else:
@@ -2208,6 +2219,7 @@ def soak(
             duration_seconds=duration_seconds,
             sample_interval=sample_interval,
             num_predict=num_predict,
+            think_time_seconds=think_time,
             on_sample=_on_sample,
         ))
 

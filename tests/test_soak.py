@@ -405,3 +405,75 @@ class TestSchemaVersion:
     def test_schema_version_bumped(self):
         from atomics.storage.schema import SCHEMA_VERSION
         assert SCHEMA_VERSION == 10
+
+
+# ── Think-time / user arrival simulation ─────────────────────────────────────
+
+
+class TestThinkTime:
+    def test_run_soak_accepts_think_time_param(self):
+        """run_soak signature includes think_time_seconds."""
+        import inspect
+        from atomics.soak import run_soak
+        sig = inspect.signature(run_soak)
+        assert "think_time_seconds" in sig.parameters
+        assert sig.parameters["think_time_seconds"].default == 0.0
+
+    def test_run_soak_provider_accepts_think_time_param(self):
+        """run_soak_provider signature includes think_time_seconds."""
+        import inspect
+        from atomics.soak import run_soak_provider
+        sig = inspect.signature(run_soak_provider)
+        assert "think_time_seconds" in sig.parameters
+        assert sig.parameters["think_time_seconds"].default == 0.0
+
+    def test_run_soak_profile_accepts_think_time_param(self):
+        """run_soak_profile signature includes think_time_seconds."""
+        import inspect
+        from atomics.soak import run_soak_profile
+        sig = inspect.signature(run_soak_profile)
+        assert "think_time_seconds" in sig.parameters
+        assert sig.parameters["think_time_seconds"].default == 0.0
+
+    def test_think_time_guard_in_source(self):
+        """soak.py contains the think_time guard inside worker bodies."""
+        import inspect
+        from atomics import soak as soak_module
+        source = inspect.getsource(soak_module)
+        assert "think_time_seconds > 0" in source
+        assert "asyncio.sleep(think_time_seconds)" in source
+
+
+class TestThinkTimeCLI:
+    def test_think_time_flag_in_help(self):
+        from click.testing import CliRunner
+        from atomics.cli import cli
+
+        runner = CliRunner()
+        result = runner.invoke(cli, ["soak", "--help"])
+        assert "--think-time" in result.output
+
+    def test_think_time_passed_to_runner(self):
+        from click.testing import CliRunner
+        from atomics.cli import cli
+        from atomics.soak import SoakResult
+
+        captured: dict = {}
+
+        async def _fake_run(*args, **kwargs):
+            captured.update(kwargs)
+            r = SoakResult(model="test", host="http://fake:11434")
+            return r
+
+        runner = CliRunner()
+        with patch("atomics.soak.run_soak", side_effect=_fake_run):
+            result = runner.invoke(cli, [
+                "soak", "--model", "test",
+                "--ollama-host", "http://fake:11434",
+                "--duration", "1m",
+                "--think-time", "5.0",
+                "--no-save",
+            ])
+
+        assert result.exit_code == 0
+        assert captured.get("think_time_seconds") == 5.0
