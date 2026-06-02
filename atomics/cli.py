@@ -2086,6 +2086,8 @@ def probe(
               help="Max output tokens per request.")
 @click.option("--save/--no-save", "save_results", default=True, show_default=True,
               help="Persist results to the database.")
+@click.option("--verbose", "-v", is_flag=True, default=False,
+              help="Show every HTTP request (httpx debug output).")
 def soak(
     model: str | None,
     provider_name: str,
@@ -2096,6 +2098,7 @@ def soak(
     sample_interval: int,
     num_predict: int,
     save_results: bool,
+    verbose: bool,
 ) -> None:
     """Soak test — hold fixed concurrency and track degradation over time.
 
@@ -2108,6 +2111,7 @@ def soak(
       atomics soak --model qwen2.5:7b -d 2h -c 8 --ollama-host http://gpu:11434
       atomics soak --profile profiles/local/gatekeeper.yaml -d 30m
       atomics soak --provider openai --model gpt-4o-mini -d 15m -c 2
+      atomics soak --model qwen2.5:3b -d 5m --verbose
     """
     from atomics.soak import parse_duration, run_soak, run_soak_profile, run_soak_provider
 
@@ -2150,6 +2154,12 @@ def soak(
             f"Max tokens: {num_predict}\n"
         )
 
+    import logging as _logging
+    if not verbose:
+        _logging.getLogger("httpx").setLevel(_logging.WARNING)
+        _logging.getLogger("httpcore").setLevel(_logging.WARNING)
+
+    tps_label = "req/s" if profile_path else "tok/s"
     sample_count = 0
 
     def _on_sample(s) -> None:
@@ -2159,11 +2169,12 @@ def soak(
         elapsed_s = int(s.elapsed_seconds % 60)
         fail_tag = f"  [red]({s.failed} err)[/red]" if s.failed else ""
         vram_tag = f"  VRAM {s.vram_used_mb:.0f}MB" if s.vram_used_mb else ""
+        tokens_tag = f"  {s.total_output_tokens:,} tok" if s.total_output_tokens else ""
         console.print(
             f"  [{elapsed_m:02d}:{elapsed_s:02d}] "
-            f"[cyan]{s.aggregate_tps:6.1f}[/cyan] req/s  "
+            f"[cyan]{s.aggregate_tps:6.1f}[/cyan] {tps_label}  "
             f"P95 {s.p95_latency_ms / 1000:.1f}s  "
-            f"({s.requests} reqs)"
+            f"({s.requests} reqs{tokens_tag})"
             f"{vram_tag}{fail_tag}"
         )
 
