@@ -143,6 +143,7 @@ async def run_soak(
     duration_seconds: float = 1800,
     sample_interval: int = 30,
     num_predict: int = 2048,
+    think_time_seconds: float = 0.0,
     on_sample: Callable[[SoakSample], None] | None = None,
 ) -> SoakResult:
     """Run a soak test against an Ollama endpoint."""
@@ -184,6 +185,8 @@ async def run_soak(
                     window_latencies.append(lat_ms)
                     window_tokens += out_tok
                     window_requests += 1
+                if think_time_seconds > 0 and not stop_event.is_set():
+                    await asyncio.sleep(think_time_seconds)
             except Exception:
                 async with window_lock:
                     window_failed += 1
@@ -278,6 +281,7 @@ async def run_soak_provider(
     duration_seconds: float = 1800,
     sample_interval: int = 30,
     num_predict: int = 2048,
+    think_time_seconds: float = 0.0,
     on_sample: Callable[[SoakSample], None] | None = None,
 ) -> SoakResult:
     """Run a soak test against any provider (cloud or local)."""
@@ -317,6 +321,8 @@ async def run_soak_provider(
                     window_tokens += out_tok
                     window_requests += 1
                     window_cost += cost
+                if think_time_seconds > 0 and not stop_event.is_set():
+                    await asyncio.sleep(think_time_seconds)
             except Exception:
                 async with window_lock:
                     window_failed += 1
@@ -405,6 +411,7 @@ async def run_soak_profile(
     concurrency: int = 4,
     duration_seconds: float = 1800,
     sample_interval: int = 30,
+    think_time_seconds: float = 0.0,
     on_sample: Callable[[SoakSample], None] | None = None,
 ) -> SoakResult:
     """Run a soak test against a custom target profile (ollama or http)."""
@@ -450,6 +457,8 @@ async def run_soak_profile(
                 async with window_lock:
                     window_latencies.append(lat_ms)
                     window_requests += 1
+                if think_time_seconds > 0 and not stop_event.is_set():
+                    await asyncio.sleep(think_time_seconds)
             except Exception:
                 async with window_lock:
                     window_failed += 1
