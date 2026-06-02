@@ -210,6 +210,7 @@ Ramp concurrent requests from 1 to N against an Ollama host to find the throughp
 ```bash
 uv run atomics stress --model qwen2.5:7b --max-concurrency 8
 uv run atomics stress --ollama-host http://gpu-host:11434 -c 16 -s 30
+uv run atomics stress --profile profiles/local/gatekeeper.yaml  # custom target profile
 uv run atomics stress --no-save  # skip database persistence
 ```
 
@@ -249,6 +250,9 @@ uv run atomics soak --model qwen2.5:7b -d 90 -c 4 -s 60
 
 # Cloud provider soak
 uv run atomics soak --provider openai --model gpt-4o-mini -d 15m -c 2
+
+# Soak with a custom target profile (app-level AI gate)
+uv run atomics soak --profile profiles/local/gatekeeper.yaml -d 30m
 ```
 
 **Verdict thresholds:**
@@ -288,10 +292,14 @@ stoneburner/
 │   ├── model_classes.py  # Model class definitions
 │   ├── reporting.py      # Rich table trend reports
 │   ├── capacity.py       # User load capacity projector
+│   ├── profiles.py       # Custom target profile loader and runner
 │   ├── stress.py         # GPU stress test runner
 │   ├── sweep.py          # Multi-model eval sweep orchestrator
 │   └── tiers.py          # Burn tier profiles (ez/baseline/mega)
 ├── configs/              # Rate/budget profiles (default, aggressive, conservative)
+├── profiles/             # Custom target profiles for AI gate testing
+│   ├── examples/         # Sanitized example profiles (committed)
+│   └── local/            # Real profiles with IPs/prompts (gitignored)
 ├── tests/                # Full pytest coverage
 └── workers/npm/          # Optional Node.js workers (Phase 3)
 ```

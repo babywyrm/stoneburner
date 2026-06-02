@@ -47,6 +47,9 @@ coverage.xml
 .env.*
 !.env.example
 
+# Target profiles (sensitive — real VM IPs, system prompts, API keys)
+profiles/local/
+
 # Node (optional workers)
 node_modules/
 workers/npm/node_modules/

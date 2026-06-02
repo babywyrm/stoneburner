@@ -1,8 +1,9 @@
 # Changelog
 
-## Unreleased — soak command, scenario command, CLI polish, SARIF, export improvements
+## Unreleased — target profiles, soak command, scenario command, CLI polish, SARIF, export improvements
 
 ### Added (stoneburner)
+- **Custom target profiles** — YAML-based profiles for testing application-level AI gates. Two modes: `ollama` (Ollama with custom system prompt, temperature, num_predict) and `http` (arbitrary HTTP endpoint with body template, response parsing, and latency extraction). `--profile` flag added to `soak`, `stress`, and `scenario` commands. Response classification (`classify:` in YAML) detects model drift under load. Sensitive profiles gitignored via `profiles/local/`. 42 tests.
 - **`atomics soak`** — long-duration stability test. Holds fixed concurrency for minutes or hours, sampling throughput and latency at configurable intervals. Computes linear-regression drift to classify runs as STABLE / DEGRADED / UNSTABLE. Tracks VRAM drift, error rate, and total cost. Human-friendly duration parsing (`30m`, `2h`, `1h30m`, bare minutes). Works with all providers. Database persistence in `soak_results` table. 48 tests.
 - **`atomics scenario`** — mixed-workload inference simulation. Runs multiple agentic workload profiles (gate, eval) concurrently against a shared Ollama host. Measures per-workload P50/P95 latency, SLA compliance, and cross-workload interference scores via automatic solo-baseline comparison. Supports YAML scenario files and CLI shorthand (`-w type:model:concurrency[:sla_ms]`). 8 gate prompts + 8 eval prompts built in; custom prompt files supported. 42 tests.
 - **`atomics sweep --save`** — persist sweep results to new `sweep_results` DB table (schema v8)

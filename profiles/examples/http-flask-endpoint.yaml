@@ -1,0 +1,39 @@
+# Example: Soak-test an application-level HTTP endpoint.
+#
+# Hits a Flask/Spring/MCP service that wraps an LLM behind a REST API.
+# Full control over method, headers, body template, and response parsing.
+#
+# Template variables: {{ prompt }}, {{ model }}, {{ num_predict }}
+#
+# Usage:
+#   atomics soak  --profile profiles/examples/http-flask-endpoint.yaml -d 10m
+#   atomics stress --profile profiles/examples/http-flask-endpoint.yaml
+
+name: example-http-gate
+type: http
+
+model: qwen2.5:3b
+
+http:
+  url: "http://localhost:5000/api/classify"
+  method: POST
+  headers:
+    Content-Type: application/json
+    X-API-Key: "change-me"
+  body_template: |
+    {"prompt": "{{ prompt }}", "model": "{{ model }}"}
+  timeout: 30
+
+prompts:
+  - "Is this pod safe to deploy? image=nginx:1.25"
+  - "Is this pod safe to deploy? image=busybox, hostPID=true"
+  - "Is this pod safe to deploy? image=myapp:latest, readOnlyRootFilesystem=true"
+
+response:
+  format: json
+  text_field: "decision"
+  latency_field: "elapsed_ms"
+
+classify:
+  approved: ["APPROVE", "ALLOW", "SAFE"]
+  blocked: ["DENY", "BLOCK", "REJECT", "UNSAFE"]
