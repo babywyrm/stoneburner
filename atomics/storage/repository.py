@@ -557,6 +557,69 @@ class MetricsRepository:
             ).fetchall()
         return [dict(r) for r in rows]
 
+    # ── Soak results ──────────────────────────────────────
+
+    def save_soak_result(self, sr: object) -> None:
+        """Persist a SoakResult from atomics.soak."""
+        import json as _json
+
+        result_id = uuid.uuid4().hex[:12]
+        now = datetime.now(UTC).isoformat()
+
+        samples_data = [
+            {
+                "elapsed_seconds": s.elapsed_seconds,
+                "requests": s.requests,
+                "failed": s.failed,
+                "total_output_tokens": s.total_output_tokens,
+                "aggregate_tps": round(s.aggregate_tps, 2),
+                "avg_latency_ms": round(s.avg_latency_ms, 2),
+                "p95_latency_ms": round(s.p95_latency_ms, 2),
+                "vram_used_mb": s.vram_used_mb,
+            }
+            for s in sr.samples
+        ]
+
+        self._conn.execute(
+            """
+            INSERT INTO soak_results
+            (result_id, model, host, provider, concurrency, duration_seconds,
+             actual_duration_seconds, sample_interval, total_requests, total_failed,
+             total_tokens, avg_tps, peak_tps, min_tps,
+             throughput_drift_pct, latency_drift_pct, avg_p95_ms,
+             vram_start_mb, vram_end_mb, vram_drift_mb,
+             error_rate, verdict, total_cost_usd, samples_json, timestamp)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                result_id, sr.model, sr.host, sr.provider,
+                sr.concurrency, round(sr.duration_seconds, 2),
+                round(sr.actual_duration_seconds, 2), sr.sample_interval,
+                sr.total_requests, sr.total_failed, sr.total_tokens,
+                round(sr.avg_tps, 2), round(sr.peak_tps, 2), round(sr.min_tps, 2),
+                round(sr.throughput_drift_pct, 2), round(sr.latency_drift_pct, 2),
+                round(sr.avg_p95_ms, 2),
+                sr.vram_start_mb, sr.vram_end_mb, sr.vram_drift_mb,
+                round(sr.error_rate, 6), sr.verdict,
+                round(sr.total_cost_usd, 6),
+                _json.dumps(samples_data), now,
+            ),
+        )
+        self._conn.commit()
+
+    def get_soak_results(self, *, model: str | None = None) -> list[dict]:
+        """Retrieve soak results, optionally filtered by model."""
+        if model:
+            rows = self._conn.execute(
+                "SELECT * FROM soak_results WHERE model = ? ORDER BY timestamp DESC",
+                (model,),
+            ).fetchall()
+        else:
+            rows = self._conn.execute(
+                "SELECT * FROM soak_results ORDER BY timestamp DESC"
+            ).fetchall()
+        return [dict(r) for r in rows]
+
     # ── Scenario results ──────────────────────────────────
 
     def save_scenario_result(self, sr: object) -> None:

@@ -1185,9 +1185,9 @@ def doctor() -> None:
 @cli.command("export")
 @click.option(
     "--suite",
-    type=click.Choice(["tasks", "stress", "sweep", "all"]),
+    type=click.Choice(["tasks", "stress", "sweep", "soak", "all"]),
     default="tasks",
-    help="Which suite to export: tasks (default), stress, sweep, or all",
+    help="Which suite to export: tasks (default), stress, sweep, soak, or all",
 )
 @click.option(
     "--since-hours",
@@ -1248,6 +1248,11 @@ def export_tasks(
             if limit:
                 rows = rows[:limit]
             _write_generic_export(rows, fmt, out_file)
+        elif suite == "soak":
+            rows = repo.get_soak_results()
+            if limit:
+                rows = rows[:limit]
+            _write_generic_export(rows, fmt, out_file)
         elif suite == "all":
             all_rows: list[dict] = []
             task_rows = repo.query_task_results(since_hours=since_hours, limit=limit)
@@ -1259,6 +1264,9 @@ def export_tasks(
                 all_rows.append(r)
             for r in repo.get_sweep_results():
                 r["_suite"] = "sweep"
+                all_rows.append(r)
+            for r in repo.get_soak_results():
+                r["_suite"] = "soak"
                 all_rows.append(r)
             if limit:
                 all_rows = all_rows[:limit]
@@ -2033,6 +2041,173 @@ def probe(
         )
         for r in summary.regressions:
             console.print(f"  • {r.target_name}: {(r.prev_score or 0)*100:.1f}% → {(r.score or 0)*100:.1f}%")
+
+
+# ── atomics soak ──────────────────────────────────────────────────────────────
+
+@cli.command("soak")
+@click.option("--model", "-m", type=str, required=True, help="Model to soak test.")
+@click.option(
+    "--provider", "-p", "provider_name",
+    type=PROVIDER_CHOICES,
+    default="ollama",
+    help="Provider to use (default: ollama for raw GPU soak).",
+)
+@click.option("--ollama-host", type=str, default=None,
+              help="Ollama endpoint (default: ATOMICS_OLLAMA_HOST or http://localhost:11434)")
+@click.option("--duration", "-d", type=str, default="30m", show_default=True,
+              help="Test duration: e.g. '30m', '2h', '1h30m', or bare minutes like '90'.")
+@click.option("--concurrency", "-c", type=int, default=4, show_default=True,
+              help="Fixed concurrent request count.")
+@click.option("--sample-interval", "-s", type=int, default=30, show_default=True,
+              help="Seconds between metric snapshots.")
+@click.option("--num-predict", type=int, default=2048, show_default=True,
+              help="Max output tokens per request.")
+@click.option("--save/--no-save", "save_results", default=True, show_default=True,
+              help="Persist results to the database.")
+def soak(
+    model: str,
+    provider_name: str,
+    ollama_host: str | None,
+    duration: str,
+    concurrency: int,
+    sample_interval: int,
+    num_predict: int,
+    save_results: bool,
+) -> None:
+    """Soak test — hold fixed concurrency and track degradation over time.
+
+    Measures throughput drift, latency drift, VRAM drift, and error rate.
+    Classifies the result as STABLE, DEGRADED, or UNSTABLE.
+
+    \b
+    Examples:
+      atomics soak --model qwen2.5:7b --duration 30m
+      atomics soak --model qwen2.5:7b -d 2h -c 8 --ollama-host http://gpu:11434
+      atomics soak --model qwen2.5:7b -d 90 -c 4 -s 60
+      atomics soak --provider openai --model gpt-4o-mini -d 15m -c 2
+    """
+    from atomics.soak import parse_duration, run_soak, run_soak_provider
+
+    settings = load_settings()
+    _setup_logging(settings.log_level)
+    console = Console()
+
+    try:
+        duration_seconds = parse_duration(duration)
+    except ValueError as exc:
+        console.print(f"[red]{exc}[/red]")
+        sys.exit(1)
+
+    dur_m = int(duration_seconds // 60)
+    dur_label = f"{dur_m}m" if dur_m < 60 else f"{dur_m // 60}h{dur_m % 60:02d}m"
+
+    use_provider_mode = provider_name != "ollama"
+    host = ollama_host or settings.ollama_host
+
+    target_label = f"{provider_name} / {model}" if use_provider_mode else f"{model} @ {host}"
+
+    console.print(
+        f"[bold]Soak test[/bold] — {target_label}\n"
+        f"Duration: [bold]{dur_label}[/bold] | "
+        f"Concurrency: [bold]{concurrency}[/bold] | "
+        f"Sample interval: [bold]{sample_interval}s[/bold] | "
+        f"Max tokens: {num_predict}\n"
+    )
+
+    sample_count = 0
+
+    def _on_sample(s) -> None:
+        nonlocal sample_count
+        sample_count += 1
+        elapsed_m = int(s.elapsed_seconds // 60)
+        elapsed_s = int(s.elapsed_seconds % 60)
+        fail_tag = f"  [red]({s.failed} err)[/red]" if s.failed else ""
+        vram_tag = f"  VRAM {s.vram_used_mb:.0f}MB" if s.vram_used_mb else ""
+        console.print(
+            f"  [{elapsed_m:02d}:{elapsed_s:02d}] "
+            f"[cyan]{s.aggregate_tps:6.1f}[/cyan] tok/s  "
+            f"P95 {s.p95_latency_ms / 1000:.1f}s  "
+            f"({s.requests} reqs, {s.total_output_tokens:,} tokens)"
+            f"{vram_tag}{fail_tag}"
+        )
+
+    console.print("[bold]Live samples:[/bold]")
+
+    if use_provider_mode:
+        provider = _make_provider(provider_name, model, ollama_host, settings)
+        result = asyncio.run(run_soak_provider(
+            provider=provider,
+            model=model,
+            concurrency=concurrency,
+            duration_seconds=duration_seconds,
+            sample_interval=sample_interval,
+            num_predict=num_predict,
+            on_sample=_on_sample,
+        ))
+    else:
+        result = asyncio.run(run_soak(
+            host=host,
+            model=model,
+            concurrency=concurrency,
+            duration_seconds=duration_seconds,
+            sample_interval=sample_interval,
+            num_predict=num_predict,
+            on_sample=_on_sample,
+        ))
+
+    console.print()
+
+    verdict_style = {
+        "STABLE": "[bold green]STABLE[/bold green]",
+        "DEGRADED": "[bold yellow]DEGRADED[/bold yellow]",
+        "UNSTABLE": "[bold red]UNSTABLE[/bold red]",
+    }
+
+    summary = Table(title="Soak Test Summary", show_lines=True, title_style="bold")
+    summary.add_column("Metric", style="dim")
+    summary.add_column("Value", style="cyan bold")
+
+    summary.add_row("Model", result.model)
+    if result.provider and result.provider != "ollama":
+        summary.add_row("Provider", result.provider)
+    summary.add_row("Duration", f"{result.actual_duration_seconds:.0f}s ({dur_label})")
+    summary.add_row("Concurrency", str(result.concurrency))
+    summary.add_row("Samples", str(len(result.samples)))
+    summary.add_row("Total requests", f"{result.total_requests} ({result.total_failed} failed)")
+    summary.add_row("Total tokens", f"{result.total_tokens:,}")
+
+    summary.add_row("Avg throughput", f"{result.avg_tps:.1f} tok/s")
+    summary.add_row("Peak throughput", f"{result.peak_tps:.1f} tok/s")
+    summary.add_row("Min throughput", f"{result.min_tps:.1f} tok/s")
+    summary.add_row("Avg P95 latency", f"{result.avg_p95_ms / 1000:.1f}s")
+
+    drift_color = "green" if abs(result.throughput_drift_pct) < 5 else ("yellow" if abs(result.throughput_drift_pct) < 15 else "red")
+    summary.add_row("Throughput drift", f"[{drift_color}]{result.throughput_drift_pct:+.1f}%[/{drift_color}]")
+
+    lat_color = "green" if result.latency_drift_pct < 10 else ("yellow" if result.latency_drift_pct < 25 else "red")
+    summary.add_row("Latency drift", f"[{lat_color}]{result.latency_drift_pct:+.1f}%[/{lat_color}]")
+
+    err_color = "green" if result.error_rate < 0.005 else ("yellow" if result.error_rate < 0.05 else "red")
+    summary.add_row("Error rate", f"[{err_color}]{result.error_rate * 100:.2f}%[/{err_color}]")
+
+    if result.vram_drift_mb is not None:
+        vram_color = "green" if abs(result.vram_drift_mb) < 100 else "yellow"
+        summary.add_row("VRAM drift", f"[{vram_color}]{result.vram_drift_mb:+.0f} MB[/{vram_color}]")
+
+    if result.total_cost_usd > 0:
+        summary.add_row("Total cost", f"[yellow]${result.total_cost_usd:.4f}[/yellow]")
+
+    summary.add_row("Verdict", verdict_style.get(result.verdict, result.verdict))
+
+    console.print(summary)
+
+    if save_results:
+        from atomics.storage.repository import MetricsRepository
+        repo = MetricsRepository(settings.db_path)
+        repo.save_soak_result(result)
+        repo.close()
+        console.print(f"\n[dim]Results saved to database.[/dim]")
 
 
 # ── atomics scenario ──────────────────────────────────────────────────────────

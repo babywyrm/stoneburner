@@ -15,7 +15,7 @@ def _tmp_repo() -> MetricsRepository:
 
 
 def test_schema_version_is_current():
-    assert SCHEMA_VERSION == 9
+    assert SCHEMA_VERSION == 10
 
 
 def test_adversarial_results_table_exists(tmp_path):
