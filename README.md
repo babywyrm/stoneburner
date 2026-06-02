@@ -233,6 +233,32 @@ uv run atomics scenario -w "gate:qwen2.5:3b:3" -d 30
 uv run atomics scenario -w "gate:qwen2.5:3b:2" -w "eval:qwen2.5:7b:1" --skip-baseline
 ```
 
+### `atomics soak` — Long-Duration Stability Test
+
+Hold fixed concurrency against an inference backend for minutes or hours. Samples throughput and latency at regular intervals and computes linear-regression drift to classify the run as **STABLE**, **DEGRADED**, or **UNSTABLE**. Detects slow VRAM leaks, thermal throttling, and gradual latency creep that stress tests miss.
+
+```bash
+# 30-minute soak at concurrency 4
+uv run atomics soak --model qwen2.5:7b --duration 30m
+
+# 2-hour endurance test at concurrency 8 against a remote host
+uv run atomics soak --model qwen2.5:7b -d 2h -c 8 --ollama-host http://gpu:11434
+
+# Bare minutes, custom sample interval
+uv run atomics soak --model qwen2.5:7b -d 90 -c 4 -s 60
+
+# Cloud provider soak
+uv run atomics soak --provider openai --model gpt-4o-mini -d 15m -c 2
+```
+
+**Verdict thresholds:**
+
+| Metric | STABLE | DEGRADED | UNSTABLE |
+|--------|--------|----------|----------|
+| Throughput drift | > -5% | -5% to -15% | ≤ -15% |
+| Latency drift | < +10% | +10% to +25% | ≥ +25% |
+| Error rate | < 0.5% | 0.5% to 5% | ≥ 5% |
+
 ---
 
 ## Architecture
@@ -252,7 +278,8 @@ stoneburner/
 │   ├── scenario_prompts.py # Built-in gate/eval prompt fixtures
 │   ├── providers/        # LLM adapters (Claude, Bedrock, OpenAI, Ollama, brain-gateway)
 │   ├── tasks/            # Task catalog with weighted, tiered selection
-│   ├── storage/          # SQLite metrics persistence (schema v7)
+│   ├── soak.py           # Long-duration stability test runner
+│   ├── storage/          # SQLite metrics persistence (schema v10)
 │   ├── scheduler/        # Cron/systemd/launchd generation and installation
 │   ├── workers/          # Optional npm worker bridge (Phase 3)
 │   ├── cli.py            # Click CLI entry point
@@ -304,10 +331,12 @@ stoneburner/
 | `atomics sweep` | Multi-model eval sweep with ranked comparison |
 | `atomics stress` | Run stress tests with configurable concurrency |
 | `atomics scenario` | Mixed-workload simulation with SLA and interference scoring |
+| `atomics soak` | Long-duration stability test with drift analysis |
 | `atomics capacity` | Project user load capacity from stress data |
 | `atomics export` | Export benchmark data (CSV, JSON) for any suite |
 | `atomics export --suite stress` | Export stress test history |
 | `atomics export --suite sweep -o out.jsonl` | Export sweep results to file |
+| `atomics export --suite soak` | Export soak test history |
 | `atomics export --suite all --format csv -o all.csv` | Export all suites as CSV |
 | `atomics compare --output results.json` | Write comparison JSON alongside table |
 | `atomics doctor` | Check installation health and config |

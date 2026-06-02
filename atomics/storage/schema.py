@@ -8,7 +8,7 @@ from pathlib import Path
 
 logger = logging.getLogger("atomics.schema")
 
-SCHEMA_VERSION = 9
+SCHEMA_VERSION = 10
 
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -165,11 +165,41 @@ CREATE TABLE IF NOT EXISTS scenario_results (
     timestamp           TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS soak_results (
+    result_id               TEXT PRIMARY KEY,
+    model                   TEXT NOT NULL,
+    host                    TEXT NOT NULL DEFAULT '',
+    provider                TEXT NOT NULL DEFAULT 'ollama',
+    concurrency             INTEGER DEFAULT 4,
+    duration_seconds        REAL DEFAULT 0.0,
+    actual_duration_seconds REAL DEFAULT 0.0,
+    sample_interval         INTEGER DEFAULT 30,
+    total_requests          INTEGER DEFAULT 0,
+    total_failed            INTEGER DEFAULT 0,
+    total_tokens            INTEGER DEFAULT 0,
+    avg_tps                 REAL DEFAULT 0.0,
+    peak_tps                REAL DEFAULT 0.0,
+    min_tps                 REAL DEFAULT 0.0,
+    throughput_drift_pct    REAL DEFAULT 0.0,
+    latency_drift_pct       REAL DEFAULT 0.0,
+    avg_p95_ms              REAL DEFAULT 0.0,
+    vram_start_mb           REAL DEFAULT NULL,
+    vram_end_mb             REAL DEFAULT NULL,
+    vram_drift_mb           REAL DEFAULT NULL,
+    error_rate              REAL DEFAULT 0.0,
+    verdict                 TEXT DEFAULT 'STABLE',
+    total_cost_usd          REAL DEFAULT 0.0,
+    samples_json            TEXT DEFAULT '[]',
+    timestamp               TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_adversarial_results_run_id ON adversarial_results(run_id);
 CREATE INDEX IF NOT EXISTS idx_probe_results_run_id ON probe_results(run_id);
 CREATE INDEX IF NOT EXISTS idx_stress_results_model ON stress_results(model);
 CREATE INDEX IF NOT EXISTS idx_sweep_results_model ON sweep_results(model);
 CREATE INDEX IF NOT EXISTS idx_scenario_results_timestamp ON scenario_results(timestamp);
+CREATE INDEX IF NOT EXISTS idx_soak_results_model ON soak_results(model);
+CREATE INDEX IF NOT EXISTS idx_soak_results_verdict ON soak_results(verdict);
 """
 
 
@@ -207,6 +237,7 @@ def init_db(db_path: Path) -> sqlite3.Connection:
             "DROP TABLE IF EXISTS stress_results;"
             "DROP TABLE IF EXISTS sweep_results;"
             "DROP TABLE IF EXISTS scenario_results;"
+            "DROP TABLE IF EXISTS soak_results;"
             "DROP TABLE IF EXISTS runs;"
             "DROP TABLE IF EXISTS schedules;"
             "DROP TABLE IF EXISTS schema_version;"
