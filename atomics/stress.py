@@ -379,3 +379,87 @@ async def run_stress_provider(
 
     result.duration_seconds = time.monotonic() - t0
     return result
+
+
+async def _run_phase_profile(
+    client: httpx.AsyncClient,
+    profile: object,
+    concurrency: int,
+    duration_seconds: float,
+) -> ConcurrencyResult:
+    """Run profile-based requests at a given concurrency for a fixed duration."""
+    from atomics.profiles import TargetProfile, _single_request_profile
+
+    tp: TargetProfile = profile  # type: ignore[assignment]
+    prompts = tp.prompts or list(STRESS_PROMPTS)
+
+    result = ConcurrencyResult(concurrency=concurrency)
+    start = time.monotonic()
+    prompt_idx = 0
+
+    async def _worker() -> None:
+        nonlocal prompt_idx
+        while time.monotonic() - start < duration_seconds:
+            prompt = prompts[prompt_idx % len(prompts)]
+            prompt_idx += 1
+            try:
+                _text, lat_ms, _cls = await _single_request_profile(
+                    client, tp, prompt
+                )
+                result.requests += 1
+                result.latencies.append(lat_ms)
+            except Exception:
+                result.failed += 1
+
+    workers = [asyncio.create_task(_worker()) for _ in range(concurrency)]
+    await asyncio.gather(*workers, return_exceptions=True)
+
+    result.elapsed_seconds = time.monotonic() - start
+    if result.latencies:
+        sorted_lats = sorted(result.latencies)
+        result.avg_latency_ms = sum(sorted_lats) / len(sorted_lats)
+        result.p95_latency_ms = _percentile(sorted_lats, 95)
+        result.aggregate_tps = result.requests / result.elapsed_seconds if result.elapsed_seconds > 0 else 0.0
+    return result
+
+
+async def run_stress_profile(
+    profile: object,
+    max_concurrency: int = 8,
+    phase_seconds: float = 15.0,
+    on_phase=None,
+) -> StressResult:
+    """Stress test against a custom target profile — ramp concurrency."""
+    from atomics.profiles import TargetProfile
+
+    tp: TargetProfile = profile  # type: ignore[assignment]
+    host = tp.ollama_host if tp.type == "ollama" else tp.http_url
+
+    result = StressResult(
+        model=tp.model,
+        host=host,
+        provider=f"profile:{tp.type}",
+    )
+
+    t0 = time.monotonic()
+    timeout = max(float(tp.http_timeout), 120.0) if tp.type == "http" else 300.0
+
+    async with httpx.AsyncClient(timeout=httpx.Timeout(timeout)) as client:
+        conc = 1
+        while conc <= max_concurrency:
+            phase = await _run_phase_profile(client, tp, conc, phase_seconds)
+            result.phases.append(phase)
+            result.total_requests += phase.requests
+            result.total_failed += phase.failed
+
+            if phase.aggregate_tps > result.peak_tps:
+                result.peak_tps = phase.aggregate_tps
+                result.saturation_concurrency = conc
+
+            if on_phase:
+                on_phase(phase)
+
+            conc = min(conc * 2, max_concurrency) if conc * 2 <= max_concurrency else max_concurrency + 1
+
+    result.duration_seconds = time.monotonic() - t0
+    return result

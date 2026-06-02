@@ -921,6 +921,8 @@ def eval(
 )
 @click.option("--model", "-m", type=str, default=None, help="Model to stress (default: ATOMICS_OLLAMA_MODEL)")
 @click.option("--ollama-host", type=str, default=None, help="Ollama endpoint")
+@click.option("--profile", "profile_path", type=click.Path(exists=True), default=None,
+              help="Target profile YAML (replaces --model/--ollama-host).")
 @click.option("--max-concurrency", "-c", type=int, default=8, help="Max parallel requests (ramps 1→2→4→...)")
 @click.option("--phase-seconds", "-s", type=float, default=15.0, help="Seconds at each concurrency level")
 @click.option("--num-predict", type=int, default=2048, help="Max output tokens per request")
@@ -929,6 +931,7 @@ def stress(
     provider_name: str,
     model: str | None,
     ollama_host: str | None,
+    profile_path: str | None,
     max_concurrency: int,
     phase_seconds: float,
     num_predict: int,
@@ -937,22 +940,30 @@ def stress(
     """Stress test — ramp concurrency to find saturation point.
 
     Works with any provider: Ollama (raw GPU metrics), OpenAI, Claude, Bedrock.
+    Use --profile for custom target profiles (app-level AI gates).
 
+    \b
     Examples:
       atomics stress --model qwen2.5:7b --ollama-host http://gpu-host:11434
+      atomics stress --profile profiles/local/gatekeeper.yaml
       atomics stress --provider openai --model gpt-4o-mini
-      atomics stress --provider claude --model claude-haiku-4-5-20251001
     """
     settings = load_settings()
     _setup_logging(settings.log_level)
     console = Console()
 
-    use_provider_mode = provider_name != "ollama"
-
-    if use_provider_mode:
+    if profile_path:
+        from atomics.profiles import load_profile
+        tp = load_profile(profile_path)
+        effective_model = tp.model
+        target_label = f"profile:{tp.name} ({tp.type})"
+        use_provider_mode = False
+    elif provider_name != "ollama":
+        use_provider_mode = True
         effective_model = model or ("gpt-4o" if provider_name == "openai" else settings.default_model)
         target_label = f"{provider_name} / {effective_model}"
     else:
+        use_provider_mode = False
         host = ollama_host or settings.ollama_host
         effective_model = model or settings.ollama_model
         target_label = f"{effective_model} @ {host}"
@@ -987,7 +998,15 @@ def stress(
 
     console.print("[bold]Throughput by concurrency:[/bold]")
 
-    if use_provider_mode:
+    if profile_path:
+        from atomics.stress import run_stress_profile
+        result = asyncio.run(run_stress_profile(
+            profile=tp,
+            max_concurrency=max_concurrency,
+            phase_seconds=phase_seconds,
+            on_phase=_on_phase,
+        ))
+    elif use_provider_mode:
         provider = _make_provider(provider_name, effective_model, ollama_host, settings)
         from atomics.stress import run_stress_provider
         result = asyncio.run(run_stress_provider(
@@ -2046,7 +2065,7 @@ def probe(
 # ── atomics soak ──────────────────────────────────────────────────────────────
 
 @cli.command("soak")
-@click.option("--model", "-m", type=str, required=True, help="Model to soak test.")
+@click.option("--model", "-m", type=str, default=None, help="Model to soak test.")
 @click.option(
     "--provider", "-p", "provider_name",
     type=PROVIDER_CHOICES,
@@ -2055,6 +2074,8 @@ def probe(
 )
 @click.option("--ollama-host", type=str, default=None,
               help="Ollama endpoint (default: ATOMICS_OLLAMA_HOST or http://localhost:11434)")
+@click.option("--profile", "profile_path", type=click.Path(exists=True), default=None,
+              help="Target profile YAML (replaces --model/--ollama-host).")
 @click.option("--duration", "-d", type=str, default="30m", show_default=True,
               help="Test duration: e.g. '30m', '2h', '1h30m', or bare minutes like '90'.")
 @click.option("--concurrency", "-c", type=int, default=4, show_default=True,
@@ -2066,9 +2087,10 @@ def probe(
 @click.option("--save/--no-save", "save_results", default=True, show_default=True,
               help="Persist results to the database.")
 def soak(
-    model: str,
+    model: str | None,
     provider_name: str,
     ollama_host: str | None,
+    profile_path: str | None,
     duration: str,
     concurrency: int,
     sample_interval: int,
@@ -2084,14 +2106,18 @@ def soak(
     Examples:
       atomics soak --model qwen2.5:7b --duration 30m
       atomics soak --model qwen2.5:7b -d 2h -c 8 --ollama-host http://gpu:11434
-      atomics soak --model qwen2.5:7b -d 90 -c 4 -s 60
+      atomics soak --profile profiles/local/gatekeeper.yaml -d 30m
       atomics soak --provider openai --model gpt-4o-mini -d 15m -c 2
     """
-    from atomics.soak import parse_duration, run_soak, run_soak_provider
+    from atomics.soak import parse_duration, run_soak, run_soak_profile, run_soak_provider
 
     settings = load_settings()
     _setup_logging(settings.log_level)
     console = Console()
+
+    if not model and not profile_path:
+        console.print("[red]Specify --model or --profile.[/red]")
+        sys.exit(1)
 
     try:
         duration_seconds = parse_duration(duration)
@@ -2102,18 +2128,27 @@ def soak(
     dur_m = int(duration_seconds // 60)
     dur_label = f"{dur_m}m" if dur_m < 60 else f"{dur_m // 60}h{dur_m % 60:02d}m"
 
-    use_provider_mode = provider_name != "ollama"
-    host = ollama_host or settings.ollama_host
-
-    target_label = f"{provider_name} / {model}" if use_provider_mode else f"{model} @ {host}"
-
-    console.print(
-        f"[bold]Soak test[/bold] — {target_label}\n"
-        f"Duration: [bold]{dur_label}[/bold] | "
-        f"Concurrency: [bold]{concurrency}[/bold] | "
-        f"Sample interval: [bold]{sample_interval}s[/bold] | "
-        f"Max tokens: {num_predict}\n"
-    )
+    if profile_path:
+        from atomics.profiles import load_profile
+        tp = load_profile(profile_path)
+        target_label = f"profile:{tp.name} ({tp.type})"
+        console.print(
+            f"[bold]Soak test[/bold] — {target_label}\n"
+            f"Duration: [bold]{dur_label}[/bold] | "
+            f"Concurrency: [bold]{concurrency}[/bold] | "
+            f"Sample interval: [bold]{sample_interval}s[/bold]\n"
+        )
+    else:
+        use_provider_mode = provider_name != "ollama"
+        host = ollama_host or settings.ollama_host
+        target_label = f"{provider_name} / {model}" if use_provider_mode else f"{model} @ {host}"
+        console.print(
+            f"[bold]Soak test[/bold] — {target_label}\n"
+            f"Duration: [bold]{dur_label}[/bold] | "
+            f"Concurrency: [bold]{concurrency}[/bold] | "
+            f"Sample interval: [bold]{sample_interval}s[/bold] | "
+            f"Max tokens: {num_predict}\n"
+        )
 
     sample_count = 0
 
@@ -2126,19 +2161,27 @@ def soak(
         vram_tag = f"  VRAM {s.vram_used_mb:.0f}MB" if s.vram_used_mb else ""
         console.print(
             f"  [{elapsed_m:02d}:{elapsed_s:02d}] "
-            f"[cyan]{s.aggregate_tps:6.1f}[/cyan] tok/s  "
+            f"[cyan]{s.aggregate_tps:6.1f}[/cyan] req/s  "
             f"P95 {s.p95_latency_ms / 1000:.1f}s  "
-            f"({s.requests} reqs, {s.total_output_tokens:,} tokens)"
+            f"({s.requests} reqs)"
             f"{vram_tag}{fail_tag}"
         )
 
     console.print("[bold]Live samples:[/bold]")
 
-    if use_provider_mode:
+    if profile_path:
+        result = asyncio.run(run_soak_profile(
+            profile=tp,
+            concurrency=concurrency,
+            duration_seconds=duration_seconds,
+            sample_interval=sample_interval,
+            on_sample=_on_sample,
+        ))
+    elif provider_name != "ollama":
         provider = _make_provider(provider_name, model, ollama_host, settings)
         result = asyncio.run(run_soak_provider(
             provider=provider,
-            model=model,
+            model=model or "",
             concurrency=concurrency,
             duration_seconds=duration_seconds,
             sample_interval=sample_interval,
@@ -2146,9 +2189,10 @@ def soak(
             on_sample=_on_sample,
         ))
     else:
+        host = ollama_host or settings.ollama_host
         result = asyncio.run(run_soak(
             host=host,
-            model=model,
+            model=model or settings.ollama_model,
             concurrency=concurrency,
             duration_seconds=duration_seconds,
             sample_interval=sample_interval,

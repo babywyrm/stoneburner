@@ -28,6 +28,7 @@ async def _run_workload(
     host: str,
     spec: WorkloadSpec,
     duration_seconds: float,
+    loaded_profile: object | None = None,
 ) -> WorkloadResult:
     """Run a single workload at its specified concurrency for a fixed duration."""
     result = WorkloadResult(spec=spec)
@@ -41,13 +42,21 @@ async def _run_workload(
             prompt = prompts[prompt_idx % len(prompts)]
             prompt_idx += 1
             try:
-                out, inp, lat, tps = await _single_request(
-                    client, host, spec.model, prompt, spec.num_predict,
-                )
-                result.requests += 1
-                result.total_output_tokens += out
-                result.latencies.append(lat)
-                result.per_request_tps.append(tps)
+                if loaded_profile is not None:
+                    from atomics.profiles import _single_request_profile
+                    _text, lat, _cls = await _single_request_profile(
+                        client, loaded_profile, prompt,
+                    )
+                    result.requests += 1
+                    result.latencies.append(lat)
+                else:
+                    out, inp, lat, tps = await _single_request(
+                        client, host, spec.model, prompt, spec.num_predict,
+                    )
+                    result.requests += 1
+                    result.total_output_tokens += out
+                    result.latencies.append(lat)
+                    result.per_request_tps.append(tps)
             except Exception:
                 result.failed += 1
 
@@ -60,9 +69,10 @@ async def _run_baseline(
     client: httpx.AsyncClient,
     host: str,
     spec: WorkloadSpec,
+    loaded_profile: object | None = None,
 ) -> float:
     """Run a workload solo for a short period, return its P50 latency."""
-    result = await _run_workload(client, host, spec, BASELINE_DURATION_SECONDS)
+    result = await _run_workload(client, host, spec, BASELINE_DURATION_SECONDS, loaded_profile)
     return result.p50_ms
 
 
@@ -81,7 +91,16 @@ async def run_scenario(
     3. Run all workloads concurrently
     4. Compute interference factors
     """
+    loaded_profiles: dict[str, object] = {}
     for spec in specs:
+        if spec.profile:
+            from atomics.profiles import load_profile
+            tp = load_profile(spec.profile)
+            loaded_profiles[spec.name] = tp
+            if not spec.prompts and tp.prompts:
+                spec.prompts = tp.prompts
+            if not spec.model and tp.model:
+                spec.model = tp.model
         if not spec.prompts:
             spec.prompts = resolve_prompts(spec.type, spec.prompts_file)
 
@@ -90,13 +109,14 @@ async def run_scenario(
     async with httpx.AsyncClient() as client:
         if not skip_baseline:
             for spec in specs:
-                baseline_p50 = await _run_baseline(client, host, spec)
+                lp = loaded_profiles.get(spec.name)
+                baseline_p50 = await _run_baseline(client, host, spec, lp)
                 scenario.baselines[spec.name] = baseline_p50
                 if on_baseline_done:
                     on_baseline_done(spec.name, baseline_p50)
 
         tasks = [
-            _run_workload(client, host, spec, duration_seconds)
+            _run_workload(client, host, spec, duration_seconds, loaded_profiles.get(spec.name))
             for spec in specs
         ]
         results = await asyncio.gather(*tasks)

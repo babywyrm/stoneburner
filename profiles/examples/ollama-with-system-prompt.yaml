@@ -1,0 +1,32 @@
+# Example: Soak-test an Ollama model with a custom system prompt.
+#
+# Simulates what an application sends to the inference backend — system prompt,
+# temperature, and constrained output length — so you can measure how the model
+# behaves under sustained load with your exact app configuration.
+#
+# Usage:
+#   atomics soak  --profile profiles/examples/ollama-with-system-prompt.yaml -d 10m
+#   atomics stress --profile profiles/examples/ollama-with-system-prompt.yaml
+
+name: example-ollama-gate
+type: ollama
+
+ollama:
+  host: "http://localhost:11434"
+  model: qwen2.5:3b
+  system_prompt: |
+    You are a security policy evaluator. Given a pod specification,
+    respond with exactly APPROVE or DENY followed by a one-sentence
+    justification. No other output.
+  temperature: 0.0
+  num_predict: 32
+
+prompts:
+  - "Evaluate pod: name=nginx, image=nginx:1.25, namespace=default"
+  - "Evaluate pod: name=debug, image=busybox:latest, namespace=kube-system, hostNetwork=true"
+  - "Evaluate pod: name=app, image=myregistry.io/app:v2.1, namespace=prod"
+  - "Evaluate pod: name=miner, image=xmrig/xmrig:latest, namespace=default"
+
+classify:
+  approved: ["APPROVE", "ALLOW"]
+  blocked: ["DENY", "BLOCK", "REJECT"]

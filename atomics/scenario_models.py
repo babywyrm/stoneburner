@@ -24,6 +24,7 @@ class WorkloadSpec:
     num_predict: int = 0
     prompts_file: str | None = None
     prompts: list[str] = field(default_factory=list)
+    profile: str | None = None
 
     def __post_init__(self) -> None:
         if self.type not in WORKLOAD_TYPES:
@@ -168,9 +169,10 @@ def load_scenario_yaml(path: str) -> list[WorkloadSpec]:
         sla_ms = entry.get("sla_ms")
         num_predict = entry.get("num_predict", 0)
         prompts_file = entry.get("prompts_file")
+        profile = entry.get("profile")
 
-        if not model:
-            raise ValueError(f"Workload '{name}' missing required 'model' field")
+        if not model and not profile:
+            raise ValueError(f"Workload '{name}' missing required 'model' or 'profile' field")
 
         specs.append(WorkloadSpec(
             name=name,
@@ -180,6 +182,7 @@ def load_scenario_yaml(path: str) -> list[WorkloadSpec]:
             sla_ms=sla_ms,
             num_predict=num_predict,
             prompts_file=prompts_file,
+            profile=profile,
         ))
 
     return specs
