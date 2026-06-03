@@ -8,7 +8,7 @@ from pathlib import Path
 
 logger = logging.getLogger("atomics.schema")
 
-SCHEMA_VERSION = 10
+SCHEMA_VERSION = 11
 
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -200,6 +200,26 @@ CREATE INDEX IF NOT EXISTS idx_sweep_results_model ON sweep_results(model);
 CREATE INDEX IF NOT EXISTS idx_scenario_results_timestamp ON scenario_results(timestamp);
 CREATE INDEX IF NOT EXISTS idx_soak_results_model ON soak_results(model);
 CREATE INDEX IF NOT EXISTS idx_soak_results_verdict ON soak_results(verdict);
+
+CREATE TABLE IF NOT EXISTS baselines (
+    baseline_id     TEXT PRIMARY KEY,
+    name            TEXT NOT NULL,
+    suite           TEXT NOT NULL DEFAULT 'soak',
+    model           TEXT NOT NULL DEFAULT '',
+    host            TEXT NOT NULL DEFAULT '',
+    avg_tps         REAL DEFAULT 0.0,
+    peak_tps        REAL DEFAULT 0.0,
+    avg_p95_ms      REAL DEFAULT 0.0,
+    error_rate      REAL DEFAULT 0.0,
+    verdict         TEXT DEFAULT 'STABLE',
+    concurrency     INTEGER DEFAULT 0,
+    notes           TEXT DEFAULT '',
+    timestamp       TEXT NOT NULL,
+    UNIQUE(name, suite)
+);
+
+CREATE INDEX IF NOT EXISTS idx_baselines_name ON baselines(name);
+CREATE INDEX IF NOT EXISTS idx_baselines_suite ON baselines(suite);
 """
 
 
@@ -238,6 +258,7 @@ def init_db(db_path: Path) -> sqlite3.Connection:
             "DROP TABLE IF EXISTS sweep_results;"
             "DROP TABLE IF EXISTS scenario_results;"
             "DROP TABLE IF EXISTS soak_results;"
+            "DROP TABLE IF EXISTS baselines;"
             "DROP TABLE IF EXISTS runs;"
             "DROP TABLE IF EXISTS schedules;"
             "DROP TABLE IF EXISTS schema_version;"

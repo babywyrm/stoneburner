@@ -2090,6 +2090,10 @@ def probe(
               help="Show every HTTP request (httpx debug output).")
 @click.option("--think-time", type=float, default=0.0, show_default=True,
               help="Seconds to wait between requests per worker (simulates user think time).")
+@click.option("--save-baseline", "save_baseline_name", type=str, default=None,
+              help="Save this run as a named baseline for future regression checks.")
+@click.option("--compare-baseline", "compare_baseline_name", type=str, default=None,
+              help="Compare this run against a previously saved baseline.")
 def soak(
     model: str | None,
     provider_name: str,
@@ -2102,6 +2106,8 @@ def soak(
     save_results: bool,
     verbose: bool,
     think_time: float,
+    save_baseline_name: str | None,
+    compare_baseline_name: str | None,
 ) -> None:
     """Soak test — hold fixed concurrency and track degradation over time.
 
@@ -2275,6 +2281,122 @@ def soak(
         repo.save_soak_result(result)
         repo.close()
         console.print(f"\n[dim]Results saved to database.[/dim]")
+
+    if save_baseline_name or compare_baseline_name:
+        from atomics.storage.schema import init_db
+        from atomics.regression import save_baseline, load_baseline, compute_regression
+        conn = init_db(settings.db_path)
+
+    if save_baseline_name:
+        from atomics.regression import save_baseline
+        from atomics.storage.schema import init_db
+        conn = init_db(settings.db_path)
+        save_baseline(
+            conn, name=save_baseline_name, suite="soak",
+            model=result.model, host=result.host,
+            avg_tps=result.avg_tps, peak_tps=result.peak_tps,
+            avg_p95_ms=result.avg_p95_ms, error_rate=result.error_rate,
+            verdict=result.verdict, concurrency=result.concurrency,
+        )
+        conn.close()
+        console.print(f"\n[green]Baseline '[bold]{save_baseline_name}[/bold]' saved.[/green]")
+
+    if compare_baseline_name:
+        from atomics.regression import load_baseline, compute_regression
+        from atomics.storage.schema import init_db
+        conn = init_db(settings.db_path)
+        bl = load_baseline(conn, compare_baseline_name, "soak")
+        conn.close()
+        if bl is None:
+            console.print(f"\n[red]Baseline '[bold]{compare_baseline_name}[/bold]' not found. "
+                          f"Run with --save-baseline first.[/red]")
+        else:
+            report = compute_regression(
+                bl,
+                current_avg_tps=result.avg_tps,
+                current_peak_tps=result.peak_tps,
+                current_avg_p95_ms=result.avg_p95_ms,
+                current_error_rate=result.error_rate,
+                current_verdict=result.verdict,
+            )
+            status_style = {
+                "IMPROVED": "[bold green]IMPROVED[/bold green]",
+                "STABLE": "[bold cyan]STABLE[/bold cyan]",
+                "REGRESSED": "[bold red]REGRESSED[/bold red]",
+            }
+            rtable = Table(
+                title=f"Regression vs baseline '{compare_baseline_name}'",
+                show_lines=True, title_style="bold",
+            )
+            rtable.add_column("Metric", style="dim")
+            rtable.add_column("Baseline", justify="right")
+            rtable.add_column("Current", justify="right")
+            rtable.add_column("Delta", justify="right")
+
+            def _delta_style(v: float, invert: bool = False) -> str:
+                bad = v > 0 if invert else v < 0
+                tag = "red" if bad else ("green" if abs(v) >= 1.0 else "dim")
+                sign = "+" if v >= 0 else ""
+                return f"[{tag}]{sign}{v:.1f}%[/{tag}]"
+
+            rtable.add_row("Avg tok/s",
+                f"{bl.avg_tps:.1f}", f"{result.avg_tps:.1f}",
+                _delta_style(report.avg_tps_delta_pct))
+            rtable.add_row("Peak tok/s",
+                f"{bl.peak_tps:.1f}", f"{result.peak_tps:.1f}",
+                _delta_style(report.peak_tps_delta_pct))
+            rtable.add_row("Avg P95 latency",
+                f"{bl.avg_p95_ms/1000:.1f}s", f"{result.avg_p95_ms/1000:.1f}s",
+                _delta_style(report.p95_delta_pct, invert=True))
+            rtable.add_row("Error rate",
+                f"{bl.error_rate*100:.2f}%", f"{result.error_rate*100:.2f}%",
+                f"[{'red' if report.error_rate_delta > 0 else 'green'}]"
+                f"{report.error_rate_delta:+.4f}[/{'red' if report.error_rate_delta > 0 else 'green'}]")
+            rtable.add_row("Verdict", bl.verdict, result.verdict,
+                "[yellow]changed[/yellow]" if report.verdict_changed else "[dim]same[/dim]")
+
+            console.print()
+            console.print(rtable)
+            console.print(
+                f"\nRegression status: {status_style.get(report.status, report.status)}"
+            )
+
+
+# ── atomics baselines ─────────────────────────────────────────────────────────
+
+@cli.command("baselines")
+def baselines_cmd() -> None:
+    """List all saved baselines."""
+    from atomics.regression import list_baselines
+    from atomics.storage.schema import init_db
+    settings = load_settings()
+    console = Console()
+    conn = init_db(settings.db_path)
+    records = list_baselines(conn)
+    conn.close()
+
+    if not records:
+        console.print("[dim]No baselines saved yet. Use --save-baseline on a soak run.[/dim]")
+        return
+
+    table = Table(title="Saved Baselines", show_lines=True)
+    table.add_column("Name", style="bold")
+    table.add_column("Suite")
+    table.add_column("Model")
+    table.add_column("Avg tok/s", justify="right")
+    table.add_column("P95 lat", justify="right")
+    table.add_column("Verdict")
+    table.add_column("Saved", style="dim")
+
+    for r in records:
+        table.add_row(
+            r.name, r.suite, r.model,
+            f"{r.avg_tps:.1f}",
+            f"{r.avg_p95_ms/1000:.1f}s",
+            r.verdict,
+            r.timestamp[:10],
+        )
+    console.print(table)
 
 
 # ── atomics scenario ──────────────────────────────────────────────────────────
