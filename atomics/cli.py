@@ -955,6 +955,9 @@ def stress(
     """
     settings = load_settings()
     _setup_logging(settings.log_level)
+    import logging as _logging
+    _logging.getLogger("httpx").setLevel(_logging.WARNING)
+    _logging.getLogger("httpcore").setLevel(_logging.WARNING)
     console = Console()
 
     if models_csv:
@@ -2183,8 +2186,19 @@ def soak(
         console.print(f"[red]{exc}[/red]")
         sys.exit(1)
 
-    dur_m = int(duration_seconds // 60)
-    dur_label = f"{dur_m}m" if dur_m < 60 else f"{dur_m // 60}h{dur_m % 60:02d}m"
+    def _dur_label(secs: float) -> str:
+        secs = int(secs)
+        if secs < 60:
+            return f"{secs}s"
+        m = secs // 60
+        if m < 60:
+            extra_s = secs % 60
+            return f"{m}m" if extra_s == 0 else f"{m}m{extra_s}s"
+        h = m // 60
+        rem_m = m % 60
+        return f"{h}h{rem_m:02d}m"
+
+    dur_label = _dur_label(duration_seconds)
 
     if profile_path:
         from atomics.profiles import load_profile
@@ -2289,7 +2303,7 @@ def soak(
     summary.add_row("Model", result.model)
     if result.provider and result.provider != "ollama":
         summary.add_row("Provider", result.provider)
-    summary.add_row("Duration", f"{result.actual_duration_seconds:.0f}s ({dur_label})")
+    summary.add_row("Duration", f"{_dur_label(result.actual_duration_seconds)} (target: {dur_label})")
     summary.add_row("Concurrency", str(result.concurrency))
     summary.add_row("Samples", str(len(result.samples)))
     summary.add_row("Total requests", f"{result.total_requests} ({result.total_failed} failed)")
@@ -2439,8 +2453,11 @@ def qa(
       atomics qa --file qa/suite.yaml --fail-fast
     """
     import asyncio as _asyncio
-    from rich.table import Table as _Table
+    import logging as _logging
     from atomics.qa_runner import load_qa_suite, run_qa_suite, QAResult
+
+    _logging.getLogger("httpx").setLevel(_logging.WARNING)
+    _logging.getLogger("httpcore").setLevel(_logging.WARNING)
 
     console = Console()
 
