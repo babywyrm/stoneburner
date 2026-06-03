@@ -920,6 +920,8 @@ def eval(
     help="Provider to stress test (default: ollama for raw GPU stress)",
 )
 @click.option("--model", "-m", type=str, default=None, help="Model to stress (default: ATOMICS_OLLAMA_MODEL)")
+@click.option("--models", "models_csv", type=str, default=None,
+              help="Comma-separated list of models for contention testing (e.g. qwen2.5:3b,qwen2.5:7b).")
 @click.option("--ollama-host", type=str, default=None, help="Ollama endpoint")
 @click.option("--profile", "profile_path", type=click.Path(exists=True), default=None,
               help="Target profile YAML (replaces --model/--ollama-host).")
@@ -930,6 +932,7 @@ def eval(
 def stress(
     provider_name: str,
     model: str | None,
+    models_csv: str | None,
     ollama_host: str | None,
     profile_path: str | None,
     max_concurrency: int,
@@ -941,16 +944,58 @@ def stress(
 
     Works with any provider: Ollama (raw GPU metrics), OpenAI, Claude, Bedrock.
     Use --profile for custom target profiles (app-level AI gates).
+    Use --models for multi-model VRAM contention testing.
 
     \b
     Examples:
       atomics stress --model qwen2.5:7b --ollama-host http://gpu-host:11434
+      atomics stress --models qwen2.5:3b,qwen2.5:7b --ollama-host http://gpu:11434
       atomics stress --profile profiles/local/gatekeeper.yaml
       atomics stress --provider openai --model gpt-4o-mini
     """
     settings = load_settings()
     _setup_logging(settings.log_level)
     console = Console()
+
+    if models_csv:
+        from atomics.contention import run_contention
+        host = ollama_host or settings.ollama_host
+        model_list = [m.strip() for m in models_csv.split(",") if m.strip()]
+        console.print(
+            f"[bold]Contention test[/bold] — {len(model_list)} models on {host}\n"
+            f"Models: {', '.join(model_list)}\n"
+            f"Phase: {phase_seconds}s solo + {phase_seconds}s mixed\n"
+        )
+        result = asyncio.run(run_contention(
+            host=host,
+            models=model_list,
+            concurrency=1,
+            phase_seconds=phase_seconds,
+            num_predict=min(num_predict, 512),
+        ))
+        ctable = Table(title="Contention Results", show_lines=True)
+        ctable.add_column("Model", style="cyan")
+        ctable.add_column("Solo tok/s", justify="right")
+        ctable.add_column("Mixed tok/s", justify="right")
+        ctable.add_column("Factor", justify="right")
+        ctable.add_column("Mixed P95", justify="right")
+        ctable.add_column("Errors", justify="right")
+        for mr in result.contention_results:
+            solo = result.solo_tps.get(mr.model, 0.0)
+            factor = result.contention_factor(mr.model)
+            factor_str = f"{factor:.2f}x" if factor is not None else "n/a"
+            factor_color = "green" if (factor or 1.0) >= 0.9 else ("yellow" if (factor or 1.0) >= 0.7 else "red")
+            ctable.add_row(
+                mr.model,
+                f"{solo:.1f}",
+                f"{mr.avg_tps:.1f}",
+                f"[{factor_color}]{factor_str}[/{factor_color}]",
+                f"{mr.p95_ms/1000:.1f}s",
+                str(mr.failed),
+            )
+        console.print(ctable)
+        console.print(f"\n[dim]Total duration: {result.duration_seconds:.1f}s[/dim]")
+        return
 
     if profile_path:
         from atomics.profiles import load_profile
