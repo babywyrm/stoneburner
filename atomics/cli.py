@@ -2407,6 +2407,106 @@ def soak(
             )
 
 
+# ── atomics qa ────────────────────────────────────────────────────────────────
+
+@cli.command("qa")
+@click.option("--file", "-f", "qa_file", type=click.Path(exists=True), required=True,
+              help="QA fixture YAML file.")
+@click.option("--model", "-m", type=str, default=None,
+              help="Override model from fixture file.")
+@click.option("--ollama-host", type=str, default=None,
+              help="Override Ollama host from fixture file.")
+@click.option("--num-predict", type=int, default=1024, show_default=True,
+              help="Max output tokens per fixture prompt.")
+@click.option("--fail-fast", is_flag=True, default=False,
+              help="Stop after the first FAIL or ERROR.")
+def qa(
+    qa_file: str,
+    model: str | None,
+    ollama_host: str | None,
+    num_predict: int,
+    fail_fast: bool,
+) -> None:
+    """QA validation — fire fixture prompts and check pass/fail patterns.
+
+    Useful for verifying CTF box solvability or AI gate regression after
+    model or config changes.
+
+    \b
+    Examples:
+      atomics qa --file qa/app-gate.yaml
+      atomics qa --file qa/policy-service.yaml --model qwen2.5:7b
+      atomics qa --file qa/suite.yaml --fail-fast
+    """
+    import asyncio as _asyncio
+    from rich.table import Table as _Table
+    from atomics.qa_runner import load_qa_suite, run_qa_suite, QAResult
+
+    console = Console()
+
+    file_model, file_host, fixtures = load_qa_suite(qa_file)
+    effective_model = model or file_model
+    effective_host = ollama_host or file_host
+
+    if not effective_model:
+        console.print("[red]No model specified. Set 'model' in the YAML or use --model.[/red]")
+        raise SystemExit(1)
+
+    console.print(
+        f"[bold]QA Suite[/bold] — {len(fixtures)} fixture(s)\n"
+        f"Model: [cyan]{effective_model}[/cyan]  Host: {effective_host}\n"
+    )
+
+    stopped_early = False
+    results: list[QAResult] = []
+
+    def _on_result(r: QAResult) -> None:
+        icon = {"PASS": "[green]✓[/green]", "FAIL": "[red]✗[/red]", "ERROR": "[yellow]![/yellow]"}.get(r.status, "?")
+        console.print(f"  {icon} [{r.status}] {r.fixture.id}  ({r.latency_ms/1000:.1f}s)")
+        results.append(r)
+        if fail_fast and r.status in ("FAIL", "ERROR"):
+            raise KeyboardInterrupt("fail-fast triggered")
+
+    try:
+        suite = _asyncio.run(run_qa_suite(
+            model=effective_model,
+            host=effective_host,
+            fixtures=fixtures,
+            num_predict=num_predict,
+            on_result=_on_result,
+        ))
+    except KeyboardInterrupt:
+        stopped_early = True
+        from atomics.qa_runner import QASuiteResult
+        suite = QASuiteResult(model=effective_model, host=effective_host, results=results)
+
+    console.print()
+    rtable = Table(title="QA Results", show_lines=True)
+    rtable.add_column("ID", style="cyan")
+    rtable.add_column("Status", justify="center")
+    rtable.add_column("Matched pass patterns")
+    rtable.add_column("Matched fail patterns")
+    rtable.add_column("Latency", justify="right")
+
+    status_style_map = {"PASS": "[green]PASS[/green]", "FAIL": "[red]FAIL[/red]", "ERROR": "[yellow]ERROR[/yellow]"}
+    for r in suite.results:
+        rtable.add_row(
+            r.fixture.id,
+            status_style_map.get(r.status, r.status),
+            ", ".join(r.matched_pass) or "-",
+            ", ".join(r.matched_fail) or "-",
+            f"{r.latency_ms/1000:.1f}s" if r.latency_ms else "-",
+        )
+
+    console.print(rtable)
+
+    pass_color = "green" if suite.pass_rate == 1.0 else ("yellow" if suite.pass_rate >= 0.5 else "red")
+    console.print(
+        f"\n[bold]Pass rate:[/bold] [{pass_color}]{suite.passed}/{suite.total}[/{pass_color}]"
+        + (" [dim](stopped early)[/dim]" if stopped_early else "")
+    )
+
+
 # ── atomics baselines ─────────────────────────────────────────────────────────
 
 @cli.command("baselines")
