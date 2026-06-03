@@ -400,3 +400,85 @@ class TestDBPersistence:
         assert row["max_interference"] == pytest.approx(1.25, abs=0.01)
 
         repo.close()
+
+
+# ── Ramp support ──────────────────────────────────────────────────────────────
+
+
+class TestRamp:
+    def test_ramp_seconds_on_scenario_result(self):
+        sr = ScenarioResult(ramp_seconds=10.0)
+        assert sr.ramp_seconds == 10.0
+
+    def test_run_scenario_accepts_ramp_seconds(self):
+        import inspect
+        from atomics.scenario import run_scenario
+        sig = inspect.signature(run_scenario)
+        assert "ramp_seconds" in sig.parameters
+        assert sig.parameters["ramp_seconds"].default == 0.0
+
+    def test_run_workload_accepts_ramp_seconds(self):
+        import inspect
+        from atomics.scenario import _run_workload
+        sig = inspect.signature(_run_workload)
+        assert "ramp_seconds" in sig.parameters
+
+    def test_ramp_stored_on_result(self):
+        """run_scenario propagates ramp_seconds to ScenarioResult."""
+        from atomics.scenario import run_scenario
+        import asyncio
+
+        async def _fake_request(client, host, model, prompt, num_predict):
+            await asyncio.sleep(0.001)
+            return (10, 5, 200.0, 50.0)
+
+        spec = WorkloadSpec(
+            name="gate", type="gate", model="test", concurrency=2,
+            prompts=["hello"],
+        )
+
+        with patch("atomics.scenario._single_request", side_effect=_fake_request):
+            result = asyncio.run(run_scenario(
+                host="http://fake:11434",
+                specs=[spec],
+                duration_seconds=0.05,
+                ramp_seconds=5.0,
+                skip_baseline=True,
+            ))
+
+        assert result.ramp_seconds == 5.0
+
+    def test_scenario_cli_ramp_flag(self):
+        from click.testing import CliRunner
+        from atomics.cli import cli
+        runner = CliRunner()
+        result = runner.invoke(cli, ["scenario", "--help"])
+        assert "--ramp" in result.output
+
+    def test_ramp_zero_no_delay(self):
+        """With ramp=0, all workers start immediately (delays all 0)."""
+        from atomics.scenario import _run_workload
+        import asyncio
+        import httpx
+
+        start_times: list[float] = []
+
+        async def _timed_request(client, host, model, prompt, num_predict):
+            start_times.append(asyncio.get_event_loop().time())
+            await asyncio.sleep(0.001)
+            return (10, 5, 1.0, 100.0)
+
+        spec = WorkloadSpec(
+            name="g", type="gate", model="test", concurrency=3,
+            prompts=["p"],
+        )
+
+        async def _run():
+            async with httpx.AsyncClient() as client:
+                with patch("atomics.scenario._single_request", side_effect=_timed_request):
+                    await _run_workload(client, "http://fake", spec, 0.05, ramp_seconds=0.0)
+
+        asyncio.run(_run())
+        if len(start_times) >= 2:
+            spread = max(start_times) - min(start_times)
+            assert spread < 0.1  # all started near-simultaneously

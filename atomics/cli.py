@@ -2411,6 +2411,8 @@ def baselines_cmd() -> None:
               help="Ollama endpoint (default: ATOMICS_OLLAMA_HOST or http://localhost:11434)")
 @click.option("--duration", "-d", type=float, default=60.0, show_default=True,
               help="Test duration in seconds for the mixed phase.")
+@click.option("--ramp", "ramp_seconds", type=float, default=0.0, show_default=True,
+              help="Seconds over which to gradually start workers (ramp-up period).")
 @click.option("--skip-baseline", is_flag=True, default=False,
               help="Skip solo baseline phase (faster, but no interference score).")
 @click.option("--save/--no-save", "save_results", default=True, show_default=True,
@@ -2420,6 +2422,7 @@ def scenario(
     workload_flags: tuple[str, ...],
     ollama_host: str | None,
     duration: float,
+    ramp_seconds: float,
     skip_baseline: bool,
     save_results: bool,
 ) -> None:
@@ -2479,6 +2482,7 @@ def scenario(
         host=host,
         specs=specs,
         duration_seconds=duration,
+        ramp_seconds=ramp_seconds,
         skip_baseline=skip_baseline,
         on_baseline_done=on_baseline,
         on_workload_done=on_workload,
