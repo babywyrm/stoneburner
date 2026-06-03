@@ -29,15 +29,22 @@ async def _run_workload(
     spec: WorkloadSpec,
     duration_seconds: float,
     loaded_profile: object | None = None,
+    ramp_seconds: float = 0.0,
 ) -> WorkloadResult:
-    """Run a single workload at its specified concurrency for a fixed duration."""
+    """Run a single workload at its specified concurrency for a fixed duration.
+
+    When ``ramp_seconds`` > 0, workers are staggered across the ramp window
+    so load builds gradually rather than all starting simultaneously.
+    """
     result = WorkloadResult(spec=spec)
     prompts = spec.prompts
     start = time.monotonic()
     prompt_idx = 0
 
-    async def _worker() -> None:
+    async def _worker(delay: float) -> None:
         nonlocal prompt_idx
+        if delay > 0:
+            await asyncio.sleep(delay)
         while time.monotonic() - start < duration_seconds:
             prompt = prompts[prompt_idx % len(prompts)]
             prompt_idx += 1
@@ -60,7 +67,14 @@ async def _run_workload(
             except Exception:
                 result.failed += 1
 
-    workers = [asyncio.create_task(_worker()) for _ in range(spec.concurrency)]
+    concurrency = spec.concurrency
+    if ramp_seconds > 0 and concurrency > 1:
+        step = ramp_seconds / concurrency
+        delays = [i * step for i in range(concurrency)]
+    else:
+        delays = [0.0] * concurrency
+
+    workers = [asyncio.create_task(_worker(delays[i])) for i in range(concurrency)]
     await asyncio.gather(*workers)
     return result
 
@@ -80,6 +94,7 @@ async def run_scenario(
     host: str,
     specs: list[WorkloadSpec],
     duration_seconds: float = 60.0,
+    ramp_seconds: float = 0.0,
     skip_baseline: bool = False,
     on_baseline_done: Callable[[str, float], None] | None = None,
     on_workload_done: Callable[[WorkloadResult], None] | None = None,
@@ -116,7 +131,8 @@ async def run_scenario(
                     on_baseline_done(spec.name, baseline_p50)
 
         tasks = [
-            _run_workload(client, host, spec, duration_seconds, loaded_profiles.get(spec.name))
+            _run_workload(client, host, spec, duration_seconds,
+                          loaded_profiles.get(spec.name), ramp_seconds)
             for spec in specs
         ]
         results = await asyncio.gather(*tasks)
@@ -138,4 +154,5 @@ async def run_scenario(
             on_workload_done(wr)
 
     scenario.duration_seconds = duration_seconds
+    scenario.ramp_seconds = ramp_seconds
     return scenario

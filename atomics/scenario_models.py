@@ -74,6 +74,7 @@ class WorkloadResult:
 @dataclass
 class ScenarioResult:
     duration_seconds: float = 0.0
+    ramp_seconds: float = 0.0
     workloads: list[WorkloadResult] = field(default_factory=list)
     baselines: dict[str, float] = field(default_factory=dict)
     interference: dict[str, float] = field(default_factory=dict)
