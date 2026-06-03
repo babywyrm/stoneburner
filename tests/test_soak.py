@@ -39,8 +39,20 @@ class TestParseDuration:
     def test_single_minute(self):
         assert parse_duration("1m") == 60
 
+    def test_seconds_only(self):
+        assert parse_duration("30s") == 30
+
+    def test_minutes_and_seconds(self):
+        assert parse_duration("2m30s") == 150
+
+    def test_hours_minutes_seconds(self):
+        assert parse_duration("1h30m20s") == 5420
+
     def test_case_insensitive(self):
         assert parse_duration("2H30M") == 9000
+
+    def test_case_insensitive_seconds(self):
+        assert parse_duration("45S") == 45
 
     def test_whitespace_stripped(self):
         assert parse_duration("  30m  ") == 1800

@@ -12,25 +12,29 @@ from typing import Callable
 def parse_duration(s: str) -> float:
     """Parse a human-friendly duration string into seconds.
 
-    Accepts: '30m', '2h', '1h30m', '90' (bare number = minutes).
+    Accepts: '30s', '30m', '2h', '1h30m', '1h30m20s', '90' (bare number = minutes).
     """
     s = s.strip().lower()
     if not s:
         raise ValueError("Empty duration string")
 
+    # Bare integer → minutes
     m = re.fullmatch(r"(\d+)", s)
     if m:
         return int(m.group(1)) * 60
 
-    pattern = re.fullmatch(r"(?:(\d+)h)?(?:(\d+)m)?", s)
-    if not pattern or (pattern.group(1) is None and pattern.group(2) is None):
-        raise ValueError(f"Invalid duration: {s!r}. Use e.g. '30m', '2h', '1h30m'.")
+    # Full pattern: optional h, optional m, optional s
+    pattern = re.fullmatch(r"(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?", s)
+    if not pattern or all(pattern.group(i) is None for i in (1, 2, 3)):
+        raise ValueError(f"Invalid duration: {s!r}. Use e.g. '30s', '30m', '2h', '1h30m'.")
 
     hours = int(pattern.group(1) or 0)
     minutes = int(pattern.group(2) or 0)
-    if hours == 0 and minutes == 0:
+    seconds = int(pattern.group(3) or 0)
+    total = hours * 3600 + minutes * 60 + seconds
+    if total == 0:
         raise ValueError(f"Duration must be > 0: {s!r}")
-    return hours * 3600 + minutes * 60
+    return float(total)
 
 
 def _linear_slope(xs: list[float], ys: list[float]) -> float:
