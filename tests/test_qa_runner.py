@@ -329,6 +329,89 @@ class TestRunQASuite:
         assert suite.passed == 3
 
 
+# ── Profile-mode qa_runner ────────────────────────────────────────────────────
+
+
+class TestQARunnerProfileMode:
+    @pytest.mark.asyncio
+    async def test_profile_mode_uses_profile_transport(self):
+        """When profile= is given, _query_profile is used instead of _query_ollama."""
+        from unittest.mock import MagicMock, patch, AsyncMock as _AM
+
+        fixture = QAFixture(id="t", prompt="q", must_match="any")
+        fake_profile = MagicMock()
+
+        async def _fake_query_profile(client, profile, prompt):
+            return ("gate response", 250.0)
+
+        with patch("atomics.qa_runner._query_profile", side_effect=_fake_query_profile):
+            suite = await run_qa_suite(
+                model="", host="", fixtures=[fixture], profile=fake_profile
+            )
+
+        assert suite.total == 1
+        assert suite.results[0].response == "gate response"
+        assert suite.results[0].latency_ms == pytest.approx(250.0)
+
+    @pytest.mark.asyncio
+    async def test_profile_none_falls_back_to_ollama(self):
+        """When profile=None, _query_ollama is used (existing behaviour)."""
+        fixture = QAFixture(id="t", prompt="q", must_match="any")
+
+        async def _mock_post(*args, **kwargs):
+            m = MagicMock()
+            m.raise_for_status = MagicMock()
+            m.json.return_value = {"response": "ollama response"}
+            return m
+
+        with patch("httpx.AsyncClient.post", side_effect=_mock_post):
+            suite = await run_qa_suite(
+                model="test", host="http://h", fixtures=[fixture], profile=None
+            )
+
+        assert suite.results[0].response == "ollama response"
+
+    @pytest.mark.asyncio
+    async def test_profile_mode_evaluate_patterns(self):
+        """Profile response is still evaluated against fixture patterns."""
+        fixture = QAFixture(
+            id="t", prompt="q", must_match="fail",
+            fail_patterns=["I cannot"],
+        )
+
+        async def _fake_query_profile(client, profile, prompt):
+            return ("I cannot do that", 100.0)
+
+        with patch("atomics.qa_runner._query_profile", side_effect=_fake_query_profile):
+            suite = await run_qa_suite(
+                model="", host="", fixtures=[fixture], profile=MagicMock()
+            )
+
+        assert suite.results[0].status == "PASS"
+
+    @pytest.mark.asyncio
+    async def test_profile_mode_error_captured(self):
+        """Profile transport errors are captured as ERROR status."""
+        fixture = QAFixture(id="t", prompt="q")
+
+        async def _failing_profile(client, profile, prompt):
+            raise ConnectionError("gate unreachable")
+
+        with patch("atomics.qa_runner._query_profile", side_effect=_failing_profile):
+            suite = await run_qa_suite(
+                model="", host="", fixtures=[fixture], profile=MagicMock()
+            )
+
+        assert suite.results[0].status == "ERROR"
+        assert "gate unreachable" in suite.results[0].error
+
+    def test_run_qa_suite_signature_has_profile(self):
+        import inspect
+        sig = inspect.signature(run_qa_suite)
+        assert "profile" in sig.parameters
+        assert sig.parameters["profile"].default is None
+
+
 # ── CLI ───────────────────────────────────────────────────────────────────────
 
 
@@ -340,6 +423,46 @@ class TestQACLI:
         result = runner.invoke(cli, ["qa", "--help"])
         assert result.exit_code == 0
         assert "--file" in result.output or "-f" in result.output
+
+    def test_qa_profile_flag_in_help(self):
+        from click.testing import CliRunner
+        from atomics.cli import cli
+        result = CliRunner().invoke(cli, ["qa", "--help"])
+        assert "--profile" in result.output or "-p" in result.output
+
+    def test_qa_profile_flag_routes_to_profile_mode(self):
+        from click.testing import CliRunner
+        from atomics.cli import cli
+        from atomics.qa_runner import QASuiteResult, QAFixture, QAResult
+        from atomics.profiles import TargetProfile
+        import tempfile
+
+        yaml_content = (
+            "model: test\nhost: http://fake:11434\n"
+            "fixtures:\n  - id: x\n    prompt: p\n    must_match: any\n"
+        )
+        profile_yaml = (
+            "name: test-gate\ntype: http\n"
+            "http:\n"
+            "  url: http://gate-host:8080/api/ask\n"
+            "  method: POST\n"
+            "  body: '{\"query\": \"{prompt}\"}'\n"
+            "  response_field: response\n"
+        )
+        qa_path = _yaml_file(yaml_content)
+        profile_path = _yaml_file(profile_yaml)
+
+        fake_suite = QASuiteResult(model="", host="")
+        f = QAFixture(id="x", prompt="p", must_match="any")
+        fake_suite.results.append(QAResult(fixture=f, response="ok", latency_ms=50.0, status="PASS"))
+
+        with patch("atomics.qa_runner.run_qa_suite", new=AsyncMock(return_value=fake_suite)) as mock_run:
+            result = CliRunner().invoke(cli, ["qa", "--file", qa_path, "--profile", profile_path])
+
+        assert result.exit_code == 0
+        # profile kwarg should have been passed
+        call_kwargs = mock_run.call_args.kwargs
+        assert call_kwargs.get("profile") is not None
 
     def test_qa_runs_suite(self):
         from click.testing import CliRunner

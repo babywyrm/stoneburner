@@ -1,0 +1,44 @@
+# Example profile: CTF box AI gate (Flask/FastAPI app wrapping an LLM)
+#
+# Copy to profiles/local/ and fill in real values.
+# profiles/local/ is gitignored — your real IPs and credentials never
+# leave your machine.
+#
+# Usage:
+#   atomics qa   --file qa/examples/app-gate-guardrails.yaml \
+#                --profile profiles/local/my-gate.yaml
+#   atomics soak --profile profiles/local/my-gate.yaml -d 5m -c 2
+#   atomics stress --profile profiles/local/my-gate.yaml
+
+name: ctf-ai-gate-example
+type: http
+
+# The real endpoint of your AI gate (e.g. app-gate gatekeeper, policy-service policy)
+url: http://gate-host:8080/api/ask
+
+# HTTP method (POST for most AI gates)
+method: POST
+
+# Headers — add Authorization/API keys here in your local copy
+headers:
+  Content-Type: application/json
+  # X-API-Key: "your-key-here"
+
+# Body template. Use {prompt} where the test prompt should be injected.
+# Adjust to match your app's API shape.
+body: |
+  {"query": "{prompt}", "stream": false}
+
+# How to extract the model's response text from the JSON response.
+# Use dot-notation for nested fields: "data.message.content"
+response_field: response
+
+# Optional: extract latency from the response body if the app reports it.
+# Leave empty to measure round-trip HTTP time instead.
+latency_field: ""
+
+# Optional: classify specific response patterns as named outcomes.
+# Useful for soak/stress tests to detect drift in gate behaviour.
+classify:
+  refused: ["I cannot", "I'm unable", "not allowed", "cannot provide"]
+  allowed: ["Here is", "The answer is", "Sure"]
