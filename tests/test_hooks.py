@@ -61,3 +61,27 @@ def test_notify_macos_runs_osascript(monkeypatch):
     monkeypatch.setattr("atomics.hooks.subprocess.run", mock_run)
     notify_run_complete(_sample_summary())
     assert mock_run.called
+
+
+# ── notify-send Linux path ────────────────────────────────────────────────────
+
+def test_notify_linux_notify_send():
+    """Line 56: Linux + notify-send path uses notify_run_complete."""
+    from unittest.mock import patch, MagicMock
+    from atomics.hooks import notify_run_complete
+    from atomics.models import RunSummary
+
+    from datetime import datetime, UTC
+    summary = RunSummary(
+        run_id="test123", total_tasks=2, successful_tasks=2,
+        failed_tasks=0, total_tokens=500, total_cost_usd=0.005,
+        started_at=datetime.now(UTC), completed_at=datetime.now(UTC),
+    )
+    with patch("platform.system", return_value="Linux"), \
+         patch("shutil.which", return_value="/usr/bin/notify-send"), \
+         patch("subprocess.run") as mock_run:
+        notify_run_complete(summary, title="Atomics")
+
+    assert mock_run.called
+    call_args = mock_run.call_args[0][0]
+    assert call_args[0] == "notify-send"

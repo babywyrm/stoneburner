@@ -65,3 +65,61 @@ def test_seconds_until_allowed():
     wait = guard.seconds_until_allowed()
     assert wait > 0
     assert wait <= 60.0
+
+
+# ── Missing guard branches ────────────────────────────────────────────────────
+
+def test_guard_total_cost_property():
+    from atomics.core.guard import RateBudgetGuard, GuardConfig
+    g = RateBudgetGuard(GuardConfig(budget_limit_usd=5.0))
+    assert g.total_cost == 0.0
+    g.record_request(100, 1.25, True)
+    assert g.total_cost == 1.25
+
+
+def test_guard_reset_circuit():
+    from atomics.core.guard import RateBudgetGuard, GuardConfig
+    g = RateBudgetGuard(GuardConfig(circuit_breaker_threshold=2))
+    g.record_request(0, 0.0, False)
+    g.record_request(0, 0.0, False)
+    assert g.circuit_open
+    g.reset_circuit()
+    assert not g.circuit_open
+
+
+def test_guard_seconds_until_allowed_empty():
+    from atomics.core.guard import RateBudgetGuard, GuardConfig
+    g = RateBudgetGuard(GuardConfig(max_requests_per_minute=60))
+    assert g.seconds_until_allowed() == 0.0
+
+
+def test_guard_seconds_until_allowed_below_limit():
+    from atomics.core.guard import RateBudgetGuard, GuardConfig
+    g = RateBudgetGuard(GuardConfig(max_requests_per_minute=60))
+    g.record_request(10, 0.0, True)
+    # one request, limit is 60 → not rate limited → 0.0
+    assert g.seconds_until_allowed() == 0.0
+
+
+def test_guard_seconds_until_allowed_at_limit():
+    from atomics.core.guard import RateBudgetGuard, GuardConfig
+    g = RateBudgetGuard(GuardConfig(max_requests_per_minute=1))
+    g.record_request(10, 0.001, True)
+    wait = g.seconds_until_allowed()
+    assert 0.0 < wait <= 60.0
+
+
+def test_guard_prune_old_timestamps():
+    """Lines 87, 89: _prune_timestamps removes entries older than 60s / 3600s."""
+    import time
+    from atomics.core.guard import RateBudgetGuard, GuardConfig
+    g = RateBudgetGuard(GuardConfig(max_requests_per_minute=100))
+    # Manually inject a timestamp that is 120 seconds old
+    g._request_timestamps.appendleft(time.monotonic() - 120)
+    g._hourly_tokens.appendleft((time.monotonic() - 4000, 50))
+    old_req_len = len(g._request_timestamps)
+    old_tok_len = len(g._hourly_tokens)
+    # Calling can_proceed triggers _prune_timestamps
+    g.can_proceed()
+    assert len(g._request_timestamps) < old_req_len
+    assert len(g._hourly_tokens) < old_tok_len

@@ -16,6 +16,7 @@ from atomics.soak import (
     _compute_verdict,
     _drift_pct,
     _linear_slope,
+    _percentile as _soak_percentile,
     parse_duration,
 )
 
@@ -489,3 +490,306 @@ class TestThinkTimeCLI:
 
         assert result.exit_code == 0
         assert captured.get("think_time_seconds") == 5.0
+
+
+# ── _percentile edge cases (soak's own copy) ─────────────────────────────────
+
+
+class TestSoakPercentile:
+    def test_empty_returns_zero(self):
+        assert _soak_percentile([], 50) == 0.0
+
+    def test_single_value_triggers_c_ge_len(self):
+        # c = f+1 = 1, len(s) = 1 → c >= len(s) → return s[f]
+        assert _soak_percentile([42.0], 50) == 42.0
+
+    def test_p100_exact_end_triggers_c_ge_len(self):
+        # k = (n-1)*1.0, f = n-1, c = n → c >= len(s) → return s[-1]
+        assert _soak_percentile([1.0, 2.0, 3.0], 100) == 3.0
+
+    def test_interpolation_branch(self):
+        result = _soak_percentile([0.0, 10.0], 50)
+        assert result == 5.0
+
+    def test_p95_multivalue(self):
+        vals = [float(i) for i in range(1, 21)]
+        p95 = _soak_percentile(vals, 95)
+        assert 18 <= p95 <= 20
+
+
+# ── run_soak_provider (cloud provider mode) ───────────────────────────────────
+
+
+def _async_req_provider(out=80, inp=20, lat=20.0, tps=200.0, cost=0.001):
+    """Return an AsyncMock that resolves instantly to (out, inp, lat, tps, cost)."""
+    async def _fn(provider, prompt, num_predict):
+        await asyncio.sleep(0)
+        return (out, inp, lat, tps, cost)
+    return _fn
+
+
+def _make_mock_provider(name="mock-cloud", host="https://api.example.com"):
+    p = AsyncMock()
+    p.name = name
+    p.host = host
+    p.url = ""
+    return p
+
+
+class TestRunSoakProvider:
+    """Cover run_soak_provider (lines 281-411). Uses short durations + fast mocks."""
+
+    @pytest.mark.asyncio
+    async def test_basic_provider_run(self):
+        from atomics.soak import run_soak_provider
+        with patch("atomics.stress._single_request_provider",
+                   side_effect=_async_req_provider()):
+            result = await run_soak_provider(
+                provider=_make_mock_provider(),
+                model="test-model",
+                concurrency=2,
+                duration_seconds=0.6,
+                sample_interval=0.2,
+                num_predict=64,
+            )
+        assert result.model == "test-model"
+        assert result.concurrency == 2
+        assert result.provider == "mock-cloud"
+        assert result.total_requests > 0
+        assert result.verdict in ("STABLE", "DEGRADED", "UNSTABLE")
+
+    @pytest.mark.asyncio
+    async def test_provider_samples_collected(self):
+        from atomics.soak import run_soak_provider
+        with patch("atomics.stress._single_request_provider",
+                   side_effect=_async_req_provider(out=60, lat=50.0)):
+            result = await run_soak_provider(
+                provider=_make_mock_provider("prov2"),
+                model="m",
+                concurrency=1,
+                duration_seconds=0.5,
+                sample_interval=0.2,
+            )
+        assert len(result.samples) >= 2
+        for s in result.samples:
+            assert s.requests > 0
+
+    @pytest.mark.asyncio
+    async def test_provider_callback_fires(self):
+        from atomics.soak import run_soak_provider, SoakSample
+        received: list[SoakSample] = []
+
+        def on_sample(s: SoakSample) -> None:
+            received.append(s)
+
+        with patch("atomics.stress._single_request_provider",
+                   side_effect=_async_req_provider()):
+            await run_soak_provider(
+                provider=_make_mock_provider("cb-prov"),
+                model="m",
+                concurrency=1,
+                duration_seconds=0.5,
+                sample_interval=0.2,
+                on_sample=on_sample,
+            )
+        assert len(received) >= 2
+
+    @pytest.mark.asyncio
+    async def test_provider_failure_handling(self):
+        from atomics.soak import run_soak_provider
+        call_n = [0]
+
+        async def _sometimes_fail(provider, prompt, num_predict):
+            call_n[0] += 1
+            await asyncio.sleep(0)
+            if call_n[0] % 3 == 0:
+                raise ConnectionError("boom")
+            return (40, 10, 50.0, 160.0, 0.0)
+
+        with patch("atomics.stress._single_request_provider", side_effect=_sometimes_fail):
+            result = await run_soak_provider(
+                provider=_make_mock_provider("fail-prov"),
+                model="m",
+                concurrency=1,
+                duration_seconds=0.5,
+                sample_interval=0.2,
+            )
+        assert result.error_rate >= 0.0
+
+    @pytest.mark.asyncio
+    async def test_provider_think_time_param(self):
+        from atomics.soak import run_soak_provider
+        with patch("atomics.stress._single_request_provider",
+                   side_effect=_async_req_provider(lat=10.0)):
+            result = await run_soak_provider(
+                provider=_make_mock_provider("think"),
+                model="m",
+                concurrency=1,
+                duration_seconds=0.3,
+                sample_interval=0.2,
+                think_time_seconds=0.01,
+            )
+        assert result.model == "m"
+
+    @pytest.mark.asyncio
+    async def test_provider_metrics_computed(self):
+        from atomics.soak import run_soak_provider
+        with patch("atomics.stress._single_request_provider",
+                   side_effect=_async_req_provider(out=100, cost=0.002)):
+            result = await run_soak_provider(
+                provider=_make_mock_provider("metrics-prov", "https://x"),
+                model="metrics-model",
+                concurrency=2,
+                duration_seconds=0.6,
+                sample_interval=0.2,
+            )
+        assert result.avg_tps >= 0.0
+        assert result.peak_tps >= result.min_tps
+        assert result.total_cost_usd >= 0.0
+
+
+# ── run_soak_profile (custom target profile mode) ────────────────────────────
+
+
+def _make_ollama_profile():
+    from types import SimpleNamespace
+    return SimpleNamespace(
+        type="ollama", name="test-gate", model="qwen2.5:3b",
+        ollama_host="http://localhost:11434", http_url="",
+        http_timeout=30, prompts=["Is this a test?", "What is your role?"],
+    )
+
+
+def _make_http_profile():
+    from types import SimpleNamespace
+    return SimpleNamespace(
+        type="http", name="http-gate", model="",
+        ollama_host="", http_url="http://localhost:8080/ask",
+        http_timeout=30, prompts=["Probe question"],
+    )
+
+
+async def _fast_profile_req(client, profile, prompt):
+    await asyncio.sleep(0)
+    return ("ok response", 20.0, "pass")
+
+
+class TestRunSoakProfile:
+    """Cover run_soak_profile (lines 413-542). Short durations + instant mocks."""
+
+    @pytest.mark.asyncio
+    async def test_ollama_profile_basic_run(self):
+        from atomics.soak import run_soak_profile
+        with patch("atomics.profiles._single_request_profile",
+                   side_effect=_fast_profile_req):
+            result = await run_soak_profile(
+                profile=_make_ollama_profile(),
+                concurrency=2,
+                duration_seconds=0.6,
+                sample_interval=0.2,
+            )
+        assert result.model == "qwen2.5:3b"
+        assert result.concurrency == 2
+        assert result.total_requests > 0
+        assert result.verdict in ("STABLE", "DEGRADED", "UNSTABLE")
+
+    @pytest.mark.asyncio
+    async def test_http_profile_basic_run(self):
+        from atomics.soak import run_soak_profile
+        with patch("atomics.profiles._single_request_profile",
+                   side_effect=_fast_profile_req):
+            result = await run_soak_profile(
+                profile=_make_http_profile(),
+                concurrency=1,
+                duration_seconds=0.5,
+                sample_interval=0.2,
+            )
+        assert result.provider == "profile:http"
+        assert result.total_requests > 0
+
+    @pytest.mark.asyncio
+    async def test_profile_callback_fires(self):
+        from atomics.soak import run_soak_profile, SoakSample
+        received: list[SoakSample] = []
+
+        def on_sample(s: SoakSample) -> None:
+            received.append(s)
+
+        with patch("atomics.profiles._single_request_profile",
+                   side_effect=_fast_profile_req):
+            await run_soak_profile(
+                profile=_make_ollama_profile(),
+                concurrency=1,
+                duration_seconds=0.5,
+                sample_interval=0.2,
+                on_sample=on_sample,
+            )
+        assert len(received) >= 2
+
+    @pytest.mark.asyncio
+    async def test_profile_failure_handling(self):
+        from atomics.soak import run_soak_profile
+        call_n = [0]
+
+        async def _sometimes_fail(client, profile, prompt):
+            call_n[0] += 1
+            await asyncio.sleep(0)
+            if call_n[0] % 3 == 0:
+                raise RuntimeError("gate down")
+            return ("ok", 20.0, "pass")
+
+        with patch("atomics.profiles._single_request_profile", side_effect=_sometimes_fail):
+            result = await run_soak_profile(
+                profile=_make_ollama_profile(),
+                concurrency=1,
+                duration_seconds=0.5,
+                sample_interval=0.2,
+            )
+        assert result.error_rate >= 0.0
+
+    @pytest.mark.asyncio
+    async def test_profile_think_time_param(self):
+        from atomics.soak import run_soak_profile
+        with patch("atomics.profiles._single_request_profile",
+                   side_effect=_fast_profile_req):
+            result = await run_soak_profile(
+                profile=_make_ollama_profile(),
+                concurrency=1,
+                duration_seconds=0.3,
+                sample_interval=0.2,
+                think_time_seconds=0.01,
+            )
+        assert result.model == "qwen2.5:3b"
+
+    @pytest.mark.asyncio
+    async def test_profile_metrics_computed(self):
+        from atomics.soak import run_soak_profile
+        with patch("atomics.profiles._single_request_profile",
+                   side_effect=_fast_profile_req):
+            result = await run_soak_profile(
+                profile=_make_ollama_profile(),
+                concurrency=2,
+                duration_seconds=0.6,
+                sample_interval=0.2,
+            )
+        assert result.avg_tps >= 0.0
+        assert result.peak_tps >= 0.0
+
+    @pytest.mark.asyncio
+    async def test_profile_no_prompts_falls_back_to_stress_prompts(self):
+        from types import SimpleNamespace
+        from atomics.soak import run_soak_profile
+        profile_no_prompts = SimpleNamespace(
+            type="ollama", name="no-prompts", model="m",
+            ollama_host="http://localhost:11434", http_url="",
+            http_timeout=30, prompts=[],
+        )
+        with patch("atomics.profiles._single_request_profile",
+                   side_effect=_fast_profile_req):
+            result = await run_soak_profile(
+                profile=profile_no_prompts,
+                concurrency=1,
+                duration_seconds=0.5,
+                sample_interval=0.2,
+            )
+        assert result.total_requests > 0

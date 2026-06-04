@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock
+import subprocess
+import shutil
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -555,3 +557,194 @@ def test_cli_stress_provider_save_cost(monkeypatch, tmp_path):
     assert result.exit_code == 0, result.output
     assert "saved" in result.output.lower()
     assert "cost" in result.output.lower() or "$" in result.output
+
+
+# ── _get_gpu_info / _get_vram_used_mb ─────────────────────────────────────────
+
+
+class TestGPUInfo:
+    def test_get_gpu_info_no_nvidia_smi(self):
+        from atomics.stress import _get_gpu_info
+        with patch("shutil.which", return_value=None):
+            name, total = _get_gpu_info()
+        assert name == ""
+        assert total is None
+
+    def test_get_gpu_info_success(self):
+        from atomics.stress import _get_gpu_info
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = "NVIDIA RTX 4090, 24576"
+        with patch("shutil.which", return_value="/usr/bin/nvidia-smi"), \
+             patch("subprocess.run", return_value=mock_result):
+            name, total = _get_gpu_info()
+        assert name == "NVIDIA RTX 4090"
+        assert total == 24576.0
+
+    def test_get_gpu_info_nonzero_returncode(self):
+        from atomics.stress import _get_gpu_info
+        mock_result = MagicMock()
+        mock_result.returncode = 1
+        mock_result.stdout = ""
+        with patch("shutil.which", return_value="/usr/bin/nvidia-smi"), \
+             patch("subprocess.run", return_value=mock_result):
+            name, total = _get_gpu_info()
+        assert name == ""
+        assert total is None
+
+    def test_get_gpu_info_exception(self):
+        from atomics.stress import _get_gpu_info
+        with patch("shutil.which", return_value="/usr/bin/nvidia-smi"), \
+             patch("subprocess.run", side_effect=OSError("no smi")):
+            name, total = _get_gpu_info()
+        assert name == ""
+        assert total is None
+
+    def test_get_vram_used_no_smi(self):
+        from atomics.stress import _get_vram_used_mb
+        with patch("shutil.which", return_value=None):
+            assert _get_vram_used_mb() is None
+
+    def test_get_vram_used_success(self):
+        from atomics.stress import _get_vram_used_mb
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = "8192"
+        with patch("shutil.which", return_value="/usr/bin/nvidia-smi"), \
+             patch("subprocess.run", return_value=mock_result):
+            assert _get_vram_used_mb() == 8192.0
+
+    def test_get_vram_used_nonzero_returncode(self):
+        from atomics.stress import _get_vram_used_mb
+        mock_result = MagicMock()
+        mock_result.returncode = 1
+        mock_result.stdout = ""
+        with patch("shutil.which", return_value="/usr/bin/nvidia-smi"), \
+             patch("subprocess.run", return_value=mock_result):
+            assert _get_vram_used_mb() is None
+
+    def test_get_vram_used_exception(self):
+        from atomics.stress import _get_vram_used_mb
+        with patch("shutil.which", return_value="/usr/bin/nvidia-smi"), \
+             patch("subprocess.run", side_effect=ValueError("bad")):
+            assert _get_vram_used_mb() is None
+
+
+# ── _run_phase_profile / run_stress_profile ───────────────────────────────────
+
+
+def _make_stress_ollama_profile():
+    from types import SimpleNamespace
+    return SimpleNamespace(
+        type="ollama", name="test-gate", model="qwen2.5:3b",
+        ollama_host="http://localhost:11434", http_url="",
+        http_timeout=30, prompts=["probe 1", "probe 2"],
+    )
+
+
+def _make_stress_http_profile():
+    from types import SimpleNamespace
+    return SimpleNamespace(
+        type="http", name="http-gate", model="",
+        ollama_host="", http_url="http://localhost:8080/gate",
+        http_timeout=30, prompts=[],
+    )
+
+
+async def _instant_profile_req(client, profile, prompt):
+    """Instant fake profile request — no real I/O."""
+    return ("ok", 5.0, "pass")
+
+
+class TestRunStressProfile:
+    """Cover _run_phase_profile + run_stress_profile. Uses instant mock + 0.15s phases."""
+
+    @pytest.mark.asyncio
+    async def test_run_stress_profile_ollama(self):
+        from atomics.stress import run_stress_profile
+        with patch("atomics.profiles._single_request_profile",
+                   side_effect=_instant_profile_req):
+            result = await run_stress_profile(
+                profile=_make_stress_ollama_profile(),
+                max_concurrency=2,
+                phase_seconds=0.15,
+            )
+        assert result.model == "qwen2.5:3b"
+        assert result.provider == "profile:ollama"
+        assert len(result.phases) >= 1
+        assert result.peak_tps >= 0.0
+        assert result.total_requests > 0
+
+    @pytest.mark.asyncio
+    async def test_run_stress_profile_http(self):
+        from atomics.stress import run_stress_profile
+        with patch("atomics.profiles._single_request_profile",
+                   side_effect=_instant_profile_req):
+            result = await run_stress_profile(
+                profile=_make_stress_http_profile(),
+                max_concurrency=1,
+                phase_seconds=0.15,
+            )
+        assert result.provider == "profile:http"
+        assert result.host == "http://localhost:8080/gate"
+
+    @pytest.mark.asyncio
+    async def test_run_stress_profile_on_phase_callback(self):
+        from atomics.stress import run_stress_profile, ConcurrencyResult
+        phases_received: list[ConcurrencyResult] = []
+
+        def on_phase(p: ConcurrencyResult) -> None:
+            phases_received.append(p)
+
+        with patch("atomics.profiles._single_request_profile",
+                   side_effect=_instant_profile_req):
+            result = await run_stress_profile(
+                profile=_make_stress_ollama_profile(),
+                max_concurrency=2,
+                phase_seconds=0.15,
+                on_phase=on_phase,
+            )
+        assert len(phases_received) == len(result.phases)
+
+    @pytest.mark.asyncio
+    async def test_run_stress_profile_failure_in_phase(self):
+        from atomics.stress import run_stress_profile
+        call_n = [0]
+
+        async def _sometimes_fail(client, profile, prompt):
+            call_n[0] += 1
+            if call_n[0] % 2 == 0:
+                raise RuntimeError("gate error")
+            return ("ok", 10.0, "pass")
+
+        with patch("atomics.profiles._single_request_profile", side_effect=_sometimes_fail):
+            result = await run_stress_profile(
+                profile=_make_stress_ollama_profile(),
+                max_concurrency=1,
+                phase_seconds=0.15,
+            )
+        assert result.total_failed >= 0
+
+    @pytest.mark.asyncio
+    async def test_run_stress_profile_saturation_concurrency_set(self):
+        from atomics.stress import run_stress_profile
+        with patch("atomics.profiles._single_request_profile",
+                   side_effect=_instant_profile_req):
+            result = await run_stress_profile(
+                profile=_make_stress_ollama_profile(),
+                max_concurrency=4,
+                phase_seconds=0.15,
+            )
+        assert result.saturation_concurrency >= 1
+
+    @pytest.mark.asyncio
+    async def test_run_stress_profile_no_prompts_uses_stress_prompts(self):
+        from atomics.stress import run_stress_profile
+        with patch("atomics.profiles._single_request_profile",
+                   side_effect=_instant_profile_req):
+            result = await run_stress_profile(
+                profile=_make_stress_http_profile(),
+                max_concurrency=1,
+                phase_seconds=0.15,
+            )
+        assert result.total_requests > 0

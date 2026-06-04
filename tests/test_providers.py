@@ -59,3 +59,36 @@ def test_openai_cost_estimation():
     cost = _estimate_cost("gpt-4o", 1000, 500)
     expected = (1000 * 2.50 + 500 * 10.0) / 1_000_000
     assert abs(cost - expected) < 0.000001
+
+
+# ── providers/__init__ lazy __getattr__ ──────────────────────────────────────
+
+def test_providers_init_ollama_lazy():
+    import atomics.providers as p
+    OllamaProvider = p.OllamaProvider
+    assert OllamaProvider.__name__ == "OllamaProvider"
+
+
+def test_providers_init_openai_lazy():
+    import atomics.providers as p
+    OpenAIProvider = p.OpenAIProvider
+    assert OpenAIProvider.__name__ == "OpenAIProvider"
+
+
+def test_providers_init_brain_gateway_lazy():
+    import atomics.providers as p
+    BrainGatewayProvider = p.BrainGatewayProvider
+    assert BrainGatewayProvider.__name__ == "BrainGatewayProvider"
+
+
+def test_providers_init_bedrock_lazy():
+    import atomics.providers as p
+    BedrockProvider = p.BedrockProvider
+    assert BedrockProvider.__name__ == "BedrockProvider"
+
+
+def test_providers_init_unknown_attr():
+    import atomics.providers as p
+    import pytest
+    with pytest.raises(AttributeError, match="no attribute"):
+        _ = p.NonExistentProvider
