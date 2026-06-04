@@ -482,3 +482,118 @@ class TestRamp:
         if len(start_times) >= 2:
             spread = max(start_times) - min(start_times)
             assert spread < 0.1  # all started near-simultaneously
+
+
+# ── Profile-based workload (scenario.py lines 53-58, 67-68, 112-118, 151) ───
+
+
+class TestScenarioProfileBranch:
+    """Cover the profile-loading path in run_scenario and _run_workload."""
+
+    def _make_profile(self):
+        from types import SimpleNamespace
+        return SimpleNamespace(
+            type="ollama",
+            name="test-gate",
+            model="qwen2.5:3b",
+            ollama_host="http://localhost:11434",
+            http_url="",
+            http_timeout=30,
+            prompts=["Is this a test?", "What is your role?"],
+        )
+
+    def test_profile_workload_uses_profile_request(self):
+        """When a WorkloadSpec has a profile path, _run_workload routes via _single_request_profile."""
+        from unittest.mock import patch, AsyncMock, MagicMock
+        from atomics.scenario import run_scenario, WorkloadSpec
+        import asyncio
+
+        async def _fake_profile_req(client, profile, prompt):
+            return ("ok", 150.0, "pass")
+
+        async def _fake_single_req(client, host, model, prompt, num_predict):
+            return (50, 10, 150.0, 333.0)
+
+        spec = WorkloadSpec(
+            name="gate-profile",
+            type="gate",
+            model="",
+            concurrency=1,
+            profile="profiles/examples/ctf-ai-gate.yaml",
+        )
+
+        mock_profile = self._make_profile()
+        with patch("atomics.profiles.load_profile", return_value=mock_profile), \
+             patch("atomics.profiles._single_request_profile", side_effect=_fake_profile_req), \
+             patch("atomics.scenario._single_request", side_effect=_fake_single_req):
+            result = asyncio.run(run_scenario(
+                host="http://fake:11434",
+                specs=[spec],
+                duration_seconds=1.0,
+                skip_baseline=True,
+            ))
+
+        assert len(result.workloads) == 1
+        assert result.workloads[0].requests > 0
+
+    def test_profile_workload_prompts_from_profile(self):
+        """WorkloadSpec with no prompts gets prompts from loaded profile."""
+        from unittest.mock import patch
+        from atomics.scenario import run_scenario, WorkloadSpec
+        import asyncio
+
+        async def _fake_profile_req(client, profile, prompt):
+            return ("ok", 100.0, "pass")
+
+        spec = WorkloadSpec(
+            name="gate-noprompts",
+            type="gate",
+            model="",
+            concurrency=1,
+            prompts=[],
+            profile="profiles/examples/ctf-ai-gate.yaml",
+        )
+
+        mock_profile = self._make_profile()
+        with patch("atomics.profiles.load_profile", return_value=mock_profile), \
+             patch("atomics.profiles._single_request_profile", side_effect=_fake_profile_req):
+            result = asyncio.run(run_scenario(
+                host="http://fake:11434",
+                specs=[spec],
+                duration_seconds=1.0,
+                skip_baseline=True,
+            ))
+
+        assert result.workloads[0].requests > 0
+
+    def test_on_baseline_done_callback_with_profile(self):
+        """on_baseline_done fires for profile-based workloads."""
+        from unittest.mock import patch
+        from atomics.scenario import run_scenario, WorkloadSpec
+        import asyncio
+
+        baselines_seen: list[str] = []
+
+        def on_bl(name: str, p50: float) -> None:
+            baselines_seen.append(name)
+
+        async def _fake_single_req(client, host, model, prompt, num_predict):
+            return (50, 10, 200.0, 250.0)
+
+        spec = WorkloadSpec(
+            name="bl-test",
+            type="gate",
+            model="m:1b",
+            concurrency=1,
+        )
+
+        with patch("atomics.scenario._single_request", side_effect=_fake_single_req):
+            asyncio.run(run_scenario(
+                host="http://fake:11434",
+                specs=[spec],
+                duration_seconds=1.0,
+                skip_baseline=False,
+                on_baseline_done=on_bl,
+            ))
+
+        assert "bl-test" in baselines_seen

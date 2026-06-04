@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import textwrap
+import pytest
 from pathlib import Path
 
 
@@ -217,3 +218,185 @@ def test_run_probe_regression_detected(tmp_path):
         regression_threshold=0.05,
     ))
     assert len(summary.regressions) >= 0
+
+
+# ── Connector — http source + truncation + decode exception ───────────────────
+
+def test_fetch_artifact_file_truncation(tmp_path):
+    """_fetch_file truncates content > max_bytes."""
+    import asyncio
+    from atomics.probe.config import ProbeTarget
+    from atomics.probe.connectors import fetch_artifact
+    f = tmp_path / "big.log"
+    f.write_bytes(b"A" * 200)
+    target = ProbeTarget(name="big", artifact_type="access-log", source="file", path=str(f))
+    content = asyncio.run(fetch_artifact(target, max_bytes=50))
+    assert len(content) == 50
+
+
+@pytest.mark.skipif(
+    not __import__("importlib.util", fromlist=["find_spec"]).find_spec("aiohttp"),
+    reason="aiohttp not installed",
+)
+def test_fetch_artifact_http_source():
+    """_fetch_http path is exercised via mocked aiohttp."""
+    import asyncio
+    from unittest.mock import AsyncMock, MagicMock, patch
+    from atomics.probe.config import ProbeTarget
+    from atomics.probe.connectors import fetch_artifact
+
+    mock_resp = AsyncMock()
+    mock_resp.raise_for_status = MagicMock()
+    mock_resp.read = AsyncMock(return_value=b'{"status": "ok"}')
+    mock_resp.__aenter__ = AsyncMock(return_value=mock_resp)
+    mock_resp.__aexit__ = AsyncMock(return_value=False)
+
+    mock_session = AsyncMock()
+    mock_session.get = MagicMock(return_value=mock_resp)
+    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session.__aexit__ = AsyncMock(return_value=False)
+
+    target = ProbeTarget(
+        name="api", artifact_type="api-response", source="http",
+        url="http://localhost:9999/status",
+    )
+    with patch("aiohttp.ClientSession", return_value=mock_session):
+        content = asyncio.run(fetch_artifact(target))
+    assert "ok" in content
+
+
+@pytest.mark.skipif(
+    not __import__("importlib.util", fromlist=["find_spec"]).find_spec("aiohttp"),
+    reason="aiohttp not installed",
+)
+def test_fetch_artifact_http_error():
+    """_fetch_http wraps aiohttp.ClientError into ProbeConnectorError."""
+    import asyncio
+    import aiohttp
+    from unittest.mock import AsyncMock, MagicMock, patch
+    from atomics.probe.config import ProbeTarget
+    from atomics.probe.connectors import fetch_artifact, ProbeConnectorError
+
+    mock_session = AsyncMock()
+    mock_session.get = MagicMock(side_effect=aiohttp.ClientConnectionError("refused"))
+    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session.__aexit__ = AsyncMock(return_value=False)
+
+    target = ProbeTarget(
+        name="bad-api", artifact_type="api-response", source="http",
+        url="http://localhost:9999/dead",
+    )
+    with patch("aiohttp.ClientSession", return_value=mock_session), \
+         pytest.raises(ProbeConnectorError, match="HTTP fetch failed"):
+        asyncio.run(fetch_artifact(target))
+
+
+# ── Runner — ProbeSummary properties + fetch/analysis failure paths ───────────
+
+def test_probe_summary_overall_score():
+    from atomics.probe.runner import ProbeSummary, ProbeResult
+    from atomics.probe.config import ProbeTarget
+
+    summary = ProbeSummary()
+    summary.results = [
+        ProbeResult(target_name="a", artifact_type="access-log", check_id="c",
+                    score=0.8, prev_score=None, regressed=False, judge_model="m",
+                    judge_rationale="ok"),
+        ProbeResult(target_name="b", artifact_type="access-log", check_id="c",
+                    score=0.6, prev_score=None, regressed=False, judge_model="m",
+                    judge_rationale="ok"),
+    ]
+    assert summary.overall_score == 0.7
+
+
+def test_probe_summary_overall_score_empty():
+    from atomics.probe.runner import ProbeSummary
+    summary = ProbeSummary()
+    assert summary.overall_score is None
+
+
+def test_probe_summary_regressions():
+    from atomics.probe.runner import ProbeSummary, ProbeResult
+    summary = ProbeSummary()
+    summary.results = [
+        ProbeResult(target_name="a", artifact_type="access-log", check_id="c",
+                    score=0.5, prev_score=0.9, regressed=True,
+                    judge_model="m", judge_rationale="dropped"),
+        ProbeResult(target_name="b", artifact_type="access-log", check_id="c",
+                    score=0.9, prev_score=0.8, regressed=False,
+                    judge_model="m", judge_rationale="ok"),
+    ]
+    assert len(summary.regressions) == 1
+    assert summary.regressions[0].target_name == "a"
+
+
+def test_run_probe_fetch_failure_path(tmp_path):
+    """When fetch_artifact raises, runner records a fetch_error result."""
+    from atomics.probe.config import ProbeTarget
+    from atomics.probe.runner import run_probe
+    from atomics.probe.connectors import ProbeConnectorError
+    from unittest.mock import patch
+
+    targets = [ProbeTarget(name="broken", artifact_type="access-log",
+                           source="file", path="/nonexistent/log.txt")]
+    received = []
+
+    def on_result(r):
+        received.append(r)
+
+    summary = asyncio.run(run_probe(
+        _provider(), judge_provider=_judge(), targets=targets, on_result=on_result,
+    ))
+    assert summary.results[0].check_id == "fetch_error"
+    assert len(received) == 1
+
+
+def test_run_probe_analysis_failure_path(tmp_path):
+    """When provider.generate raises, runner records a failed analysis result."""
+    from atomics.probe.config import ProbeTarget
+    from atomics.probe.runner import run_probe
+
+    f = tmp_path / "log.txt"
+    f.write_text("GET /admin 403\n")
+    targets = [ProbeTarget(name="nginx", artifact_type="access-log",
+                           source="file", path=str(f))]
+
+    fail_provider = AsyncMock()
+    fail_provider.name = "fail"
+    fail_provider.generate = AsyncMock(side_effect=RuntimeError("LLM down"))
+
+    received = []
+
+    def on_result(r):
+        received.append(r)
+
+    summary = asyncio.run(run_probe(
+        fail_provider, judge_provider=_judge(), targets=targets, on_result=on_result,
+    ))
+    assert summary.results[0].score is None
+    assert len(received) == 1
+
+
+def test_fetch_artifact_http_dispatches(tmp_path):
+    """Line 22: source='http' dispatches to _fetch_http."""
+    from unittest.mock import patch, AsyncMock
+    from atomics.probe.config import ProbeTarget
+    from atomics.probe.connectors import fetch_artifact
+
+    target = ProbeTarget(
+        name="api", artifact_type="api-response", source="http",
+        url="http://localhost:9999/status",
+    )
+    # Patch _fetch_http directly — avoids needing aiohttp installed
+    with patch("atomics.probe.connectors._fetch_http",
+               new=AsyncMock(return_value='{"status":"ok"}')):
+        content = asyncio.run(fetch_artifact(target))
+    assert "ok" in content
+
+
+def test_build_check_unknown_artifact_type():
+    """probe/checks.py line 27: unknown artifact_type → generic_analysis handler."""
+    from atomics.probe.checks import build_check
+    check = build_check("some-unknown-type", "raw content here")
+    assert check["check_id"] == "generic_analysis"
+    assert "prompt" in check

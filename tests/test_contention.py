@@ -227,3 +227,34 @@ class TestContentionCLI:
 
         assert result.exit_code == 0
         assert captured.get("models") == ["qwen2.5:3b", "qwen2.5:7b"]
+
+
+# ── avg_latency_ms empty branch + contention_factor None branches ─────────────
+
+def test_contention_model_result_avg_latency_empty():
+    from atomics.contention import ContentionModelResult
+    r = ContentionModelResult(model="m", requests=0, failed=0, latencies=[])
+    assert r.avg_latency_ms == 0.0
+
+
+def test_contention_factor_mixed_none():
+    from atomics.contention import ContentionResult, ContentionModelResult
+    cr = ContentionResult(host="h", models=["a", "b"], phase_seconds=5.0)
+    cr.solo_tps = {"a": 10.0, "b": 5.0}
+    # "a" not in contention_results → mixed avg_tps = 0 (no per_request_tps),
+    # but the next() lookup won't find "a" via per_request_tps, and avg_tps
+    # is computed as 0.0 — which is not None, so let's use a model not present
+    cr.contention_results = [ContentionModelResult(model="b", requests=10,
+                                                    failed=0, latencies=[100.0])]
+    # "a" has no entry → next() returns None → factor is None
+    assert cr.contention_factor("a") is None
+
+
+def test_contention_factor_solo_zero():
+    from atomics.contention import ContentionResult, ContentionModelResult
+    cr = ContentionResult(host="h", models=["a"], phase_seconds=5.0)
+    cr.solo_tps = {"a": 0.0}  # solo == 0 → factor is None
+    r = ContentionModelResult(model="a", requests=5, failed=0, latencies=[80.0])
+    r.per_request_tps = [3.0]
+    cr.contention_results = [r]
+    assert cr.contention_factor("a") is None

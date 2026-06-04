@@ -116,3 +116,209 @@ def test_cli_redblue_help():
     result = runner.invoke(cli, ["redblue", "--help"])
     assert result.exit_code == 0
     assert "red" in result.output.lower()
+
+
+# ── RedBlueSummary computed properties ───────────────────────────────────────
+
+
+import asyncio as _asyncio
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
+
+
+def _make_summary_with_results():
+    """Build a RedBlueSummary with stubbed results for property testing."""
+    from atomics.eval.redblue.runner import RedBlueSummary, RedBlueFixtureResult
+    from atomics.eval.redblue.fixtures import RedBlueFixture
+    from atomics.eval.judge import JudgeResult
+    from atomics.models import TaskResult, TaskStatus, TaskCategory
+    from datetime import UTC, datetime
+
+    def _fixture(fid: str, team: str, category: str) -> RedBlueFixture:
+        return RedBlueFixture(
+            id=fid, team=team, category=category, complexity="MEDIUM",
+            prompt="probe", gold_criteria=["a"],
+        )
+
+    def _task(latency: float = 200.0, cost: float = 0.001) -> TaskResult:
+        t = TaskResult(
+            run_id="test", category=TaskCategory.GENERAL_QA,
+            task_name="x", provider="mock", model="m",
+        )
+        t.status = TaskStatus.SUCCESS
+        t.latency_ms = latency
+        t.estimated_cost_usd = cost
+        return t
+
+    def _judge(score: float = 0.8) -> JudgeResult:
+        # score normalised: accuracy/4 * 0.4 + completeness/3 * 0.3 + format/3 * 0.3
+        j = JudgeResult(
+            score=score, accuracy=3, completeness=2, format_score=2,
+            rationale="good", judge_model="m", parse_failed=False,
+        )
+        return j
+
+    now = datetime.now(UTC)
+    summary = RedBlueSummary(
+        run_id="test", provider="mock", model="m", mode="all",
+        started_at=now, completed_at=now,
+    )
+    summary.results = [
+        RedBlueFixtureResult(fixture=_fixture("r1", "red", "recon"), task_result=_task(100.0, 0.001), judge=_judge(0.9)),
+        RedBlueFixtureResult(fixture=_fixture("r2", "red", "recon"), task_result=_task(200.0, 0.002), judge=_judge(0.7)),
+        RedBlueFixtureResult(fixture=_fixture("b1", "blue", "defense"), task_result=_task(300.0, 0.003), judge=_judge(0.8)),
+        RedBlueFixtureResult(fixture=_fixture("f1", "red", "recon"), task_result=_task(150.0, 0.001), judge=None),
+    ]
+    return summary
+
+
+def test_redblue_summary_overall_quality():
+    summary = _make_summary_with_results()
+    q = summary.overall_quality
+    assert q is not None
+    assert 0.0 <= q <= 1.0
+
+
+def test_redblue_summary_overall_quality_no_results():
+    from atomics.eval.redblue.runner import RedBlueSummary
+    from datetime import UTC, datetime
+    now = datetime.now(UTC)
+    empty = RedBlueSummary(run_id="x", provider="m", model="m", mode="all",
+                           started_at=now, completed_at=now, results=[])
+    assert empty.overall_quality is None
+
+
+def test_redblue_summary_category_scores():
+    summary = _make_summary_with_results()
+    cats = summary.category_scores
+    assert "recon" in cats
+    assert "defense" in cats
+    assert 0.0 <= cats["recon"] <= 1.0
+
+
+def test_redblue_summary_avg_latency_ms():
+    summary = _make_summary_with_results()
+    avg = summary.avg_latency_ms
+    assert avg == round((100.0 + 200.0 + 300.0 + 150.0) / 4, 1)
+
+
+def test_redblue_summary_avg_latency_empty():
+    from atomics.eval.redblue.runner import RedBlueSummary
+    from datetime import UTC, datetime
+    now = datetime.now(UTC)
+    empty = RedBlueSummary(run_id="x", provider="m", model="m", mode="all",
+                           started_at=now, completed_at=now, results=[])
+    assert empty.avg_latency_ms == 0.0
+
+
+def test_redblue_summary_total_cost_usd():
+    summary = _make_summary_with_results()
+    assert abs(summary.total_cost_usd - 0.007) < 1e-9
+
+
+# ── on_fixture_done callback paths ───────────────────────────────────────────
+
+
+def _provider_raises():
+    p = AsyncMock()
+    p.name = "fail-prov"
+    p.generate = AsyncMock(side_effect=RuntimeError("forced failure"))
+    return p
+
+
+def _provider_ok():
+    p = AsyncMock()
+    p.name = "ok-prov"
+    p.generate = AsyncMock(return_value=SimpleNamespace(
+        text="answer", model="m", input_tokens=20, output_tokens=40,
+        total_tokens=60, thinking_tokens=0, latency_ms=150.0,
+        estimated_cost_usd=0.0, tokens_per_second=100.0,
+    ))
+    return p
+
+
+def _judge_good():
+    j = AsyncMock()
+    j.name = "judge"
+    j.generate = AsyncMock(return_value=SimpleNamespace(
+        text="ACCURACY: 8\nCOMPLETENESS: 7\nFORMAT: 8\nRATIONALE: good",
+        model="judge-m", input_tokens=10, output_tokens=20,
+        total_tokens=30, thinking_tokens=0, latency_ms=50.0,
+        estimated_cost_usd=0.0, tokens_per_second=200.0,
+    ))
+    return j
+
+
+def test_on_fixture_done_called_on_success_sync():
+    from atomics.eval.redblue.runner import run_redblue
+
+    received = []
+
+    def cb(fr):
+        received.append(fr)
+
+    summary = _asyncio.run(run_redblue(
+        _provider_ok(),
+        judge_provider=_judge_good(),
+        mode="red",
+        on_fixture_done=cb,
+    ))
+
+    assert len(received) == summary.total_fixtures
+
+
+def test_on_fixture_done_called_on_generate_failure_sync():
+    from atomics.eval.redblue.runner import run_redblue
+    from atomics.models import TaskStatus
+
+    received = []
+
+    def cb(fr):
+        received.append(fr)
+
+    summary = _asyncio.run(run_redblue(
+        _provider_raises(),
+        judge_provider=_judge_good(),
+        mode="red",
+        on_fixture_done=cb,
+    ))
+
+    assert len(received) == summary.total_fixtures
+    for fr in received:
+        assert fr.task_result.status == TaskStatus.FAILED
+
+
+def test_on_fixture_done_called_async_callback():
+    from atomics.eval.redblue.runner import run_redblue
+
+    received = []
+
+    async def async_cb(fr):
+        received.append(fr)
+
+    summary = _asyncio.run(run_redblue(
+        _provider_ok(),
+        judge_provider=_judge_good(),
+        mode="red",
+        on_fixture_done=async_cb,
+    ))
+
+    assert len(received) == summary.total_fixtures
+
+
+def test_on_fixture_done_async_callback_on_failure():
+    from atomics.eval.redblue.runner import run_redblue
+
+    received = []
+
+    async def async_cb(fr):
+        received.append(fr)
+
+    _asyncio.run(run_redblue(
+        _provider_raises(),
+        judge_provider=_judge_good(),
+        mode="red",
+        on_fixture_done=async_cb,
+    ))
+
+    assert len(received) > 0

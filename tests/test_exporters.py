@@ -123,3 +123,35 @@ def test_export_cli_sweep_suite(tmp_path, monkeypatch):
     result = runner.invoke(cli, ["export", "--suite", "sweep"])
     assert result.exit_code == 0, result.output
     assert "qwen3:14b" in result.output
+
+
+# ── _json_default datetime / write_csv empty rows ────────────────────────────
+
+def test_json_default_datetime():
+    from datetime import datetime, UTC
+    from atomics.exporters import _json_default
+    dt = datetime(2026, 1, 15, 12, 0, 0, tzinfo=UTC)
+    assert _json_default(dt) == dt.isoformat()
+
+
+def test_json_default_non_datetime():
+    from atomics.exporters import _json_default
+    assert _json_default(object()) != ""  # falls through to str()
+
+
+def test_write_csv_empty_rows():
+    import io
+    from atomics.exporters import write_csv
+    out = io.StringIO()
+    write_csv([], out)
+    assert out.getvalue() == ""  # early return, nothing written
+
+
+def test_write_csv_nonempty():
+    import io
+    from atomics.exporters import write_csv
+    out = io.StringIO()
+    write_csv([{"a": 1, "b": "x"}, {"a": 2, "b": "y"}], out)
+    content = out.getvalue()
+    assert "a" in content
+    assert "1" in content
