@@ -367,7 +367,7 @@ stoneburner/
 ├── qa/                   # QA fixture suites
 │   ├── examples/         # Committed fixtures — prompts + patterns, no secrets
 │   └── local/            # Local fixtures with real box details (gitignored)
-├── tests/                # Full pytest coverage (675+ tests)
+├── tests/                # Full pytest coverage (754+ tests, 84% coverage)
 └── workers/npm/          # Optional Node.js workers (Phase 3)
 ```
 
