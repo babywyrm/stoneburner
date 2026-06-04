@@ -49,6 +49,7 @@ coverage.xml
 
 # Target profiles (sensitive — real VM IPs, system prompts, API keys)
 profiles/local/
+qa/local/
 
 # Node (optional workers)
 node_modules/

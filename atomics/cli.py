@@ -2425,17 +2425,20 @@ def soak(
 
 @cli.command("qa")
 @click.option("--file", "-f", "qa_file", type=click.Path(exists=True), required=True,
-              help="QA fixture YAML file.")
+              help="QA fixture YAML file (prompts + pass/fail patterns — no secrets).")
+@click.option("--profile", "-p", "profile_path", type=click.Path(exists=True), default=None,
+              help="Target profile YAML for app-level gates (gitignored, replaces --model/--ollama-host).")
 @click.option("--model", "-m", type=str, default=None,
-              help="Override model from fixture file.")
+              help="Override model from fixture file (raw Ollama mode).")
 @click.option("--ollama-host", type=str, default=None,
-              help="Override Ollama host from fixture file.")
+              help="Override Ollama host from fixture file (raw Ollama mode).")
 @click.option("--num-predict", type=int, default=1024, show_default=True,
-              help="Max output tokens per fixture prompt.")
+              help="Max output tokens per fixture prompt (raw Ollama mode only).")
 @click.option("--fail-fast", is_flag=True, default=False,
               help="Stop after the first FAIL or ERROR.")
 def qa(
     qa_file: str,
+    profile_path: str | None,
     model: str | None,
     ollama_host: str | None,
     num_predict: int,
@@ -2443,14 +2446,25 @@ def qa(
 ) -> None:
     """QA validation — fire fixture prompts and check pass/fail patterns.
 
-    Useful for verifying CTF box solvability or AI gate regression after
-    model or config changes.
+    Two modes:
 
     \b
-    Examples:
-      atomics qa --file qa/app-gate.yaml
-      atomics qa --file qa/policy-service.yaml --model qwen2.5:7b
-      atomics qa --file qa/suite.yaml --fail-fast
+    RAW OLLAMA (default): talks directly to an Ollama model.
+      atomics qa --file qa/examples/ctf-solvability.yaml --model gemma4:26b
+
+    \b
+    PROFILE MODE: routes requests through an app-level HTTP target.
+    The profile lives in profiles/local/ (gitignored — keeps your real
+    box IPs and credentials out of the repo). The fixture file is safe
+    to commit; it only contains prompts and patterns.
+      atomics qa --file qa/examples/app-gate-gate.yaml \\
+                 --profile profiles/local/app-gate.yaml
+
+    \b
+    Other examples:
+      atomics qa --file qa/examples/ai-gate-regression.yaml --fail-fast
+      atomics qa --file qa/examples/policy-service-policy.yaml \\
+                 --profile profiles/local/policy-service-mcp.yaml
     """
     import asyncio as _asyncio
     import logging as _logging
@@ -2462,16 +2476,25 @@ def qa(
     console = Console()
 
     file_model, file_host, fixtures = load_qa_suite(qa_file)
-    effective_model = model or file_model
-    effective_host = ollama_host or file_host
 
-    if not effective_model:
-        console.print("[red]No model specified. Set 'model' in the YAML or use --model.[/red]")
-        raise SystemExit(1)
+    # Load profile if given — it handles all transport details
+    loaded_profile = None
+    target_label: str
+    if profile_path:
+        from atomics.profiles import load_profile
+        loaded_profile = load_profile(profile_path)
+        target_label = f"profile:[bold cyan]{loaded_profile.name}[/bold cyan] ({loaded_profile.type})"
+    else:
+        effective_model = model or file_model
+        effective_host = ollama_host or file_host
+        if not effective_model:
+            console.print("[red]No model specified. Set 'model' in the YAML or use --model.[/red]")
+            raise SystemExit(1)
+        target_label = f"[cyan]{effective_model}[/cyan]  Host: {effective_host}"
 
     console.print(
         f"[bold]QA Suite[/bold] — {len(fixtures)} fixture(s)\n"
-        f"Model: [cyan]{effective_model}[/cyan]  Host: {effective_host}\n"
+        f"Target: {target_label}\n"
     )
 
     stopped_early = False
@@ -2486,11 +2509,12 @@ def qa(
 
     try:
         suite = _asyncio.run(run_qa_suite(
-            model=effective_model,
-            host=effective_host,
+            model=effective_model if not loaded_profile else "",
+            host=effective_host if not loaded_profile else "",
             fixtures=fixtures,
             num_predict=num_predict,
             on_result=_on_result,
+            profile=loaded_profile,
         ))
     except KeyboardInterrupt:
         stopped_early = True

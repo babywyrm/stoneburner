@@ -168,21 +168,42 @@ async def _query_ollama(
     return text, lat
 
 
+async def _query_profile(
+    client: httpx.AsyncClient,
+    profile: object,
+    prompt: str,
+) -> tuple[str, float]:
+    """Fire a single prompt via a TargetProfile. Returns (response_text, latency_ms)."""
+    from atomics.profiles import _single_request_profile
+    text, lat, _cls = await _single_request_profile(client, profile, prompt)
+    return text, lat
+
+
 async def run_qa_suite(
     model: str,
     host: str,
     fixtures: list[QAFixture],
     num_predict: int = 1024,
     on_result: object = None,
+    profile: object = None,
 ) -> QASuiteResult:
-    """Run all fixtures sequentially and evaluate each response."""
+    """Run all fixtures sequentially and evaluate each response.
+
+    When ``profile`` is provided (a TargetProfile), requests are sent via the
+    profile's transport (arbitrary HTTP endpoint) instead of raw Ollama.
+    The profile handles endpoint URL, auth headers, body template, and response
+    extraction — keeping all sensitive connection details out of fixture files.
+    """
     suite = QASuiteResult(model=model, host=host)
     t0 = time.monotonic()
 
     async with httpx.AsyncClient(timeout=httpx.Timeout(120.0)) as client:
         for fixture in fixtures:
             try:
-                text, lat = await _query_ollama(client, host, model, fixture.prompt, num_predict)
+                if profile is not None:
+                    text, lat = await _query_profile(client, profile, fixture.prompt)
+                else:
+                    text, lat = await _query_ollama(client, host, model, fixture.prompt, num_predict)
                 status, mp, mf = evaluate_fixture(fixture, text)
                 qa_result = QAResult(
                     fixture=fixture,
