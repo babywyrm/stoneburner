@@ -1,12 +1,14 @@
 # Changelog
 
-## Unreleased — target profiles, soak command, scenario command, CLI polish, SARIF, export improvements
+## Unreleased — atomics qa, regression tracking, contention testing, ramp, think-time, target profiles, soak, scenario, CLI polish
 
 ### Added (stoneburner)
 - **Baseline regression tracking** — `atomics soak --save-baseline NAME` captures key metrics (avg tok/s, peak tok/s, P95 latency, error rate, verdict) under a named key. `--compare-baseline NAME` prints a colour-coded delta table and reports IMPROVED / STABLE / REGRESSED. `atomics baselines` lists all saved baselines. Thresholds: >10% TPS drop or >20% P95 spike triggers REGRESSED. Schema v11 adds `baselines` table with UNIQUE(name, suite) upsert. 23 tests.
 - **Scenario ramp (`--ramp`)** — `atomics scenario --ramp 10` staggers worker start times across the ramp window so load builds gradually rather than hammering at t=0. Stored on `ScenarioResult.ramp_seconds`. 6 tests.
 - **Multi-model VRAM contention (`--models`)** — `atomics stress --models qwen2.5:3b,qwen2.5:7b` runs each model solo first (baseline TPS), then all simultaneously. Reports per-model TPS degradation as a contention factor (<1.0 = degradation). CLI colour codes: green ≥0.9, yellow ≥0.7, red <0.7. 22 tests.
 - **`atomics qa`** — QA validation for CTF solvability and AI gate regression. Reads a YAML fixture file defining prompts with `pass_patterns`, `fail_patterns`, and `must_match` (pass/fail/any). Fires each at an Ollama model, evaluates responses with case-insensitive regex, prints a rich table and overall pass rate. `--fail-fast` stops at first failure. Example fixtures in `qa/examples/`. 32 tests.
+- **`atomics soak --think-time SECONDS`** — simulate realistic user pacing by inserting a think-time sleep between requests per worker. Defaults to 0 (no pause). Lets you model actual concurrency (N workers × think_time determines effective req/s) rather than pure hammering. 4 tests.
+- **`atomics qa --profile`** — `--profile profiles/local/gate.yaml` routes fixture queries through a TargetProfile (app HTTP endpoint or Ollama with custom system prompt) instead of raw Ollama. Fixture YAML stays committed; real IPs/tokens live in `profiles/local/` (gitignored). 8 tests.
 - **Custom target profiles** — YAML-based profiles for testing application-level AI gates. Two modes: `ollama` (Ollama with custom system prompt, temperature, num_predict) and `http` (arbitrary HTTP endpoint with body template, response parsing, and latency extraction). `--profile` flag added to `soak`, `stress`, and `scenario` commands. Response classification (`classify:` in YAML) detects model drift under load. Sensitive profiles gitignored via `profiles/local/`. 42 tests.
 - **`atomics soak`** — long-duration stability test. Holds fixed concurrency for minutes or hours, sampling throughput and latency at configurable intervals. Computes linear-regression drift to classify runs as STABLE / DEGRADED / UNSTABLE. Tracks VRAM drift, error rate, and total cost. Human-friendly duration parsing (`30m`, `2h`, `1h30m`, bare minutes). Works with all providers. Database persistence in `soak_results` table. 48 tests.
 - **`atomics scenario`** — mixed-workload inference simulation. Runs multiple agentic workload profiles (gate, eval) concurrently against a shared Ollama host. Measures per-workload P50/P95 latency, SLA compliance, and cross-workload interference scores via automatic solo-baseline comparison. Supports YAML scenario files and CLI shorthand (`-w type:model:concurrency[:sla_ms]`). 8 gate prompts + 8 eval prompts built in; custom prompt files supported. 42 tests.
@@ -19,7 +21,7 @@
 ### Changed (stoneburner)
 - `atomics sweep --host` renamed to `--ollama-host` (hidden `--host` alias kept for backward compat)
 - `atomics capacity --think-time` shorthand changed from `-t` to `--think` (removes collision with `--tier` `-t`)
-- Schema bumped v7 → v8 → v9 → v10 (adds `sweep_results`, `scenario_results`, and `soak_results` tables; existing DBs auto-migrated)
+- Schema bumped v7 → v8 → v9 → v10 → v11 (adds `sweep_results`, `scenario_results`, `soak_results`, and `baselines` tables; existing DBs auto-migrated)
 - `atomics export --suite soak` added for soak result export
 
 ### Added (mcpnuke)
