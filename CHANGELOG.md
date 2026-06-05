@@ -3,7 +3,10 @@
 ## Unreleased — atomics qa, regression tracking, contention testing, ramp, think-time, target profiles, soak, scenario, CLI polish, vllm provider
 
 ### Added (stoneburner)
-- **`--provider vllm`** — new `VllmProvider` adapter targeting any OpenAI-compatible endpoint (`/v1/chat/completions`). Supports vLLM, LiteLLM, llama.cpp. `--vllm-host` flag on all eval commands (`run`, `provider-test`, `sweep`, `adversarial`, `redblue`, `probe`). Config via `ATOMICS_VLLM_HOST` / `ATOMICS_VLLM_MODEL`. Thinking mode via `chat_template_kwargs.enable_thinking` for qwen3-family models. 24 tests. Probe profile `profiles/vllm-gateway.yaml` for the lab LiteLLM gateway.
+- **`--provider vllm`** — new `VllmProvider` adapter targeting any OpenAI-compatible endpoint (`/v1/chat/completions`). Supports vLLM, LiteLLM, llama.cpp. `--vllm-host` flag on all eval commands (`run`, `provider-test`, `sweep`, `adversarial`, `redblue`, `probe`). Config via `ATOMICS_VLLM_HOST` / `ATOMICS_VLLM_MODEL`. Thinking mode via `chat_template_kwargs.enable_thinking` for qwen3-family models. 24 unit tests + 7 CLI integration tests. Probe profile `profiles/vllm-gateway.yaml` for the lab LiteLLM gateway.
+- **`atomics models --provider vllm`** — model discovery from OpenAI-compatible `/v1/models` endpoint. Table drops Size/Params columns (not available from gateway). `--vllm-host` flag mirrors `--host` for Ollama.
+- **`qwen3:0.6b` registered** — added to `MODEL_CLASS_MAP` (LIGHT) and `THINKING_CAPABLE` set. Was showing as unknown on gpu-host gateway.
+- **`atomics baselines` CLI test** — added `test_cli_baselines_empty` and `test_cli_baselines_with_records` covering the empty-db and populated table paths.
 - **Baseline regression tracking** — `atomics soak --save-baseline NAME` captures key metrics (avg tok/s, peak tok/s, P95 latency, error rate, verdict) under a named key. `--compare-baseline NAME` prints a colour-coded delta table and reports IMPROVED / STABLE / REGRESSED. `atomics baselines` lists all saved baselines. Thresholds: >10% TPS drop or >20% P95 spike triggers REGRESSED. Schema v11 adds `baselines` table with UNIQUE(name, suite) upsert. 23 tests.
 - **Scenario ramp (`--ramp`)** — `atomics scenario --ramp 10` staggers worker start times across the ramp window so load builds gradually rather than hammering at t=0. Stored on `ScenarioResult.ramp_seconds`. 6 tests.
 - **Multi-model VRAM contention (`--models`)** — `atomics stress --models qwen2.5:3b,qwen2.5:7b` runs each model solo first (baseline TPS), then all simultaneously. Reports per-model TPS degradation as a contention factor (<1.0 = degradation). CLI colour codes: green ≥0.9, yellow ≥0.7, red <0.7. 22 tests.
@@ -18,6 +21,9 @@
 - **`atomics compare --output FILE`** — write JSON comparison alongside the Rich table
 - **`atomics doctor` documentation** — README section with full check list and CI usage guidance
 - **`configs/*.toml` removed** — orphaned profile TOMLs unreferenced by any code were deleted
+
+### Fixed (stoneburner)
+- **Adversarial scorer regex** — `[\r\n]+` after resistance score required a newline immediately after the integer. Small models (qwen2.5:3b, qwen3.5:0.8b) pad lines with trailing spaces (`RESISTANCE: 5  \n`), breaking all parse attempts and silently returning `score=0.5` for every fixture. Changed to `\s+` throughout. 3 regression tests added (clean `\n`, trailing-space `\n`, CRLF).
 
 ### Changed (stoneburner)
 - `atomics sweep --host` renamed to `--ollama-host` (hidden `--host` alias kept for backward compat)
