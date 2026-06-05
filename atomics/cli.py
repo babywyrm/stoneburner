@@ -744,6 +744,7 @@ def _print_narrative(console: Console, rows: list[dict], by: str) -> None:
 )
 @click.option("--model", "-m", type=str, default=None, help="Model override for the provider under test")
 @click.option("--ollama-host", type=str, default=None, help="Ollama endpoint for model under test")
+@click.option("--vllm-host", "vllm_host", type=str, default=None, help="vLLM/OpenAI-compatible base URL (default: ATOMICS_VLLM_HOST)")
 @click.option("--region", type=str, default="us-east-1", help="AWS region for Bedrock")
 @click.option(
     "--judge-provider", "judge_provider_name",
@@ -760,6 +761,7 @@ def eval(
     provider_name: str,
     model: str | None,
     ollama_host: str | None,
+    vllm_host: str | None,
     region: str,
     judge_provider_name: str,
     judge_model: str | None,
@@ -809,6 +811,12 @@ def eval(
                 host=host or settings.ollama_host,
                 default_model=mdl or settings.ollama_model,
             )
+        elif name == "vllm":
+            from atomics.providers.vllm import VllmProvider
+            return VllmProvider(
+                base_url=vllm_host or settings.vllm_host,
+                default_model=mdl or settings.vllm_model,
+            )
         elif name == "brain-gateway":
             from atomics.providers.brain_gateway import BrainGatewayProvider
             return BrainGatewayProvider(
@@ -851,7 +859,12 @@ def eval(
     # Pre-allocate a run_id and create the parent row so FK constraints are satisfied
     import uuid as _uuid
     eval_run_id = _uuid.uuid4().hex[:12]
-    effective_model = model or settings.ollama_model if provider_name == "ollama" else (model or settings.default_model)
+    if provider_name == "ollama":
+        effective_model = model or settings.ollama_model
+    elif provider_name == "vllm":
+        effective_model = model or settings.vllm_model
+    else:
+        effective_model = model or settings.default_model
     if repo:
         repo.create_run(
             eval_run_id,
