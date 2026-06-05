@@ -33,7 +33,7 @@ def cli() -> None:
     """Atomics — Agentic token usage benchmarking platform."""
 
 
-PROVIDER_CHOICES = click.Choice(["claude", "bedrock", "openai", "ollama", "brain-gateway"], case_sensitive=False)
+PROVIDER_CHOICES = click.Choice(["claude", "bedrock", "openai", "ollama", "vllm", "brain-gateway"], case_sensitive=False)
 
 
 @cli.command()
@@ -64,6 +64,7 @@ PROVIDER_CHOICES = click.Choice(["claude", "bedrock", "openai", "ollama", "brain
 @click.option("--interval", "-i", type=int, default=None, help="Override loop interval (seconds)")
 @click.option("--region", type=str, default="us-east-1", help="AWS region for Bedrock")
 @click.option("--ollama-host", type=str, default=None, help="Ollama endpoint (default: ATOMICS_OLLAMA_HOST or http://localhost:11434)")
+@click.option("--vllm-host", type=str, default=None, help="vLLM/OpenAI-compatible base URL (default: ATOMICS_VLLM_HOST or http://localhost:8000/v1)")
 @click.option("--gateway-url", type=str, default=None, help="Brain-gateway endpoint (default: ATOMICS_BRAIN_GATEWAY_URL or http://localhost:8080)")
 @click.option(
     "--hook",
@@ -105,6 +106,7 @@ def run(
     interval: int | None,
     region: str,
     ollama_host: str | None,
+    vllm_host: str | None,
     gateway_url: str | None,
     hook_cmd: str | None,
     notify_flag: bool | None,
@@ -162,6 +164,12 @@ def run(
         host = ollama_host or settings.ollama_host
         effective_model = model or settings.ollama_model
         provider = OllamaProvider(host=host, default_model=effective_model)
+    elif provider_name == "vllm":
+        from atomics.providers.vllm import VllmProvider
+
+        base_url = vllm_host or settings.vllm_host
+        effective_model = model or settings.vllm_model
+        provider = VllmProvider(base_url=base_url, default_model=effective_model)
     elif provider_name == "brain-gateway":
         from atomics.providers.brain_gateway import BrainGatewayProvider
 
@@ -249,10 +257,11 @@ def report(hours: int, runs: int) -> None:
 @click.option("--model", "-m", type=str, default=None, help="Model to test")
 @click.option("--region", type=str, default="us-east-1", help="AWS region for Bedrock")
 @click.option("--ollama-host", type=str, default=None, help="Ollama endpoint")
+@click.option("--vllm-host", type=str, default=None, help="vLLM/OpenAI-compatible base URL")
 @click.option("--gateway-url", type=str, default=None, help="Brain-gateway endpoint")
 @click.option("--thinking/--no-thinking", "thinking_flag", default=None, help="Enable/disable thinking mode")
 @click.option("--thinking-budget", type=int, default=None, help="Max thinking tokens")
-def provider_test(provider_name: str, model: str | None, region: str, ollama_host: str | None, gateway_url: str | None, thinking_flag: bool | None, thinking_budget: int | None) -> None:
+def provider_test(provider_name: str, model: str | None, region: str, ollama_host: str | None, vllm_host: str | None, gateway_url: str | None, thinking_flag: bool | None, thinking_budget: int | None) -> None:
     """Quick health check against the configured provider."""
     settings = load_settings()
     _setup_logging(settings.log_level)
@@ -299,6 +308,13 @@ def provider_test(provider_name: str, model: str | None, region: str, ollama_hos
         ollama_model_name = model or settings.ollama_model
         prov = OllamaProvider(host=host, default_model=ollama_model_name)
         model_label = ollama_model_name
+    elif provider_name == "vllm":
+        from atomics.providers.vllm import VllmProvider
+
+        base_url = vllm_host or settings.vllm_host
+        vllm_model_name = model or settings.vllm_model
+        prov = VllmProvider(base_url=base_url, default_model=vllm_model_name)
+        model_label = vllm_model_name
     elif provider_name == "brain-gateway":
         from atomics.providers.brain_gateway import BrainGatewayProvider
 
@@ -1563,7 +1579,7 @@ def show_tiers() -> None:
 
 # ── Shared provider builder for new suites ────────────────────────────────────
 
-def _make_provider(name: str, mdl: str | None, host: str | None, settings):
+def _make_provider(name: str, mdl: str | None, host: str | None, settings, *, vllm_host: str | None = None):
     """Build a provider instance — mirrors the pattern inside eval()."""
     if name == "claude":
         if not settings.anthropic_api_key:
@@ -1580,6 +1596,12 @@ def _make_provider(name: str, mdl: str | None, host: str | None, settings):
             sys.exit(1)
         from atomics.providers.openai import OpenAIProvider
         return OpenAIProvider(api_key=settings.openai_api_key, default_model=mdl or "gpt-4o")
+    if name == "vllm":
+        from atomics.providers.vllm import VllmProvider
+        return VllmProvider(
+            base_url=vllm_host or settings.vllm_host,
+            default_model=mdl or settings.vllm_model,
+        )
     if name == "brain-gateway":
         from atomics.providers.brain_gateway import BrainGatewayProvider
         return BrainGatewayProvider(url=host or settings.brain_gateway_url, default_model=mdl)
@@ -1608,6 +1630,8 @@ def _make_provider(name: str, mdl: str | None, host: str | None, settings):
               help="Ollama host URL (default: ATOMICS_OLLAMA_HOST)")
 @click.option("--host", "ollama_host", type=str, default=None, hidden=True,
               help="Deprecated alias for --ollama-host")
+@click.option("--vllm-host", "vllm_host", type=str, default=None,
+              help="vLLM/OpenAI-compatible base URL (default: ATOMICS_VLLM_HOST)")
 @click.option("--judge-provider", "judge_provider_name", type=PROVIDER_CHOICES, default="ollama",
               help="Provider for quality judge (default: ollama — $0)")
 @click.option("--judge-model", type=str, default=None, help="Judge model override")
@@ -1624,6 +1648,7 @@ def sweep(
     models: str | None,
     all_local: bool,
     ollama_host: str | None,
+    vllm_host: str | None,
     judge_provider_name: str,
     judge_model: str | None,
     judge_host: str | None,
@@ -1678,13 +1703,14 @@ def sweep(
     fixture_ids = [f.strip() for f in fixtures.split(",") if f.strip()] if fixtures else None
 
     def provider_factory(model_name: str):
-        return _make_provider(provider_name, model_name, ollama_host, settings)
+        return _make_provider(provider_name, model_name, ollama_host, settings, vllm_host=vllm_host)
 
     judge_provider = _make_provider(
         judge_provider_name,
         judge_model,
         judge_host or effective_host,
         settings,
+        vllm_host=vllm_host,
     )
 
     result_table = Table(title="Model Sweep Results", show_lines=True)
@@ -1774,6 +1800,7 @@ def sweep(
 @click.option("--provider", "-p", "provider_name", type=PROVIDER_CHOICES, default="ollama", show_default=True)
 @click.option("--model", "-m", type=str, default=None, help="Model override for the provider under test.")
 @click.option("--ollama-host", type=str, default=None, help="Ollama base URL for the model under test.")
+@click.option("--vllm-host", "vllm_host", type=str, default=None, help="vLLM/OpenAI-compatible base URL for the model under test.")
 @click.option("--judge-provider", "judge_provider_name", type=PROVIDER_CHOICES, default="ollama", show_default=True)
 @click.option("--judge-model", type=str, default=None, help="Primary judge model override.")
 @click.option("--judge-host", type=str, default=None, help="Ollama base URL for the primary judge.")
@@ -1795,6 +1822,7 @@ def adversarial(
     provider_name: str,
     model: str | None,
     ollama_host: str | None,
+    vllm_host: str | None,
     judge_provider_name: str,
     judge_model: str | None,
     judge_host: str | None,
@@ -1820,8 +1848,8 @@ def adversarial(
 
     console = Console()
     settings = load_settings()
-    provider = _make_provider(provider_name, model, ollama_host, settings)
-    judge = _make_provider(judge_provider_name, judge_model, judge_host or ollama_host, settings)
+    provider = _make_provider(provider_name, model, ollama_host, settings, vllm_host=vllm_host)
+    judge = _make_provider(judge_provider_name, judge_model, judge_host or ollama_host, settings, vllm_host=vllm_host)
     categories = [c.strip() for c in category.split(",")] if category else None
 
     # Parse --extra-judges "ollama:deepseek-r1:14b@http://host:port,claude:model"
@@ -1835,7 +1863,7 @@ def adversarial(
             parts = spec.split(":", 1)
             ej_provider_name = parts[0]
             ej_model = parts[1] if len(parts) > 1 else None
-            ej_provider = _make_provider(ej_provider_name, ej_model, host_override or judge_host or ollama_host, settings)
+            ej_provider = _make_provider(ej_provider_name, ej_model, host_override or judge_host or ollama_host, settings, vllm_host=vllm_host)
             extra_judge_pairs.append((ej_provider, ej_model))
 
     judge_label = judge_model or "default"
@@ -1918,6 +1946,7 @@ def adversarial(
 @click.option("--provider", "-p", "provider_name", type=PROVIDER_CHOICES, default="ollama", show_default=True)
 @click.option("--model", "-m", type=str, default=None)
 @click.option("--ollama-host", type=str, default=None)
+@click.option("--vllm-host", "vllm_host", type=str, default=None, help="vLLM/OpenAI-compatible base URL.")
 @click.option("--judge-provider", "judge_provider_name", type=PROVIDER_CHOICES, default="ollama", show_default=True)
 @click.option("--judge-model", type=str, default=None)
 @click.option("--judge-host", type=str, default=None)
@@ -1930,6 +1959,7 @@ def redblue(
     provider_name: str,
     model: str | None,
     ollama_host: str | None,
+    vllm_host: str | None,
     judge_provider_name: str,
     judge_model: str | None,
     judge_host: str | None,
@@ -1945,8 +1975,8 @@ def redblue(
     console = Console()
     fixture_count = {"red": len(RED_FIXTURES), "blue": len(BLUE_FIXTURES), "all": len(ALL_FIXTURES)}[mode]
     settings = load_settings()
-    provider = _make_provider(provider_name, model, ollama_host, settings)
-    judge = _make_provider(judge_provider_name, judge_model, judge_host or ollama_host, settings)
+    provider = _make_provider(provider_name, model, ollama_host, settings, vllm_host=vllm_host)
+    judge = _make_provider(judge_provider_name, judge_model, judge_host or ollama_host, settings, vllm_host=vllm_host)
 
     console.print(
         f"\n[bold]Red/Blue eval[/bold] — model: [cyan]{provider_name}[/cyan] ({model or 'default'})\n"
@@ -2003,6 +2033,7 @@ def redblue(
 @click.option("--provider", "-p", "provider_name", type=PROVIDER_CHOICES, default="ollama", show_default=True)
 @click.option("--model", "-m", type=str, default=None)
 @click.option("--ollama-host", type=str, default=None)
+@click.option("--vllm-host", "vllm_host", type=str, default=None, help="vLLM/OpenAI-compatible base URL.")
 @click.option("--judge-provider", "judge_provider_name", type=PROVIDER_CHOICES, default="ollama", show_default=True)
 @click.option("--judge-model", type=str, default=None)
 @click.option("--judge-host", type=str, default=None)
@@ -2023,6 +2054,7 @@ def probe(
     provider_name: str,
     model: str | None,
     ollama_host: str | None,
+    vllm_host: str | None,
     judge_provider_name: str,
     judge_model: str | None,
     judge_host: str | None,
@@ -2041,8 +2073,8 @@ def probe(
 
     console = Console()
     settings = load_settings()
-    provider = _make_provider(provider_name, model, ollama_host, settings)
-    judge = _make_provider(judge_provider_name, judge_model, judge_host or ollama_host, settings)
+    provider = _make_provider(provider_name, model, ollama_host, settings, vllm_host=vllm_host)
+    judge = _make_provider(judge_provider_name, judge_model, judge_host or ollama_host, settings, vllm_host=vllm_host)
 
     targets = []
     if probes_file:
