@@ -234,61 +234,107 @@ def test_fetch_artifact_file_truncation(tmp_path):
     assert len(content) == 50
 
 
-@pytest.mark.skipif(
-    not __import__("importlib.util", fromlist=["find_spec"]).find_spec("aiohttp"),
-    reason="aiohttp not installed",
-)
 def test_fetch_artifact_http_source():
-    """_fetch_http path is exercised via mocked aiohttp."""
+    """_fetch_http fetches content via httpx and returns decoded string."""
     import asyncio
     from unittest.mock import AsyncMock, MagicMock, patch
     from atomics.probe.config import ProbeTarget
     from atomics.probe.connectors import fetch_artifact
 
-    mock_resp = AsyncMock()
+    mock_resp = MagicMock()
     mock_resp.raise_for_status = MagicMock()
-    mock_resp.read = AsyncMock(return_value=b'{"status": "ok"}')
-    mock_resp.__aenter__ = AsyncMock(return_value=mock_resp)
-    mock_resp.__aexit__ = AsyncMock(return_value=False)
+    mock_resp.content = b'{"status": "ok"}'
 
-    mock_session = AsyncMock()
-    mock_session.get = MagicMock(return_value=mock_resp)
-    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
-    mock_session.__aexit__ = AsyncMock(return_value=False)
+    mock_client = AsyncMock()
+    mock_client.get = AsyncMock(return_value=mock_resp)
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
 
     target = ProbeTarget(
         name="api", artifact_type="api-response", source="http",
         url="http://localhost:9999/status",
     )
-    with patch("aiohttp.ClientSession", return_value=mock_session):
+    with patch("httpx.AsyncClient", return_value=mock_client):
         content = asyncio.run(fetch_artifact(target))
     assert "ok" in content
 
 
-@pytest.mark.skipif(
-    not __import__("importlib.util", fromlist=["find_spec"]).find_spec("aiohttp"),
-    reason="aiohttp not installed",
-)
 def test_fetch_artifact_http_error():
-    """_fetch_http wraps aiohttp.ClientError into ProbeConnectorError."""
+    """_fetch_http wraps httpx.HTTPError into ProbeConnectorError."""
     import asyncio
-    import aiohttp
-    from unittest.mock import AsyncMock, MagicMock, patch
+    import httpx
+    from unittest.mock import AsyncMock, patch
     from atomics.probe.config import ProbeTarget
     from atomics.probe.connectors import fetch_artifact, ProbeConnectorError
 
-    mock_session = AsyncMock()
-    mock_session.get = MagicMock(side_effect=aiohttp.ClientConnectionError("refused"))
-    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
-    mock_session.__aexit__ = AsyncMock(return_value=False)
+    mock_client = AsyncMock()
+    mock_client.get = AsyncMock(side_effect=httpx.ConnectError("refused"))
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
 
     target = ProbeTarget(
         name="bad-api", artifact_type="api-response", source="http",
         url="http://localhost:9999/dead",
     )
-    with patch("aiohttp.ClientSession", return_value=mock_session), \
-         pytest.raises(ProbeConnectorError, match="HTTP fetch failed"):
+    with patch("httpx.AsyncClient", return_value=mock_client):
+        with pytest.raises(ProbeConnectorError, match="HTTP fetch failed"):
+            asyncio.run(fetch_artifact(target))
+
+
+def test_fetch_artifact_http_truncation():
+    """_fetch_http truncates responses larger than max_bytes."""
+    import asyncio
+    from unittest.mock import AsyncMock, MagicMock, patch
+    from atomics.probe.config import ProbeTarget
+    from atomics.probe.connectors import fetch_artifact
+
+    big_content = b"X" * 200
+
+    mock_resp = MagicMock()
+    mock_resp.raise_for_status = MagicMock()
+    mock_resp.content = big_content
+
+    mock_client = AsyncMock()
+    mock_client.get = AsyncMock(return_value=mock_resp)
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+
+    target = ProbeTarget(
+        name="big-api", artifact_type="api-response", source="http",
+        url="http://localhost:9999/big",
+    )
+    with patch("httpx.AsyncClient", return_value=mock_client):
+        content = asyncio.run(fetch_artifact(target, max_bytes=50))
+    assert len(content) == 50
+
+
+def test_fetch_artifact_http_custom_headers():
+    """_fetch_http passes custom headers from ProbeTarget."""
+    import asyncio
+    from unittest.mock import AsyncMock, MagicMock, patch, call
+    from atomics.probe.config import ProbeTarget
+    from atomics.probe.connectors import fetch_artifact
+
+    mock_resp = MagicMock()
+    mock_resp.raise_for_status = MagicMock()
+    mock_resp.content = b"ok"
+
+    mock_client = AsyncMock()
+    mock_client.get = AsyncMock(return_value=mock_resp)
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+
+    target = ProbeTarget(
+        name="auth-api", artifact_type="api-response", source="http",
+        url="http://localhost:9999/secure",
+        headers={"Authorization": "Bearer tok-123"},
+    )
+    with patch("httpx.AsyncClient", return_value=mock_client) as patched_cls:
         asyncio.run(fetch_artifact(target))
+    # Verify headers were passed to the client constructor
+    patched_cls.assert_called_once()
+    _, ctor_kwargs = patched_cls.call_args
+    assert ctor_kwargs.get("headers", {}).get("Authorization") == "Bearer tok-123"
 
 
 # ── Runner — ProbeSummary properties + fetch/analysis failure paths ───────────

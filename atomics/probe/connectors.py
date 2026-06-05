@@ -44,20 +44,20 @@ async def _fetch_file(target: ProbeTarget, *, max_bytes: int) -> str:
 
 
 async def _fetch_http(target: ProbeTarget, *, max_bytes: int) -> str:
-    import aiohttp
+    import httpx
 
     url = target.url or ""
     headers = target.headers or {}
 
     try:
-        async with aiohttp.ClientSession(headers=headers) as session:
-            async with session.get(url, timeout=aiohttp.ClientTimeout(total=15)) as resp:
-                resp.raise_for_status()
-                content = await resp.read()
-                if len(content) > max_bytes:
-                    content = content[:max_bytes]
-                return content.decode("utf-8", errors="replace")
-    except aiohttp.ClientError as exc:
+        async with httpx.AsyncClient(headers=headers, timeout=15.0) as client:
+            resp = await client.get(url)
+            resp.raise_for_status()
+            content = resp.content
+            if len(content) > max_bytes:
+                content = content[:max_bytes]
+            return content.decode("utf-8", errors="replace")
+    except httpx.HTTPError as exc:
         raise ProbeConnectorError(
             f"HTTP fetch failed for target '{target.name}' ({url}): {exc}"
         ) from exc
