@@ -412,3 +412,483 @@ def test_cli_login_help():
     assert result.exit_code == 0
     assert "--headless" in result.output
     assert "--issuer" in result.output
+
+
+# ── OAuthPKCEAuth — flow coverage ───────────────────────────────────────────
+
+
+_DEVICE_PROFILE = OPENAI_PROFILE  # has device_authorization_endpoint
+
+
+@pytest.mark.asyncio
+async def test_oauth_validate_exception_returns_false(tmp_path: Path):
+    """validate() returns False when _get_tokens raises."""
+    from unittest.mock import patch
+
+    store = TokenStore(tmp_path / "auth.json")
+    auth = OAuthPKCEAuth(profile=OPENAI_PROFILE, store=store)
+    with patch.object(auth, "_get_tokens", side_effect=RuntimeError("store broken")):
+        result = await auth.validate()
+    assert result is False
+
+
+@pytest.mark.asyncio
+async def test_oauth_get_headers_triggers_refresh(tmp_path: Path):
+    """get_headers() calls _refresh when token needs_refresh."""
+    import asyncio as aio
+    from unittest.mock import AsyncMock, patch
+
+    store = TokenStore(tmp_path / "auth.json")
+    # Save a token that needs_refresh (expires soon but not yet expired)
+    near_expiry = CachedTokens(
+        access_token="old-token",
+        refresh_token="rt-abc",
+        expires_at=time.time() + 30,  # needs_refresh threshold is typically 60s
+        profile_name="openai",
+    )
+    store.save(near_expiry)
+    auth = OAuthPKCEAuth(profile=OPENAI_PROFILE, store=store)
+
+    refreshed = CachedTokens(
+        access_token="new-token",
+        refresh_token="rt-new",
+        expires_at=time.time() + 3600,
+        profile_name="openai",
+    )
+    with patch.object(auth, "_refresh", new=AsyncMock(return_value=refreshed)):
+        headers = await auth.get_headers()
+    assert headers["Authorization"] == "Bearer new-token"
+
+
+@pytest.mark.asyncio
+async def test_oauth_parse_token_response():
+    """_parse_token_response correctly maps body fields."""
+    store = TokenStore.__new__(TokenStore)
+    store._path = Path("/dev/null")
+    auth = OAuthPKCEAuth(profile=OPENAI_PROFILE, store=store)
+    body = {
+        "access_token": "at-xyz",
+        "refresh_token": "rt-xyz",
+        "id_token": "id-xyz",
+        "expires_in": 7200,
+    }
+    tokens = auth._parse_token_response(body)
+    assert tokens.access_token == "at-xyz"
+    assert tokens.refresh_token == "rt-xyz"
+    assert tokens.id_token == "id-xyz"
+    assert tokens.expires_at > time.time() + 7100
+
+
+@pytest.mark.asyncio
+async def test_oauth_parse_token_response_default_expiry():
+    """_parse_token_response uses 3600s when expires_in is absent."""
+    store = TokenStore.__new__(TokenStore)
+    store._path = Path("/dev/null")
+    auth = OAuthPKCEAuth(profile=OPENAI_PROFILE, store=store)
+    body = {"access_token": "at", "refresh_token": ""}
+    tokens = auth._parse_token_response(body)
+    assert tokens.expires_at > time.time() + 3590
+
+
+@pytest.mark.asyncio
+async def test_oauth_exchange_code(tmp_path: Path):
+    """_exchange_code posts to token_endpoint and parses the response."""
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    mock_resp = MagicMock()
+    mock_resp.raise_for_status = MagicMock()
+    mock_resp.json = MagicMock(return_value={
+        "access_token": "at-from-exchange",
+        "refresh_token": "rt-exchange",
+        "expires_in": 3600,
+    })
+
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock(return_value=mock_resp)
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+
+    store = TokenStore(tmp_path / "auth.json")
+    auth = OAuthPKCEAuth(profile=OPENAI_PROFILE, store=store)
+
+    with patch("httpx.AsyncClient", return_value=mock_client):
+        tokens = await auth._exchange_code(
+            code="auth-code", verifier="verifier-123",
+            redirect_uri="http://localhost:19274/callback",
+        )
+    assert tokens.access_token == "at-from-exchange"
+    assert tokens.refresh_token == "rt-exchange"
+
+
+@pytest.mark.asyncio
+async def test_oauth_refresh(tmp_path: Path):
+    """_refresh posts with refresh_token and returns new tokens."""
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    mock_resp = MagicMock()
+    mock_resp.raise_for_status = MagicMock()
+    mock_resp.json = MagicMock(return_value={
+        "access_token": "refreshed-at",
+        "refresh_token": "refreshed-rt",
+        "expires_in": 3600,
+    })
+
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock(return_value=mock_resp)
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+
+    store = TokenStore(tmp_path / "auth.json")
+    auth = OAuthPKCEAuth(profile=OPENAI_PROFILE, store=store)
+    old_tokens = CachedTokens(
+        access_token="old", refresh_token="old-rt", expires_at=time.time() + 30
+    )
+
+    with patch("httpx.AsyncClient", return_value=mock_client):
+        new_tokens = await auth._refresh(old_tokens)
+    assert new_tokens.access_token == "refreshed-at"
+    assert new_tokens.refresh_token == "refreshed-rt"
+    mock_client.post.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_oauth_refresh_preserves_old_refresh_token(tmp_path: Path):
+    """_refresh reuses old refresh_token when new response omits it."""
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    mock_resp = MagicMock()
+    mock_resp.raise_for_status = MagicMock()
+    mock_resp.json = MagicMock(return_value={
+        "access_token": "fresh-at",
+        "expires_in": 3600,
+        # no refresh_token in response
+    })
+
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock(return_value=mock_resp)
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+
+    store = TokenStore(tmp_path / "auth.json")
+    auth = OAuthPKCEAuth(profile=OPENAI_PROFILE, store=store)
+    old_tokens = CachedTokens(
+        access_token="old", refresh_token="keep-me", expires_at=time.time() + 30
+    )
+
+    with patch("httpx.AsyncClient", return_value=mock_client):
+        new_tokens = await auth._refresh(old_tokens)
+    assert new_tokens.refresh_token == "keep-me"
+
+
+@pytest.mark.asyncio
+async def test_oauth_device_code_flow_success(tmp_path: Path):
+    """_device_code_flow polls until 200 and returns tokens."""
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    device_resp = MagicMock()
+    device_resp.raise_for_status = MagicMock()
+    device_resp.json = MagicMock(return_value={
+        "device_code": "dc-123",
+        "user_code": "ABCD-1234",
+        "verification_uri_complete": "https://example.com/activate?code=ABCD-1234",
+        "interval": 0,
+    })
+
+    # First poll: authorization_pending; second poll: success
+    pending_resp = MagicMock()
+    pending_resp.status_code = 400
+    pending_resp.raise_for_status = MagicMock()
+    pending_resp.json = MagicMock(return_value={"error": "authorization_pending"})
+
+    token_resp = MagicMock()
+    token_resp.status_code = 200
+    token_resp.raise_for_status = MagicMock()
+    token_resp.json = MagicMock(return_value={
+        "access_token": "at-device",
+        "refresh_token": "rt-device",
+        "expires_in": 3600,
+    })
+
+    call_count = 0
+
+    async def fake_post(url, **_kw):
+        nonlocal call_count
+        if "device/code" in url:
+            return device_resp
+        call_count += 1
+        return pending_resp if call_count == 1 else token_resp
+
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock(side_effect=fake_post)
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+
+    store = TokenStore(tmp_path / "auth.json")
+    auth = OAuthPKCEAuth(profile=_DEVICE_PROFILE, store=store)
+
+    with patch("httpx.AsyncClient", return_value=mock_client), \
+         patch("asyncio.sleep", new=AsyncMock()):
+        tokens = await auth._device_code_flow()
+
+    assert tokens.access_token == "at-device"
+
+
+@pytest.mark.asyncio
+async def test_oauth_device_code_flow_slow_down(tmp_path: Path):
+    """_device_code_flow increments poll_interval on slow_down and eventually succeeds."""
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    device_resp = MagicMock()
+    device_resp.raise_for_status = MagicMock()
+    device_resp.json = MagicMock(return_value={
+        "device_code": "dc-slow",
+        "user_code": "",
+        "verification_uri": "https://example.com/activate",
+        "interval": 1,
+    })
+
+    slow_resp = MagicMock()
+    slow_resp.status_code = 400
+    slow_resp.raise_for_status = MagicMock()
+    slow_resp.json = MagicMock(return_value={"error": "slow_down"})
+
+    token_resp = MagicMock()
+    token_resp.status_code = 200
+    token_resp.raise_for_status = MagicMock()
+    token_resp.json = MagicMock(return_value={
+        "access_token": "at-slow", "refresh_token": "", "expires_in": 3600,
+    })
+
+    call_count = 0
+
+    async def fake_post(url, **_kw):
+        nonlocal call_count
+        if "device/code" in url:
+            return device_resp
+        call_count += 1
+        return slow_resp if call_count == 1 else token_resp
+
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock(side_effect=fake_post)
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+
+    store = TokenStore(tmp_path / "auth.json")
+    auth = OAuthPKCEAuth(profile=_DEVICE_PROFILE, store=store)
+
+    with patch("httpx.AsyncClient", return_value=mock_client), \
+         patch("asyncio.sleep", new=AsyncMock()):
+        tokens = await auth._device_code_flow()
+
+    assert tokens.access_token == "at-slow"
+
+
+@pytest.mark.asyncio
+async def test_oauth_device_code_flow_unknown_error(tmp_path: Path):
+    """_device_code_flow calls raise_for_status on unrecognised error codes."""
+    import httpx
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    device_resp = MagicMock()
+    device_resp.raise_for_status = MagicMock()
+    device_resp.json = MagicMock(return_value={
+        "device_code": "dc-err", "user_code": "", "verification_uri": "https://x.com", "interval": 0,
+    })
+
+    error_resp = MagicMock()
+    error_resp.status_code = 400
+    error_resp.json = MagicMock(return_value={"error": "expired_token"})
+    error_resp.raise_for_status = MagicMock(
+        side_effect=httpx.HTTPStatusError("400", request=MagicMock(), response=error_resp)
+    )
+
+    async def fake_post(url, **_kw):
+        if "device/code" in url:
+            return device_resp
+        return error_resp
+
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock(side_effect=fake_post)
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+
+    store = TokenStore(tmp_path / "auth.json")
+    auth = OAuthPKCEAuth(profile=_DEVICE_PROFILE, store=store)
+
+    with patch("httpx.AsyncClient", return_value=mock_client), \
+         patch("asyncio.sleep", new=AsyncMock()):
+        with pytest.raises(httpx.HTTPStatusError):
+            await auth._device_code_flow()
+
+
+@pytest.mark.asyncio
+async def test_oauth_device_code_flow_no_endpoint(tmp_path: Path):
+    """_device_code_flow raises when profile has no device_authorization_endpoint."""
+    from atomics.auth.profiles import OIDCProfile
+
+    no_device_profile = OIDCProfile(
+        name="no-device", issuer="https://example.com",
+        token_endpoint="https://example.com/token",
+        client_id="client-x",
+    )
+    store = TokenStore(tmp_path / "auth.json")
+    auth = OAuthPKCEAuth(profile=no_device_profile, store=store)
+
+    with pytest.raises(RuntimeError, match="does not support device code flow"):
+        await auth._device_code_flow()
+
+
+@pytest.mark.asyncio
+async def test_oauth_login_headless_delegates(tmp_path: Path):
+    """login(headless=True) calls _device_code_flow and saves tokens."""
+    from unittest.mock import AsyncMock, patch
+
+    store = TokenStore(tmp_path / "auth.json")
+    auth = OAuthPKCEAuth(profile=_DEVICE_PROFILE, store=store)
+    expected = CachedTokens(
+        access_token="hd-token", refresh_token="hd-rt",
+        expires_at=time.time() + 3600, profile_name="openai",
+    )
+    with patch.object(auth, "_device_code_flow", new=AsyncMock(return_value=expected)):
+        tokens = await auth.login(headless=True)
+    assert tokens.access_token == "hd-token"
+    assert store.has_valid_tokens()
+
+
+@pytest.mark.asyncio
+async def test_oauth_login_browser_delegates(tmp_path: Path):
+    """login(headless=False) calls _browser_flow and saves tokens."""
+    from unittest.mock import AsyncMock, patch
+
+    store = TokenStore(tmp_path / "auth.json")
+    auth = OAuthPKCEAuth(profile=_DEVICE_PROFILE, store=store)
+    expected = CachedTokens(
+        access_token="br-token", refresh_token="br-rt",
+        expires_at=time.time() + 3600, profile_name="openai",
+    )
+    with patch.object(auth, "_browser_flow", new=AsyncMock(return_value=expected)):
+        tokens = await auth.login(headless=False)
+    assert tokens.access_token == "br-token"
+    assert store.has_valid_tokens()
+
+
+@pytest.mark.asyncio
+async def test_oauth_browser_flow(tmp_path: Path):
+    """_browser_flow opens browser, awaits callback code, and exchanges it."""
+    import asyncio as aio
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    store = TokenStore(tmp_path / "auth.json")
+    auth = OAuthPKCEAuth(profile=OPENAI_PROFILE, store=store)
+    expected_tokens = CachedTokens(
+        access_token="browser-at", refresh_token="browser-rt",
+        expires_at=time.time() + 3600, profile_name="openai",
+    )
+
+    def fake_start_server(port, state, code_future, loop):
+        loop.call_soon(code_future.set_result, "auth-code-from-browser")
+        mock_srv = MagicMock()
+        mock_srv.shutdown = MagicMock()
+        return mock_srv
+
+    with patch("webbrowser.open") as mock_browser, \
+         patch("atomics.auth.oauth._start_callback_server", side_effect=fake_start_server), \
+         patch.object(auth, "_exchange_code", new=AsyncMock(return_value=expected_tokens)):
+        tokens = await auth._browser_flow()
+
+    assert tokens.access_token == "browser-at"
+    mock_browser.assert_called_once()
+
+
+# ── _start_callback_server Handler ──────────────────────────────────────────
+
+
+def test_callback_handler_success():
+    """Handler.do_GET with valid state and code sets the future result."""
+    import asyncio as aio
+    import threading
+    from io import BytesIO
+    from http.server import HTTPServer
+    from atomics.auth.oauth import _start_callback_server
+
+    loop = aio.new_event_loop()
+    future: aio.Future[str] = loop.create_future()
+
+    server = _start_callback_server(
+        port=0,  # OS picks a free port
+        expected_state="st-abc",
+        code_future=future,
+        loop=loop,
+    )
+    port = server.server_address[1]
+
+    import urllib.request
+    url = f"http://127.0.0.1:{port}/callback?state=st-abc&code=code-xyz"
+    resp = urllib.request.urlopen(url, timeout=3)
+    assert resp.status == 200
+
+    # Drain the scheduled call_soon
+    loop.run_until_complete(aio.sleep(0))
+    assert future.result() == "code-xyz"
+    server.shutdown()
+    loop.close()
+
+
+def test_callback_handler_state_mismatch():
+    """Handler.do_GET with wrong state sets RuntimeError on the future."""
+    import asyncio as aio
+    from atomics.auth.oauth import _start_callback_server
+    import urllib.request, urllib.error
+
+    loop = aio.new_event_loop()
+    future: aio.Future[str] = loop.create_future()
+
+    server = _start_callback_server(
+        port=0, expected_state="expected-state",
+        code_future=future, loop=loop,
+    )
+    port = server.server_address[1]
+
+    try:
+        urllib.request.urlopen(
+            f"http://127.0.0.1:{port}/callback?state=WRONG&code=c",
+            timeout=3,
+        )
+    except urllib.error.HTTPError as e:
+        assert e.code == 400
+
+    loop.run_until_complete(aio.sleep(0))
+    with pytest.raises(RuntimeError, match="state mismatch"):
+        future.result()
+    server.shutdown()
+    loop.close()
+
+
+def test_callback_handler_oauth_error():
+    """Handler.do_GET with error param sets RuntimeError on the future."""
+    import asyncio as aio
+    from atomics.auth.oauth import _start_callback_server
+    import urllib.request, urllib.error
+
+    loop = aio.new_event_loop()
+    future: aio.Future[str] = loop.create_future()
+
+    server = _start_callback_server(
+        port=0, expected_state="st",
+        code_future=future, loop=loop,
+    )
+    port = server.server_address[1]
+
+    try:
+        urllib.request.urlopen(
+            f"http://127.0.0.1:{port}/callback?error=access_denied",
+            timeout=3,
+        )
+    except urllib.error.HTTPError as e:
+        assert e.code == 400
+
+    loop.run_until_complete(aio.sleep(0))
+    with pytest.raises(RuntimeError, match="OAuth error"):
+        future.result()
+    server.shutdown()
+    loop.close()
