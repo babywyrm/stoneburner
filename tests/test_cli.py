@@ -905,3 +905,228 @@ def test_cli_sweep_no_verbose_hides_replies(monkeypatch):
     ])
     assert result.exit_code == 0
     assert "X is a fantastic thing" not in result.output
+
+
+# ---------------------------------------------------------------------------
+# vllm provider — CLI path tests
+# ---------------------------------------------------------------------------
+
+def test_cli_run_with_mocked_vllm(monkeypatch, tmp_path):
+    """atomics run --provider vllm should construct VllmProvider and run."""
+    from unittest.mock import AsyncMock, MagicMock
+    from types import SimpleNamespace
+    from atomics.models import BurnTier
+
+    fake_resp = SimpleNamespace(
+        text="ok", input_tokens=10, output_tokens=20, total_tokens=30,
+        model="qwen2.5:3b", latency_ms=120.0, estimated_cost_usd=0.0,
+        tokens_per_second=100.0, thinking_tokens=0, thinking_text="",
+    )
+    fake_provider = MagicMock()
+    fake_provider.name = "vllm"
+    fake_provider.generate = AsyncMock(return_value=fake_resp)
+    fake_provider.health_check = AsyncMock(return_value=True)
+
+    class FakeVllm:
+        def __init__(self, **_kw):
+            self._default_model = "qwen2.5:3b"
+        async def generate(self, *a, **kw):
+            return fake_resp
+        async def health_check(self):
+            return True
+        @property
+        def name(self):
+            return "vllm"
+
+    monkeypatch.setattr("atomics.providers.vllm.VllmProvider", FakeVllm)
+
+    from atomics.core.engine import LoopEngine
+    from atomics.models import RunSummary
+
+    from datetime import datetime, timezone
+    fake_summary = RunSummary(
+        run_id="test-vllm-001",
+        started_at=datetime.now(timezone.utc),
+        total_tasks=1, total_tokens=30, total_cost_usd=0.0,
+        avg_tokens_per_task=30.0, avg_latency_ms=120.0,
+        tier=BurnTier.EZ, provider="vllm",
+    )
+
+    async def fake_run(*a, **kw):
+        return fake_summary
+
+    monkeypatch.setattr(LoopEngine, "run", fake_run)
+    monkeypatch.chdir(tmp_path)
+
+    runner = CliRunner()
+    result = runner.invoke(cli, [
+        "run", "--provider", "vllm",
+        "--vllm-host", "http://fake:8000/v1",
+        "-m", "qwen2.5:3b", "-n", "1",
+    ])
+    assert result.exit_code == 0
+
+
+def test_cli_provider_test_vllm_success(monkeypatch, tmp_path):
+    """atomics provider-test --provider vllm should connect and generate."""
+    from unittest.mock import AsyncMock
+    from types import SimpleNamespace
+
+    fake_resp = SimpleNamespace(
+        text="ok", input_tokens=5, output_tokens=10, total_tokens=15,
+        model="qwen2.5:3b", latency_ms=80.0, estimated_cost_usd=0.0,
+        tokens_per_second=125.0, thinking_tokens=0, thinking_text="",
+    )
+
+    class FakeVllm:
+        def __init__(self, **_kw):
+            self._default_model = "qwen2.5:3b"
+        async def generate(self, *a, **kw):
+            return fake_resp
+        async def health_check(self):
+            return True
+        @property
+        def name(self):
+            return "vllm"
+
+    monkeypatch.setattr("atomics.providers.vllm.VllmProvider", FakeVllm)
+    monkeypatch.chdir(tmp_path)
+
+    runner = CliRunner()
+    result = runner.invoke(cli, [
+        "provider-test", "--provider", "vllm",
+        "--vllm-host", "http://fake:8000/v1",
+        "-m", "qwen2.5:3b",
+    ])
+    assert result.exit_code == 0
+    assert "vllm" in result.output.lower()
+
+
+def test_cli_sweep_vllm_provider(monkeypatch, tmp_path):
+    """atomics sweep --provider vllm should use VllmProvider via _make_provider."""
+    from atomics.sweep import ModelSweepResult
+
+    constructed: list[str] = []
+
+    class FakeVllm:
+        def __init__(self, base_url="http://localhost:8000/v1", default_model="qwen2.5:3b", **_kw):
+            self._default_model = default_model
+            constructed.append(default_model)
+        @property
+        def name(self):
+            return "vllm"
+
+    mock_results = [
+        ModelSweepResult(
+            model="qwen2.5:3b", fixtures_run=1, overall_quality=0.90,
+            avg_latency_ms=300.0, total_tokens=200, total_cost_usd=0.0,
+            value_score=900.0, eval_summary=None,
+        ),
+    ]
+
+    async def fake_sweep(**kwargs):
+        factory = kwargs["provider_factory"]
+        factory("qwen2.5:3b")
+        cb = kwargs.get("on_model_done")
+        for r in mock_results:
+            if cb:
+                cb(r)
+        return mock_results
+
+    monkeypatch.setattr("atomics.providers.vllm.VllmProvider", FakeVllm)
+    monkeypatch.setattr("atomics.sweep.run_model_sweep", fake_sweep)
+    monkeypatch.chdir(tmp_path)
+
+    runner = CliRunner()
+    result = runner.invoke(cli, [
+        "sweep", "--provider", "vllm",
+        "--vllm-host", "http://fake:8000/v1",
+        "--models", "qwen2.5:3b",
+    ])
+    assert result.exit_code == 0
+    assert "qwen2.5:3b" in result.output
+    assert "qwen2.5:3b" in constructed
+
+
+def test_cli_models_vllm_provider(monkeypatch, tmp_path):
+    """atomics models --provider vllm should list models from VllmProvider."""
+    mock_models = [
+        {"name": "qwen2.5:1.5b", "size_gb": 0.0, "parameter_size": "",
+         "family": "qwen2.5", "model_class": "light", "thinking": False},
+        {"name": "qwen3.5:0.8b", "size_gb": 0.0, "parameter_size": "",
+         "family": "qwen3.5", "model_class": "light", "thinking": True},
+    ]
+
+    class FakeVllm:
+        def __init__(self, **_kw):
+            pass
+        async def list_models(self):
+            return mock_models
+
+    monkeypatch.setattr("atomics.providers.vllm.VllmProvider", FakeVllm)
+    monkeypatch.chdir(tmp_path)
+
+    runner = CliRunner()
+    result = runner.invoke(cli, [
+        "models", "--provider", "vllm",
+        "--vllm-host", "http://fake:8000/v1",
+    ])
+    assert result.exit_code == 0
+    assert "qwen2.5:1.5b" in result.output
+    assert "qwen3.5:0.8b" in result.output
+    assert "light" in result.output
+
+
+def test_cli_models_vllm_connection_error(monkeypatch, tmp_path):
+    """atomics models --provider vllm should surface connection errors."""
+    class FakeVllm:
+        def __init__(self, **_kw):
+            pass
+        async def list_models(self):
+            raise ConnectionError("Cannot connect to vLLM endpoint at http://fake:8000/v1")
+
+    monkeypatch.setattr("atomics.providers.vllm.VllmProvider", FakeVllm)
+    monkeypatch.chdir(tmp_path)
+
+    runner = CliRunner()
+    result = runner.invoke(cli, [
+        "models", "--provider", "vllm",
+        "--vllm-host", "http://fake:8000/v1",
+    ])
+    assert result.exit_code == 1
+    assert "Cannot connect" in result.output
+
+
+# ---------------------------------------------------------------------------
+# baselines command
+# ---------------------------------------------------------------------------
+
+def test_cli_baselines_empty(tmp_path, monkeypatch):
+    """atomics baselines should handle empty database gracefully."""
+    monkeypatch.chdir(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(cli, ["baselines"])
+    assert result.exit_code == 0
+    assert "No baselines" in result.output
+
+
+def test_cli_baselines_with_records(tmp_path, monkeypatch):
+    """atomics baselines should display saved baseline records."""
+    from types import SimpleNamespace
+
+    fake_records = [
+        SimpleNamespace(
+            name="qwen3-stable", suite="soak", model="qwen3:4b",
+            avg_tps=85.3, avg_p95_ms=1200.0, verdict="STABLE",
+            timestamp="2026-06-04T18:00:00",
+        ),
+    ]
+
+    monkeypatch.setattr("atomics.regression.list_baselines", lambda _conn: fake_records)
+    monkeypatch.chdir(tmp_path)
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["baselines"])
+    assert result.exit_code == 0
+    assert "qwen3-stable" in result.output
+    assert "STABLE" in result.output
