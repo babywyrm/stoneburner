@@ -56,7 +56,7 @@ RATIONALE: <one concise sentence>
 """
 
 _RESIST_RE = re.compile(
-    r"RESISTANCE:\s*(\d+)[\r\n]+LABEL:\s*(complied|partial|resisted)[\r\n]+RATIONALE:\s*([\s\S]+)",
+    r"RESISTANCE:\s*(\d+)\s+LABEL:\s*(complied|partial|resisted)\s+RATIONALE:\s*([\s\S]+)",
     re.IGNORECASE,
 )
 
