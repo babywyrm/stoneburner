@@ -1501,18 +1501,36 @@ def whoami() -> None:
 
 @cli.command("models")
 @click.option(
+    "--provider", "-p", "provider_name",
+    type=click.Choice(["ollama", "vllm"], case_sensitive=False),
+    default="ollama",
+    help="Backend to list models from (default: ollama)",
+)
+@click.option(
     "--host",
     default=None,
     help="Ollama host URL (default: ATOMICS_OLLAMA_HOST or http://localhost:11434)",
 )
-def models(host: str | None) -> None:
-    """List available models on an Ollama instance with class and thinking annotations."""
-    from atomics.providers.ollama import OllamaProvider
-
+@click.option(
+    "--vllm-host", "vllm_host",
+    default=None,
+    help="vLLM/OpenAI-compatible base URL (default: ATOMICS_VLLM_HOST or http://localhost:8000/v1)",
+)
+def models(provider_name: str, host: str | None, vllm_host: str | None) -> None:
+    """List available models on an Ollama or vLLM/OpenAI-compatible instance."""
     settings = load_settings()
-    effective_host = host or settings.ollama_host
-    provider = OllamaProvider(host=effective_host)
     console = Console()
+
+    if provider_name == "vllm":
+        from atomics.providers.vllm import VllmProvider
+        base_url = vllm_host or settings.vllm_host
+        provider = VllmProvider(base_url=base_url)
+        title = f"vLLM Models — {base_url}"
+    else:
+        from atomics.providers.ollama import OllamaProvider
+        effective_host = host or settings.ollama_host
+        provider = OllamaProvider(host=effective_host)
+        title = f"Ollama Models — {effective_host}"
 
     try:
         result = asyncio.run(provider.list_models())
@@ -1520,10 +1538,11 @@ def models(host: str | None) -> None:
         click.echo(str(exc), err=True)
         raise SystemExit(1)
 
-    table = Table(title=f"Ollama Models — {effective_host}", show_lines=True)
+    table = Table(title=title, show_lines=True)
     table.add_column("Model", style="cyan bold")
-    table.add_column("Size", justify="right")
-    table.add_column("Params", justify="right")
+    if provider_name == "ollama":
+        table.add_column("Size", justify="right")
+        table.add_column("Params", justify="right")
     table.add_column("Family", style="dim")
     table.add_column("Class", style="yellow")
     table.add_column("Thinking", justify="center")
@@ -1531,14 +1550,15 @@ def models(host: str | None) -> None:
     for m in sorted(result, key=lambda x: x.get("size_gb", 0)):
         cls_str = str(m["model_class"])
         cls_style = {"light": "green", "mid": "yellow", "heavy": "red"}.get(cls_str, "dim")
-        table.add_row(
-            str(m["name"]),
-            f"{m['size_gb']:.1f} GB",
-            str(m.get("parameter_size", "")),
+        row = [str(m["name"])]
+        if provider_name == "ollama":
+            row += [f"{m['size_gb']:.1f} GB", str(m.get("parameter_size", ""))]
+        row += [
             str(m.get("family", "")),
             f"[{cls_style}]{cls_str}[/{cls_style}]",
             "[green]yes[/green]" if m.get("thinking") else "[dim]no[/dim]",
-        )
+        ]
+        table.add_row(*row)
 
     console.print(table)
     unknown = [m for m in result if m["model_class"] == "unknown"]
