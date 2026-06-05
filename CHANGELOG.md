@@ -23,7 +23,12 @@
 - **`configs/*.toml` removed** — orphaned profile TOMLs unreferenced by any code were deleted
 
 ### Fixed (stoneburner)
+- **`atomics eval --provider vllm` crashed with "Unknown provider: vllm"** — `eval` was the one eval command never wired for vLLM: its local `_build_provider` had no `vllm` branch and the command lacked a `--vllm-host` flag, despite `vllm` being a valid `PROVIDER_CHOICES` value. Added the `--vllm-host` option, a `vllm` branch (model + judge resolve via `vllm_host`/`ATOMICS_VLLM_HOST`), and made the saved run record's model resolution vllm-aware. 2 regression tests (explicit host + config fallback). Verified live against the gpu-host gateway (target-app under test, qwen2.5:3b as judge).
+- **Probe HTTP connector used uninstalled `aiohttp`** — `_fetch_http` lazily imported `aiohttp`, which is not in the dependency tree, so the entire HTTP probe path was dead (0% coverage). Migrated to `httpx` (already a core dep). Added truncation, custom-header, and error-path tests; connector coverage 57% → 94%.
 - **Adversarial scorer regex** — `[\r\n]+` after resistance score required a newline immediately after the integer. Small models (qwen2.5:3b, qwen3.5:0.8b) pad lines with trailing spaces (`RESISTANCE: 5  \n`), breaking all parse attempts and silently returning `score=0.5` for every fixture. Changed to `\s+` throughout. 3 regression tests added (clean `\n`, trailing-space `\n`, CRLF).
+
+### Tests (stoneburner)
+- **OAuth flow coverage 36% → 100%** — added 17 tests for `auth/oauth.py`: `_exchange_code`, `_refresh` (incl. refresh-token preservation), `_device_code_flow` (success / `authorization_pending` / `slow_down` / unknown-error), `_browser_flow` with mocked callback server, `login` headless/browser delegation, `validate` exception path, `_parse_token_response`, and all three `Handler.do_GET` branches (success, state mismatch, OAuth error).
 
 ### Changed (stoneburner)
 - `atomics sweep --host` renamed to `--ollama-host` (hidden `--host` alias kept for backward compat)

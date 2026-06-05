@@ -1048,6 +1048,90 @@ def test_cli_sweep_vllm_provider(monkeypatch, tmp_path):
     assert "qwen2.5:3b" in constructed
 
 
+def test_cli_eval_vllm_provider(monkeypatch, tmp_path):
+    """atomics eval --provider vllm should construct VllmProvider for both model and judge.
+
+    Regression: eval's local _build_provider had no vllm branch and the command
+    lacked a --vllm-host flag, so `eval --provider vllm` died with 'Unknown provider: vllm'.
+    """
+    from types import SimpleNamespace
+
+    constructed: list[tuple[str, str]] = []
+
+    class FakeVllm:
+        def __init__(self, base_url="http://localhost:8000/v1", default_model="qwen2.5:3b", **_kw):
+            self._default_model = default_model
+            constructed.append((base_url, default_model))
+
+        @property
+        def name(self):
+            return "vllm"
+
+    fake_summary = SimpleNamespace(
+        overall_accuracy=0.9, value_score=900.0, avg_latency_ms=120.0,
+        total_tokens=100, total_cost_usd=0.0, fixture_results=[],
+    )
+
+    async def fake_run_eval(*_a, **_kw):
+        return fake_summary
+
+    monkeypatch.setattr("atomics.providers.vllm.VllmProvider", FakeVllm)
+    monkeypatch.setattr("atomics.eval.runner.run_eval", fake_run_eval)
+    monkeypatch.chdir(tmp_path)
+
+    runner = CliRunner()
+    result = runner.invoke(cli, [
+        "eval", "--provider", "vllm",
+        "--vllm-host", "http://fake:8000/v1",
+        "-m", "qwen3:0.6b",
+        "--judge-provider", "vllm",
+        "--judge-model", "qwen2.5:3b",
+        "--no-save",
+    ])
+    assert result.exit_code == 0, result.output
+    assert "Unknown provider" not in result.output
+    # Model under test and judge both built through VllmProvider with the supplied host
+    assert ("http://fake:8000/v1", "qwen3:0.6b") in constructed
+    assert ("http://fake:8000/v1", "qwen2.5:3b") in constructed
+
+
+def test_cli_eval_vllm_missing_host_uses_config(monkeypatch, tmp_path):
+    """atomics eval --provider vllm without --vllm-host falls back to settings.vllm_host."""
+    from types import SimpleNamespace
+
+    constructed: list[str] = []
+
+    class FakeVllm:
+        def __init__(self, base_url="http://localhost:8000/v1", default_model="qwen2.5:3b", **_kw):
+            constructed.append(base_url)
+
+        @property
+        def name(self):
+            return "vllm"
+
+    fake_summary = SimpleNamespace(
+        overall_accuracy=None, value_score=None, avg_latency_ms=0.0,
+        total_tokens=0, total_cost_usd=0.0, fixture_results=[],
+    )
+
+    async def fake_run_eval(*_a, **_kw):
+        return fake_summary
+
+    monkeypatch.setenv("ATOMICS_VLLM_HOST", "http://config-host:8000/v1")
+    monkeypatch.setattr("atomics.providers.vllm.VllmProvider", FakeVllm)
+    monkeypatch.setattr("atomics.eval.runner.run_eval", fake_run_eval)
+    monkeypatch.chdir(tmp_path)
+
+    runner = CliRunner()
+    result = runner.invoke(cli, [
+        "eval", "--provider", "vllm", "-m", "qwen3:0.6b",
+        "--judge-provider", "vllm", "--judge-model", "qwen2.5:3b",
+        "--no-save",
+    ])
+    assert result.exit_code == 0, result.output
+    assert "http://config-host:8000/v1" in constructed
+
+
 def test_cli_models_vllm_provider(monkeypatch, tmp_path):
     """atomics models --provider vllm should list models from VllmProvider."""
     mock_models = [
