@@ -26,6 +26,7 @@ set -euo pipefail
 BRAIN_ENV="${BRAIN_ENV:-/etc/agentic/inference.env}"
 
 # Source existing control file if present
+# shellcheck source=/dev/null
 [[ -f "$BRAIN_ENV" ]] && source "$BRAIN_ENV"
 
 # Defaults from existing env or sensible fallbacks
