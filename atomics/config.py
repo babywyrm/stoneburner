@@ -33,7 +33,7 @@ class AtomicsSettings(BaseSettings):
     ollama_host: str = Field(default="http://localhost:11434", validation_alias="ATOMICS_OLLAMA_HOST")
     ollama_model: str = Field(default="qwen2.5:7b", validation_alias="ATOMICS_OLLAMA_MODEL")
 
-    # vLLM / OpenAI-compatible gateway (e.g. gpu-host LiteLLM at :8000/v1).
+    # vLLM / OpenAI-compatible gateway (e.g. a LiteLLM gateway at :8000/v1).
     # "vllm" refers to the wire-format dialect (POST /v1/chat/completions),
     # not the OpenAI company. Nothing leaves the LAN.
     vllm_host: str = Field(default="http://localhost:8000/v1", validation_alias="ATOMICS_VLLM_HOST")

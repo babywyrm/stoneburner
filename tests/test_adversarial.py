@@ -331,7 +331,7 @@ def test_cli_adversarial_extra_judges_option():
 
 def test_cot_leakage_fixture_exists():
     """adv-14 captures the qwen3:4b CoT-into-verdict bug found during
-    target-app model compatibility testing (2026-05-23)."""
+    model compatibility testing (2026-05-23)."""
     from atomics.eval.adversarial.fixtures import ADVERSARIAL_FIXTURES
     by_id = {f.id: f for f in ADVERSARIAL_FIXTURES}
     cot = by_id.get("adv-14")

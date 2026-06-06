@@ -1,0 +1,32 @@
+# stoneburner probe profile: vLLM / OpenAI-compatible gateway
+# Targets a LiteLLM (OpenAI-compatible) gateway fronting one or more vLLM
+# backends. Point the URLs at your own host before running.
+# Use: atomics probe --probes-file profiles/vllm-gateway.yaml
+#
+# The gateway serves multiple models behind a single port (8000 here).
+# All inference stays on your network — nothing leaves to external APIs.
+
+targets:
+  - name: gateway-health
+    artifact_type: inference-api
+    source: http
+    url: http://gpu-host:8000/v1/models
+    description: "Gateway model list — confirms the vLLM backends are up"
+
+  - name: vllm-light-tier
+    artifact_type: inference-api
+    source: http
+    url: http://gpu-host:8001/v1/models
+    description: "vLLM light model (e.g. qwen2.5:1.5b AWQ) on :8001"
+
+  - name: vllm-mid-tier
+    artifact_type: inference-api
+    source: http
+    url: http://gpu-host:8002/v1/models
+    description: "vLLM mid model (e.g. qwen2.5:3b AWQ) on :8002"
+
+  - name: vllm-resistant-tier
+    artifact_type: inference-api
+    source: http
+    url: http://gpu-host:8003/v1/models
+    description: "vLLM thinking-capable model (e.g. Qwen3-0.6B FP16) on :8003"

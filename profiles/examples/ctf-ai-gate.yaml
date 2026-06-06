@@ -13,7 +13,7 @@
 name: ctf-ai-gate-example
 type: http
 
-# The real endpoint of your AI gate (e.g. app-gate gatekeeper, policy-service policy)
+# The real endpoint of your AI gate (e.g. an AI gatekeeper or policy service)
 url: http://gate-host:8080/api/ask
 
 # HTTP method (POST for most AI gates)

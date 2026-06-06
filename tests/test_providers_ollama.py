@@ -192,7 +192,7 @@ def test_ollama_model_classes():
 
 def test_ollama_config_defaults(monkeypatch, tmp_path):
     # Clear any process-level env vars AND chdir to a tmp dir so that the
-    # project's .env file (which points to the GPU_HOST) is not loaded.
+    # project's .env file (which points to the GPU host) is not loaded.
     monkeypatch.delenv("ATOMICS_OLLAMA_HOST", raising=False)
     monkeypatch.delenv("ATOMICS_OLLAMA_MODEL", raising=False)
     monkeypatch.chdir(tmp_path)

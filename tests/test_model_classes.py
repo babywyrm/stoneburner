@@ -51,7 +51,7 @@ def test_get_models_for_unknown_is_empty():
 
 
 def test_classify_ollama_local_models():
-    """All gpu-host models should be classified, not UNKNOWN."""
+    """All gateway models should be classified, not UNKNOWN."""
     assert classify_model("gemma3:4b") == ModelClass.MID
     assert classify_model("gemma4:e4b") == ModelClass.MID
     assert classify_model("functiongemma:latest") == ModelClass.LIGHT

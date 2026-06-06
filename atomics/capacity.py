@@ -4,7 +4,7 @@ Takes stress test data (local GPU or cloud API latency measurements) and
 projects how the system behaves under different user load patterns using
 Little's Law and linear interpolation from measured data points.
 
-Answers the question: "Can my gpu-host / cloud endpoint handle N users?"
+Answers the question: "Can my GPU host / cloud endpoint handle N users?"
 """
 
 from __future__ import annotations

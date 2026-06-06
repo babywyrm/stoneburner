@@ -3,7 +3,7 @@
 Speaks the OpenAI /v1/chat/completions API, which is the wire-format
 dialect exposed by vLLM, LiteLLM, and any OpenAI-compatible gateway.
 This is NOT the OpenAI cloud service — it connects to a local endpoint
-(e.g. the gpu-host LiteLLM gateway at http://gpu-host:8000/v1).
+(e.g. a LiteLLM gateway at http://gpu-host:8000/v1).
 
 The provider name is "vllm" to make it explicit that this is a local
 inference backend, not the OpenAI company.
