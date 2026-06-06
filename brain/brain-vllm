@@ -6,8 +6,8 @@
 # Starting/stopping them one at a time — or worse, killing by port — is
 # error-prone and leaves VRAM half-allocated. This wraps the whole fleet.
 #
-# Unit discovery is dynamic, so this works on any box that follows the
-# vllm-<name>.service convention (gpu-host today, cloud nodes later).
+# Unit discovery is dynamic, so this works on any host that follows the
+# vllm-<name>.service convention (local GPU box or cloud node).
 #
 # Usage:
 #   ./brain-vllm status                 # fleet + GPU state
