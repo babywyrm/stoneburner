@@ -107,29 +107,48 @@ if $HAS_GPU; then
   nvidia-smi --query-gpu=name,memory.used,memory.total,utilization.gpu,temperature.gpu \
     --format=csv,noheader | sed "s/^/   /"
 
-  # vLLM processes (if any)
+  # GPU compute processes — classified as vLLM, Ollama, or other.
   gpu_pids=$(nvidia-smi --query-compute-apps=pid,used_memory --format=csv,noheader,nounits 2>/dev/null || true)
   if [[ -n "$gpu_pids" ]]; then
-    _heading "vLLM engines (GPU PID -> model)"
-    echo "$gpu_pids" | while IFS=, read -r pid mem; do
+    _heading "GPU compute processes"
+    seen_ollama=false
+    while IFS=, read -r pid mem; do
+      [[ -z "$pid" ]] && continue
       pid=$(echo "$pid" | tr -d " "); mem=$(echo "$mem" | tr -d " ")
-      # try reading cmdline (works if same user or no hidepid)
       cmd=$(tr "\0" " " < /proc/$pid/cmdline 2>/dev/null || true)
-      port=$(echo "$cmd" | grep -oP '(?<=--port )\d+' || true)
-      # if cmdline blank (hidepid), climb to parent
-      if [[ -z "$port" ]]; then
+      # vLLM workers spawn via multiprocessing with empty cmdlines; climb to the
+      # API-server parent that carries --port/--model.
+      if ! echo "$cmd" | grep -qE -- '--port|--model'; then
         ppid=$(awk '/^PPid:/{print $2}' /proc/$pid/status 2>/dev/null || true)
-        if [[ -n "$ppid" ]]; then
-          cmd=$(tr "\0" " " < /proc/$ppid/cmdline 2>/dev/null || true)
-          port=$(echo "$cmd" | grep -oP '(?<=--port )\d+' || true)
-        fi
+        [[ -n "$ppid" ]] && cmd=$(tr "\0" " " < /proc/$ppid/cmdline 2>/dev/null || "$cmd")
       fi
-      model=$(echo "$cmd"  | grep -oP '(?<=--model )\S+' || true)
-      served=$(echo "$cmd" | grep -oP '(?<=--served-model-name ).*?(?= --)' || true)
-      util=$(echo "$cmd"   | grep -oP '(?<=--gpu-memory-utilization )\S+' || true)
-      printf "   :%-5s %-28s -> %-22s | %5s MiB | budget=%s\n" \
-        "${port:-?}" "${model:-?}" "${served:-?}" "$mem" "${util:-?}"
-    done
+
+      if echo "$cmd" | grep -qiE 'ollama|/blobs/sha256'; then
+        # Ollama runner — model name comes from `ollama ps`, not the cmdline.
+        printf "   [ollama] runner pid=%-7s | %6s MiB\n" "$pid" "$mem"
+        seen_ollama=true
+      elif echo "$cmd" | grep -qE -- '--port|vllm'; then
+        port=$(echo "$cmd"   | grep -oP '(?<=--port )\d+' || true)
+        model=$(echo "$cmd"  | grep -oP '(?<=--model )\S+' || true)
+        served=$(echo "$cmd" | grep -oP '(?<=--served-model-name ).*?(?= --)' || true)
+        util=$(echo "$cmd"   | grep -oP '(?<=--gpu-memory-utilization )\S+' || true)
+        printf "   [vllm]   :%-5s %-28s -> %-22s | %6s MiB | budget=%s\n" \
+          "${port:-?}" "${model:-?}" "${served:-?}" "$mem" "${util:-?}"
+      else
+        printf "   [other]  pid=%-7s | %6s MiB\n" "$pid" "$mem"
+      fi
+    done <<< "$gpu_pids"
+
+    # If an Ollama runner is on the GPU, show what model is actually loaded.
+    if $seen_ollama && command -v ollama &>/dev/null; then
+      ps_out=$(ollama ps 2>/dev/null | tail -n +2 || true)
+      if [[ -n "$ps_out" ]]; then
+        echo "   --- ollama loaded (ollama ps) ---"
+        echo "$ps_out" | while read -r line; do
+          [[ -n "$line" ]] && printf "   %s\n" "$line"
+        done
+      fi
+    fi
   fi
 else
   _heading "GPU"
