@@ -1,0 +1,116 @@
+#!/usr/bin/env bash
+# brain-vllm — Manage vLLM engine + gateway systemd units as a group.
+#
+# vLLM backends are typically deployed as one systemd unit per model
+# (e.g. vllm-qwen25-3b.service) behind a single gateway (litellm-gateway).
+# Starting/stopping them one at a time — or worse, killing by port — is
+# error-prone and leaves VRAM half-allocated. This wraps the whole fleet.
+#
+# Unit discovery is dynamic, so this works on any box that follows the
+# vllm-<name>.service convention (gpu-host today, cloud nodes later).
+#
+# Usage:
+#   ./brain-vllm status                 # fleet + GPU state
+#   ./brain-vllm start                  # start all enabled engines, then gateway
+#   ./brain-vllm stop                   # stop gateway, then all engines (free VRAM)
+#   ./brain-vllm restart                # stop then start
+#   ./brain-vllm start vllm-qwen25-3b   # act on specific unit(s)
+#
+# Env:
+#   VLLM_UNIT_GLOB   unit pattern for engines (default: vllm-*.service)
+#   GATEWAY_UNIT     gateway unit name        (default: litellm-gateway.service)
+
+set -euo pipefail
+
+VLLM_UNIT_GLOB="${VLLM_UNIT_GLOB:-vllm-*.service}"
+GATEWAY_UNIT="${GATEWAY_UNIT:-litellm-gateway.service}"
+
+# systemctl wrapper — escalate only when not already root.
+_sc() {
+  if [[ ${EUID:-$(id -u)} -eq 0 ]]; then
+    systemctl "$@"
+  else
+    sudo systemctl "$@"
+  fi
+}
+
+# All engine units matching the glob (enabled or not).
+_all_engines() {
+  systemctl list-unit-files "$VLLM_UNIT_GLOB" --no-legend 2>/dev/null | awk '{print $1}'
+}
+
+# Only engines that are enabled (the ones meant to run on boot).
+_enabled_engines() {
+  systemctl list-unit-files "$VLLM_UNIT_GLOB" --no-legend 2>/dev/null \
+    | awk '$2=="enabled"{print $1}'
+}
+
+_gpu_line() {
+  command -v nvidia-smi &>/dev/null || return 0
+  nvidia-smi --query-gpu=memory.used,memory.total --format=csv,noheader 2>/dev/null \
+    | sed 's/^/   GPU VRAM: /'
+}
+
+usage() {
+  echo "Usage: brain-vllm {status|start|stop|restart} [unit...]"
+  exit 1
+}
+
+cmd_status() {
+  echo "=============== vLLM FLEET STATUS ==============="
+  local any=false
+  while read -r u; do
+    [[ -z "$u" ]] && continue
+    any=true
+    printf "   %-26s %-9s %s\n" "$u" \
+      "$(systemctl is-active "$u" 2>/dev/null)" \
+      "$(systemctl is-enabled "$u" 2>/dev/null)"
+  done < <(_all_engines)
+  $any || echo "   (no units match $VLLM_UNIT_GLOB)"
+
+  echo "   ----------------------------------------------"
+  printf "   %-26s %-9s %s\n" "$GATEWAY_UNIT" \
+    "$(systemctl is-active "$GATEWAY_UNIT" 2>/dev/null)" \
+    "$(systemctl is-enabled "$GATEWAY_UNIT" 2>/dev/null)"
+  _gpu_line
+}
+
+cmd_start() {
+  local units=("$@")
+  if [[ ${#units[@]} -eq 0 ]]; then
+    mapfile -t units < <(_enabled_engines)
+  fi
+  for u in "${units[@]}"; do
+    echo ">>> starting $u"
+    _sc start "$u"
+  done
+  echo ">>> starting $GATEWAY_UNIT"
+  _sc start "$GATEWAY_UNIT"
+  echo "Done. Engines may take ~10-20s to load weights into VRAM."
+}
+
+cmd_stop() {
+  local units=("$@")
+  if [[ ${#units[@]} -eq 0 ]]; then
+    # Gateway first so it stops routing to engines we're about to kill.
+    echo ">>> stopping $GATEWAY_UNIT"
+    _sc stop "$GATEWAY_UNIT" || true
+    mapfile -t units < <(_all_engines)
+  fi
+  for u in "${units[@]}"; do
+    echo ">>> stopping $u"
+    _sc stop "$u" || true
+  done
+  echo "Done. VRAM released."
+}
+
+[[ $# -lt 1 ]] && usage
+action="$1"; shift || true
+
+case "$action" in
+  status)  cmd_status ;;
+  start)   cmd_start "$@" ;;
+  stop)    cmd_stop "$@" ;;
+  restart) cmd_stop "$@"; echo; cmd_start "$@" ;;
+  *)       usage ;;
+esac

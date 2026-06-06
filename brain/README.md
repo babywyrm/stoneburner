@@ -10,6 +10,7 @@ with no dependency on the `atomics` Python package.
 |--------|---------|
 | `brain-status` | Print running models, VRAM mapping, gateway state |
 | `brain-switch` | Toggle a box between Ollama and OpenAI-compatible (vLLM/LiteLLM) |
+| `brain-vllm` | Start/stop/restart the vLLM engine + gateway systemd fleet |
 
 ## Environment
 
@@ -45,4 +46,23 @@ The same file becomes a k8s ConfigMap via `envFrom` in production.
 ./brain-switch ollama              # switch to native Ollama
 ./brain-switch openai              # switch to gateway/vLLM
 ./brain-switch status              # show current backend
+
+./brain-vllm status                # vLLM fleet + GPU state
+./brain-vllm stop                  # stop gateway + all engines (free VRAM)
+./brain-vllm start                 # start enabled engines + gateway
+./brain-vllm restart               # full fleet bounce
+```
+
+## VRAM contention
+
+vLLM and Ollama both claim GPU memory. On a single-GPU box you generally
+run one OR the other for a given test. To hand the whole card to a large
+Ollama model, stop the vLLM fleet first:
+
+```bash
+./brain-vllm stop        # free VRAM held by vLLM engines
+./brain-switch ollama --model gemma4:12b
+# ... run tests ...
+./brain-vllm start       # bring vLLM back when done
+./brain-switch openai
 ```
