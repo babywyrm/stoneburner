@@ -16,6 +16,7 @@ set -euo pipefail
 # --- Config -------------------------------------------------------------------
 
 BRAIN_ENV="${BRAIN_ENV:-/etc/agentic/inference.env}"
+# shellcheck source=/dev/null
 [[ -f "$BRAIN_ENV" ]] && source "$BRAIN_ENV"
 
 OLLAMA_URL="${OLLAMA_URL:-http://127.0.0.1:11434}"
@@ -168,13 +169,13 @@ if $HAS_GPU; then
     while IFS=, read -r pid mem; do
       [[ -z "$pid" ]] && continue
       pid=$(echo "$pid" | tr -d " "); mem=$(echo "$mem" | tr -d " ")
-      cmd=$(tr "\0" " " < /proc/$pid/cmdline 2>/dev/null || true)
+      cmd=$(tr "\0" " " < "/proc/$pid/cmdline" 2>/dev/null || true)
       # vLLM workers spawn via multiprocessing with empty cmdlines; climb to the
       # API-server parent that carries --port/--model.
       if ! echo "$cmd" | grep -qE -- '--port|--model'; then
-        ppid=$(awk '/^PPid:/{print $2}' /proc/$pid/status 2>/dev/null || true)
+        ppid=$(awk '/^PPid:/{print $2}' "/proc/$pid/status" 2>/dev/null || true)
         if [[ -n "$ppid" ]]; then
-          parent_cmd=$(tr "\0" " " < /proc/$ppid/cmdline 2>/dev/null || true)
+          parent_cmd=$(tr "\0" " " < "/proc/$ppid/cmdline" 2>/dev/null || true)
           [[ -n "$parent_cmd" ]] && cmd="$parent_cmd"
         fi
       fi
