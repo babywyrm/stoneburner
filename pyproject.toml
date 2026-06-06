@@ -1,6 +1,6 @@
 [project]
 name = "atomics"
-version = "0.5.0"
+version = "0.6.0"
 description = "Agentic token usage benchmarking platform"
 readme = "README.md"
 requires-python = ">=3.11"
