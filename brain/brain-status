@@ -2,14 +2,14 @@
 # brain-status — Print the inference backend state for any box.
 #
 # Works on:
-#   - gpu-host (vLLM + LiteLLM gateway + GPU)
+#   - a GPU host (vLLM + OpenAI-compatible gateway + GPU)
 #   - any box running Ollama
 #   - any box with an OpenAI-compatible endpoint
 #
 # Usage:
 #   ./brain-status              # human-readable report
 #   ./brain-status --json       # machine-readable JSON
-#   BRAIN_HOST=gpu-host ./brain-status   # remote probe (no SSH)
+#   OPENAI_BASE_URL=http://<host>:8000/v1 ./brain-status   # probe a remote gateway
 
 set -euo pipefail
 

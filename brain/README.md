@@ -1,7 +1,7 @@
 # brain/ — Inference Backend Utilities
 
 Portable ops scripts for managing the inference layer on any box —
-local dev, gpu-host, or cloud nodes. These are standalone shell scripts
+local dev, a GPU host, or cloud nodes. These are standalone shell scripts
 with no dependency on the `atomics` Python package.
 
 ## Scripts
@@ -26,9 +26,9 @@ OLLAMA_MODEL=qwen3.5:0.8b         # Ollama model tag
 OLLAMA_THINK=false                 # thinking mode toggle
 ```
 
-These are the same variables consumed by the agent services (target-app,
-policy-service) and will be consumed by app-gate once it gets the
-Spring AI OpenAI-starter swap.
+These are the same variables consumed by downstream agent services —
+any app that reads `INFERENCE_API` plus the Ollama/OpenAI vars (directly,
+via a small adapter, or via a k8s ConfigMap) self-configures from them.
 
 ## Control file
 
