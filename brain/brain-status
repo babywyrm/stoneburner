@@ -20,6 +20,7 @@ BRAIN_ENV="${BRAIN_ENV:-/etc/agentic/inference.env}"
 
 OLLAMA_URL="${OLLAMA_URL:-http://127.0.0.1:11434}"
 OPENAI_BASE_URL="${OPENAI_BASE_URL:-}"
+OPENAI_API_KEY="${OPENAI_API_KEY:-dummy}"
 INFERENCE_API="${INFERENCE_API:-}"
 JSON_MODE=false
 [[ "${1:-}" == "--json" ]] && JSON_MODE=true
@@ -34,6 +35,62 @@ _heading() {
 }
 
 _bool() { [[ "$1" == "true" ]] && echo "True" || echo "False"; }
+
+# Echo a JSON array of {"id", "serving"} for an OpenAI-compatible gateway.
+# Liveness is ground-truth, not just "advertised": prefer LiteLLM's /health
+# (healthy/unhealthy endpoints, one call); otherwise fall back to a 1-token
+# completion probe per model. serving is true/false, or null if unknown.
+_gateway_status_json() {
+  python3 - "${1%/}" "${2:-dummy}" <<'PY'
+import sys, json, urllib.request
+base, key = sys.argv[1], sys.argv[2]
+
+def get(url, timeout=6, data=None):
+    hdr = {"Authorization": f"Bearer {key}"}
+    if data is not None:
+        hdr["Content-Type"] = "application/json"
+    req = urllib.request.Request(url, data=data, headers=hdr)
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return json.load(r)
+
+models = []
+try:
+    models = [m["id"] for m in get(base + "/models").get("data", [])]
+except Exception:
+    pass
+
+serving, used_health = {}, False
+health_base = base[:-3] if base.endswith("/v1") else base
+try:
+    h = get(health_base + "/health", timeout=10)
+    if isinstance(h, dict) and ("healthy_endpoints" in h or "unhealthy_endpoints" in h):
+        used_health = True
+        def names(lst):
+            out = set()
+            for e in lst or []:
+                m = e.get("model", "")
+                out.add(m)
+                if "/" in m:
+                    out.add(m.split("/", 1)[1])
+            return out
+        healthy, unhealthy = names(h.get("healthy_endpoints")), names(h.get("unhealthy_endpoints"))
+        for mid in models:
+            serving[mid] = True if mid in healthy else (False if mid in unhealthy else None)
+except Exception:
+    pass
+
+if not used_health:
+    for mid in models:
+        try:
+            body = json.dumps({"model": mid, "messages": [{"role": "user", "content": "hi"}],
+                               "max_tokens": 1}).encode()
+            serving[mid] = "choices" in get(base + "/chat/completions", timeout=8, data=body)
+        except Exception:
+            serving[mid] = False
+
+print(json.dumps([{"id": mid, "serving": serving.get(mid)} for mid in models]))
+PY
+}
 
 # --- Detect what's available --------------------------------------------------
 
@@ -77,11 +134,7 @@ print(json.dumps([{'name':m['name'],'size_gb':round(m.get('size',0)/1e9,2)} for 
 
   gateway_json="[]"
   if $HAS_GATEWAY; then
-    gateway_json=$(_curl "${OPENAI_BASE_URL}/models" | python3 -c "
-import sys,json
-d=json.load(sys.stdin)
-print(json.dumps([m['id'] for m in d.get('data',[])]))
-" 2>/dev/null || echo "[]")
+    gateway_json=$(_gateway_status_json "$OPENAI_BASE_URL" "$OPENAI_API_KEY" 2>/dev/null || echo "[]")
   fi
 
   python3 -c "
@@ -120,7 +173,10 @@ if $HAS_GPU; then
       # API-server parent that carries --port/--model.
       if ! echo "$cmd" | grep -qE -- '--port|--model'; then
         ppid=$(awk '/^PPid:/{print $2}' /proc/$pid/status 2>/dev/null || true)
-        [[ -n "$ppid" ]] && cmd=$(tr "\0" " " < /proc/$ppid/cmdline 2>/dev/null || "$cmd")
+        if [[ -n "$ppid" ]]; then
+          parent_cmd=$(tr "\0" " " < /proc/$ppid/cmdline 2>/dev/null || true)
+          [[ -n "$parent_cmd" ]] && cmd="$parent_cmd"
+        fi
       fi
 
       if echo "$cmd" | grep -qiE 'ollama|/blobs/sha256'; then
@@ -171,14 +227,20 @@ else
   echo "   (not reachable)"
 fi
 
-# Gateway
+# Gateway — advertised models annotated with real backend liveness.
 _heading "Gateway (${OPENAI_BASE_URL:-not configured})"
 if $HAS_GATEWAY; then
-  _curl "${OPENAI_BASE_URL}/models" | python3 -c "
+  _gateway_status_json "$OPENAI_BASE_URL" "$OPENAI_API_KEY" | python3 -c "
 import sys,json
-d=json.load(sys.stdin)
-for m in d.get('data',[]):
-    print(f\"   - {m['id']}\")
+arr=json.load(sys.stdin)
+if not arr:
+    print('   (no models advertised)')
+for m in arr:
+    s=m['serving']
+    tag='[up]  ' if s is True else ('[DOWN]' if s is False else '[?]   ')
+    print(f\"   {tag} {m['id']}\")
+if any(m['serving'] is False for m in arr):
+    print('   WARNING: gateway advertises models whose backend is DOWN')
 " 2>/dev/null
 else
   echo "   (not reachable)"
