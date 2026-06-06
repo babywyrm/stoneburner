@@ -104,7 +104,7 @@ def test_project_capacity_scenario_fields():
 
 
 def test_project_capacity_normal_50_users_5min():
-    """50 users at 5 min think time on gpu-host should be manageable."""
+    """50 users at 5 min think time on the GPU host should be manageable."""
     profile = LoadProfile(users=50, think_time_s=300.0, response_tokens=400)
     result = project_capacity(profile=profile, phases=GPU_HOST_PHASES, peak_tps=107.0)
     normal = next(s for s in result.scenarios if s.name == "Normal")
@@ -113,7 +113,7 @@ def test_project_capacity_normal_50_users_5min():
 
 
 def test_project_capacity_200_users_is_heavy():
-    """200 users at 5 min think time on a single gpu-host GPU will be slow."""
+    """200 users at 5 min think time on a single GPU will be slow."""
     profile = LoadProfile(users=200, think_time_s=300.0, response_tokens=400)
     result = project_capacity(profile=profile, phases=GPU_HOST_PHASES, peak_tps=107.0)
     normal = next(s for s in result.scenarios if s.name == "Normal")

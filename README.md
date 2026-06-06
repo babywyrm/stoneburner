@@ -171,7 +171,7 @@ uv run atomics models --host http://gpu-host:11434
 Sweep the eval fixture set across multiple models and produce a ranked comparison table. Works with any provider — local Ollama, Claude, OpenAI, Bedrock, or brain-gateway.
 
 ```bash
-# Sweep all local models on the gpu-host
+# Sweep all local models on the GPU host
 uv run atomics sweep --all-local --host http://gpu-host:11434
 
 # Sweep specific local models
@@ -300,7 +300,7 @@ uv run atomics qa --file qa/examples/app-gate-guardrails.yaml \
 
 # Profile mode — test an actual app endpoint (real IP in gitignored profile)
 uv run atomics qa --file qa/examples/app-gate-guardrails.yaml \
-                  --profile profiles/local/app-gate.yaml
+                  --profile profiles/local/my-gate.yaml
 
 # Stop at first failure
 uv run atomics qa --file qa/examples/ai-gate-regression.yaml --fail-fast

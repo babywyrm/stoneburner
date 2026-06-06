@@ -2522,14 +2522,14 @@ def qa(
     The profile lives in profiles/local/ (gitignored — keeps your real
     box IPs and credentials out of the repo). The fixture file is safe
     to commit; it only contains prompts and patterns.
-      atomics qa --file qa/examples/app-gate-gate.yaml \\
-                 --profile profiles/local/app-gate.yaml
+      atomics qa --file qa/examples/app-gate-guardrails.yaml \\
+                 --profile profiles/local/my-gate.yaml
 
     \b
     Other examples:
       atomics qa --file qa/examples/ai-gate-regression.yaml --fail-fast
-      atomics qa --file qa/examples/policy-service-policy.yaml \\
-                 --profile profiles/local/policy-service-mcp.yaml
+      atomics qa --file qa/examples/app-gate-guardrails.yaml \\
+                 --profile profiles/local/my-policy.yaml
     """
     import asyncio as _asyncio
     import logging as _logging
