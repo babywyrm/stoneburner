@@ -1,0 +1,124 @@
+#!/usr/bin/env bash
+# brain-switch — Toggle between Ollama and OpenAI-compatible inference.
+#
+# Writes/updates the control file at /etc/agentic/inference.env (or $BRAIN_ENV).
+# The same control file is sourced by brain-status and consumed by the agent services
+# (target-app/policy-service via INFERENCE_API env, app-gate via Spring profiles).
+#
+# Usage:
+#   ./brain-switch status                # show current backend
+#   ./brain-switch ollama                # switch to native Ollama
+#   ./brain-switch openai                # switch to gateway/vLLM
+#   ./brain-switch openai --url http://gpu-host:8000/v1 --model qwen2.5:3b
+#
+# Options (openai mode):
+#   --url URL       OpenAI-compatible base URL (default: http://127.0.0.1:8000/v1)
+#   --model MODEL   Model name the gateway routes (default: current OPENAI_MODEL)
+#   --key KEY       API key (default: dummy — local gateways ignore it)
+#
+# Options (ollama mode):
+#   --url URL       Ollama host (default: http://127.0.0.1:11434)
+#   --model MODEL   Ollama model tag (default: current OLLAMA_MODEL)
+#   --think BOOL    Thinking mode: true/false/auto (default: auto)
+
+set -euo pipefail
+
+BRAIN_ENV="${BRAIN_ENV:-/etc/agentic/inference.env}"
+
+# Source existing control file if present
+[[ -f "$BRAIN_ENV" ]] && source "$BRAIN_ENV"
+
+# Defaults from existing env or sensible fallbacks
+OLLAMA_URL="${OLLAMA_URL:-http://127.0.0.1:11434}"
+OLLAMA_MODEL="${OLLAMA_MODEL:-qwen3.5:0.8b}"
+OLLAMA_THINK="${OLLAMA_THINK:-}"
+OPENAI_BASE_URL="${OPENAI_BASE_URL:-http://127.0.0.1:8000/v1}"
+OPENAI_MODEL="${OPENAI_MODEL:-${OLLAMA_MODEL}}"
+OPENAI_API_KEY="${OPENAI_API_KEY:-dummy}"
+INFERENCE_API="${INFERENCE_API:-}"
+
+usage() {
+  echo "Usage: brain-switch {status|ollama|openai} [options]"
+  echo "  status              Show current backend"
+  echo "  ollama  [--url URL] [--model MODEL] [--think true|false|auto]"
+  echo "  openai  [--url URL] [--model MODEL] [--key KEY]"
+  exit 1
+}
+
+show_status() {
+  if [[ -f "$BRAIN_ENV" ]]; then
+    echo "Control file: $BRAIN_ENV"
+    echo "---"
+    cat "$BRAIN_ENV"
+  else
+    echo "No control file at $BRAIN_ENV"
+    echo "INFERENCE_API=${INFERENCE_API:-not set}"
+  fi
+}
+
+write_env() {
+  local dir
+  dir=$(dirname "$BRAIN_ENV")
+  if [[ ! -d "$dir" ]]; then
+    echo "Creating $dir ..."
+    mkdir -p "$dir" 2>/dev/null || { echo "Cannot create $dir — try with sudo?"; exit 1; }
+  fi
+
+  cat > "$BRAIN_ENV" <<ENVFILE
+# Inference backend control file — written by brain-switch
+# Sourced by brain-status, agent services, and k8s ConfigMaps.
+# $(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+INFERENCE_API=${INFERENCE_API}
+
+# Ollama (native /api/chat)
+OLLAMA_URL=${OLLAMA_URL}
+OLLAMA_MODEL=${OLLAMA_MODEL}
+OLLAMA_THINK=${OLLAMA_THINK}
+
+# OpenAI-compatible (vLLM / LiteLLM gateway)
+OPENAI_BASE_URL=${OPENAI_BASE_URL}
+OPENAI_MODEL=${OPENAI_MODEL}
+OPENAI_API_KEY=${OPENAI_API_KEY}
+ENVFILE
+
+  echo "Wrote $BRAIN_ENV"
+  echo "---"
+  cat "$BRAIN_ENV"
+}
+
+[[ $# -lt 1 ]] && usage
+cmd="${1}"; shift
+
+case "$cmd" in
+  status)
+    show_status
+    ;;
+  ollama)
+    INFERENCE_API=ollama
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --url)   OLLAMA_URL="$2"; shift 2 ;;
+        --model) OLLAMA_MODEL="$2"; shift 2 ;;
+        --think) OLLAMA_THINK="$2"; shift 2 ;;
+        *) echo "Unknown option: $1"; usage ;;
+      esac
+    done
+    write_env
+    ;;
+  openai)
+    INFERENCE_API=openai
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --url)   OPENAI_BASE_URL="$2"; shift 2 ;;
+        --model) OPENAI_MODEL="$2"; shift 2 ;;
+        --key)   OPENAI_API_KEY="$2"; shift 2 ;;
+        *) echo "Unknown option: $1"; usage ;;
+      esac
+    done
+    write_env
+    ;;
+  *)
+    usage
+    ;;
+esac

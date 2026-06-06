@@ -1,0 +1,182 @@
+#!/usr/bin/env bash
+# brain-status — Print the inference backend state for any box.
+#
+# Works on:
+#   - gpu-host (vLLM + LiteLLM gateway + GPU)
+#   - any box running Ollama
+#   - any box with an OpenAI-compatible endpoint
+#
+# Usage:
+#   ./brain-status              # human-readable report
+#   ./brain-status --json       # machine-readable JSON
+#   BRAIN_HOST=gpu-host ./brain-status   # remote probe (no SSH)
+
+set -euo pipefail
+
+# --- Config -------------------------------------------------------------------
+
+BRAIN_ENV="${BRAIN_ENV:-/etc/agentic/inference.env}"
+[[ -f "$BRAIN_ENV" ]] && source "$BRAIN_ENV"
+
+OLLAMA_URL="${OLLAMA_URL:-http://127.0.0.1:11434}"
+OPENAI_BASE_URL="${OPENAI_BASE_URL:-}"
+INFERENCE_API="${INFERENCE_API:-}"
+JSON_MODE=false
+[[ "${1:-}" == "--json" ]] && JSON_MODE=true
+
+# --- Helpers ------------------------------------------------------------------
+
+_curl() { curl -s --max-time 5 "$@" 2>/dev/null; }
+
+_heading() {
+  $JSON_MODE && return
+  printf "\n## %s\n" "$1"
+}
+
+_bool() { [[ "$1" == "true" ]] && echo "True" || echo "False"; }
+
+# --- Detect what's available --------------------------------------------------
+
+HAS_GPU=false
+HAS_OLLAMA=false
+HAS_GATEWAY=false
+
+command -v nvidia-smi &>/dev/null && nvidia-smi --query-gpu=name --format=csv,noheader &>/dev/null 2>&1 && HAS_GPU=true
+_curl "${OLLAMA_URL}/api/tags" | grep -q '"models"' 2>/dev/null && HAS_OLLAMA=true
+
+if [[ -n "$OPENAI_BASE_URL" ]]; then
+  _curl "${OPENAI_BASE_URL}/models" | grep -q '"data"' 2>/dev/null && HAS_GATEWAY=true
+else
+  # probe common local gateway ports
+  for port in 8000 4000; do
+    if _curl "http://127.0.0.1:${port}/v1/models" | grep -q '"data"' 2>/dev/null; then
+      OPENAI_BASE_URL="http://127.0.0.1:${port}/v1"
+      HAS_GATEWAY=true
+      break
+    fi
+  done
+fi
+
+# --- JSON output mode ---------------------------------------------------------
+
+if $JSON_MODE; then
+  gpu_json="null"
+  if $HAS_GPU; then
+    gpu_json=$(nvidia-smi --query-gpu=name,memory.used,memory.total,utilization.gpu,temperature.gpu \
+      --format=csv,noheader,nounits | awk -F', ' '{printf "{\"name\":\"%s\",\"used_mib\":%s,\"total_mib\":%s,\"util_pct\":%s,\"temp_c\":%s}", $1,$2,$3,$4,$5}')
+  fi
+
+  ollama_json="[]"
+  if $HAS_OLLAMA; then
+    ollama_json=$(_curl "${OLLAMA_URL}/api/tags" | python3 -c "
+import sys,json
+d=json.load(sys.stdin)
+print(json.dumps([{'name':m['name'],'size_gb':round(m.get('size',0)/1e9,2)} for m in d.get('models',[])]))
+" 2>/dev/null || echo "[]")
+  fi
+
+  gateway_json="[]"
+  if $HAS_GATEWAY; then
+    gateway_json=$(_curl "${OPENAI_BASE_URL}/models" | python3 -c "
+import sys,json
+d=json.load(sys.stdin)
+print(json.dumps([m['id'] for m in d.get('data',[])]))
+" 2>/dev/null || echo "[]")
+  fi
+
+  python3 -c "
+import json,sys
+gpu = json.loads('$gpu_json') if '$gpu_json' != 'null' else None
+print(json.dumps({
+  'gpu': gpu,
+  'ollama': {'available': $(_bool $HAS_OLLAMA), 'url': '$OLLAMA_URL', 'models': json.loads('$ollama_json')},
+  'gateway': {'available': $(_bool $HAS_GATEWAY), 'url': '${OPENAI_BASE_URL:-}', 'models': json.loads('$gateway_json')},
+  'inference_api': '${INFERENCE_API:-auto}',
+}, indent=2))
+"
+  exit 0
+fi
+
+# --- Human-readable output ----------------------------------------------------
+
+echo "================= INFERENCE BACKEND REPORT ================="
+
+# GPU
+if $HAS_GPU; then
+  _heading "GPU"
+  nvidia-smi --query-gpu=name,memory.used,memory.total,utilization.gpu,temperature.gpu \
+    --format=csv,noheader | sed "s/^/   /"
+
+  # vLLM processes (if any)
+  gpu_pids=$(nvidia-smi --query-compute-apps=pid,used_memory --format=csv,noheader,nounits 2>/dev/null || true)
+  if [[ -n "$gpu_pids" ]]; then
+    _heading "vLLM engines (GPU PID -> model)"
+    echo "$gpu_pids" | while IFS=, read -r pid mem; do
+      pid=$(echo "$pid" | tr -d " "); mem=$(echo "$mem" | tr -d " ")
+      # try reading cmdline (works if same user or no hidepid)
+      cmd=$(tr "\0" " " < /proc/$pid/cmdline 2>/dev/null || true)
+      port=$(echo "$cmd" | grep -oP '(?<=--port )\d+' || true)
+      # if cmdline blank (hidepid), climb to parent
+      if [[ -z "$port" ]]; then
+        ppid=$(awk '/^PPid:/{print $2}' /proc/$pid/status 2>/dev/null || true)
+        if [[ -n "$ppid" ]]; then
+          cmd=$(tr "\0" " " < /proc/$ppid/cmdline 2>/dev/null || true)
+          port=$(echo "$cmd" | grep -oP '(?<=--port )\d+' || true)
+        fi
+      fi
+      model=$(echo "$cmd"  | grep -oP '(?<=--model )\S+' || true)
+      served=$(echo "$cmd" | grep -oP '(?<=--served-model-name ).*?(?= --)' || true)
+      util=$(echo "$cmd"   | grep -oP '(?<=--gpu-memory-utilization )\S+' || true)
+      printf "   :%-5s %-28s -> %-22s | %5s MiB | budget=%s\n" \
+        "${port:-?}" "${model:-?}" "${served:-?}" "$mem" "${util:-?}"
+    done
+  fi
+else
+  _heading "GPU"
+  echo "   (no GPU detected)"
+fi
+
+# Ollama
+_heading "Ollama (${OLLAMA_URL})"
+if $HAS_OLLAMA; then
+  _curl "${OLLAMA_URL}/api/tags" | python3 -c "
+import sys,json
+d=json.load(sys.stdin)
+for m in d.get('models',[]):
+    sz=m.get('size',0)/1e9
+    print(f\"   - {m['name']:30s} {sz:.1f} GB\")
+if not d.get('models'):
+    print('   (no models pulled)')
+" 2>/dev/null
+else
+  echo "   (not reachable)"
+fi
+
+# Gateway
+_heading "Gateway (${OPENAI_BASE_URL:-not configured})"
+if $HAS_GATEWAY; then
+  _curl "${OPENAI_BASE_URL}/models" | python3 -c "
+import sys,json
+d=json.load(sys.stdin)
+for m in d.get('data',[]):
+    print(f\"   - {m['id']}\")
+" 2>/dev/null
+else
+  echo "   (not reachable)"
+fi
+
+# Active backend
+_heading "Active backend"
+if [[ -n "${INFERENCE_API:-}" ]]; then
+  echo "   INFERENCE_API=${INFERENCE_API}"
+else
+  if $HAS_GATEWAY; then
+    echo "   auto-detected: openai (gateway available)"
+  elif $HAS_OLLAMA; then
+    echo "   auto-detected: ollama"
+  else
+    echo "   (no backend detected)"
+  fi
+fi
+
+echo
