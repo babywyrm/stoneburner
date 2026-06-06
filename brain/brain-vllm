@@ -17,13 +17,21 @@
 #   ./brain-vllm start vllm-qwen25-3b   # act on specific unit(s)
 #
 # Env:
-#   VLLM_UNIT_GLOB   unit pattern for engines (default: vllm-*.service)
-#   GATEWAY_UNIT     gateway unit name        (default: litellm-gateway.service)
+#   VLLM_UNIT_GLOB     unit pattern for engines (default: vllm-*.service)
+#   GATEWAY_UNIT       gateway unit name        (default: litellm-gateway.service)
+#   VLLM_STAGGER_SECS  settle delay between engine starts (default: 10)
+#
+# Engines are started SEQUENTIALLY with a settle delay: launching them all at
+# once makes them race for VRAM, and whichever runs its KV-cache check while
+# the GPU is momentarily full dies with "No available memory for the cache
+# blocks", flaps via systemd Restart=, and leaves a window of unavailability.
+# Staggering lets each engine claim its gpu_memory_utilization budget cleanly.
 
 set -euo pipefail
 
 VLLM_UNIT_GLOB="${VLLM_UNIT_GLOB:-vllm-*.service}"
 GATEWAY_UNIT="${GATEWAY_UNIT:-litellm-gateway.service}"
+VLLM_STAGGER_SECS="${VLLM_STAGGER_SECS:-10}"
 
 # systemctl wrapper — escalate only when not already root.
 _sc() {
@@ -75,18 +83,41 @@ cmd_status() {
   _gpu_line
 }
 
+# Wait until a unit reports active, up to a timeout (seconds).
+_wait_active() {
+  local unit="$1" timeout="${2:-60}" waited=0
+  while (( waited < timeout )); do
+    [[ "$(systemctl is-active "$unit" 2>/dev/null)" == "active" ]] && return 0
+    sleep 2; waited=$((waited + 2))
+  done
+  return 1
+}
+
 cmd_start() {
   local units=("$@")
   if [[ ${#units[@]} -eq 0 ]]; then
     mapfile -t units < <(_enabled_engines)
   fi
+  local n=${#units[@]} i=0
   for u in "${units[@]}"; do
+    i=$((i + 1))
     echo ">>> starting $u"
     _sc start "$u"
+    if _wait_active "$u" 60; then
+      echo "    active."
+    else
+      echo "    WARNING: $u not active after 60s — check 'journalctl -u $u'"
+    fi
+    # Settle delay lets this engine finish claiming VRAM before the next races
+    # for the KV-cache budget. Skip after the final engine.
+    if (( i < n )); then
+      echo "    settling ${VLLM_STAGGER_SECS}s before next engine..."
+      sleep "$VLLM_STAGGER_SECS"
+    fi
   done
   echo ">>> starting $GATEWAY_UNIT"
   _sc start "$GATEWAY_UNIT"
-  echo "Done. Engines may take ~10-20s to load weights into VRAM."
+  echo "Done."
 }
 
 cmd_stop() {
