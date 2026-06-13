@@ -261,6 +261,94 @@ class TestOpenAIProviderThinking:
         assert visible_out == 50
 
 
+class TestOpenAIResponsesReasoning:
+    @pytest.mark.asyncio
+    async def test_responses_reasoning_from_output_tokens_details(self):
+        """Responses API nests reasoning under usage.output_tokens_details."""
+        from atomics.auth import AuthStrategy
+        from atomics.providers.openai import OpenAIProvider
+
+        details = MagicMock()
+        details.reasoning_tokens = 120
+
+        usage = MagicMock()
+        usage.input_tokens = 20
+        usage.output_tokens = 200
+        usage.output_tokens_details = details
+        # A spurious top-level attr must be ignored in favor of the nested one.
+        usage.reasoning_tokens = 0
+
+        response = MagicMock()
+        response.output_text = "42"
+        response.usage = usage
+        response.model_dump.return_value = {}
+
+        auth = MagicMock(spec=AuthStrategy)
+        auth.get_headers = AsyncMock(return_value={"Authorization": "Bearer tok"})
+
+        mock_client = MagicMock()
+        mock_client.responses.create = AsyncMock(return_value=response)
+
+        provider = OpenAIProvider(default_model="o3", client=mock_client, auth=auth)
+        resp = await provider.generate("What is 6*7?", thinking=True)
+
+        assert resp.text == "42"
+        assert resp.thinking_tokens == 120
+        assert resp.output_tokens - resp.thinking_tokens == 80
+
+
+class TestOllamaThinkingTokenEstimate:
+    @pytest.mark.asyncio
+    async def test_thinking_tokens_anchored_to_eval_count(self):
+        """Estimate is a char-proportional slice of the real eval_count, not a word count."""
+        from atomics.providers.ollama import OllamaProvider
+
+        # 36 reasoning chars, 4 answer chars -> ~90% of 100 generated tokens.
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.raise_for_status = MagicMock()
+        mock_response.json.return_value = {
+            "response": "<think>aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</think>bbbb",
+            "eval_count": 100,
+            "prompt_eval_count": 10,
+            "eval_duration": 1_000_000_000,
+            "total_duration": 2_000_000_000,
+        }
+
+        mock_client = AsyncMock()
+        mock_client.post = AsyncMock(return_value=mock_response)
+
+        provider = OllamaProvider(default_model="qwen3:14b", client=mock_client)
+        resp = await provider.generate("hi")
+
+        assert resp.thinking_text == "a" * 36
+        assert resp.thinking_tokens == round(100 * 36 / 40)  # == 90
+        # Never exceeds the real output token count.
+        assert resp.thinking_tokens <= resp.output_tokens
+
+    @pytest.mark.asyncio
+    async def test_no_thinking_means_zero_thinking_tokens(self):
+        from atomics.providers.ollama import OllamaProvider
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.raise_for_status = MagicMock()
+        mock_response.json.return_value = {
+            "response": "plain answer, no tags",
+            "eval_count": 50,
+            "prompt_eval_count": 10,
+            "eval_duration": 1_000_000_000,
+            "total_duration": 2_000_000_000,
+        }
+
+        mock_client = AsyncMock()
+        mock_client.post = AsyncMock(return_value=mock_response)
+
+        provider = OllamaProvider(default_model="qwen2.5:7b", client=mock_client)
+        resp = await provider.generate("hi")
+        assert resp.thinking_tokens == 0
+
+
 class TestTaskResultThinking:
     def test_thinking_fields_on_task_result(self):
         from atomics.models import TaskCategory, TaskResult

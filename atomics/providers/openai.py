@@ -218,7 +218,13 @@ class OpenAIProvider(BaseProvider):
         usage = getattr(response, "usage", None)
         inp = getattr(usage, "input_tokens", 0) if usage else 0
         out = getattr(usage, "output_tokens", 0) if usage else 0
-        reasoning_tokens = getattr(usage, "reasoning_tokens", 0) or 0
+        # The Responses API reports reasoning under usage.output_tokens_details;
+        # fall back to a direct attribute for forward/backward compatibility.
+        details = getattr(usage, "output_tokens_details", None) if usage else None
+        if details is not None:
+            reasoning_tokens = getattr(details, "reasoning_tokens", 0) or 0
+        else:
+            reasoning_tokens = getattr(usage, "reasoning_tokens", 0) or 0
 
         visible_out = out - reasoning_tokens
         tps = visible_out / (latency / 1000) if latency > 0 and visible_out > 0 else None
