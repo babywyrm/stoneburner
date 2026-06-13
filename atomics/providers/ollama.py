@@ -101,7 +101,15 @@ class OllamaProvider(BaseProvider):
         total_duration = data.get("total_duration", 0)
         latency = total_duration / 1e6 if total_duration else 0.0
 
-        thinking_tokens = len(thinking_text.split()) if thinking_text else 0
+        # Ollama reports total generated tokens (eval_count) but no separate
+        # count for the <think> reasoning span. Estimate the reasoning share by
+        # character proportion of the generated text so the figure stays anchored
+        # to the real token total rather than an unanchored word count.
+        thinking_tokens = 0
+        if thinking_text and out > 0:
+            generated_chars = len(thinking_text) + len(text)
+            if generated_chars > 0:
+                thinking_tokens = round(out * len(thinking_text) / generated_chars)
 
         return ProviderResponse(
             text=text,

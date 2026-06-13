@@ -112,6 +112,9 @@ class ClaudeProvider(BaseProvider):
 
         inp = response.usage.input_tokens
         out = response.usage.output_tokens
+        # Anthropic bills extended-thinking tokens as ordinary output and does not
+        # expose a separate thinking-token count, so this is 0 in production; the
+        # getattr keeps the value truthful if a future/usage object ever reports one.
         thinking_tokens = getattr(response.usage, "thinking_tokens", 0) or 0
         cache_read = getattr(response.usage, "cache_read_input_tokens", 0) or 0
         cache_write = getattr(response.usage, "cache_creation_input_tokens", 0) or 0
