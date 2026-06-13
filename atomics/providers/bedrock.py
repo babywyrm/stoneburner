@@ -8,25 +8,19 @@ from __future__ import annotations
 
 import time
 
+from atomics.providers import pricing
 from atomics.providers.base import BaseProvider, ProviderResponse, compute_tps
 
-BEDROCK_PRICING: dict[str, tuple[float, float]] = {
-    "us.anthropic.claude-sonnet-4-6": (3.0, 15.0),
-    "us.anthropic.claude-haiku-4-5-20251001-v1:0": (1.0, 5.0),
-    "us.anthropic.claude-opus-4-6-v1": (5.0, 25.0),
-    "us.anthropic.claude-sonnet-4-20250514-v1:0": (3.0, 15.0),
-    "us.anthropic.claude-sonnet-4-5-20250929-v1:0": (3.0, 15.0),
-    "anthropic.claude-sonnet-4-20250514-v1:0": (3.0, 15.0),
-    "anthropic.claude-3-5-sonnet-20241022-v2:0": (3.0, 15.0),
-    "anthropic.claude-3-5-haiku-20241022-v1:0": (0.80, 4.0),
-}
-
-DEFAULT_PRICING = (3.0, 15.0)
+# Pricing per 1M tokens (input / output). Sourced from the central pricing
+# module; re-exported here for backward compatibility.
+BEDROCK_PRICING = pricing.BEDROCK_PRICING
+DEFAULT_PRICING = pricing.BEDROCK_DEFAULT
 
 
 def _estimate_cost(model_id: str, input_tokens: int, output_tokens: int) -> float:
-    inp_price, out_price = BEDROCK_PRICING.get(model_id, DEFAULT_PRICING)
-    return (input_tokens * inp_price + output_tokens * out_price) / 1_000_000
+    return pricing.estimate_cost(
+        model_id, input_tokens, output_tokens, table=BEDROCK_PRICING, default=DEFAULT_PRICING
+    )
 
 
 class BedrockProvider(BaseProvider):
