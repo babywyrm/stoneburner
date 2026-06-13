@@ -43,6 +43,62 @@ async def test_claude_generate_and_health():
     assert await provider.health_check() is True
 
 
+class _FakeClaudeCacheResp:
+    class _Text:
+        def __init__(self, text: str):
+            self.text = text
+            self.type = "text"
+
+    class _Usage:
+        def __init__(self):
+            self.input_tokens = 10
+            self.output_tokens = 20
+            self.cache_read_input_tokens = 2000
+            self.cache_creation_input_tokens = 400
+
+    def __init__(self):
+        self.content = [self._Text("cached")]
+        self.usage = self._Usage()
+
+    def model_dump(self):
+        return {"ok": True}
+
+
+@pytest.mark.asyncio
+async def test_claude_generate_captures_cache_tokens():
+    class FakeMessages:
+        async def create(self, **_kwargs):
+            return _FakeClaudeCacheResp()
+
+    from atomics.providers.claude import ClaudeProvider, _estimate_cost
+
+    fake_client = type("FakeClient", (), {"messages": FakeMessages()})()
+    provider = ClaudeProvider(api_key="fake", client=fake_client)
+    resp = await provider.generate("hi", model="claude-sonnet-4-20250514")
+
+    assert resp.cache_read_tokens == 2000
+    assert resp.cache_write_tokens == 400
+    # Cost must reflect the cached-token discount/premium.
+    expected = round(_estimate_cost("claude-sonnet-4-20250514", 10, 20, 2000, 400), 6)
+    assert resp.estimated_cost_usd == expected
+
+
+@pytest.mark.asyncio
+async def test_claude_generate_without_cache_fields_defaults_zero():
+    """A usage object lacking cache fields must not crash and reports 0."""
+    class FakeMessages:
+        async def create(self, **_kwargs):
+            return _FakeClaudeResp()
+
+    from atomics.providers.claude import ClaudeProvider
+
+    fake_client = type("FakeClient", (), {"messages": FakeMessages()})()
+    provider = ClaudeProvider(api_key="fake", client=fake_client)
+    resp = await provider.generate("hi", model="claude-sonnet-4-6")
+    assert resp.cache_read_tokens == 0
+    assert resp.cache_write_tokens == 0
+
+
 @pytest.mark.asyncio
 async def test_claude_health_failure():
     class FakeMessages:

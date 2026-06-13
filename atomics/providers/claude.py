@@ -23,9 +23,28 @@ MODEL_PRICING: dict[str, tuple[float, float]] = {
 DEFAULT_PRICING = (3.0, 15.0)
 
 
-def _estimate_cost(model: str, input_tokens: int, output_tokens: int) -> float:
+# Anthropic prompt-caching multipliers (relative to the base input rate):
+# cache writes bill at 1.25x, cache reads at 0.10x. Cached tokens are reported
+# separately from input_tokens, so they are additive in the cost calculation.
+_CACHE_WRITE_MULTIPLIER = 1.25
+_CACHE_READ_MULTIPLIER = 0.10
+
+
+def _estimate_cost(
+    model: str,
+    input_tokens: int,
+    output_tokens: int,
+    cache_read_tokens: int = 0,
+    cache_write_tokens: int = 0,
+) -> float:
     inp_price, out_price = MODEL_PRICING.get(model, DEFAULT_PRICING)
-    return (input_tokens * inp_price + output_tokens * out_price) / 1_000_000
+    cost = (
+        input_tokens * inp_price
+        + cache_write_tokens * inp_price * _CACHE_WRITE_MULTIPLIER
+        + cache_read_tokens * inp_price * _CACHE_READ_MULTIPLIER
+        + output_tokens * out_price
+    )
+    return cost / 1_000_000
 
 
 _DEFAULT_THINKING_BUDGET = 10_000
@@ -94,6 +113,8 @@ class ClaudeProvider(BaseProvider):
         inp = response.usage.input_tokens
         out = response.usage.output_tokens
         thinking_tokens = getattr(response.usage, "thinking_tokens", 0) or 0
+        cache_read = getattr(response.usage, "cache_read_input_tokens", 0) or 0
+        cache_write = getattr(response.usage, "cache_creation_input_tokens", 0) or 0
 
         visible_out = out - thinking_tokens
         tps = visible_out / (latency / 1000) if latency > 0 and visible_out > 0 else None
@@ -105,10 +126,14 @@ class ClaudeProvider(BaseProvider):
             total_tokens=inp + out,
             model=model,
             latency_ms=round(latency, 2),
-            estimated_cost_usd=round(_estimate_cost(model, inp, out), 6),
+            estimated_cost_usd=round(
+                _estimate_cost(model, inp, out, cache_read, cache_write), 6
+            ),
             tokens_per_second=round(tps, 2) if tps is not None else None,
             thinking_tokens=thinking_tokens,
             thinking_text=thinking_text,
+            cache_read_tokens=cache_read,
+            cache_write_tokens=cache_write,
             raw=response.model_dump() if hasattr(response, "model_dump") else None,
         )
 

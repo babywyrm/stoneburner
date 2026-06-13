@@ -18,6 +18,11 @@ class ProviderResponse:
     tokens_per_second: float | None = None
     thinking_tokens: int = 0
     thinking_text: str = ""
+    # Prompt-caching usage (providers that support it; 0 elsewhere).
+    # cache_read_tokens: input tokens served from cache (billed at a discount).
+    # cache_write_tokens: input tokens written to cache (billed at a premium).
+    cache_read_tokens: int = 0
+    cache_write_tokens: int = 0
     raw: dict | None = field(default=None, repr=False)
 
 
