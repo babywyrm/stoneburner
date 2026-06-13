@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import time
 
-from atomics.providers.base import BaseProvider, ProviderResponse
+from atomics.providers.base import BaseProvider, ProviderResponse, compute_tps
 
 BEDROCK_PRICING: dict[str, tuple[float, float]] = {
     "us.anthropic.claude-sonnet-4-6": (3.0, 15.0),
@@ -96,6 +96,7 @@ class BedrockProvider(BaseProvider):
             model=model_id,
             latency_ms=round(latency, 2),
             estimated_cost_usd=round(_estimate_cost(model_id, inp, out), 6),
+            tokens_per_second=compute_tps(out, latency / 1000),
             raw=response,
         )
 

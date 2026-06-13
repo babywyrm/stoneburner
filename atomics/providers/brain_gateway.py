@@ -12,7 +12,7 @@ import time
 
 import httpx
 
-from atomics.providers.base import BaseProvider, ProviderResponse
+from atomics.providers.base import BaseProvider, ProviderResponse, compute_tps
 
 
 class BrainGatewayProvider(BaseProvider):
@@ -93,7 +93,7 @@ class BrainGatewayProvider(BaseProvider):
         cost = usage.get("cost_usd", 0.0)
         model_used = usage.get("model", effective_model or "unknown")
 
-        tps = out / (latency_ms / 1000) if latency_ms > 0 and out > 0 else None
+        tps = compute_tps(out, latency_ms / 1000)
 
         return ProviderResponse(
             text=text,
@@ -103,7 +103,7 @@ class BrainGatewayProvider(BaseProvider):
             model=model_used,
             latency_ms=round(latency_ms, 2),
             estimated_cost_usd=cost,
-            tokens_per_second=round(tps, 2) if tps is not None else None,
+            tokens_per_second=tps,
             raw=data,
         )
 

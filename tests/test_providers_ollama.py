@@ -56,6 +56,8 @@ async def test_ollama_generate_success():
     assert resp.estimated_cost_usd == 0.0
     assert resp.tokens_per_second is not None
     assert resp.tokens_per_second == pytest.approx(42 / 0.33, rel=0.01)
+    # Ollama times pure decode (eval_duration), so it reports the generation basis.
+    assert resp.tps_basis == "generation"
 
 
 @pytest.mark.asyncio

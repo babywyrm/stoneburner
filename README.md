@@ -63,6 +63,18 @@ uv run atomics provider-test -p ollama -m qwen3:14b --thinking
 
 When `--thinking` / `--no-thinking` is omitted, stoneburner checks the model against its capability registry and enables thinking automatically for known models. Use `--no-thinking` to force it off for A/B comparisons.
 
+## Metrics & Fidelity
+
+Stoneburner reports only what a provider can actually observe, so cross-model comparisons stay honest:
+
+- **Cost** — token usage × per-model pricing. For Claude, prompt-caching is priced correctly: cache **reads** bill at 0.10× and cache **writes** at 1.25× the base input rate, and the cached-token counts (`cache_read_tokens` / `cache_write_tokens`) are captured alongside `input_tokens`.
+- **Thinking tokens** — populated only when the provider truly reports a count: OpenAI `reasoning_tokens` (`completion_tokens_details` / `output_tokens_details`). For Ollama and vLLM, which expose reasoning text but no separate count, the value is a character-proportional estimate anchored to the real output-token total (never exceeds `output_tokens`). For Claude it is `0`, because Anthropic bills extended thinking as ordinary output and reports no separate figure.
+- **Throughput (`tokens_per_second`)** — always *total* output tokens ÷ elapsed time. The time basis is recorded in `tps_basis`:
+  - `wall_clock` — end-to-end request time including network, queueing, and prompt processing (Claude, OpenAI, Bedrock, vLLM/gateway, brain-gateway).
+  - `generation` — pure decode time from the backend (Ollama `eval_duration`).
+
+  Compare tok/s across providers with the basis in mind: `generation`-basis numbers reflect raw decode speed, while `wall_clock` numbers reflect what a caller actually experiences.
+
 ## Burn Tiers
 
 Atomics supports three usage tiers that control task complexity, model selection, cadence, and budget:

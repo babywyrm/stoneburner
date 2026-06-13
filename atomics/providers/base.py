@@ -16,6 +16,12 @@ class ProviderResponse:
     latency_ms: float
     estimated_cost_usd: float
     tokens_per_second: float | None = None
+    # How tokens_per_second was measured, so cross-provider comparisons are honest:
+    #   "wall_clock"  — total output tokens / end-to-end request time (includes
+    #                   network + queue + prompt processing; API providers).
+    #   "generation"  — total output tokens / pure decode time (local providers
+    #                   that report a generation duration, e.g. Ollama eval_duration).
+    tps_basis: str = "wall_clock"
     thinking_tokens: int = 0
     thinking_text: str = ""
     # Prompt-caching usage (providers that support it; 0 elsewhere).
@@ -24,6 +30,19 @@ class ProviderResponse:
     cache_read_tokens: int = 0
     cache_write_tokens: int = 0
     raw: dict | None = field(default=None, repr=False)
+
+
+def compute_tps(output_tokens: int, seconds: float) -> float | None:
+    """Tokens/second over the given elapsed seconds.
+
+    Standardized across providers to use *total* output tokens (thinking tokens
+    are real generated work) divided by the elapsed time. Returns None when the
+    rate is undefined (no tokens or no measured time). The time *basis* differs
+    per provider and is recorded separately in ProviderResponse.tps_basis.
+    """
+    if seconds > 0 and output_tokens > 0:
+        return round(output_tokens / seconds, 2)
+    return None
 
 
 class BaseProvider(ABC):
