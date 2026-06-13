@@ -91,9 +91,16 @@ class OpenAIProvider(BaseProvider):
             if token:
                 self._client.api_key = token
 
+        kwargs = {
+            "system": system,
+            "model": model,
+            "max_tokens": max_tokens,
+            "thinking": thinking,
+            "thinking_budget": thinking_budget,
+        }
         if self._use_responses_api:
-            return await self._generate_responses(prompt, system=system, model=model, max_tokens=max_tokens, thinking=thinking, thinking_budget=thinking_budget)
-        return await self._generate_completions(prompt, system=system, model=model, max_tokens=max_tokens, thinking=thinking, thinking_budget=thinking_budget)
+            return await self._generate_responses(prompt, **kwargs)
+        return await self._generate_completions(prompt, **kwargs)
 
     async def _generate_completions(
         self, prompt: str, *, system: str, model: str, max_tokens: int,
