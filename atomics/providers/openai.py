@@ -9,29 +9,16 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING
 
+from atomics.providers import pricing
 from atomics.providers.base import BaseProvider, ProviderResponse, compute_tps
 
 if TYPE_CHECKING:
     from atomics.auth import AuthStrategy
 
-MODEL_PRICING: dict[str, tuple[float, float]] = {
-    "gpt-4o": (2.50, 10.0),
-    "gpt-4o-2024-11-20": (2.50, 10.0),
-    "gpt-4o-mini": (0.15, 0.60),
-    "gpt-4o-mini-2024-07-18": (0.15, 0.60),
-    "gpt-4.1": (2.00, 8.00),
-    "gpt-4.1-mini": (0.40, 1.60),
-    "gpt-4.1-nano": (0.10, 0.40),
-    "gpt-5": (15.0, 60.0),
-    "gpt-5-turbo": (5.00, 20.0),
-    "gpt-5.3": (10.0, 40.0),
-    "gpt-5.5": (15.0, 60.0),
-    "o3": (2.00, 8.00),
-    "o3-mini": (1.10, 4.40),
-    "o3-pro": (20.0, 80.0),
-    "o4-mini": (1.10, 4.40),
-    "codex-mini-latest": (1.50, 6.00),
-}
+# Pricing per 1M tokens (input / output). Sourced from the central pricing
+# module; re-exported here for backward compatibility.
+MODEL_PRICING = pricing.OPENAI_PRICING
+DEFAULT_PRICING = pricing.OPENAI_DEFAULT
 
 # Models that require max_completion_tokens instead of max_tokens
 _MAX_COMPLETION_TOKENS_MODELS = {
@@ -43,12 +30,11 @@ _MAX_COMPLETION_TOKENS_MODELS = {
 # the entire budget and leave the visible response empty.
 _REASONING_TOKEN_MULTIPLIER = 8
 
-DEFAULT_PRICING = (2.50, 10.0)
-
 
 def _estimate_cost(model: str, input_tokens: int, output_tokens: int) -> float:
-    inp_price, out_price = MODEL_PRICING.get(model, DEFAULT_PRICING)
-    return (input_tokens * inp_price + output_tokens * out_price) / 1_000_000
+    return pricing.estimate_cost(
+        model, input_tokens, output_tokens, table=MODEL_PRICING, default=DEFAULT_PRICING
+    )
 
 
 class OpenAIProvider(BaseProvider):

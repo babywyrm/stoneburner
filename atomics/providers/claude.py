@@ -6,28 +6,13 @@ import time
 
 import anthropic
 
+from atomics.providers import pricing
 from atomics.providers.base import BaseProvider, ProviderResponse, compute_tps
 
-# Pricing per 1M tokens (input / output)
-MODEL_PRICING: dict[str, tuple[float, float]] = {
-    "claude-opus-4-6": (5.0, 25.0),
-    "claude-sonnet-4-6": (3.0, 15.0),
-    "claude-haiku-4-5-20251001": (1.0, 5.0),
-    "claude-haiku-4-5": (1.0, 5.0),
-    "claude-sonnet-4-5-20250929": (3.0, 15.0),
-    "claude-sonnet-4-5": (3.0, 15.0),
-    "claude-sonnet-4-20250514": (3.0, 15.0),
-    "claude-opus-4-20250514": (15.0, 75.0),
-}
-
-DEFAULT_PRICING = (3.0, 15.0)
-
-
-# Anthropic prompt-caching multipliers (relative to the base input rate):
-# cache writes bill at 1.25x, cache reads at 0.10x. Cached tokens are reported
-# separately from input_tokens, so they are additive in the cost calculation.
-_CACHE_WRITE_MULTIPLIER = 1.25
-_CACHE_READ_MULTIPLIER = 0.10
+# Pricing per 1M tokens (input / output). Sourced from the central pricing
+# module; re-exported here for backward compatibility.
+MODEL_PRICING = pricing.CLAUDE_PRICING
+DEFAULT_PRICING = pricing.CLAUDE_DEFAULT
 
 
 def _estimate_cost(
@@ -37,14 +22,15 @@ def _estimate_cost(
     cache_read_tokens: int = 0,
     cache_write_tokens: int = 0,
 ) -> float:
-    inp_price, out_price = MODEL_PRICING.get(model, DEFAULT_PRICING)
-    cost = (
-        input_tokens * inp_price
-        + cache_write_tokens * inp_price * _CACHE_WRITE_MULTIPLIER
-        + cache_read_tokens * inp_price * _CACHE_READ_MULTIPLIER
-        + output_tokens * out_price
+    return pricing.estimate_cost(
+        model,
+        input_tokens,
+        output_tokens,
+        table=MODEL_PRICING,
+        default=DEFAULT_PRICING,
+        cache_read_tokens=cache_read_tokens,
+        cache_write_tokens=cache_write_tokens,
     )
-    return cost / 1_000_000
 
 
 _DEFAULT_THINKING_BUDGET = 10_000
