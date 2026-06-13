@@ -178,6 +178,8 @@ def test_save_and_query_cache_and_tps_basis():
     claude_row = next(r for r in rows if r["group_key"] == "claude")
     assert claude_row["total_cache_read_tokens"] == 2000
     assert claude_row["total_cache_write_tokens"] == 400
+    assert claude_row["tps_bases"] == "generation"
+    assert claude_row["avg_thinking_tokens"] == 0
     repo.close()
 
 

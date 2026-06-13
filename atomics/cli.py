@@ -604,6 +604,14 @@ def compare(
             console.print("[dim]No data to compare. Run benchmarks with multiple providers first.[/dim]")
             return
 
+        # Only surface the optional fidelity columns when there's signal, to keep
+        # the table readable.
+        any_thinking = any((r.get("avg_thinking_tokens") or 0) > 0 for r in rows)
+        any_cache = any(
+            (r.get("total_cache_read_tokens") or 0) or (r.get("total_cache_write_tokens") or 0)
+            for r in rows
+        )
+
         label = "Provider" if by == "provider" else "Model"
         detail_label = "Model(s)" if by == "provider" else "Provider"
         table = Table(title=f"Comparison by {label}", show_lines=True)
@@ -615,11 +623,17 @@ def compare(
         table.add_column("P50 Lat.", justify="right")
         table.add_column("P95 Lat.", justify="right")
         table.add_column("Avg tok/s", justify="right", style="blue")
+        table.add_column("Basis", style="dim")
+        if any_thinking:
+            table.add_column("Avg think", justify="right")
+        if any_cache:
+            table.add_column("Cache r/w", justify="right")
         table.add_column("$/1K tok", justify="right", style="yellow")
         table.add_column("Value Score", justify="right", style="cyan bold")
         table.add_column("Total $", justify="right", style="yellow bold")
 
         classes_seen: set[str] = set()
+        bases_seen: set[str] = set()
         for r in rows:
             if by == "model":
                 model_classes = {classify_model(r["group_key"])}
@@ -630,11 +644,14 @@ def compare(
             classes_seen.update(c.value for c in model_classes)
             avg_tps = r.get("avg_tokens_per_second")
             tps_label = f"{avg_tps:.1f}" if avg_tps else "—"
+            bases = sorted({b for b in (r.get("tps_bases") or "").split(",") if b})
+            bases_seen.update(bases)
+            basis_label = ", ".join(bases) or "—"
             acc = r.get("avg_accuracy_score")
             quality_label = f"{acc * 100:.1f}%" if acc is not None else "—"
             val = r.get("value_score")
             value_label = f"{val:.1f}" if val is not None else "—"
-            table.add_row(
+            cells = [
                 r["group_key"],
                 r.get("models_used", "—") or "—",
                 cls_label,
@@ -643,10 +660,21 @@ def compare(
                 f"{r['p50_latency_ms']:.0f}ms",
                 f"{r['p95_latency_ms']:.0f}ms",
                 tps_label,
+                basis_label,
+            ]
+            if any_thinking:
+                think = r.get("avg_thinking_tokens") or 0
+                cells.append(f"{think:.0f}" if think else "—")
+            if any_cache:
+                cr = r.get("total_cache_read_tokens") or 0
+                cw = r.get("total_cache_write_tokens") or 0
+                cells.append(f"{cr}/{cw}" if (cr or cw) else "—")
+            cells += [
                 f"${r['cost_per_1k_tokens']:.4f}",
                 value_label,
                 f"${r['total_cost']:.4f}",
-            )
+            ]
+            table.add_row(*cells)
         console.print(table)
 
         if len(classes_seen) > 1:
@@ -654,6 +682,13 @@ def compare(
                 "\n[yellow]⚠ Mixed model classes detected.[/yellow] "
                 "For a fair comparison, run the same tier with equivalent models "
                 "(e.g. all light-class or all mid-class)."
+            )
+
+        if len(bases_seen) > 1:
+            console.print(
+                "\n[yellow]⚠ Mixed throughput bases detected (wall_clock vs generation).[/yellow] "
+                "tok/s is not directly comparable: wall_clock includes network/queue time, "
+                "while generation measures pure decode speed."
             )
 
         if narrative:
