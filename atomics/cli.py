@@ -366,10 +366,17 @@ def provider_test(provider_name: str, model: str | None, region: str, ollama_hos
         )
         if resp.thinking_tokens:
             console.print(f"Thinking tokens: {resp.thinking_tokens}")
+        if resp.cache_read_tokens or resp.cache_write_tokens:
+            console.print(
+                f"Cache tokens: read={resp.cache_read_tokens} "
+                f"write={resp.cache_write_tokens}"
+            )
         console.print(f"Latency: {resp.latency_ms:.0f}ms")
         console.print(f"Cost: ${resp.estimated_cost_usd:.6f}")
         if resp.tokens_per_second is not None:
-            console.print(f"Throughput: {resp.tokens_per_second:.1f} tok/s")
+            console.print(
+                f"Throughput: {resp.tokens_per_second:.1f} tok/s ({resp.tps_basis})"
+            )
 
     asyncio.run(_test())
 

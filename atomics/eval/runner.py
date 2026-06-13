@@ -117,10 +117,13 @@ async def run_eval(
             task_result.output_tokens = resp.output_tokens
             task_result.total_tokens = resp.total_tokens
             task_result.thinking_tokens = resp.thinking_tokens
+            task_result.cache_read_tokens = resp.cache_read_tokens
+            task_result.cache_write_tokens = resp.cache_write_tokens
             task_result.model = resp.model
             task_result.latency_ms = resp.latency_ms
             task_result.estimated_cost_usd = resp.estimated_cost_usd
             task_result.tokens_per_second = resp.tokens_per_second
+            task_result.tps_basis = resp.tps_basis
             task_result.thinking_enabled = thinking is True
         except Exception as exc:
             task_result.status = TaskStatus.FAILED

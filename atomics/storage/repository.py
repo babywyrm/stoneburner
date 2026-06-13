@@ -106,13 +106,15 @@ class MetricsRepository:
                 task_id, run_id, category, task_name, provider, model, status,
                 suite,
                 prompt, response, input_tokens, output_tokens, total_tokens,
-                thinking_tokens,
-                latency_ms, estimated_cost_usd, tokens_per_second,
+                thinking_tokens, cache_read_tokens, cache_write_tokens,
+                latency_ms, estimated_cost_usd, tokens_per_second, tps_basis,
                 thinking_enabled,
                 error_class, error_message,
                 started_at, completed_at,
                 accuracy_score, judge_model, quality_rationale
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+            )
             """,
             (
                 result.task_id,
@@ -129,9 +131,12 @@ class MetricsRepository:
                 result.output_tokens,
                 result.total_tokens,
                 result.thinking_tokens,
+                result.cache_read_tokens,
+                result.cache_write_tokens,
                 result.latency_ms,
                 result.estimated_cost_usd,
                 result.tokens_per_second,
+                result.tps_basis,
                 int(result.thinking_enabled),
                 result.error_class,
                 result.error_message,
@@ -338,6 +343,8 @@ class MetricsRepository:
                 COALESCE(AVG(estimated_cost_usd), 0) as avg_cost_per_task,
                 COALESCE(SUM(estimated_cost_usd), 0) as total_cost,
                 COALESCE(SUM(total_tokens), 0) as total_tokens,
+                COALESCE(SUM(cache_read_tokens), 0) as total_cache_read_tokens,
+                COALESCE(SUM(cache_write_tokens), 0) as total_cache_write_tokens,
                 AVG(tokens_per_second) as avg_tokens_per_second,
                 AVG(accuracy_score) as avg_accuracy_score,
                 COUNT(accuracy_score) as scored_tasks

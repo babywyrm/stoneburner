@@ -417,7 +417,7 @@ class TestSchemaVersion:
 
     def test_schema_version_bumped(self):
         from atomics.storage.schema import SCHEMA_VERSION
-        assert SCHEMA_VERSION == 11
+        assert SCHEMA_VERSION == 12
 
 
 # ── Think-time / user arrival simulation ─────────────────────────────────────

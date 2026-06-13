@@ -8,7 +8,7 @@ from pathlib import Path
 
 logger = logging.getLogger("atomics.schema")
 
-SCHEMA_VERSION = 11
+SCHEMA_VERSION = 12
 
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -48,9 +48,12 @@ CREATE TABLE IF NOT EXISTS task_results (
     output_tokens   INTEGER DEFAULT 0,
     total_tokens    INTEGER DEFAULT 0,
     thinking_tokens INTEGER DEFAULT 0,
+    cache_read_tokens INTEGER DEFAULT 0,
+    cache_write_tokens INTEGER DEFAULT 0,
     latency_ms      REAL DEFAULT 0.0,
     estimated_cost_usd REAL DEFAULT 0.0,
     tokens_per_second REAL DEFAULT NULL,
+    tps_basis       TEXT DEFAULT 'wall_clock',
     thinking_enabled INTEGER DEFAULT 0,
     error_class     TEXT DEFAULT '',
     error_message   TEXT DEFAULT '',
