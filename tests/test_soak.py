@@ -582,13 +582,16 @@ class TestRunSoakProvider:
         def on_sample(s: SoakSample) -> None:
             received.append(s)
 
+        # duration/interval give ~5 expected samples — enough margin that
+        # coverage/scheduler overhead can't starve this below the >=2 assertion
+        # (0.5s/0.2s left exactly 2 expected samples with zero slack and flaked).
         with patch("atomics.stress._single_request_provider",
                    side_effect=_async_req_provider()):
             await run_soak_provider(
                 provider=_make_mock_provider("cb-prov"),
                 model="m",
                 concurrency=1,
-                duration_seconds=0.5,
+                duration_seconds=1.0,
                 sample_interval=0.2,
                 on_sample=on_sample,
             )
