@@ -229,6 +229,10 @@ class OpenAIProvider(BaseProvider):
     async def health_check(self) -> bool:
         try:
             resp = await self.generate("Say OK.", max_tokens=8)
-            return len(resp.text) > 0
+            # A successful round-trip that consumed tokens proves the provider is
+            # live. Don't require visible text: reasoning models can spend the
+            # whole (small) budget on hidden reasoning and return empty content
+            # with finish_reason="length", which made this flaky for o-series.
+            return resp.total_tokens > 0
         except Exception:
             return False

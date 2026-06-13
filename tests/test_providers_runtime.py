@@ -199,3 +199,37 @@ async def test_openai_health_failure():
 
     provider = OpenAIProvider(api_key="fake", client=fake_client)
     assert await provider.health_check() is False
+
+
+@pytest.mark.asyncio
+async def test_openai_health_passes_on_empty_reasoning_response():
+    """A reasoning model can burn the whole budget and return empty visible text
+    (finish_reason='length'); a token-consuming round-trip still means healthy."""
+    class _EmptyChoice:
+        def __init__(self):
+            self.message = type("Msg", (), {"content": ""})()
+
+    class _Resp:
+        def __init__(self):
+            self.choices = [_EmptyChoice()]
+            # 8 prompt + 64 reasoning tokens consumed, but no visible content.
+            self.usage = _FakeOpenAIUsage(prompt_tokens=8, completion_tokens=64)
+
+        def model_dump(self):
+            return {"ok": True}
+
+    class FakeCompletions:
+        async def create(self, **_kwargs):
+            return _Resp()
+
+    fake_client = type(
+        "FakeClient", (), {"chat": type("Chat", (), {"completions": FakeCompletions()})()}
+    )()
+
+    from atomics.providers.openai import OpenAIProvider
+
+    provider = OpenAIProvider(api_key="fake", default_model="o4-mini", client=fake_client)
+    resp = await provider.generate("hi", model="o4-mini", max_tokens=8)
+    assert resp.text == ""
+    assert resp.total_tokens == 72
+    assert await provider.health_check() is True
