@@ -9,7 +9,7 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING
 
-from atomics.providers.base import BaseProvider, ProviderResponse
+from atomics.providers.base import BaseProvider, ProviderResponse, compute_tps
 
 if TYPE_CHECKING:
     from atomics.auth import AuthStrategy
@@ -165,8 +165,7 @@ class OpenAIProvider(BaseProvider):
             details = usage.completion_tokens_details
             reasoning_tokens = getattr(details, "reasoning_tokens", 0) or 0
 
-        visible_out = out - reasoning_tokens
-        tps = visible_out / (latency / 1000) if latency > 0 and visible_out > 0 else None
+        tps = compute_tps(out, latency / 1000)
 
         return ProviderResponse(
             text=text,
@@ -176,7 +175,7 @@ class OpenAIProvider(BaseProvider):
             model=model,
             latency_ms=round(latency, 2),
             estimated_cost_usd=round(_estimate_cost(model, inp, out), 6),
-            tokens_per_second=round(tps, 2) if tps is not None else None,
+            tokens_per_second=tps,
             thinking_tokens=reasoning_tokens,
             raw=response.model_dump() if hasattr(response, "model_dump") else None,
         )
@@ -226,8 +225,7 @@ class OpenAIProvider(BaseProvider):
         else:
             reasoning_tokens = getattr(usage, "reasoning_tokens", 0) or 0
 
-        visible_out = out - reasoning_tokens
-        tps = visible_out / (latency / 1000) if latency > 0 and visible_out > 0 else None
+        tps = compute_tps(out, latency / 1000)
 
         return ProviderResponse(
             text=text,
@@ -237,7 +235,7 @@ class OpenAIProvider(BaseProvider):
             model=model,
             latency_ms=round(latency, 2),
             estimated_cost_usd=round(_estimate_cost(model, inp, out), 6),
-            tokens_per_second=round(tps, 2) if tps is not None else None,
+            tokens_per_second=tps,
             thinking_tokens=reasoning_tokens,
             raw=response.model_dump() if hasattr(response, "model_dump") else None,
         )

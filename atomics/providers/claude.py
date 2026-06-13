@@ -6,7 +6,7 @@ import time
 
 import anthropic
 
-from atomics.providers.base import BaseProvider, ProviderResponse
+from atomics.providers.base import BaseProvider, ProviderResponse, compute_tps
 
 # Pricing per 1M tokens (input / output)
 MODEL_PRICING: dict[str, tuple[float, float]] = {
@@ -119,8 +119,7 @@ class ClaudeProvider(BaseProvider):
         cache_read = getattr(response.usage, "cache_read_input_tokens", 0) or 0
         cache_write = getattr(response.usage, "cache_creation_input_tokens", 0) or 0
 
-        visible_out = out - thinking_tokens
-        tps = visible_out / (latency / 1000) if latency > 0 and visible_out > 0 else None
+        tps = compute_tps(out, latency / 1000)
 
         return ProviderResponse(
             text=text,

@@ -100,6 +100,20 @@ async def test_claude_generate_without_cache_fields_defaults_zero():
 
 
 @pytest.mark.asyncio
+async def test_claude_generate_reports_wall_clock_basis():
+    class FakeMessages:
+        async def create(self, **_kwargs):
+            return _FakeClaudeResp()
+
+    from atomics.providers.claude import ClaudeProvider
+
+    fake_client = type("FakeClient", (), {"messages": FakeMessages()})()
+    provider = ClaudeProvider(api_key="fake", client=fake_client)
+    resp = await provider.generate("hi", model="claude-sonnet-4-6")
+    assert resp.tps_basis == "wall_clock"
+
+
+@pytest.mark.asyncio
 async def test_claude_health_failure():
     class FakeMessages:
         async def create(self, **_kwargs):

@@ -62,6 +62,43 @@ def test_claude_cost_estimation_cache_defaults_to_zero():
     )
 
 
+def test_compute_tps_basic():
+    from atomics.providers.base import compute_tps
+
+    assert compute_tps(200, 2.0) == 100.0
+
+
+def test_compute_tps_uses_total_output_tokens():
+    """Throughput counts all generated tokens, not just visible output."""
+    from atomics.providers.base import compute_tps
+
+    # 200 total tokens over 2s is 100 tok/s regardless of any thinking split.
+    assert compute_tps(200, 2.0) == 100.0
+
+
+def test_compute_tps_undefined_returns_none():
+    from atomics.providers.base import compute_tps
+
+    assert compute_tps(0, 2.0) is None
+    assert compute_tps(100, 0.0) is None
+    assert compute_tps(100, -1.0) is None
+
+
+def test_provider_response_tps_basis_default_is_wall_clock():
+    from atomics.providers.base import ProviderResponse
+
+    resp = ProviderResponse(
+        text="x",
+        input_tokens=1,
+        output_tokens=1,
+        total_tokens=2,
+        model="m",
+        latency_ms=1.0,
+        estimated_cost_usd=0.0,
+    )
+    assert resp.tps_basis == "wall_clock"
+
+
 def test_bedrock_cost_estimation():
     from atomics.providers.bedrock import _estimate_cost
 

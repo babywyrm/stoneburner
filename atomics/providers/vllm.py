@@ -16,7 +16,7 @@ import time
 import httpx
 
 from atomics.model_classes import classify_model, supports_thinking
-from atomics.providers.base import BaseProvider, ProviderResponse
+from atomics.providers.base import BaseProvider, ProviderResponse, compute_tps
 
 _THINKING_MODEL_PREFIXES: tuple[str, ...] = ("qwen3", "deepseek-r1")
 
@@ -115,7 +115,9 @@ class VllmProvider(BaseProvider):
         out = usage.get("completion_tokens", 0)
         total = usage.get("total_tokens", inp + out)
 
-        tps = round(out / (latency_ms / 1000), 2) if latency_ms > 0 and out > 0 else None
+        # OpenAI-compatible HTTP call to a local gateway: latency is end-to-end
+        # (network + queue + decode), so throughput is reported on wall-clock basis.
+        tps = compute_tps(out, latency_ms / 1000)
 
         thinking_text = ""
         thinking_tokens = 0
@@ -123,7 +125,12 @@ class VllmProvider(BaseProvider):
             thinking_content = choice.get("message", {}).get("reasoning_content", "")
             if thinking_content:
                 thinking_text = thinking_content
-                thinking_tokens = len(thinking_text.split())
+                # vLLM counts reasoning within completion_tokens but reports no
+                # separate figure; estimate by character proportion so it stays
+                # anchored to the real token total instead of a word count.
+                generated_chars = len(thinking_text) + len(text)
+                if generated_chars > 0 and out > 0:
+                    thinking_tokens = round(out * len(thinking_text) / generated_chars)
 
         return ProviderResponse(
             text=text,
