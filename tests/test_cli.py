@@ -355,7 +355,10 @@ def test_cli_provider_test_bedrock_success(monkeypatch):
                 latency_ms=1.0,
                 estimated_cost_usd=0.0,
                 tokens_per_second=None,
+                tps_basis="wall_clock",
                 thinking_tokens=0,
+                cache_read_tokens=0,
+                cache_write_tokens=0,
             )
 
     monkeypatch.setattr("atomics.providers.bedrock.BedrockProvider", DummyProvider)
@@ -385,7 +388,10 @@ def test_cli_provider_test_openai_success(monkeypatch):
                 latency_ms=1.0,
                 estimated_cost_usd=0.0,
                 tokens_per_second=None,
+                tps_basis="wall_clock",
                 thinking_tokens=0,
+                cache_read_tokens=0,
+                cache_write_tokens=0,
             )
 
     monkeypatch.setattr("atomics.providers.openai.OpenAIProvider", DummyProvider)
@@ -628,7 +634,10 @@ def test_cli_provider_test_success(monkeypatch):
                 latency_ms=1.0,
                 estimated_cost_usd=0.0,
                 tokens_per_second=None,
+                tps_basis="wall_clock",
                 thinking_tokens=0,
+                cache_read_tokens=0,
+                cache_write_tokens=0,
             )
 
     monkeypatch.setattr("atomics.providers.claude.ClaudeProvider", DummyProvider)
@@ -921,6 +930,7 @@ def test_cli_run_with_mocked_vllm(monkeypatch, tmp_path):
         text="ok", input_tokens=10, output_tokens=20, total_tokens=30,
         model="qwen2.5:3b", latency_ms=120.0, estimated_cost_usd=0.0,
         tokens_per_second=100.0, thinking_tokens=0, thinking_text="",
+        tps_basis="wall_clock", cache_read_tokens=0, cache_write_tokens=0,
     )
     fake_provider = MagicMock()
     fake_provider.name = "vllm"
@@ -976,6 +986,7 @@ def test_cli_provider_test_vllm_success(monkeypatch, tmp_path):
         text="ok", input_tokens=5, output_tokens=10, total_tokens=15,
         model="qwen2.5:3b", latency_ms=80.0, estimated_cost_usd=0.0,
         tokens_per_second=125.0, thinking_tokens=0, thinking_text="",
+        tps_basis="wall_clock", cache_read_tokens=0, cache_write_tokens=0,
     )
 
     class FakeVllm:

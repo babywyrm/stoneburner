@@ -52,10 +52,13 @@ async def execute_task(
         result.output_tokens = resp.output_tokens
         result.total_tokens = resp.total_tokens
         result.thinking_tokens = resp.thinking_tokens
+        result.cache_read_tokens = resp.cache_read_tokens
+        result.cache_write_tokens = resp.cache_write_tokens
         result.model = resp.model
         result.latency_ms = resp.latency_ms
         result.estimated_cost_usd = resp.estimated_cost_usd
         result.tokens_per_second = resp.tokens_per_second
+        result.tps_basis = resp.tps_basis
 
     except Exception as exc:
         result.status = TaskStatus.FAILED

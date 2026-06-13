@@ -15,7 +15,7 @@ def _tmp_repo() -> MetricsRepository:
 
 
 def test_schema_version_is_current():
-    assert SCHEMA_VERSION == 11
+    assert SCHEMA_VERSION == 12
 
 
 def test_adversarial_results_table_exists(tmp_path):
@@ -141,6 +141,66 @@ def test_save_and_query_task_result():
     assert summary.total_tasks == 1
     assert summary.successful_tasks == 1
     assert summary.total_tokens == 150
+    repo.close()
+
+
+def test_save_and_query_cache_and_tps_basis():
+    """Cache tokens and tps_basis must round-trip through the DB."""
+    repo = _tmp_repo()
+    repo.create_run("run-cache")
+
+    result = TaskResult(
+        run_id="run-cache",
+        category=TaskCategory.GENERAL_QA,
+        task_name="cached_q",
+        provider="claude",
+        model="claude-sonnet-4-20250514",
+        status=TaskStatus.SUCCESS,
+        input_tokens=100,
+        output_tokens=50,
+        total_tokens=150,
+        cache_read_tokens=2000,
+        cache_write_tokens=400,
+        tokens_per_second=42.0,
+        tps_basis="generation",
+        estimated_cost_usd=0.001,
+        started_at=datetime.now(UTC),
+        completed_at=datetime.now(UTC),
+    )
+    repo.save_task_result(result)
+
+    tasks = repo.get_run_tasks("run-cache")
+    assert tasks[0]["cache_read_tokens"] == 2000
+    assert tasks[0]["cache_write_tokens"] == 400
+    assert tasks[0]["tps_basis"] == "generation"
+
+    rows = repo.compare_providers()
+    claude_row = next(r for r in rows if r["group_key"] == "claude")
+    assert claude_row["total_cache_read_tokens"] == 2000
+    assert claude_row["total_cache_write_tokens"] == 400
+    repo.close()
+
+
+def test_cache_and_tps_basis_defaults():
+    """Defaults persist as 0 / wall_clock when a provider reports no cache use."""
+    repo = _tmp_repo()
+    repo.create_run("run-nocache")
+    repo.save_task_result(
+        TaskResult(
+            run_id="run-nocache",
+            category=TaskCategory.GENERAL_QA,
+            task_name="plain",
+            provider="ollama",
+            model="qwen2.5:7b",
+            status=TaskStatus.SUCCESS,
+            started_at=datetime.now(UTC),
+            completed_at=datetime.now(UTC),
+        )
+    )
+    tasks = repo.get_run_tasks("run-nocache")
+    assert tasks[0]["cache_read_tokens"] == 0
+    assert tasks[0]["cache_write_tokens"] == 0
+    assert tasks[0]["tps_basis"] == "wall_clock"
     repo.close()
 
 

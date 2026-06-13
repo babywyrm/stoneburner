@@ -68,9 +68,12 @@ class TaskResult(BaseModel):
     output_tokens: int = 0
     total_tokens: int = 0
     thinking_tokens: int = 0
+    cache_read_tokens: int = 0
+    cache_write_tokens: int = 0
     latency_ms: float = 0.0
     estimated_cost_usd: float = 0.0
     tokens_per_second: float | None = None
+    tps_basis: str = "wall_clock"
     thinking_enabled: bool = False
     error_class: str = ""
     error_message: str = ""
