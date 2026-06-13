@@ -345,6 +345,8 @@ class MetricsRepository:
                 COALESCE(SUM(total_tokens), 0) as total_tokens,
                 COALESCE(SUM(cache_read_tokens), 0) as total_cache_read_tokens,
                 COALESCE(SUM(cache_write_tokens), 0) as total_cache_write_tokens,
+                COALESCE(AVG(thinking_tokens), 0) as avg_thinking_tokens,
+                GROUP_CONCAT(DISTINCT tps_basis) as tps_bases,
                 AVG(tokens_per_second) as avg_tokens_per_second,
                 AVG(accuracy_score) as avg_accuracy_score,
                 COUNT(accuracy_score) as scored_tasks

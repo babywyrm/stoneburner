@@ -543,6 +543,50 @@ def test_cli_compare_with_filters(tmp_path):
     assert result.exit_code == 0
 
 
+def test_cli_compare_warns_on_mixed_throughput_basis(tmp_path):
+    """A wall_clock provider next to a generation provider must trigger the basis warning."""
+    from datetime import UTC, datetime
+
+    from atomics.models import TaskCategory, TaskResult, TaskStatus
+    from atomics.storage.repository import MetricsRepository
+
+    db_path = tmp_path / "cmp_basis.db"
+    repo = MetricsRepository(db_path)
+    specs = [
+        ("openai", "gpt-4o", "wall_clock", "ob1"),
+        ("ollama", "qwen2.5:7b", "generation", "ol1"),
+    ]
+    for provider, model, basis, run_id in specs:
+        repo.create_run(run_id, provider=provider, tier="ez")
+        repo.save_task_result(
+            TaskResult(
+                task_id=f"{run_id}-t",
+                run_id=run_id,
+                category=TaskCategory.GENERAL_QA,
+                task_name="q",
+                provider=provider,
+                model=model,
+                status=TaskStatus.SUCCESS,
+                total_tokens=100,
+                latency_ms=200.0,
+                tokens_per_second=80.0,
+                tps_basis=basis,
+                estimated_cost_usd=0.0,
+                started_at=datetime.now(UTC),
+                completed_at=datetime.now(UTC),
+            )
+        )
+        repo.complete_run(run_id)
+    repo.close()
+
+    runner = CliRunner(env={"ATOMICS_DB_PATH": str(db_path)})
+    result = runner.invoke(cli, ["compare"])
+    assert result.exit_code == 0
+    # The warning only fires when tps_bases is populated from the DB and parsed
+    # into more than one distinct basis across the compared groups.
+    assert "Mixed throughput bases" in result.output
+
+
 def test_cli_completion_zsh():
     runner = CliRunner()
     result = runner.invoke(cli, ["completion", "zsh"])
