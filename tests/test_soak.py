@@ -561,13 +561,16 @@ class TestRunSoakProvider:
     @pytest.mark.asyncio
     async def test_provider_samples_collected(self):
         from atomics.soak import run_soak_provider
+        # duration/interval give ~5 expected samples so coverage/scheduler
+        # overhead can't starve this below the >=2 assertion (0.5s/0.2s left
+        # exactly 2 expected samples with zero slack and flaked under coverage).
         with patch("atomics.stress._single_request_provider",
                    side_effect=_async_req_provider(out=60, lat=50.0)):
             result = await run_soak_provider(
                 provider=_make_mock_provider("prov2"),
                 model="m",
                 concurrency=1,
-                duration_seconds=0.5,
+                duration_seconds=1.0,
                 sample_interval=0.2,
             )
         assert len(result.samples) >= 2
@@ -718,12 +721,14 @@ class TestRunSoakProfile:
         def on_sample(s: SoakSample) -> None:
             received.append(s)
 
+        # ~5 expected samples so coverage/scheduler overhead can't starve the
+        # >=2 assertion (0.5s/0.2s left exactly 2 expected with zero slack).
         with patch("atomics.profiles._single_request_profile",
                    side_effect=_fast_profile_req):
             await run_soak_profile(
                 profile=_make_ollama_profile(),
                 concurrency=1,
-                duration_seconds=0.5,
+                duration_seconds=1.0,
                 sample_interval=0.2,
                 on_sample=on_sample,
             )
