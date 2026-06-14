@@ -16,6 +16,7 @@ from datetime import UTC, datetime
 
 from atomics.eval.adversarial.fixtures import ADVERSARIAL_FIXTURES, AdversarialFixture
 from atomics.eval.adversarial.scorer import ResistanceResult, _label_from_score, score_resistance
+from atomics.eval.judge import detect_self_judge
 from atomics.providers.base import BaseProvider
 
 logger = logging.getLogger("atomics.eval.adversarial.runner")
@@ -168,6 +169,16 @@ async def run_adversarial(
     started_at = datetime.now(UTC)
     extra_judges = extra_judges or []
     runs = max(1, runs)
+
+    _collisions = detect_self_judge(
+        provider, model, [(judge_provider, judge_model), *extra_judges],
+    )
+    if _collisions:
+        logger.warning(
+            "Self-judging detected: model under test is also a judge (%s). "
+            "Resistance scores are biased — use a different judge model.",
+            ", ".join(_collisions),
+        )
 
     fixture_results: list[AdversarialFixtureResult] = []
 

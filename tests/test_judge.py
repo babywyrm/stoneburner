@@ -8,6 +8,7 @@ from atomics.eval.judge import (
     _parse_rubric,
     char_budget_for_tokens,
     compute_criteria_coverage,
+    detect_self_judge,
     score_consensus,
     score_response,
 )
@@ -291,3 +292,61 @@ async def test_parse_failure_rate_on_summary():
         fixture_results=[_fr(True), _fr(False), _fr(False), _fr(False)],
     )
     assert summary.parse_failure_rate == 0.25
+
+
+# ── Self-judge detection ────────────────────────────────────────────────────
+class _StubProvider:
+    def __init__(self, name: str, default_model: str | None):
+        self._name = name
+        self._default = default_model
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def default_model(self) -> str | None:
+        return self._default
+
+
+def test_self_judge_detected_for_same_provider_and_model():
+    ut = _StubProvider("ollama", "qwen2.5:7b")
+    judge = _StubProvider("ollama", "qwen2.5:7b")
+    collisions = detect_self_judge(ut, "qwen2.5:7b", [(judge, "qwen2.5:7b")])
+    assert collisions == ["ollama:qwen2.5:7b"]
+
+
+def test_self_judge_detected_when_both_models_resolve_to_default():
+    ut = _StubProvider("ollama", "qwen2.5:7b")
+    judge = _StubProvider("ollama", "qwen2.5:7b")
+    # Neither caller passed an explicit model → both resolve to the default.
+    assert detect_self_judge(ut, None, [(judge, None)]) == ["ollama:qwen2.5:7b"]
+
+
+def test_no_self_judge_for_different_model():
+    ut = _StubProvider("ollama", "qwen3:4b")
+    judge = _StubProvider("ollama", "qwen2.5:7b")
+    assert detect_self_judge(ut, "qwen3:4b", [(judge, "qwen2.5:7b")]) == []
+
+
+def test_no_self_judge_for_different_provider():
+    ut = _StubProvider("ollama", "qwen2.5:7b")
+    judge = _StubProvider("claude", "qwen2.5:7b")  # contrived, but names differ
+    assert detect_self_judge(ut, "qwen2.5:7b", [(judge, "qwen2.5:7b")]) == []
+
+
+def test_self_judge_detected_among_consensus_panel():
+    ut = _StubProvider("ollama", "qwen3:4b")
+    safe = _StubProvider("ollama", "mistral:7b")
+    colliding = _StubProvider("ollama", "qwen3:4b")
+    collisions = detect_self_judge(
+        ut, "qwen3:4b", [(safe, "mistral:7b"), (colliding, "qwen3:4b")],
+    )
+    assert collisions == ["ollama:qwen3:4b"]
+
+
+def test_no_self_judge_when_model_unknowable():
+    ut = _StubProvider("ollama", None)
+    judge = _StubProvider("ollama", None)
+    # Can't resolve the test model → don't guess a collision.
+    assert detect_self_judge(ut, None, [(judge, None)]) == []

@@ -51,6 +51,10 @@ class BedrockProvider(BaseProvider):
     def name(self) -> str:
         return "bedrock"
 
+    @property
+    def default_model(self) -> str | None:
+        return self._model_id
+
     async def generate(
         self,
         prompt: str,

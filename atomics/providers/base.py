@@ -52,6 +52,15 @@ class BaseProvider(ABC):
     @abstractmethod
     def name(self) -> str: ...
 
+    @property
+    def default_model(self) -> str | None:
+        """The model this adapter uses when a call omits an explicit model.
+
+        Used for self-judge detection and logging. Subclasses override to expose
+        their configured default; the base returns None when it cannot be known.
+        """
+        return None
+
     @abstractmethod
     async def generate(
         self,
