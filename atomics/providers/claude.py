@@ -60,6 +60,7 @@ class ClaudeProvider(BaseProvider):
         max_tokens: int = 1024,
         thinking: bool | None = None,
         thinking_budget: int | None = None,
+        temperature: float | None = None,
     ) -> ProviderResponse:
         model = model or self._default_model
         messages = [{"role": "user", "content": prompt}]
@@ -80,6 +81,10 @@ class ClaudeProvider(BaseProvider):
         else:
             kwargs["max_tokens"] = max_tokens
             kwargs["system"] = system or "You are a helpful assistant."
+            # Anthropic requires temperature=1 when extended thinking is enabled,
+            # so only forward an explicit temperature when thinking is off.
+            if temperature is not None:
+                kwargs["temperature"] = temperature
 
         t0 = time.monotonic()
         response = await self._client.messages.create(**kwargs)

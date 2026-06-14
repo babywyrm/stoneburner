@@ -82,6 +82,7 @@ class OpenAIProvider(BaseProvider):
         max_tokens: int = 1024,
         thinking: bool | None = None,
         thinking_budget: int | None = None,
+        temperature: float | None = None,
     ) -> ProviderResponse:
         model = model or self._default_model
 
@@ -97,6 +98,7 @@ class OpenAIProvider(BaseProvider):
             "max_tokens": max_tokens,
             "thinking": thinking,
             "thinking_budget": thinking_budget,
+            "temperature": temperature,
         }
         if self._use_responses_api:
             return await self._generate_responses(prompt, **kwargs)
@@ -105,6 +107,7 @@ class OpenAIProvider(BaseProvider):
     async def _generate_completions(
         self, prompt: str, *, system: str, model: str, max_tokens: int,
         thinking: bool | None = None, thinking_budget: int | None = None,
+        temperature: float | None = None,
     ) -> ProviderResponse:
         """Chat Completions API — used with static API keys."""
         messages: list[dict] = []
@@ -120,6 +123,10 @@ class OpenAIProvider(BaseProvider):
             token_param = {"max_completion_tokens": max_tokens * multiplier}
         else:
             token_param = {"max_tokens": max_tokens}
+        # Reasoning models (o-series/gpt-5) reject an explicit temperature; only
+        # forward it for standard chat models.
+        if temperature is not None and not is_reasoning:
+            token_param["temperature"] = temperature
         t0 = time.monotonic()
         response = await self._client.chat.completions.create(
             model=model,
@@ -176,6 +183,7 @@ class OpenAIProvider(BaseProvider):
     async def _generate_responses(
         self, prompt: str, *, system: str, model: str, max_tokens: int,
         thinking: bool | None = None, thinking_budget: int | None = None,
+        temperature: float | None = None,
     ) -> ProviderResponse:
         """Responses API — used with OAuth tokens (ChatGPT OAuth scopes)."""
         input_items: list[dict] = []
@@ -189,6 +197,10 @@ class OpenAIProvider(BaseProvider):
         else:
             effective_max = max_tokens
 
+        extra: dict = {}
+        # Reasoning models reject an explicit temperature; only forward otherwise.
+        if temperature is not None and not is_reasoning:
+            extra["temperature"] = temperature
         t0 = time.monotonic()
         response = await self._client.responses.create(
             model=model,
@@ -196,6 +208,7 @@ class OpenAIProvider(BaseProvider):
             instructions=system or "You are a helpful assistant.",
             max_output_tokens=effective_max,
             store=False,
+            **extra,
         )
         latency = (time.monotonic() - t0) * 1000
 

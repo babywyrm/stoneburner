@@ -52,12 +52,15 @@ class OllamaProvider(BaseProvider):
         max_tokens: int = 1024,
         thinking: bool | None = None,
         thinking_budget: int | None = None,
+        temperature: float | None = None,
     ) -> ProviderResponse:
         model = model or self._default_model
 
         use_thinking = thinking if thinking is not None else _model_supports_thinking(model)
 
         options: dict = {}
+        if temperature is not None:
+            options["temperature"] = temperature
         if thinking_budget and use_thinking:
             options["num_predict"] = max_tokens + thinking_budget
         if not use_thinking and _model_supports_thinking(model):

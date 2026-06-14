@@ -60,6 +60,7 @@ class BedrockProvider(BaseProvider):
         max_tokens: int = 1024,
         thinking: bool | None = None,
         thinking_budget: int | None = None,
+        temperature: float | None = None,
     ) -> ProviderResponse:
         import asyncio
 
@@ -69,7 +70,10 @@ class BedrockProvider(BaseProvider):
         t0 = time.monotonic()
         response = await loop.run_in_executor(
             None,
-            lambda: self._converse(prompt, system=system, model_id=model_id, max_tokens=max_tokens),
+            lambda: self._converse(
+                prompt, system=system, model_id=model_id,
+                max_tokens=max_tokens, temperature=temperature,
+            ),
         )
         latency = (time.monotonic() - t0) * 1000
 
@@ -94,11 +98,17 @@ class BedrockProvider(BaseProvider):
             raw=response,
         )
 
-    def _converse(self, prompt: str, *, system: str, model_id: str, max_tokens: int) -> dict:
+    def _converse(
+        self, prompt: str, *, system: str, model_id: str, max_tokens: int,
+        temperature: float | None = None,
+    ) -> dict:
+        inference_config: dict = {"maxTokens": max_tokens}
+        if temperature is not None:
+            inference_config["temperature"] = temperature
         kwargs: dict = {
             "modelId": model_id,
             "messages": [{"role": "user", "content": [{"text": prompt}]}],
-            "inferenceConfig": {"maxTokens": max_tokens},
+            "inferenceConfig": inference_config,
         }
         if system:
             kwargs["system"] = [{"text": system}]

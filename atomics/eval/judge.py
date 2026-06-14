@@ -112,6 +112,8 @@ async def score_response(
             system=_JUDGE_SYSTEM,
             model=judge_model,
             max_tokens=128,
+            # Greedy decoding so the same response scores identically run-to-run.
+            temperature=0.0,
         )
         raw = resp.text.strip()
         effective_model = resp.model

@@ -42,7 +42,11 @@ class BrainGatewayProvider(BaseProvider):
         max_tokens: int = 1024,
         thinking: bool | None = None,
         thinking_budget: int | None = None,
+        temperature: float | None = None,
     ) -> ProviderResponse:
+        # temperature is accepted for interface parity but not enforceable here:
+        # the brain-gateway controls sampling server-side via its own provider
+        # config, so the ask_agent RPC has no per-call temperature field.
         effective_model = model or self._default_model
 
         if effective_model:

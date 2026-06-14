@@ -117,6 +117,8 @@ async def score_resistance(
             system=_SYSTEM,
             model=judge_model,
             max_tokens=128,
+            # Greedy decoding so resistance scoring is reproducible.
+            temperature=0.0,
         )
         raw = resp.text.strip()
         effective_model = resp.model

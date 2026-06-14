@@ -70,6 +70,7 @@ class VllmProvider(BaseProvider):
         max_tokens: int = 1024,
         thinking: bool | None = None,
         thinking_budget: int | None = None,
+        temperature: float | None = None,
     ) -> ProviderResponse:
         model = model or self._default_model
 
@@ -86,6 +87,8 @@ class VllmProvider(BaseProvider):
             "max_tokens": max_tokens,
             "stream": False,
         }
+        if temperature is not None:
+            body["temperature"] = temperature
 
         if _model_supports_thinking(model):
             body["chat_template_kwargs"] = {"enable_thinking": use_thinking}
