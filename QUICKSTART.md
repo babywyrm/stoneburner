@@ -1,0 +1,231 @@
+# Stoneburner Quickstart
+
+Recipe-first guide to **`atomics`** — the agentic token-usage benchmarking and
+LLM-evaluation harness. Every block below is copy‑pasteable. For the full
+reference see [`README.md`](README.md).
+
+> **Mental model:** point `atomics` at a provider (cloud API or a local
+> Ollama/vLLM box), pick a *goal* (cost, quality, safety, scale), run the
+> matching command, then `compare`/`report`/`export` the results out of SQLite.
+
+---
+
+## 1. 60‑second setup
+
+```bash
+# 1. Install (uv manages the venv)
+uv sync
+
+# 2. Pick a backend — set whichever you'll use
+export ANTHROPIC_API_KEY=sk-ant-...        # Claude (default provider)
+export OPENAI_API_KEY=sk-...               # OpenAI / o-series
+export ATOMICS_OLLAMA_HOST=http://gpu:11434  # local Ollama (zero cost)
+
+# 3. Pre-flight: confirms keys, hosts, DB are all wired
+uv run atomics doctor
+
+# 4. Smoke test the provider you plan to use
+uv run atomics provider-test -p ollama -m qwen2.5:7b
+```
+
+`doctor` exits non‑zero if anything is missing, so it's safe in front of a long
+run: `uv run atomics doctor && uv run atomics run --tier ez -n 3`.
+
+---
+
+## 2. Choose a backend
+
+| Goal | Provider | Flag | Cost |
+|------|----------|------|------|
+| Frontier quality | Claude | `--provider claude` | $$ |
+| OpenAI / reasoning | OpenAI | `--provider openai` | $$ |
+| AWS-hosted Claude | Bedrock | `--provider bedrock --region us-east-1` | $$ |
+| **Free local infer** | Ollama | `--provider ollama` | **$0** |
+| OpenAI-compatible gateway | vLLM | `--provider vllm` | local |
+
+Local Ollama is the default for the eval/security suites because it's free and
+private — nothing leaves the LAN.
+
+```bash
+# What models does my GPU box have? (class + thinking annotations)
+uv run atomics models --host http://gpu:11434
+```
+
+---
+
+## 3. Recipes by goal
+
+### "How much will this model cost, and how fast is it?"
+
+```bash
+# Run N tasks; measures tokens, cost, latency, tok/s
+uv run atomics run --provider ollama -m qwen2.5:7b -n 5 -i 0
+
+# Same on a cloud model
+uv run atomics run --provider claude -n 5 -i 0
+
+# See the trend report
+uv run atomics report
+
+# Side-by-side once you've run a few providers/models
+uv run atomics compare              # by provider
+uv run atomics compare --by model   # by individual model
+```
+
+### "Is the model any good?" — quality eval with an LLM judge
+
+The judge defaults to a **local Ollama model**, so scoring is $0. Quality is a
+0–100% accuracy score over 25 fixtures plus an objective `criteria_coverage`.
+
+```bash
+# Full 25-fixture eval, judged locally
+uv run atomics eval --provider ollama -m qwen2.5:7b --judge-model qwen2.5:14b
+
+# Fast spot-check on just a few fixtures (great for iterating)
+uv run atomics eval --provider ollama -m qwen3:4b --fixtures ev-01,ev-19
+
+# Cloud model under test, strong local judge
+uv run atomics eval --provider claude --judge-provider ollama --judge-model qwen2.5:14b
+```
+
+> **Never self-judge.** A model grading its own answers is biased upward. Use a
+> *different* (ideally stronger) judge than the model under test — the runner
+> prints a loud warning if it detects a collision.
+
+#### Multi-judge consensus
+
+Score with a panel and get an inter-judge disagreement signal
+(`judge_score_stdev`):
+
+```bash
+uv run atomics eval --provider ollama -m qwen3:4b \
+  --judge-model qwen2.5:14b \
+  --extra-judges ollama:mistral:7b,ollama:deepseek-r1:14b \
+  --fixtures ev-18,ev-19,ev-20
+```
+
+#### Trust the judge
+
+```bash
+# Prove the configured judge ranks wrong < thin < thorough answers correctly
+ATOMICS_LIVE_JUDGE=1 uv run pytest tests/test_calibration.py::test_live_judge_is_calibrated -q
+```
+
+### "Which of my models is best?" — multi-model sweep
+
+```bash
+# Sweep every model on the GPU box, ranked table
+uv run atomics sweep --all-local --host http://gpu:11434
+
+# Specific models, just a few fixtures
+uv run atomics sweep --models qwen2.5:3b,qwen2.5:7b,mistral:7b --fixtures ev-01,ev-02,ev-03
+```
+
+### "Is it safe?" — security evaluation suites
+
+```bash
+# Resistance to prompt injection / jailbreaks (higher = more resistant)
+uv run atomics adversarial --provider ollama -m qwen3:14b --judge-model qwen2.5:14b
+
+# Offensive + defensive security capability (red/blue tasks)
+uv run atomics redblue --provider ollama -m qwen3:14b
+
+# Point an LLM at real artifacts (logs, scan reports, configs)
+uv run atomics probe --artifact access-log --file /var/log/nginx/access.log
+```
+
+### "Will it scale?" — capacity, stress, soak, scenario
+
+```bash
+# Find the GPU saturation point (ramp concurrency 1→8)
+uv run atomics stress --model qwen2.5:7b --max-concurrency 8 --ollama-host http://gpu:11434
+
+# How many users can this setup serve? (pure math from measured data)
+uv run atomics capacity --users 200 --model qwen2.5:7b
+
+# Hold load for 30 min, classify STABLE/DEGRADED/UNSTABLE (catches VRAM leaks)
+uv run atomics soak --model qwen2.5:7b --duration 30m -c 4
+
+# Multiple agentic services competing for one GPU
+uv run atomics scenario -w "gate:qwen2.5:3b:2:5000" -w "eval:qwen2.5:7b:1:15000" -d 60
+```
+
+### "Does my AI gate still work?" — QA regression
+
+```bash
+# Test a model directly against pass/fail patterns
+uv run atomics qa --file qa/examples/app-gate-guardrails.yaml \
+                  --model qwen2.5:3b --ollama-host http://gpu:11434
+
+# Test a real app endpoint (secrets stay in a gitignored profile)
+uv run atomics qa --file qa/examples/ai-gate-regression.yaml \
+                  --profile profiles/local/my-gate.yaml
+```
+
+---
+
+## 4. Get the data out
+
+```bash
+uv run atomics compare --output results.json          # comparison JSON
+uv run atomics export --suite all --format csv -o all.csv
+uv run atomics export --suite sweep -o sweep.jsonl
+```
+
+---
+
+## 5. Schedule it (continuous benchmarking)
+
+```bash
+# Auto-detect cron/systemd/launchd and install
+uv run atomics schedule --tier ez -n 5 -i 15 --install
+uv run atomics schedule-status     # show installed schedules + health
+uv run atomics schedule --tier ez --uninstall
+```
+
+---
+
+## 6. Config cheat-sheet
+
+Set via env vars (prefix `ATOMICS_`) or a `.env` file in the repo root:
+
+| Variable | Default | Notes |
+|----------|---------|-------|
+| `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | — | cloud providers |
+| `ATOMICS_OLLAMA_HOST` | `http://localhost:11434` | local Ollama endpoint |
+| `ATOMICS_OLLAMA_MODEL` | `qwen2.5:7b` | default Ollama model |
+| `ATOMICS_OLLAMA_TIMEOUT` | `300` | **per-request seconds** — raise for slow thinking models |
+| `ATOMICS_VLLM_HOST` | `http://localhost:8000/v1` | vLLM / OpenAI-compatible gateway |
+| `ATOMICS_VLLM_TIMEOUT` | `300` | per-request seconds for vLLM |
+| `ATOMICS_BUDGET_LIMIT_USD` | `50.00` | hard cost cap per run |
+| `ATOMICS_DB_PATH` | platform | SQLite location |
+
+`.env` example:
+
+```ini
+ATOMICS_OLLAMA_HOST=http://192.168.1.239:11434
+ATOMICS_OLLAMA_MODEL=qwen2.5:7b
+ATOMICS_OLLAMA_TIMEOUT=600   # big reasoning models on hard prompts
+```
+
+---
+
+## 7. Troubleshooting
+
+| Symptom | Fix |
+|---------|-----|
+| `ReadTimeout` on a thinking model | Raise `ATOMICS_OLLAMA_TIMEOUT` (e.g. `600`). Thinking models can reason for minutes on HEAVY fixtures. |
+| Quality scores look suspiciously high | You may be self-judging — use a different `--judge-model` than the model under test. |
+| `Unknown provider` | Install the extra: `uv sync --extra openai` / `--extra bedrock`. |
+| Ollama host unreachable | `uv run atomics doctor` and check `ATOMICS_OLLAMA_HOST`. |
+| Want a quick eval, not all 25 | `atomics eval --fixtures ev-01,ev-02`. |
+
+---
+
+## 8. Running the test suite
+
+```bash
+uv sync --extra dev
+uv run pytest -q                                   # full suite
+uv run pytest --cov=atomics --cov-report=term-missing
+```
