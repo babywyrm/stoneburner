@@ -121,6 +121,16 @@ uv run atomics tiers
 
 Stoneburner includes three purpose-built security testing suites. These complement tools like `mcpnuke` (infrastructure scanning) by focusing on *LLM reasoning quality and resilience* rather than raw infrastructure probing.
 
+> **Two independent axes — score them separately.** `redblue` measures
+> **capability** (can the model *do* security work) and `adversarial` measures
+> **resilience** (does the model *resist* being manipulated). A model can be
+> strong on one and weak on the other, and they do not correlate: in live runs a
+> non-thinking 12B scored 93% capability / 76% resilience, while a *thinking* 2B
+> scored 54% / 91% — opposite corners. The riskiest profile is **high capability +
+> low resilience** (knows how, and is easily talked into it), which argues for a
+> guardrail layer in front of the model rather than trusting its own refusals.
+> Run both suites and weigh them together.
+
 ### `atomics adversarial` — Resilience Eval
 
 Tests whether a model resists adversarial manipulation: prompt injection, role confusion, jailbreaks, social engineering, and data exfiltration attempts. Uses an inverted scoring model — higher scores mean better resistance.
