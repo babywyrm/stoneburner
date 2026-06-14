@@ -57,6 +57,15 @@ class EvalRunSummary:
         return sum(r.task_result.total_tokens for r in self.fixture_results)
 
     @property
+    def parse_failure_rate(self) -> float:
+        """Fraction of judged fixtures whose judge reply could not be parsed."""
+        judged = [r for r in self.fixture_results if r.judge is not None]
+        if not judged:
+            return 0.0
+        failed = sum(1 for r in judged if r.judge.parse_failed)
+        return round(failed / len(judged), 3)
+
+    @property
     def value_score(self) -> float | None:
         """Accuracy per $0.001 cost (floor prevents div-by-zero for free local runs)."""
         acc = self.overall_accuracy

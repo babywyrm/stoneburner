@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from atomics.eval.judge import (
+    _parse_rubric,
     char_budget_for_tokens,
     compute_criteria_coverage,
     score_consensus,
@@ -189,3 +190,104 @@ async def test_consensus_all_failed_returns_flagged_primary():
     )
     assert result.parse_failed is True
     assert result.n_judges == 2
+
+
+# ── Robust parsing + reformat retry + failure rate ──────────────────────────
+def test_parse_rubric_strict_format():
+    parsed = _parse_rubric("ACCURACY: 4\nCOMPLETENESS: 3\nFORMAT: 2\nRATIONALE: good.")
+    assert parsed == (4, 3, 2, "good.")
+
+
+def test_parse_rubric_tolerates_markdown_and_reordering():
+    raw = (
+        "Here is my assessment:\n"
+        "**Format** - 2\n"
+        "**Accuracy**: 4\n"
+        "**Completeness** = 1\n"
+        "Rationale: mostly correct but shallow."
+    )
+    parsed = _parse_rubric(raw)
+    assert parsed is not None
+    acc, comp, fmt, rationale = parsed
+    assert (acc, comp, fmt) == (4, 1, 2)
+    assert "shallow" in rationale
+
+
+def test_parse_rubric_clamps_out_of_range():
+    parsed = _parse_rubric("ACCURACY: 9\nCOMPLETENESS: 7\nFORMAT: 5\nRATIONALE: x")
+    assert parsed == (4, 3, 3, "x")
+
+
+def test_parse_rubric_returns_none_when_no_numbers():
+    assert _parse_rubric("I cannot score this response, sorry.") is None
+
+
+def test_parse_rubric_missing_rationale_is_tolerated():
+    parsed = _parse_rubric("Accuracy 3 Completeness 2 Format 3")
+    assert parsed is not None
+    assert parsed[:3] == (3, 2, 3)
+
+
+class _RetryJudge:
+    """Returns a malformed reply first, then a clean one on the reformat retry."""
+    name = "retry-judge"
+
+    def __init__(self):
+        self.calls = 0
+
+    async def generate(self, prompt, *, system="", model=None, max_tokens=1024,
+                        thinking=None, thinking_budget=None, temperature=None):
+        self.calls += 1
+        if self.calls == 1:
+            text = "I think it's quite good overall, maybe four out of five stars."
+        else:
+            text = "ACCURACY: 4\nCOMPLETENESS: 3\nFORMAT: 3\nRATIONALE: reformatted."
+        return ProviderResponse(
+            text=text, input_tokens=1, output_tokens=1, total_tokens=2,
+            model="retry-judge", latency_ms=1.0, estimated_cost_usd=0.0,
+        )
+
+    async def health_check(self):
+        return True
+
+
+@pytest.mark.asyncio
+async def test_reformat_retry_recovers_unparseable_reply():
+    judge = _RetryJudge()
+    result = await score_response("q", "a", judge_provider=judge)
+    assert judge.calls == 2  # one reformat retry happened
+    assert result.parse_failed is False
+    assert result.score == 1.0
+    assert result.rationale == "reformatted."
+
+
+@pytest.mark.asyncio
+async def test_no_retry_when_first_reply_parses():
+    judge = _RetryJudge()
+    # Force a parseable first reply by pre-incrementing past the malformed branch.
+    judge.calls = 1
+    result = await score_response("q", "a", judge_provider=judge)
+    # Only the single scoring call; calls goes 1 -> 2, no extra retry call.
+    assert result.parse_failed is False
+    assert judge.calls == 2
+
+
+@pytest.mark.asyncio
+async def test_parse_failure_rate_on_summary():
+    from atomics.eval.judge import JudgeResult
+    from atomics.eval.runner import EvalRunSummary, FixtureResult
+
+    def _fr(parse_failed: bool):
+        jr = JudgeResult(
+            score=0.5 if parse_failed else 0.8, accuracy=0, completeness=0,
+            format_score=0, rationale="", judge_model="m", parse_failed=parse_failed,
+        )
+        return FixtureResult(fixture=None, task_result=None, judge=jr)
+
+    from datetime import UTC, datetime
+    summary = EvalRunSummary(
+        run_id="r", provider="p", model="m", judge_provider="j", judge_model="jm",
+        started_at=datetime.now(UTC), completed_at=datetime.now(UTC),
+        fixture_results=[_fr(True), _fr(False), _fr(False), _fr(False)],
+    )
+    assert summary.parse_failure_rate == 0.25
