@@ -2,6 +2,8 @@
 
 import sys
 
+import pytest
+
 from atomics.config import AtomicsSettings
 from atomics.doctor import run_doctor
 
@@ -80,6 +82,7 @@ def test_doctor_openai_sdk_missing(capsys, tmp_path):
 
 def test_doctor_boto3_aws_creds_valid(capsys, tmp_path):
     """Lines 75-79: boto3 installed + valid creds branch."""
+    pytest.importorskip("boto3", reason="optional 'bedrock' extra not installed")
     from atomics.doctor import run_doctor
     from atomics.config import AtomicsSettings
     settings = AtomicsSettings(db_path=tmp_path / "doc.db")
@@ -107,6 +110,7 @@ def test_doctor_boto3_aws_creds_valid(capsys, tmp_path):
 
 def test_doctor_boto3_aws_creds_invalid(capsys, tmp_path):
     """Lines 75-79: boto3 installed but creds invalid (exception)."""
+    pytest.importorskip("boto3", reason="optional 'bedrock' extra not installed")
     from atomics.doctor import run_doctor
     from atomics.config import AtomicsSettings
     settings = AtomicsSettings(db_path=tmp_path / "doc.db")
