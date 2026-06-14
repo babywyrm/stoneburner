@@ -33,23 +33,59 @@ run: `uv run atomics doctor && uv run atomics run --tier ez -n 3`.
 
 ---
 
-## 2. Choose a backend
+## 2. Choose a backend — local **and** cloud are first-class
 
-| Goal | Provider | Flag | Cost |
-|------|----------|------|------|
-| Frontier quality | Claude | `--provider claude` | $$ |
-| OpenAI / reasoning | OpenAI | `--provider openai` | $$ |
-| AWS-hosted Claude | Bedrock | `--provider bedrock --region us-east-1` | $$ |
-| **Free local infer** | Ollama | `--provider ollama` | **$0** |
-| OpenAI-compatible gateway | vLLM | `--provider vllm` | local |
+`atomics` treats local inference and cloud APIs as peers. Every suite
+(`run`, `eval`, `sweep`, `adversarial`, `redblue`, `probe`) takes the same
+`--provider` flag, so you can benchmark a private on-prem model and a frontier
+cloud model with identical commands and compare them side-by-side.
 
-Local Ollama is the default for the eval/security suites because it's free and
-private — nothing leaves the LAN.
+### Local / self-hosted (private, $0, nothing leaves the LAN)
+
+| Backend | Flag | When to use |
+|---------|------|-------------|
+| **Ollama** | `--provider ollama` | Default for eval/security suites — free, private GPU box |
+| **vLLM / OpenAI-compatible gateway** | `--provider vllm` | LiteLLM, vLLM, TGI, or any `/v1/chat/completions` endpoint on the LAN |
+| **brain-gateway** (camazotz) | `--provider brain-gateway` | Internal agentic gateway in the ecosystem |
 
 ```bash
-# What models does my GPU box have? (class + thinking annotations)
+# Ollama on a GPU box — list models (class + thinking annotations)
 uv run atomics models --host http://gpu:11434
+uv run atomics run --provider ollama -m qwen2.5:7b --ollama-host http://gpu:11434 -n 5 -i 0
+
+# vLLM / OpenAI-compatible gateway (e.g. a LiteLLM gateway at :8000/v1)
+uv run atomics run --provider vllm --vllm-host http://gpu:8000/v1 -m qwen2.5:7b -n 5 -i 0
+
+# Internal brain-gateway
+uv run atomics run --provider brain-gateway --gateway-url http://nuc:30080 -n 5 -i 0
 ```
+
+> **Model-agnostic:** `-m`/`--model` accepts *any* model the backend serves —
+> the `qwen*` tags in these examples are just placeholders. `gemma4:12b`,
+> `llama3.2:3b`, `mistral:7b`, `phi4:latest`, `deepseek-r1:14b`, `dolphin3:8b`,
+> and friends all work the same way. Known families get automatic
+> thinking-mode detection and light/mid/heavy class tagging; an unrecognized
+> model still runs and simply defaults its class. Run `atomics models --host …`
+> to see what a box serves with its annotations.
+
+### Cloud APIs (frontier quality, billed per token)
+
+| Backend | Flag | Install |
+|---------|------|---------|
+| **Claude** (Anthropic) | `--provider claude` | `uv sync` (included) |
+| **OpenAI** / o-series | `--provider openai` | `uv sync --extra openai` |
+| **Bedrock** (AWS) | `--provider bedrock --region us-east-1` | `uv sync --extra bedrock` |
+
+```bash
+uv run atomics run --provider claude -n 5 -i 0
+uv run atomics run --provider openai -m gpt-4o -n 5 -i 0
+uv run atomics run --provider bedrock --region us-east-1 -n 5 -i 0
+```
+
+> **Ecosystem fit:** run private/local models for sensitive workloads and cost
+> control, reach for cloud models when you need frontier capability — then use
+> `atomics compare` to make the local-vs-cloud trade-off with real numbers
+> (cost, latency, tok/s, quality) instead of vibes.
 
 ---
 
@@ -98,7 +134,8 @@ Score with a panel and get an inter-judge disagreement signal
 (`judge_score_stdev`):
 
 ```bash
-uv run atomics eval --provider ollama -m qwen3:4b \
+# Mixed judge panel spanning model families keeps any one family's bias in check
+uv run atomics eval --provider ollama -m gemma4:12b \
   --judge-model qwen2.5:14b \
   --extra-judges ollama:mistral:7b,ollama:deepseek-r1:14b \
   --fixtures ev-18,ev-19,ev-20
@@ -117,8 +154,8 @@ ATOMICS_LIVE_JUDGE=1 uv run pytest tests/test_calibration.py::test_live_judge_is
 # Sweep every model on the GPU box, ranked table
 uv run atomics sweep --all-local --host http://gpu:11434
 
-# Specific models, just a few fixtures
-uv run atomics sweep --models qwen2.5:3b,qwen2.5:7b,mistral:7b --fixtures ev-01,ev-02,ev-03
+# Specific models across families, just a few fixtures
+uv run atomics sweep --models gemma4:12b,llama3.2:3b,mistral:7b,phi4:latest,deepseek-r1:14b --fixtures ev-01,ev-02,ev-03
 ```
 
 ### "Is it safe?" — security evaluation suites
