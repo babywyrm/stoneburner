@@ -148,6 +148,7 @@ async def run_redblue(
         task_result.accuracy_score = judge.score
         task_result.judge_model = judge.judge_model
         task_result.quality_rationale = judge.rationale
+        task_result.criteria_coverage = judge.criteria_coverage
 
         logger.info(
             "[redblue] %s → %.3f — %s",

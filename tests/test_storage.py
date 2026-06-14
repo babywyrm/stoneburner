@@ -4,6 +4,8 @@ import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 
+import pytest
+
 from atomics.models import TaskCategory, TaskResult, TaskStatus
 from atomics.storage.repository import MetricsRepository, _percentile
 from atomics.storage.schema import SCHEMA_VERSION, init_db
@@ -15,7 +17,7 @@ def _tmp_repo() -> MetricsRepository:
 
 
 def test_schema_version_is_current():
-    assert SCHEMA_VERSION == 12
+    assert SCHEMA_VERSION == 13
 
 
 def test_adversarial_results_table_exists(tmp_path):
@@ -180,6 +182,55 @@ def test_save_and_query_cache_and_tps_basis():
     assert claude_row["total_cache_write_tokens"] == 400
     assert claude_row["tps_bases"] == "generation"
     assert claude_row["avg_thinking_tokens"] == 0
+    repo.close()
+
+
+def test_save_and_query_criteria_coverage():
+    """criteria_coverage must round-trip and aggregate as an average."""
+    repo = _tmp_repo()
+    repo.create_run("run-cov")
+
+    result = TaskResult(
+        run_id="run-cov",
+        category=TaskCategory.GENERAL_QA,
+        task_name="covered_q",
+        provider="ollama",
+        model="qwen2.5:7b",
+        status=TaskStatus.SUCCESS,
+        accuracy_score=0.8,
+        criteria_coverage=0.667,
+        started_at=datetime.now(UTC),
+        completed_at=datetime.now(UTC),
+    )
+    repo.save_task_result(result)
+
+    tasks = repo.get_run_tasks("run-cov")
+    assert tasks[0]["criteria_coverage"] == 0.667
+
+    rows = repo.compare_providers()
+    row = next(r for r in rows if r["group_key"] == "ollama")
+    assert row["avg_criteria_coverage"] == pytest.approx(0.667)
+    repo.close()
+
+
+def test_criteria_coverage_defaults_to_null():
+    """A task with no gold criteria persists NULL coverage."""
+    repo = _tmp_repo()
+    repo.create_run("run-nocov")
+    repo.save_task_result(
+        TaskResult(
+            run_id="run-nocov",
+            category=TaskCategory.GENERAL_QA,
+            task_name="q",
+            provider="ollama",
+            model="qwen2.5:7b",
+            status=TaskStatus.SUCCESS,
+            started_at=datetime.now(UTC),
+            completed_at=datetime.now(UTC),
+        )
+    )
+    tasks = repo.get_run_tasks("run-nocov")
+    assert tasks[0]["criteria_coverage"] is None
     repo.close()
 
 
