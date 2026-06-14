@@ -4,6 +4,8 @@
 
 A continuous, cron-schedulable benchmarking harness that runs realistic everyday tasks against LLM providers to measure token consumption, cost, throughput (tok/s), and performance trends over time. Supports tiered usage profiles and multiple providers including local Ollama inference.
 
+> **New here?** Start with the recipe-first [**QUICKSTART**](QUICKSTART.md) — copy‑pasteable commands grouped by goal (cost, quality, safety, scale).
+
 ## Quick Start
 
 ```bash
@@ -84,6 +86,7 @@ Quality scores come from an LLM-as-judge (`atomics eval` / `redblue`), defaultin
 - **Fair completeness** — the judge sees the response truncated to a budget scaled to the fixture's expected output length (~4 chars/token, floored at 3000), so long HEAVY answers are scored in full rather than cut at a fixed cap.
 - **Objective coverage anchor** — alongside the judge's 0–10 rubric, `criteria_coverage` reports the fraction of a fixture's `gold_criteria` actually present in the response. It is computed lexically, independently of the judge, so a verbose-but-empty answer can't hide.
 - **Multi-judge consensus** — pass `--extra-judges provider:model[@host],…` to `atomics eval` to score with a panel. Scores from judges that parsed are averaged and the inter-judge standard deviation (`judge_score_stdev`) is recorded as a disagreement signal.
+- **Fast spot-checks** — `--fixtures ev-19` (or a comma-separated list) runs just a subset of the 25 fixtures, so you can iterate on a single hard prompt without paying for a full run.
 - **Robust parsing** — a strict rubric parse falls back to a lenient field-by-field scan (markdown, reordering, missing rationale tolerated), then to a single reformat retry before giving up. The eval summary reports a `parse_failure_rate` so a flaky judge is visible.
 - **Calibration guard** — `atomics/eval/calibration.py` ranks graded answers (wrong → thin → thorough) and asserts the judge scores them monotonically with clear separation. The deterministic regression test runs in CI; an opt-in live check validates the real judge:
 
@@ -433,6 +436,8 @@ stoneburner/
 | `atomics schedule --uninstall` | Remove installed schedule |
 | `atomics schedule-status` | Show installed schedules and OS health |
 | `atomics eval` | Run evaluation suite against a provider |
+| `atomics eval --fixtures ev-19` | Run a fixture subset for a fast spot-check |
+| `atomics eval --extra-judges ollama:mistral:7b` | Multi-judge consensus scoring |
 | `atomics models` | List available models on Ollama host with class/thinking annotations |
 | `atomics sweep` | Multi-model eval sweep with ranked comparison |
 | `atomics stress` | Ramp concurrency to find GPU saturation point |
@@ -507,6 +512,10 @@ Set via environment variables (prefix `ATOMICS_`) or `.env` file:
 | `ATOMICS_BUDGET_LIMIT_USD` | `50.00` | Total cost cap per run |
 | `ATOMICS_OLLAMA_HOST` | `http://localhost:11434` | Ollama endpoint URL |
 | `ATOMICS_OLLAMA_MODEL` | `qwen2.5:7b` | Default model for Ollama runs |
+| `ATOMICS_OLLAMA_TIMEOUT` | `300` | Per-request timeout (s). Raise for slow thinking models on HEAVY prompts |
+| `ATOMICS_VLLM_HOST` | `http://localhost:8000/v1` | vLLM / OpenAI-compatible gateway base URL |
+| `ATOMICS_VLLM_MODEL` | `qwen2.5:3b` | Default model for vLLM runs |
+| `ATOMICS_VLLM_TIMEOUT` | `300` | Per-request timeout (s) for vLLM |
 | `ATOMICS_BRAIN_GATEWAY_URL` | `http://localhost:8080` | Camazotz brain-gateway endpoint |
 | `ATOMICS_DB_PATH` | (platform) | SQLite database location (see below) |
 

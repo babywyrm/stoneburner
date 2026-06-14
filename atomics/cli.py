@@ -800,6 +800,9 @@ def _print_narrative(console: Console, rows: list[dict], by: str) -> None:
               help="Comma-separated extra judges for consensus scoring. "
                    "Format: provider:model (e.g. claude:claude-sonnet-4-6,ollama:deepseek-r1:14b). "
                    "Reports mean quality and inter-judge stddev.")
+@click.option("--fixtures", "fixtures_filter", type=str, default=None,
+              help="Comma-separated fixture IDs to run a subset (e.g. ev-19 or "
+                   "ev-01,ev-02). Default: all 25 fixtures.")
 @click.option("--save/--no-save", "save_results", default=True, help="Persist results to the database")
 @click.option("--thinking/--no-thinking", "thinking_flag", default=None, help="Enable/disable thinking for capable models")
 @click.option("--thinking-budget", type=int, default=None, help="Max thinking tokens")
@@ -813,6 +816,7 @@ def eval(
     judge_model: str | None,
     judge_host: str | None,
     extra_judges: str | None,
+    fixtures_filter: str | None,
     save_results: bool,
     thinking_flag: bool | None,
     thinking_budget: int | None,
@@ -900,6 +904,16 @@ def eval(
 
     from atomics.eval.fixtures import EVAL_FIXTURES
 
+    selected_fixtures = None
+    if fixtures_filter:
+        wanted = {fid.strip() for fid in fixtures_filter.split(",") if fid.strip()}
+        selected_fixtures = [f for f in EVAL_FIXTURES if f.id in wanted]
+        missing = wanted - {f.id for f in selected_fixtures}
+        if missing:
+            click.echo(f"Error: unknown fixture id(s): {', '.join(sorted(missing))}", err=True)
+            sys.exit(1)
+    fixture_count = len(selected_fixtures) if selected_fixtures is not None else len(EVAL_FIXTURES)
+
     judge_label = judge_model or "default"
     if extra_judge_pairs:
         judge_label += f" + {len(extra_judge_pairs)} consensus"
@@ -907,7 +921,7 @@ def eval(
         f"\n[bold]Eval run[/bold] — model under test: [cyan]{provider_name}[/cyan] "
         f"({model or 'default'})\n"
         f"Judge: [cyan]{judge_provider_name}[/cyan] ({judge_label})\n"
-        f"Fixtures: [bold]{len(EVAL_FIXTURES)}[/bold] | Results saved: [bold]{'yes' if save_results else 'no'}[/bold]\n"
+        f"Fixtures: [bold]{fixture_count}[/bold] | Results saved: [bold]{'yes' if save_results else 'no'}[/bold]\n"
     )
 
     repo = None
@@ -987,6 +1001,7 @@ def eval(
         thinking=eff_thinking,
         thinking_budget=thinking_budget,
         extra_judges=extra_judge_pairs,
+        fixtures=selected_fixtures,
     ))
 
     console.print(result_table)
