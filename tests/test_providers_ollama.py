@@ -87,6 +87,27 @@ async def test_ollama_generate_with_model_override():
     assert body["model"] == "qwen3:4b"
 
 
+def test_ollama_default_timeout_is_generous():
+    # Thinking models can reason well past the old 120s cap.
+    assert OllamaProvider()._timeout == 300.0
+
+
+@pytest.mark.asyncio
+async def test_ollama_generate_uses_configured_timeout():
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.raise_for_status = MagicMock()
+    mock_response.json.return_value = {
+        "response": "ok", "eval_count": 5, "prompt_eval_count": 3, "eval_duration": 1,
+    }
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock(return_value=mock_response)
+
+    provider = OllamaProvider(host="http://fake:11434", timeout=42.0, client=mock_client)
+    await provider.generate("hi")
+    assert mock_client.post.call_args.kwargs["timeout"] == 42.0
+
+
 @pytest.mark.asyncio
 async def test_ollama_generate_zero_eval_duration():
     mock_response = MagicMock()

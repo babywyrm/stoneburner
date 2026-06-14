@@ -857,12 +857,14 @@ def eval(
             return OllamaProvider(
                 host=host or settings.ollama_host,
                 default_model=mdl or settings.ollama_model,
+                timeout=settings.ollama_timeout,
             )
         elif name == "vllm":
             from atomics.providers.vllm import VllmProvider
             return VllmProvider(
                 base_url=vllm_host or settings.vllm_host,
                 default_model=mdl or settings.vllm_model,
+                timeout=settings.vllm_timeout,
             )
         elif name == "brain-gateway":
             from atomics.providers.brain_gateway import BrainGatewayProvider
@@ -1707,12 +1709,17 @@ def _make_provider(name: str, mdl: str | None, host: str | None, settings, *, vl
         return VllmProvider(
             base_url=vllm_host or settings.vllm_host,
             default_model=mdl or settings.vllm_model,
+            timeout=settings.vllm_timeout,
         )
     if name == "brain-gateway":
         from atomics.providers.brain_gateway import BrainGatewayProvider
         return BrainGatewayProvider(url=host or settings.brain_gateway_url, default_model=mdl)
     from atomics.providers.ollama import OllamaProvider
-    return OllamaProvider(host=host or settings.ollama_host, default_model=mdl or settings.ollama_model)
+    return OllamaProvider(
+        host=host or settings.ollama_host,
+        default_model=mdl or settings.ollama_model,
+        timeout=settings.ollama_timeout,
+    )
 
 
 # ── atomics sweep ─────────────────────────────────────────────────────────────
