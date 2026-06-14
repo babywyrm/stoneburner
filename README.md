@@ -75,6 +75,24 @@ Stoneburner reports only what a provider can actually observe, so cross-model co
 
   Compare tok/s across providers with the basis in mind: `generation`-basis numbers reflect raw decode speed, while `wall_clock` numbers reflect what a caller actually experiences.
 
+## Judge Accuracy
+
+Quality scores come from an LLM-as-judge (`atomics eval` / `redblue`), defaulting to a local Ollama model so scoring is $0. The judge is built to be reproducible and hard to game:
+
+- **Deterministic** — every judge call uses `temperature=0.0`, so the same response scores identically run-to-run. The `temperature` knob is plumbed through all providers and withheld only where a backend forbids it (OpenAI reasoning models, Claude extended-thinking).
+- **Fair completeness** — the judge sees the response truncated to a budget scaled to the fixture's expected output length (~4 chars/token, floored at 3000), so long HEAVY answers are scored in full rather than cut at a fixed cap.
+- **Objective coverage anchor** — alongside the judge's 0–10 rubric, `criteria_coverage` reports the fraction of a fixture's `gold_criteria` actually present in the response. It is computed lexically, independently of the judge, so a verbose-but-empty answer can't hide.
+- **Multi-judge consensus** — pass `--extra-judges provider:model[@host],…` to `atomics eval` to score with a panel. Scores from judges that parsed are averaged and the inter-judge standard deviation (`judge_score_stdev`) is recorded as a disagreement signal.
+- **Robust parsing** — a strict rubric parse falls back to a lenient field-by-field scan (markdown, reordering, missing rationale tolerated), then to a single reformat retry before giving up. The eval summary reports a `parse_failure_rate` so a flaky judge is visible.
+- **Calibration guard** — `atomics/eval/calibration.py` ranks graded answers (wrong → thin → thorough) and asserts the judge scores them monotonically with clear separation. The deterministic regression test runs in CI; an opt-in live check validates the real judge:
+
+```bash
+# Validate the configured Ollama judge actually ranks answers correctly
+ATOMICS_LIVE_JUDGE=1 uv run pytest tests/test_calibration.py::test_live_judge_is_calibrated -q
+```
+
+All judge fields persist to `task_results` and surface in `atomics compare` (`avg_criteria_coverage`, `avg_judge_score_stdev`).
+
 ## Burn Tiers
 
 Atomics supports three usage tiers that control task complexity, model selection, cadence, and budget:
@@ -359,7 +377,7 @@ stoneburner/
 │   ├── contention.py     # Multi-model VRAM contention test runner
 │   ├── qa_runner.py      # QA fixture suite runner (Ollama + profile modes)
 │   ├── regression.py     # Baseline save/load/compare for soak regression tracking
-│   ├── storage/          # SQLite metrics persistence (schema v11)
+│   ├── storage/          # SQLite metrics persistence (schema v14)
 │   ├── scheduler/        # Cron/systemd/launchd generation and installation
 │   ├── workers/          # Optional npm worker bridge (Phase 3)
 │   ├── cli.py            # Click CLI entry point
