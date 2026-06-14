@@ -29,6 +29,23 @@ class ModelSweepResult:
     total_cost_usd: float
     value_score: float | None
     eval_summary: EvalRunSummary | None
+    # Representative failure reason (e.g. "404 Not Found" when a model tag
+    # isn't pulled on the host). None when nothing failed.
+    error: str | None = None
+
+
+def _representative_error(summary: EvalRunSummary) -> str | None:
+    """Most common per-fixture error message in a summary, or None."""
+    from collections import Counter
+
+    msgs = [
+        fr.task_result.error_message
+        for fr in summary.fixture_results
+        if fr.task_result.error_message
+    ]
+    if not msgs:
+        return None
+    return Counter(msgs).most_common(1)[0][0][:200]
 
 
 def _filter_fixtures(fixture_ids: list[str] | None) -> list[EvalFixture]:
@@ -91,9 +108,13 @@ async def run_model_sweep(
                 total_cost_usd=summary.total_cost_usd,
                 value_score=summary.value_score,
                 eval_summary=summary,
+                # If nothing scored (e.g. every fixture 404'd because the tag
+                # isn't pulled), capture why so the caller needn't dig the logs.
+                error=_representative_error(summary) if summary.overall_accuracy is None else None,
             )
         except Exception as exc:
-            logger.warning("[sweep] Model %s failed: %s", model, exc)
+            err = (str(exc) or repr(exc))[:200]
+            logger.warning("[sweep] Model %s failed: %s", model, err)
             result = ModelSweepResult(
                 model=model,
                 fixtures_run=0,
@@ -103,6 +124,7 @@ async def run_model_sweep(
                 total_cost_usd=0.0,
                 value_score=None,
                 eval_summary=None,
+                error=err,
             )
 
         results.append(result)
