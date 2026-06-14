@@ -796,6 +796,10 @@ def _print_narrative(console: Console, rows: list[dict], by: str) -> None:
 )
 @click.option("--judge-model", type=str, default=None, help="Model override for the judge")
 @click.option("--judge-host", type=str, default=None, help="Ollama host for the judge (if different)")
+@click.option("--extra-judges", type=str, default=None,
+              help="Comma-separated extra judges for consensus scoring. "
+                   "Format: provider:model (e.g. claude:claude-sonnet-4-6,ollama:deepseek-r1:14b). "
+                   "Reports mean quality and inter-judge stddev.")
 @click.option("--save/--no-save", "save_results", default=True, help="Persist results to the database")
 @click.option("--thinking/--no-thinking", "thinking_flag", default=None, help="Enable/disable thinking for capable models")
 @click.option("--thinking-budget", type=int, default=None, help="Max thinking tokens")
@@ -808,6 +812,7 @@ def eval(
     judge_provider_name: str,
     judge_model: str | None,
     judge_host: str | None,
+    extra_judges: str | None,
     save_results: bool,
     thinking_flag: bool | None,
     thinking_budget: int | None,
@@ -872,12 +877,34 @@ def eval(
     # Judge host falls back to: --judge-host → --ollama-host → ATOMICS_OLLAMA_HOST env/.env
     judge_provider = _build_provider(judge_provider_name, judge_model, judge_host or ollama_host or settings.ollama_host)
 
+    # Parse --extra-judges "claude:claude-sonnet-4-6,ollama:deepseek-r1:14b@http://host:11434"
+    extra_judge_pairs: list[tuple] = []
+    if extra_judges:
+        for spec in extra_judges.split(","):
+            spec = spec.strip()
+            if not spec:
+                continue
+            ej_host = None
+            if "@" in spec:
+                spec, ej_host = spec.rsplit("@", 1)
+            parts = spec.split(":", 1)
+            ej_provider_name = parts[0]
+            ej_model = parts[1] if len(parts) > 1 else None
+            ej_provider = _build_provider(
+                ej_provider_name, ej_model,
+                ej_host or judge_host or ollama_host or settings.ollama_host,
+            )
+            extra_judge_pairs.append((ej_provider, ej_model))
+
     from atomics.eval.fixtures import EVAL_FIXTURES
 
+    judge_label = judge_model or "default"
+    if extra_judge_pairs:
+        judge_label += f" + {len(extra_judge_pairs)} consensus"
     console.print(
         f"\n[bold]Eval run[/bold] — model under test: [cyan]{provider_name}[/cyan] "
         f"({model or 'default'})\n"
-        f"Judge: [cyan]{judge_provider_name}[/cyan] ({judge_model or 'default'})\n"
+        f"Judge: [cyan]{judge_provider_name}[/cyan] ({judge_label})\n"
         f"Fixtures: [bold]{len(EVAL_FIXTURES)}[/bold] | Results saved: [bold]{'yes' if save_results else 'no'}[/bold]\n"
     )
 
@@ -957,6 +984,7 @@ def eval(
         on_fixture_done=on_done,
         thinking=eff_thinking,
         thinking_budget=thinking_budget,
+        extra_judges=extra_judge_pairs,
     ))
 
     console.print(result_table)
