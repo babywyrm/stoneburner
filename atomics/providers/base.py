@@ -62,6 +62,7 @@ class BaseProvider(ABC):
         max_tokens: int = 1024,
         thinking: bool | None = None,
         thinking_budget: int | None = None,
+        temperature: float | None = None,
     ) -> ProviderResponse: ...
 
     @abstractmethod
