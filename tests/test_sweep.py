@@ -126,6 +126,10 @@ async def test_sweep_handles_provider_error():
     assert len(results) == 1
     assert results[0].model == "broken-model:1b"
     assert results[0].overall_quality is None
+    # The failure reason must be captured so the CLI can surface it
+    # instead of a bare "FAIL" that forces a log dive.
+    assert results[0].error is not None
+    assert "refused" in results[0].error
 
 
 @pytest.mark.asyncio

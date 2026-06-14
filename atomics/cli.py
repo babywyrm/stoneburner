@@ -1908,10 +1908,10 @@ def sweep(
 
     failed = [r for r in results if r.overall_quality is None]
     if failed:
-        console.print(
-            f"\n[yellow]{len(failed)} model(s) failed: "
-            f"{', '.join(r.model for r in failed)}[/yellow]"
-        )
+        console.print(f"\n[yellow]{len(failed)} model(s) failed:[/yellow]")
+        for r in failed:
+            reason = f" — [dim]{r.error}[/dim]" if r.error else ""
+            console.print(f"[yellow]  • {r.model}[/yellow]{reason}")
 
     if save_results:
         from atomics.storage.repository import MetricsRepository
