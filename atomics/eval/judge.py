@@ -57,6 +57,24 @@ _SCORE_RE = re.compile(
 )
 
 
+# Rough chars-per-token for sizing the judge's view of a response. English text
+# averages ~4 chars/token; we use this to scale truncation to a fixture's
+# expected output length so long answers aren't cut off (which would unfairly
+# penalise Completeness on MODERATE/HEAVY fixtures).
+_CHARS_PER_TOKEN = 4
+_MIN_JUDGE_CHARS = 3000
+
+
+def char_budget_for_tokens(max_output_tokens: int) -> int:
+    """Judge-visible character budget for a response of up to N output tokens.
+
+    Floored at _MIN_JUDGE_CHARS so short fixtures keep generous headroom, and
+    scaled by chars/token so a 2000-token answer is judged in full rather than
+    truncated at the old fixed 3000-char cap.
+    """
+    return max(_MIN_JUDGE_CHARS, max_output_tokens * _CHARS_PER_TOKEN)
+
+
 @dataclass
 class JudgeResult:
     score: float          # 0.0-1.0 normalised
