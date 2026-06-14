@@ -82,6 +82,7 @@ class TaskResult(BaseModel):
     accuracy_score: float | None = None
     judge_model: str = ""
     quality_rationale: str = ""
+    criteria_coverage: float | None = None
 
 
 class RunSummary(BaseModel):

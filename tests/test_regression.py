@@ -195,7 +195,7 @@ class TestSaveAndLoadBaseline:
 class TestSchemaVersion:
     def test_schema_version_is_current(self):
         from atomics.storage.schema import SCHEMA_VERSION
-        assert SCHEMA_VERSION == 12
+        assert SCHEMA_VERSION == 13
 
     def test_baselines_table_exists(self):
         conn = _make_db()

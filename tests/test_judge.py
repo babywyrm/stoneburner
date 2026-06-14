@@ -6,6 +6,7 @@ import pytest
 
 from atomics.eval.judge import (
     char_budget_for_tokens,
+    compute_criteria_coverage,
     score_response,
 )
 from atomics.providers.base import ProviderResponse
@@ -65,3 +66,60 @@ async def test_long_response_not_truncated_with_scaled_budget():
     assert _TRUNCATION_MARKER not in judge.last_prompt
     # Full response made it into the judge's view.
     assert long_response in judge.last_prompt
+
+
+# ── Gold-criteria coverage anchor ───────────────────────────────────────────
+def test_coverage_none_without_criteria():
+    assert compute_criteria_coverage("anything", None) is None
+    assert compute_criteria_coverage("anything", []) is None
+
+
+def test_coverage_full_when_all_criteria_present():
+    response = (
+        "Shamir's secret sharing splits a secret using polynomial interpolation "
+        "over a finite field; any threshold of shares reconstructs it."
+    )
+    criteria = ["polynomial interpolation", "finite field", "threshold of shares"]
+    assert compute_criteria_coverage(response, criteria) == 1.0
+
+
+def test_coverage_partial_when_some_criteria_missing():
+    response = "It uses polynomial interpolation and nothing else worth noting."
+    criteria = ["polynomial interpolation", "finite field", "threshold of shares"]
+    # Only the first concept is present → 1/3.
+    assert compute_criteria_coverage(response, criteria) == pytest.approx(0.333, abs=0.01)
+
+
+def test_coverage_zero_for_empty_response():
+    criteria = ["polynomial interpolation", "finite field"]
+    assert compute_criteria_coverage("", criteria) == 0.0
+
+
+def test_coverage_is_case_insensitive():
+    response = "POLYNOMIAL INTERPOLATION over a FINITE FIELD."
+    criteria = ["polynomial interpolation", "finite field"]
+    assert compute_criteria_coverage(response, criteria) == 1.0
+
+
+@pytest.mark.asyncio
+async def test_score_response_attaches_coverage():
+    judge = _PromptCapturingJudge()
+    result = await score_response(
+        "q", "polynomial interpolation over a finite field",
+        judge_provider=judge,
+        gold_criteria=["polynomial interpolation", "finite field"],
+    )
+    assert result.criteria_coverage == 1.0
+
+
+@pytest.mark.asyncio
+async def test_coverage_survives_judge_parse_failure():
+    """Coverage is judge-independent: still computed when parsing fails."""
+    judge = _PromptCapturingJudge(reply="garbage that does not match the rubric")
+    result = await score_response(
+        "q", "polynomial interpolation and finite field math",
+        judge_provider=judge,
+        gold_criteria=["polynomial interpolation", "finite field"],
+    )
+    assert result.parse_failed is True
+    assert result.criteria_coverage == 1.0

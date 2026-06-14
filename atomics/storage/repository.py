@@ -111,9 +111,10 @@ class MetricsRepository:
                 thinking_enabled,
                 error_class, error_message,
                 started_at, completed_at,
-                accuracy_score, judge_model, quality_rationale
+                accuracy_score, judge_model, quality_rationale, criteria_coverage
             ) VALUES (
-                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
             )
             """,
             (
@@ -145,6 +146,7 @@ class MetricsRepository:
                 result.accuracy_score,
                 result.judge_model,
                 result.quality_rationale,
+                result.criteria_coverage,
             ),
         )
         self._conn.commit()
@@ -349,7 +351,8 @@ class MetricsRepository:
                 GROUP_CONCAT(DISTINCT tps_basis) as tps_bases,
                 AVG(tokens_per_second) as avg_tokens_per_second,
                 AVG(accuracy_score) as avg_accuracy_score,
-                COUNT(accuracy_score) as scored_tasks
+                COUNT(accuracy_score) as scored_tasks,
+                AVG(criteria_coverage) as avg_criteria_coverage
             FROM task_results {where}
             GROUP BY {col}
             ORDER BY avg_cost_per_task ASC

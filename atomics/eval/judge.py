@@ -75,6 +75,45 @@ def char_budget_for_tokens(max_output_tokens: int) -> int:
     return max(_MIN_JUDGE_CHARS, max_output_tokens * _CHARS_PER_TOKEN)
 
 
+# Words ignored when matching a gold criterion's key terms against a response.
+_COVERAGE_STOPWORDS = frozenset({
+    "the", "a", "an", "of", "and", "or", "to", "in", "is", "for", "with", "on",
+    "how", "does", "what", "why", "be", "are", "as", "by", "it", "that", "this",
+})
+# Fraction of a criterion's significant terms that must appear for it to count
+# as covered. Lets multi-word concepts tolerate a missing minor word.
+_COVERAGE_TERM_THRESHOLD = 0.6
+
+
+def _criterion_covered(criterion: str, response_lower: str) -> bool:
+    terms = [
+        t for t in re.findall(r"[a-z0-9]+", criterion.lower())
+        if t not in _COVERAGE_STOPWORDS and len(t) > 2
+    ]
+    if not terms:
+        return criterion.lower().strip() in response_lower
+    hits = sum(1 for t in terms if t in response_lower)
+    return hits / len(terms) >= _COVERAGE_TERM_THRESHOLD
+
+
+def compute_criteria_coverage(
+    response: str, gold_criteria: list[str] | None,
+) -> float | None:
+    """Objective, judge-independent fraction of gold criteria present in a response.
+
+    A lexical anchor (not semantic): each criterion counts as covered when a
+    majority of its significant terms appear in the response. Returns None when
+    a fixture supplies no gold criteria. This complements the LLM judge's
+    advisory use of the same criteria with a deterministic signal that can't be
+    gamed by a verbose-but-empty answer.
+    """
+    if not gold_criteria:
+        return None
+    response_lower = response.lower()
+    covered = sum(1 for c in gold_criteria if _criterion_covered(c, response_lower))
+    return round(covered / len(gold_criteria), 3)
+
+
 @dataclass
 class JudgeResult:
     score: float          # 0.0-1.0 normalised
@@ -84,6 +123,7 @@ class JudgeResult:
     rationale: str
     judge_model: str
     parse_failed: bool = False
+    criteria_coverage: float | None = None  # lexical gold-criteria coverage, 0.0-1.0
 
 
 async def score_response(
@@ -106,6 +146,10 @@ async def score_response(
             Injected into the rubric as additional context for the judge.
         max_response_chars: Truncate responses beyond this to keep judge prompt lean.
     """
+    # Deterministic anchor over the *full* response (independent of judge and of
+    # the prompt truncation below).
+    criteria_coverage = compute_criteria_coverage(response, gold_criteria)
+
     truncated = response[:max_response_chars]
     if len(response) > max_response_chars:
         truncated += "\n[...response truncated for scoring...]"
@@ -145,6 +189,7 @@ async def score_response(
             rationale=f"Judge call failed: {exc}",
             judge_model=judge_model or "unknown",
             parse_failed=True,
+            criteria_coverage=criteria_coverage,
         )
 
     match = _SCORE_RE.search(raw)
@@ -158,6 +203,7 @@ async def score_response(
             rationale=f"Parse failed: {raw[:100]}",
             judge_model=effective_model,
             parse_failed=True,
+            criteria_coverage=criteria_coverage,
         )
 
     acc = min(int(match.group(1)), 4)
@@ -180,4 +226,5 @@ async def score_response(
         format_score=fmt,
         rationale=rationale,
         judge_model=effective_model,
+        criteria_coverage=criteria_coverage,
     )

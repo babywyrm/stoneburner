@@ -157,6 +157,7 @@ async def run_eval(
         task_result.accuracy_score = judge.score
         task_result.judge_model = judge.judge_model
         task_result.quality_rationale = judge.rationale
+        task_result.criteria_coverage = judge.criteria_coverage
 
         fr = FixtureResult(fixture=fixture, task_result=task_result, judge=judge)
         fixture_results.append(fr)
