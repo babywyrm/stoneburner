@@ -803,6 +803,21 @@ async def test_oauth_browser_flow(tmp_path: Path):
 # ── _start_callback_server Handler ──────────────────────────────────────────
 
 
+def _run_until_future_done(loop, future, timeout=3.0):
+    """Tick the loop until the handler thread's call_soon_threadsafe callback
+    lands and resolves the future. A single sleep(0) raced the cross-thread
+    scheduling (the HTTP response can return before the callback runs), which
+    flaked on Linux/3.12 with InvalidStateError. Polling until done is
+    deterministic across platforms.
+    """
+    import asyncio as aio
+    import time
+
+    deadline = time.monotonic() + timeout
+    while not future.done() and time.monotonic() < deadline:
+        loop.run_until_complete(aio.sleep(0.01))
+
+
 def test_callback_handler_success():
     """Handler.do_GET with valid state and code sets the future result."""
     import asyncio as aio
@@ -827,8 +842,7 @@ def test_callback_handler_success():
     resp = urllib.request.urlopen(url, timeout=3)
     assert resp.status == 200
 
-    # Drain the scheduled call_soon
-    loop.run_until_complete(aio.sleep(0))
+    _run_until_future_done(loop, future)
     assert future.result() == "code-xyz"
     server.shutdown()
     loop.close()
@@ -857,7 +871,7 @@ def test_callback_handler_state_mismatch():
     except urllib.error.HTTPError as e:
         assert e.code == 400
 
-    loop.run_until_complete(aio.sleep(0))
+    _run_until_future_done(loop, future)
     with pytest.raises(RuntimeError, match="state mismatch"):
         future.result()
     server.shutdown()
@@ -887,7 +901,7 @@ def test_callback_handler_oauth_error():
     except urllib.error.HTTPError as e:
         assert e.code == 400
 
-    loop.run_until_complete(aio.sleep(0))
+    _run_until_future_done(loop, future)
     with pytest.raises(RuntimeError, match="OAuth error"):
         future.result()
     server.shutdown()
