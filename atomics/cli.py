@@ -1004,6 +1004,9 @@ def eval(
     summary_table.add_row("Total Tokens", f"{summary.total_tokens:,}")
     summary_table.add_row("Total Cost", f"${summary.total_cost_usd:.6f}")
     summary_table.add_row("Fixtures Run", str(len(summary.fixture_results)))
+    pf_rate = summary.parse_failure_rate
+    pf_style = "green" if pf_rate == 0 else "yellow" if pf_rate < 0.1 else "red"
+    summary_table.add_row("Judge Parse Failures", f"[{pf_style}]{pf_rate * 100:.1f}%[/{pf_style}]")
     console.print(summary_table)
 
     if repo:

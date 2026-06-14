@@ -57,6 +57,67 @@ _SCORE_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Lenient field-by-field patterns for the fallback parser. Each tolerates
+# markdown bold/markers, arbitrary separators, and field reordering — e.g.
+# "**Accuracy** - 4", "ACCURACY = 4", "Accuracy: 4/4".
+_ACC_RE = re.compile(r"accuracy\W{0,6}(\d+)", re.IGNORECASE)
+_COMP_RE = re.compile(r"complet\w*\W{0,6}(\d+)", re.IGNORECASE)
+_FMT_RE = re.compile(r"format\W{0,6}(\d+)", re.IGNORECASE)
+_RATIONALE_RE = re.compile(r"rationale\W{0,6}([\s\S]+)", re.IGNORECASE)
+
+_REFORMAT_SYSTEM = (
+    "You reformat a previous evaluation into the exact required format. "
+    "Do not change the scores; only restructure them."
+)
+
+_REFORMAT_TEMPLATE = """\
+Your previous reply could not be parsed. Re-emit the SAME scores using ONLY
+these four lines and nothing else (no preamble, no markdown):
+ACCURACY: <integer 0-4>
+COMPLETENESS: <integer 0-3>
+FORMAT: <integer 0-3>
+RATIONALE: <one concise sentence>
+
+Your previous reply was:
+{bad}
+"""
+
+
+def _parse_rubric(raw: str) -> tuple[int, int, int, str] | None:
+    """Parse a judge reply into (accuracy, completeness, format, rationale).
+
+    Tries the strict line-oriented format first, then falls back to a lenient
+    field-by-field scan that tolerates markdown, reordering, and stray prose.
+    Returns None only when the three numeric scores cannot be recovered.
+    """
+    match = _SCORE_RE.search(raw)
+    if match:
+        rationale = " ".join(match.group(4).strip().splitlines()).strip()
+        return (
+            min(int(match.group(1)), 4),
+            min(int(match.group(2)), 3),
+            min(int(match.group(3)), 3),
+            rationale,
+        )
+
+    acc_m = _ACC_RE.search(raw)
+    comp_m = _COMP_RE.search(raw)
+    fmt_m = _FMT_RE.search(raw)
+    if not (acc_m and comp_m and fmt_m):
+        return None
+
+    rat_m = _RATIONALE_RE.search(raw)
+    rationale = (
+        " ".join(rat_m.group(1).strip().splitlines()).strip()
+        if rat_m else "(no rationale provided)"
+    )
+    return (
+        min(int(acc_m.group(1)), 4),
+        min(int(comp_m.group(1)), 3),
+        min(int(fmt_m.group(1)), 3),
+        rationale,
+    )
+
 
 # Rough chars-per-token for sizing the judge's view of a response. English text
 # averages ~4 chars/token; we use this to scale truncation to a fixture's
@@ -171,17 +232,19 @@ async def score_response(
         response=truncated,
     )
 
-    try:
+    async def _ask(text: str, system: str) -> tuple[str, str]:
         resp = await judge_provider.generate(
-            judge_prompt,
-            system=_JUDGE_SYSTEM,
+            text,
+            system=system,
             model=judge_model,
             max_tokens=128,
             # Greedy decoding so the same response scores identically run-to-run.
             temperature=0.0,
         )
-        raw = resp.text.strip()
-        effective_model = resp.model
+        return resp.text.strip(), resp.model
+
+    try:
+        raw, effective_model = await _ask(judge_prompt, _JUDGE_SYSTEM)
     except Exception as exc:
         logger.warning("Judge call failed: %s", exc)
         return JudgeResult(
@@ -195,8 +258,24 @@ async def score_response(
             criteria_coverage=criteria_coverage,
         )
 
-    match = _SCORE_RE.search(raw)
-    if not match:
+    parsed = _parse_rubric(raw)
+
+    # One reformat retry: the scores are often present but mis-formatted (markdown,
+    # preamble, reordering). Ask the judge to re-emit the same scores cleanly
+    # before giving up.
+    if parsed is None:
+        logger.info("Judge reply unparseable; attempting one reformat retry.")
+        try:
+            retry_raw, effective_model = await _ask(
+                _REFORMAT_TEMPLATE.format(bad=raw[:500]), _REFORMAT_SYSTEM,
+            )
+            parsed = _parse_rubric(retry_raw)
+            if parsed is not None:
+                raw = retry_raw
+        except Exception as exc:
+            logger.warning("Judge reformat retry failed: %s", exc)
+
+    if parsed is None:
         logger.warning("Judge parse failed for response: %r", raw[:200])
         return JudgeResult(
             score=0.5,
@@ -209,11 +288,7 @@ async def score_response(
             criteria_coverage=criteria_coverage,
         )
 
-    acc = min(int(match.group(1)), 4)
-    comp = min(int(match.group(2)), 3)
-    fmt = min(int(match.group(3)), 3)
-    # Collapse multi-line rationales to one line; strip trailing whitespace
-    rationale = " ".join(match.group(4).strip().splitlines()).strip()
+    acc, comp, fmt, rationale = parsed
     raw_score = acc + comp + fmt          # 0-10
     normalised = round(raw_score / 10.0, 3)
 

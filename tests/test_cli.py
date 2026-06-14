@@ -1125,6 +1125,7 @@ def test_cli_eval_vllm_provider(monkeypatch, tmp_path):
     fake_summary = SimpleNamespace(
         overall_accuracy=0.9, value_score=900.0, avg_latency_ms=120.0,
         total_tokens=100, total_cost_usd=0.0, fixture_results=[],
+        parse_failure_rate=0.0,
     )
 
     async def fake_run_eval(*_a, **_kw):
@@ -1167,6 +1168,7 @@ def test_cli_eval_vllm_missing_host_uses_config(monkeypatch, tmp_path):
     fake_summary = SimpleNamespace(
         overall_accuracy=None, value_score=None, avg_latency_ms=0.0,
         total_tokens=0, total_cost_usd=0.0, fixture_results=[],
+        parse_failure_rate=0.0,
     )
 
     async def fake_run_eval(*_a, **_kw):
