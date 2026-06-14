@@ -11,6 +11,7 @@ from atomics.eval.fixtures import EVAL_FIXTURES, EvalFixture
 from atomics.eval.judge import (
     JudgeResult,
     char_budget_for_tokens,
+    detect_self_judge,
     score_consensus,
     score_response,
 )
@@ -105,6 +106,18 @@ async def run_eval(
             recorded.
     """
     extra_judges = extra_judges or []
+
+    _collisions = detect_self_judge(
+        provider, model, [(judge_provider, judge_model), *extra_judges],
+    )
+    if _collisions:
+        logger.warning(
+            "Self-judging detected: model under test is also a judge (%s). "
+            "Quality scores are biased upward by self-preference — use a "
+            "different judge model for a fair evaluation.",
+            ", ".join(_collisions),
+        )
+
     run_id = run_id or uuid.uuid4().hex[:12]
     started_at = datetime.now(UTC)
     fixture_results: list[FixtureResult] = []

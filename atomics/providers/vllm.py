@@ -55,6 +55,10 @@ class VllmProvider(BaseProvider):
     def name(self) -> str:
         return "vllm"
 
+    @property
+    def default_model(self) -> str | None:
+        return self._default_model
+
     def _headers(self) -> dict[str, str]:
         return {
             "Authorization": f"Bearer {self._api_key}",

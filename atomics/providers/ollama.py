@@ -43,6 +43,10 @@ class OllamaProvider(BaseProvider):
     def name(self) -> str:
         return "ollama"
 
+    @property
+    def default_model(self) -> str | None:
+        return self._default_model
+
     async def generate(
         self,
         prompt: str,

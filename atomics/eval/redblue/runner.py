@@ -11,7 +11,12 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
-from atomics.eval.judge import JudgeResult, char_budget_for_tokens, score_response
+from atomics.eval.judge import (
+    JudgeResult,
+    char_budget_for_tokens,
+    detect_self_judge,
+    score_response,
+)
 from atomics.eval.redblue.fixtures import ALL_FIXTURES, BLUE_FIXTURES, RED_FIXTURES, RedBlueFixture
 from atomics.models import TaskCategory, TaskResult, TaskStatus
 from atomics.providers.base import BaseProvider
@@ -76,6 +81,13 @@ async def run_redblue(
     on_fixture_done: object | None = None,
 ) -> RedBlueSummary:
     """Run red/blue fixtures against provider, judge with quality scorer."""
+    if detect_self_judge(provider, model, [(judge_provider, judge_model)]):
+        logger.warning(
+            "Self-judging detected: the model under test is also the judge. "
+            "Scores are biased upward by self-preference — use a different "
+            "judge model for a fair evaluation.",
+        )
+
     run_id = run_id or uuid.uuid4().hex[:12]
     started_at = datetime.now(UTC)
 

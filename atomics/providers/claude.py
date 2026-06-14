@@ -51,6 +51,10 @@ class ClaudeProvider(BaseProvider):
     def name(self) -> str:
         return "claude"
 
+    @property
+    def default_model(self) -> str | None:
+        return self._default_model
+
     async def generate(
         self,
         prompt: str,

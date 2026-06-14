@@ -79,6 +79,7 @@ Stoneburner reports only what a provider can actually observe, so cross-model co
 
 Quality scores come from an LLM-as-judge (`atomics eval` / `redblue`), defaulting to a local Ollama model so scoring is $0. The judge is built to be reproducible and hard to game:
 
+- **No self-judging** — a model rating its own output is biased upward (self-preference bias). The runners detect when a judge is the same provider+model as the model under test — including any consensus panel member, and including the case where both fall back to a provider's default model — and emit a loud warning. Use a different (ideally stronger) judge than the model under test.
 - **Deterministic** — every judge call uses `temperature=0.0`, so the same response scores identically run-to-run. The `temperature` knob is plumbed through all providers and withheld only where a backend forbids it (OpenAI reasoning models, Claude extended-thinking).
 - **Fair completeness** — the judge sees the response truncated to a budget scaled to the fixture's expected output length (~4 chars/token, floored at 3000), so long HEAVY answers are scored in full rather than cut at a fixed cap.
 - **Objective coverage anchor** — alongside the judge's 0–10 rubric, `criteria_coverage` reports the fraction of a fixture's `gold_criteria` actually present in the response. It is computed lexically, independently of the judge, so a verbose-but-empty answer can't hide.
