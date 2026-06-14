@@ -561,16 +561,16 @@ class TestRunSoakProvider:
     @pytest.mark.asyncio
     async def test_provider_samples_collected(self):
         from atomics.soak import run_soak_provider
-        # duration/interval give ~5 expected samples so coverage/scheduler
-        # overhead can't starve this below the >=2 assertion (0.5s/0.2s left
-        # exactly 2 expected samples with zero slack and flaked under coverage).
+        # duration/interval give ~15 expected samples so coverage/scheduler
+        # overhead on slow CI hosts can't starve this below the >=2 assertion
+        # (1.0s/0.2s still flaked under coverage on a slower Linux box).
         with patch("atomics.stress._single_request_provider",
                    side_effect=_async_req_provider(out=60, lat=50.0)):
             result = await run_soak_provider(
                 provider=_make_mock_provider("prov2"),
                 model="m",
                 concurrency=1,
-                duration_seconds=1.0,
+                duration_seconds=3.0,
                 sample_interval=0.2,
             )
         assert len(result.samples) >= 2
@@ -585,16 +585,16 @@ class TestRunSoakProvider:
         def on_sample(s: SoakSample) -> None:
             received.append(s)
 
-        # duration/interval give ~5 expected samples — enough margin that
-        # coverage/scheduler overhead can't starve this below the >=2 assertion
-        # (0.5s/0.2s left exactly 2 expected samples with zero slack and flaked).
+        # duration/interval give ~15 expected samples — enough margin that
+        # coverage/scheduler overhead on slow CI hosts can't starve this below
+        # the >=2 assertion (1.0s/0.2s still flaked under coverage on Linux).
         with patch("atomics.stress._single_request_provider",
                    side_effect=_async_req_provider()):
             await run_soak_provider(
                 provider=_make_mock_provider("cb-prov"),
                 model="m",
                 concurrency=1,
-                duration_seconds=1.0,
+                duration_seconds=3.0,
                 sample_interval=0.2,
                 on_sample=on_sample,
             )

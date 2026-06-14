@@ -447,6 +447,7 @@ async def test_run_stress_provider_tps_fallback():
 
 def test_cli_stress_with_provider(monkeypatch, tmp_path):
     """atomics stress --provider openai routes to run_stress_provider."""
+    pytest.importorskip("openai", reason="optional 'openai' extra not installed")
     from click.testing import CliRunner
     from atomics.cli import cli
 
@@ -523,6 +524,7 @@ def test_cli_stress_provider_claude(monkeypatch, tmp_path):
 
 def test_cli_stress_provider_save_cost(monkeypatch, tmp_path):
     """Stress with --provider --save should persist cost data."""
+    pytest.importorskip("openai", reason="optional 'openai' extra not installed")
     from click.testing import CliRunner
     from atomics.cli import cli
 
