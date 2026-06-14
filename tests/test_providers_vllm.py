@@ -37,6 +37,27 @@ def test_vllm_trailing_slash_stripped():
     assert provider._base_url == "http://fake:8000/v1"
 
 
+def test_vllm_default_timeout_is_generous():
+    assert VllmProvider()._timeout == 300.0
+
+
+@pytest.mark.asyncio
+async def test_vllm_generate_uses_configured_timeout():
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.raise_for_status = MagicMock()
+    mock_response.json.return_value = {
+        "choices": [{"message": {"content": "ok"}}],
+        "usage": {"prompt_tokens": 3, "completion_tokens": 5, "total_tokens": 8},
+    }
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock(return_value=mock_response)
+
+    provider = VllmProvider(base_url="http://fake:8000/v1", timeout=37.0, client=mock_client)
+    await provider.generate("hi")
+    assert mock_client.post.call_args.kwargs["timeout"] == 37.0
+
+
 # ---------------------------------------------------------------------------
 # generate() — happy path
 # ---------------------------------------------------------------------------

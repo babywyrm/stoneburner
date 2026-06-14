@@ -135,9 +135,12 @@ async def run_redblue(
             task_result.tokens_per_second = resp.tokens_per_second
             task_result.completed_at = datetime.now(UTC)
         except Exception as exc:
-            logger.warning("[redblue] %s generate failed: %s", fixture.id, exc)
+            # Fall back to repr for exceptions with an empty str (e.g. ReadTimeout).
+            err = (str(exc) or repr(exc))[:500]
+            logger.warning("[redblue] %s generate failed: %s", fixture.id, err)
             task_result.status = TaskStatus.FAILED
-            task_result.error_message = str(exc)
+            task_result.error_class = type(exc).__name__
+            task_result.error_message = err
             task_result.completed_at = datetime.now(UTC)
             fr = RedBlueFixtureResult(fixture=fixture, task_result=task_result, judge=None)
             results.append(fr)

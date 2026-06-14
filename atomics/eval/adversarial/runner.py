@@ -222,7 +222,11 @@ async def run_adversarial(
                 last_thinking = resp.thinking_tokens
                 last_response = response_text
             except Exception as exc:
-                logger.warning("[adversarial] %s run %d generate failed: %s", fixture.id, run_num + 1, exc)
+                # Fall back to repr for exceptions with an empty str (e.g. ReadTimeout).
+                logger.warning(
+                    "[adversarial] %s run %d generate failed: %s",
+                    fixture.id, run_num + 1, str(exc) or repr(exc),
+                )
                 continue
 
             resistance = await _score_with_all_judges(

@@ -161,11 +161,13 @@ async def run_eval(
         except Exception as exc:
             task_result.status = TaskStatus.FAILED
             task_result.error_class = type(exc).__name__
-            task_result.error_message = str(exc)[:500]
+            # Some exceptions (e.g. httpx.ReadTimeout) have an empty str(), which
+            # produced blank, useless error rows/logs — fall back to repr.
+            task_result.error_message = (str(exc) or repr(exc))[:500]
             task_result.completed_at = datetime.now(UTC)
             fr = FixtureResult(fixture=fixture, task_result=task_result, judge=None)
             fixture_results.append(fr)
-            logger.warning("[eval] %s failed: %s", fixture.id, exc)
+            logger.warning("[eval] %s failed: %s", fixture.id, task_result.error_message)
             if on_fixture_done is not None:
                 import asyncio
                 if asyncio.iscoroutinefunction(on_fixture_done):

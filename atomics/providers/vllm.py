@@ -44,11 +44,13 @@ class VllmProvider(BaseProvider):
         default_model: str = "qwen2.5:3b",
         api_key: str = "dummy",
         *,
+        timeout: float = 300.0,
         client: object | None = None,
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._default_model = default_model
         self._api_key = api_key
+        self._timeout = timeout
         self._client = client or httpx.AsyncClient()
 
     @property
@@ -103,7 +105,7 @@ class VllmProvider(BaseProvider):
                 f"{self._base_url}/chat/completions",
                 json=body,
                 headers=self._headers(),
-                timeout=120.0,
+                timeout=self._timeout,
             )
             response.raise_for_status()
         except httpx.ConnectError as exc:

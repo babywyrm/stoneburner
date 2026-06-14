@@ -265,6 +265,25 @@ def test_run_eval_provider_failure_recorded():
     assert summary.overall_accuracy is None
 
 
+def test_run_eval_empty_exception_message_falls_back_to_repr():
+    """A failure whose str(exc) is empty (e.g. httpx.ReadTimeout) must still
+    record a non-blank error_message via repr, not an empty string."""
+    import httpx
+
+    provider = MagicMock()
+    provider.name = "timeouty"
+    provider.generate = AsyncMock(side_effect=httpx.ReadTimeout(""))
+    judge = _make_good_judge()
+    summary = asyncio.run(
+        run_eval(provider, judge_provider=judge, fixtures=[EVAL_FIXTURES[0]])
+    )
+    tr = summary.fixture_results[0].task_result
+    assert tr.status.value == "failed"
+    assert tr.error_class == "ReadTimeout"
+    assert tr.error_message  # non-empty
+    assert "ReadTimeout" in tr.error_message
+
+
 def test_run_eval_on_fixture_done_called_for_failures():
     """Callback must fire even when the provider under test raises an exception.
 

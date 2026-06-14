@@ -33,10 +33,12 @@ class OllamaProvider(BaseProvider):
         host: str = "http://localhost:11434",
         default_model: str = "qwen2.5:7b",
         *,
+        timeout: float = 300.0,
         client: object | None = None,
     ) -> None:
         self._host = host.rstrip("/")
         self._default_model = default_model
+        self._timeout = timeout
         self._client = client or httpx.AsyncClient()
 
     @property
@@ -83,7 +85,7 @@ class OllamaProvider(BaseProvider):
             response = await self._client.post(
                 f"{self._host}/api/generate",
                 json=body,
-                timeout=120.0,
+                timeout=self._timeout,
             )
             response.raise_for_status()
         except httpx.ConnectError as exc:
