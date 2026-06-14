@@ -8,7 +8,7 @@ from pathlib import Path
 
 logger = logging.getLogger("atomics.schema")
 
-SCHEMA_VERSION = 13
+SCHEMA_VERSION = 14
 
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -63,6 +63,7 @@ CREATE TABLE IF NOT EXISTS task_results (
     judge_model     TEXT DEFAULT '',
     quality_rationale TEXT DEFAULT '',
     criteria_coverage REAL DEFAULT NULL,
+    judge_score_stdev REAL DEFAULT NULL,
     FOREIGN KEY (run_id) REFERENCES runs(run_id)
 );
 

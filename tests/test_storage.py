@@ -17,7 +17,7 @@ def _tmp_repo() -> MetricsRepository:
 
 
 def test_schema_version_is_current():
-    assert SCHEMA_VERSION == 13
+    assert SCHEMA_VERSION == 14
 
 
 def test_adversarial_results_table_exists(tmp_path):
@@ -210,6 +210,33 @@ def test_save_and_query_criteria_coverage():
     rows = repo.compare_providers()
     row = next(r for r in rows if r["group_key"] == "ollama")
     assert row["avg_criteria_coverage"] == pytest.approx(0.667)
+    repo.close()
+
+
+def test_save_and_query_judge_score_stdev():
+    """Consensus inter-judge stdev must round-trip and aggregate."""
+    repo = _tmp_repo()
+    repo.create_run("run-stdev")
+    repo.save_task_result(
+        TaskResult(
+            run_id="run-stdev",
+            category=TaskCategory.GENERAL_QA,
+            task_name="q",
+            provider="claude",
+            model="claude-sonnet-4-6",
+            status=TaskStatus.SUCCESS,
+            accuracy_score=0.7,
+            judge_score_stdev=0.3,
+            started_at=datetime.now(UTC),
+            completed_at=datetime.now(UTC),
+        )
+    )
+    tasks = repo.get_run_tasks("run-stdev")
+    assert tasks[0]["judge_score_stdev"] == 0.3
+
+    rows = repo.compare_providers()
+    row = next(r for r in rows if r["group_key"] == "claude")
+    assert row["avg_judge_score_stdev"] == pytest.approx(0.3)
     repo.close()
 
 

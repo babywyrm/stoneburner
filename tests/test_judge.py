@@ -7,6 +7,7 @@ import pytest
 from atomics.eval.judge import (
     char_budget_for_tokens,
     compute_criteria_coverage,
+    score_consensus,
     score_response,
 )
 from atomics.providers.base import ProviderResponse
@@ -123,3 +124,68 @@ async def test_coverage_survives_judge_parse_failure():
     )
     assert result.parse_failed is True
     assert result.criteria_coverage == 1.0
+
+
+# ── Multi-judge consensus + variance ────────────────────────────────────────
+def _fixed_judge(name: str, reply: str):
+    """A judge provider that always returns the same rubric reply."""
+    class _J:
+        def __init__(self):
+            self.name = name
+
+        async def generate(self, prompt, *, system="", model=None, max_tokens=1024,
+                           thinking=None, thinking_budget=None, temperature=None):
+            return ProviderResponse(
+                text=reply, input_tokens=1, output_tokens=1, total_tokens=2,
+                model=name, latency_ms=1.0, estimated_cost_usd=0.0,
+            )
+
+        async def health_check(self):
+            return True
+    return _J()
+
+
+@pytest.mark.asyncio
+async def test_consensus_single_judge_has_zero_stdev():
+    judge = _PromptCapturingJudge()
+    result = await score_consensus("q", "a", primary_judge=judge)
+    assert result.n_judges == 1
+    assert result.score_stdev == 0.0
+
+
+@pytest.mark.asyncio
+async def test_consensus_averages_scores_and_reports_stdev():
+    # Judge A: 10/10 → 1.0 ; Judge B: 4/10 → 0.4. Mean 0.7, pstdev 0.3.
+    judge_a = _fixed_judge("judge-a", "ACCURACY: 4\nCOMPLETENESS: 3\nFORMAT: 3\nRATIONALE: great.")
+    judge_b = _fixed_judge("judge-b", "ACCURACY: 2\nCOMPLETENESS: 1\nFORMAT: 1\nRATIONALE: weak.")
+    result = await score_consensus(
+        "q", "a", primary_judge=judge_a, extra_judges=[(judge_b, None)],
+    )
+    assert result.n_judges == 2
+    assert result.score == pytest.approx(0.7)
+    assert result.score_stdev == pytest.approx(0.3)
+    # Both judge names recorded.
+    assert "judge-a" in result.judge_model and "judge-b" in result.judge_model
+
+
+@pytest.mark.asyncio
+async def test_consensus_excludes_failed_judges_from_mean():
+    good = _fixed_judge("good", "ACCURACY: 4\nCOMPLETENESS: 3\nFORMAT: 3\nRATIONALE: ok.")
+    broken = _fixed_judge("broken", "this is not a rubric")
+    result = await score_consensus(
+        "q", "a", primary_judge=good, extra_judges=[(broken, None)],
+    )
+    # Only the good judge counts.
+    assert result.n_judges == 1
+    assert result.score == 1.0
+
+
+@pytest.mark.asyncio
+async def test_consensus_all_failed_returns_flagged_primary():
+    broken_a = _fixed_judge("a", "nope")
+    broken_b = _fixed_judge("b", "also nope")
+    result = await score_consensus(
+        "q", "a", primary_judge=broken_a, extra_judges=[(broken_b, None)],
+    )
+    assert result.parse_failed is True
+    assert result.n_judges == 2

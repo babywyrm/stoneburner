@@ -8,7 +8,12 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from atomics.eval.fixtures import EVAL_FIXTURES, EvalFixture
-from atomics.eval.judge import JudgeResult, char_budget_for_tokens, score_response
+from atomics.eval.judge import (
+    JudgeResult,
+    char_budget_for_tokens,
+    score_consensus,
+    score_response,
+)
 from atomics.models import TaskCategory, TaskResult, TaskStatus
 from atomics.providers.base import BaseProvider
 
@@ -73,6 +78,7 @@ async def run_eval(
     thinking: bool | None = None,
     thinking_budget: int | None = None,
     fixtures: list[EvalFixture] | None = None,
+    extra_judges: list[tuple[BaseProvider, str | None]] | None = None,
 ) -> EvalRunSummary:
     """Run eval fixtures against provider, score each with judge_provider.
 
@@ -84,7 +90,12 @@ async def run_eval(
         run_id: Optional run ID (auto-generated if omitted).
         on_fixture_done: Optional async callable(fixture_result) called after each fixture.
         fixtures: Optional subset of fixtures to run (default: all EVAL_FIXTURES).
+        extra_judges: Optional (provider, model) pairs that, together with the
+            primary judge, form a consensus panel. When supplied, each fixture is
+            scored by every judge and the mean score plus inter-judge stdev is
+            recorded.
     """
+    extra_judges = extra_judges or []
     run_id = run_id or uuid.uuid4().hex[:12]
     started_at = datetime.now(UTC)
     fixture_results: list[FixtureResult] = []
@@ -143,21 +154,34 @@ async def run_eval(
 
         task_result.completed_at = datetime.now(UTC)
 
-        judge = await score_response(
-            fixture.prompt,
-            task_result.response,
-            judge_provider=judge_provider,
-            judge_model=judge_model,
-            gold_criteria=fixture.gold_criteria,
-            # Judge the full intended answer, not a fixed-cap truncation, so
-            # long HEAVY responses aren't unfairly marked down on completeness.
-            max_response_chars=char_budget_for_tokens(fixture.max_output_tokens),
-        )
+        # Judge the full intended answer, not a fixed-cap truncation, so long
+        # HEAVY responses aren't unfairly marked down on completeness.
+        char_budget = char_budget_for_tokens(fixture.max_output_tokens)
+        if extra_judges:
+            judge = await score_consensus(
+                fixture.prompt,
+                task_result.response,
+                primary_judge=judge_provider,
+                primary_model=judge_model,
+                extra_judges=extra_judges,
+                gold_criteria=fixture.gold_criteria,
+                max_response_chars=char_budget,
+            )
+        else:
+            judge = await score_response(
+                fixture.prompt,
+                task_result.response,
+                judge_provider=judge_provider,
+                judge_model=judge_model,
+                gold_criteria=fixture.gold_criteria,
+                max_response_chars=char_budget,
+            )
 
         task_result.accuracy_score = judge.score
         task_result.judge_model = judge.judge_model
         task_result.quality_rationale = judge.rationale
         task_result.criteria_coverage = judge.criteria_coverage
+        task_result.judge_score_stdev = judge.score_stdev
 
         fr = FixtureResult(fixture=fixture, task_result=task_result, judge=judge)
         fixture_results.append(fr)

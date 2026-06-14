@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import logging
 import re
+import statistics
 from dataclasses import dataclass
 
 from atomics.providers.base import BaseProvider
@@ -124,6 +125,8 @@ class JudgeResult:
     judge_model: str
     parse_failed: bool = False
     criteria_coverage: float | None = None  # lexical gold-criteria coverage, 0.0-1.0
+    score_stdev: float | None = None  # inter-judge stdev when scored by a panel
+    n_judges: int = 1  # number of judges whose scores were aggregated
 
 
 async def score_response(
@@ -227,4 +230,69 @@ async def score_response(
         rationale=rationale,
         judge_model=effective_model,
         criteria_coverage=criteria_coverage,
+    )
+
+
+async def score_consensus(
+    prompt: str,
+    response: str,
+    *,
+    primary_judge: BaseProvider,
+    primary_model: str | None = None,
+    extra_judges: list[tuple[BaseProvider, str | None]] | None = None,
+    gold_criteria: list[str] | None = None,
+    max_response_chars: int = 3000,
+) -> JudgeResult:
+    """Score a response with a panel of judges and aggregate to a consensus.
+
+    Runs the primary judge plus any extra (provider, model) judges, averages the
+    normalised scores of the judges that parsed successfully, and reports the
+    inter-judge standard deviation as score_stdev — a measure of how much the
+    judges disagree. Falls back to the primary judge's result when there is no
+    panel or when every judge fails to parse.
+    """
+    extra_judges = extra_judges or []
+
+    results: list[JudgeResult] = [
+        await score_response(
+            prompt, response,
+            judge_provider=primary_judge, judge_model=primary_model,
+            gold_criteria=gold_criteria, max_response_chars=max_response_chars,
+        )
+    ]
+    for jp, jm in extra_judges:
+        results.append(
+            await score_response(
+                prompt, response,
+                judge_provider=jp, judge_model=jm,
+                gold_criteria=gold_criteria, max_response_chars=max_response_chars,
+            )
+        )
+
+    # criteria_coverage is judge-independent, so it's identical across results.
+    coverage = results[0].criteria_coverage
+
+    valid = [r for r in results if not r.parse_failed]
+    if not valid:
+        # Everyone failed to parse; surface the primary result, flagged.
+        primary = results[0]
+        primary.n_judges = len(results)
+        primary.score_stdev = 0.0
+        return primary
+
+    scores = [r.score for r in valid]
+    mean_score = round(sum(scores) / len(scores), 3)
+    stdev = round(statistics.pstdev(scores), 3) if len(scores) > 1 else 0.0
+
+    return JudgeResult(
+        score=mean_score,
+        accuracy=round(statistics.mean(r.accuracy for r in valid)),
+        completeness=round(statistics.mean(r.completeness for r in valid)),
+        format_score=round(statistics.mean(r.format_score for r in valid)),
+        # Primary judge's rationale is the representative explanation.
+        rationale=valid[0].rationale,
+        judge_model=", ".join(r.judge_model for r in valid),
+        criteria_coverage=coverage,
+        score_stdev=stdev,
+        n_judges=len(valid),
     )
