@@ -11,7 +11,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
-from atomics.eval.judge import JudgeResult, score_response
+from atomics.eval.judge import JudgeResult, char_budget_for_tokens, score_response
 from atomics.eval.redblue.fixtures import ALL_FIXTURES, BLUE_FIXTURES, RED_FIXTURES, RedBlueFixture
 from atomics.models import TaskCategory, TaskResult, TaskStatus
 from atomics.providers.base import BaseProvider
@@ -143,6 +143,7 @@ async def run_redblue(
             judge_provider=judge_provider,
             judge_model=judge_model,
             gold_criteria=fixture.gold_criteria,
+            max_response_chars=char_budget_for_tokens(fixture.max_output_tokens),
         )
         task_result.accuracy_score = judge.score
         task_result.judge_model = judge.judge_model

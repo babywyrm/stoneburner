@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from atomics.eval.fixtures import EVAL_FIXTURES, EvalFixture
-from atomics.eval.judge import JudgeResult, score_response
+from atomics.eval.judge import JudgeResult, char_budget_for_tokens, score_response
 from atomics.models import TaskCategory, TaskResult, TaskStatus
 from atomics.providers.base import BaseProvider
 
@@ -149,6 +149,9 @@ async def run_eval(
             judge_provider=judge_provider,
             judge_model=judge_model,
             gold_criteria=fixture.gold_criteria,
+            # Judge the full intended answer, not a fixed-cap truncation, so
+            # long HEAVY responses aren't unfairly marked down on completeness.
+            max_response_chars=char_budget_for_tokens(fixture.max_output_tokens),
         )
 
         task_result.accuracy_score = judge.score
