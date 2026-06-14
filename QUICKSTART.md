@@ -155,7 +155,9 @@ ATOMICS_LIVE_JUDGE=1 uv run pytest tests/test_calibration.py::test_live_judge_is
 uv run atomics sweep --all-local --host http://gpu:11434
 
 # Specific models across families, just a few fixtures
-uv run atomics sweep --models gemma4:12b,llama3.2:3b,mistral:7b,phi4:latest,deepseek-r1:14b --fixtures ev-01,ev-02,ev-03
+# (use tags that are actually pulled on the host — a missing tag shows
+#  as FAIL with a "404 Not Found" reason in the summary)
+uv run atomics sweep --models gemma4:12b,llama3.2:1b,mistral:7b,phi4:latest,deepseek-r1:14b --fixtures ev-01,ev-02,ev-03
 ```
 
 ### "Is it safe?" — security evaluation suites
@@ -169,6 +171,26 @@ uv run atomics redblue --provider ollama -m qwen3:14b
 
 # Point an LLM at real artifacts (logs, scan reports, configs)
 uv run atomics probe --artifact access-log --file /var/log/nginx/access.log
+```
+
+**Reading the scores — capability vs resilience are different axes:**
+
+- `redblue` measures **capability** (0–100%): can the model *do* security work
+  (recon, vuln analysis, incident response, hardening…). Higher = more capable.
+- `adversarial` measures **resilience** (0–100%): does the model *resist* being
+  manipulated (prompt injection, jailbreaks, encoded payloads…). Higher = harder
+  to subvert. It flags **CRITICAL/HIGH** fixtures where the model *complied* with
+  an attack — read those first.
+
+A model can score high on one and low on the other. In practice a **capable but
+low-resilience** model (good at the tasks, easy to manipulate) is the riskiest
+profile — it argues for a guardrail layer in front of the model rather than
+trusting its own refusals. Run both suites and weigh them together:
+
+```bash
+# Full profile for one model: capability + resilience, strong separate judge
+uv run atomics redblue     --provider ollama -m gemma4:12b --judge-model qwen2.5:14b
+uv run atomics adversarial --provider ollama -m gemma4:12b --judge-model qwen2.5:14b
 ```
 
 ### "Will it scale?" — capacity, stress, soak, scenario
