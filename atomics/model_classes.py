@@ -74,7 +74,6 @@ MODEL_CLASS_MAP: dict[str, ModelClass] = {
     "gemma4:26b": ModelClass.HEAVY,
     "functiongemma:latest": ModelClass.LIGHT,
     "custom-agent:latest": ModelClass.LIGHT,
-    "hammerhand-agent:latest": ModelClass.LIGHT,
     "cogito:3b": ModelClass.MID,
     "ministral-3:3b": ModelClass.MID,
     "deepseek-r1:14b": ModelClass.MID,

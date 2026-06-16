@@ -71,7 +71,7 @@ def test_classify_brainbox_lineup_fully_tagged():
     brainbox_models = [
         "cogito:3b", "deepseek-r1:14b", "dolphin3:8b", "dolphin3:latest",
         "functiongemma:latest", "gemma3:4b", "gemma4:12b", "gemma4:26b",
-        "gemma4:e4b", "hammerhand-agent:latest", "llama3.2:1b", "ministral-3:3b",
+        "gemma4:e4b", "custom-agent:latest", "llama3.2:1b", "ministral-3:3b",
         "mistral:7b", "phi4-mini:3.8b", "phi4-mini:latest", "phi4:latest",
         "qwen2.5-coder:14b", "qwen2.5:1.5b", "qwen2.5:14b", "qwen2.5:3b",
         "qwen2.5:7b", "qwen3.5:0.8b", "qwen3.5:2b", "qwen3:1.7b", "qwen3:14b",

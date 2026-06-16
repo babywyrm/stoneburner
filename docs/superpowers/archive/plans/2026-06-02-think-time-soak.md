@@ -1,5 +1,7 @@
 # Think-Time / Arrival Delay for `atomics soak` Implementation Plan
 
+> **STATUS: COMPLETED** — shipped in v0.6.0 (`atomics soak --think-time SECONDS`). This document is retained as an implementation record; all steps below are checked off.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add a `--think-time` option to `atomics soak` that inserts a per-worker sleep between requests, enabling realistic simulation of users with think time between calls.
@@ -56,7 +58,7 @@ async def run_soak(
                     ...
 ```
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```python
 # in tests/test_soak.py
@@ -153,7 +155,7 @@ class TestThinkTime:
         assert len(think_sleeps) >= 1
 ```
 
-- [ ] **Step 2: Run tests, confirm they fail**
+- [x] **Step 2: Run tests, confirm they fail**
 
 ```bash
 uv run pytest tests/test_soak.py::TestThinkTime -v --no-cov
@@ -161,7 +163,7 @@ uv run pytest tests/test_soak.py::TestThinkTime -v --no-cov
 
 Expected: 3 failures (function signature mismatch / sleep not called)
 
-- [ ] **Step 3: Implement in `soak.py`**
+- [x] **Step 3: Implement in `soak.py`**
 
 Add `think_time_seconds: float = 0.0` parameter to `run_soak`, `run_soak_provider`, and `run_soak_profile`. In each `_worker`, after a successful request block, add:
 
@@ -177,7 +179,7 @@ if think_time_seconds > 0:
     await asyncio.sleep(think_time_seconds)
 ```
 
-- [ ] **Step 4: Run tests, confirm they pass**
+- [x] **Step 4: Run tests, confirm they pass**
 
 ```bash
 uv run pytest tests/test_soak.py::TestThinkTime -v --no-cov
@@ -185,7 +187,7 @@ uv run pytest tests/test_soak.py::TestThinkTime -v --no-cov
 
 Expected: 3 passed
 
-- [ ] **Step 5: Run full suite to check for regressions**
+- [x] **Step 5: Run full suite to check for regressions**
 
 ```bash
 uv run pytest tests/ -q --no-cov
@@ -220,7 +222,7 @@ if think_time_seconds > 0:
 
 Pass `think_time_seconds=think_time` to all three runner branches.
 
-- [ ] **Step 1: Write the failing CLI test**
+- [x] **Step 1: Write the failing CLI test**
 
 ```python
 # in tests/test_soak.py, add to existing CLI tests or new class
@@ -263,7 +265,7 @@ class TestThinkTimeCLI:
         assert result.exit_code == 0
 ```
 
-- [ ] **Step 2: Run tests, confirm they fail**
+- [x] **Step 2: Run tests, confirm they fail**
 
 ```bash
 uv run pytest tests/test_soak.py::TestThinkTimeCLI -v --no-cov
@@ -271,7 +273,7 @@ uv run pytest tests/test_soak.py::TestThinkTimeCLI -v --no-cov
 
 Expected: `--think-time` not in help, `think_time_seconds` not forwarded
 
-- [ ] **Step 3: Implement in `cli.py`**
+- [x] **Step 3: Implement in `cli.py`**
 
 Add option to `soak` command decorator:
 ```python
@@ -307,7 +309,7 @@ result = asyncio.run(run_soak_profile(
 ))
 ```
 
-- [ ] **Step 4: Run tests, confirm they pass**
+- [x] **Step 4: Run tests, confirm they pass**
 
 ```bash
 uv run pytest tests/test_soak.py::TestThinkTimeCLI -v --no-cov
@@ -315,7 +317,7 @@ uv run pytest tests/test_soak.py::TestThinkTimeCLI -v --no-cov
 
 Expected: 2 passed
 
-- [ ] **Step 5: Run full suite**
+- [x] **Step 5: Run full suite**
 
 ```bash
 uv run pytest tests/ -q --no-cov
@@ -323,7 +325,7 @@ uv run pytest tests/ -q --no-cov
 
 Expected: 580+ passed, 0 failed
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add atomics/soak.py atomics/cli.py tests/test_soak.py

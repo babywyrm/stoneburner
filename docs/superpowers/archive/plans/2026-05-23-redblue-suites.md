@@ -1,5 +1,7 @@
 # Red/Blue Team Suites Implementation Plan
 
+> **STATUS: COMPLETED** — shipped in v0.6.0. The adversarial resilience suite (`atomics/eval/adversarial/`), the red/blue capability suite (`atomics/eval/redblue/`), and the live ecosystem probe (`atomics/probe/`) are all implemented, tested, and released. This document is retained as an implementation record; all steps below are checked off.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add three new stoneburner modules — adversarial LLM resilience eval, red/blue team capability eval, and live ecosystem probe — sharing the existing provider/judge/storage infrastructure.
@@ -28,7 +30,7 @@
 
 ### Task 0.1: Schema v6 — suite column, adversarial_results, probe_results
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Add to `tests/test_storage.py`:
 ```python
@@ -70,14 +72,14 @@ def test_task_results_has_suite_column(tmp_path):
     assert row[0] == "redblue-red"
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 ```bash
 python3 -m pytest tests/test_storage.py::test_schema_version_is_6 tests/test_storage.py::test_adversarial_results_table_exists tests/test_storage.py::test_probe_results_table_exists tests/test_storage.py::test_task_results_has_suite_column -v -o "addopts="
 ```
 Expected: 4 FAILs
 
-- [ ] **Step 3: Update `atomics/storage/schema.py`**
+- [x] **Step 3: Update `atomics/storage/schema.py`**
 
 Replace the entire file:
 ```python
@@ -255,14 +257,14 @@ def init_db(db_path: Path) -> sqlite3.Connection:
     return conn
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 ```bash
 python3 -m pytest tests/test_storage.py -v -o "addopts="
 ```
 Expected: all pass
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add atomics/storage/schema.py tests/test_storage.py
@@ -286,7 +288,7 @@ git commit -m "feat(schema): v6 — suite column, adversarial_results, probe_res
 
 ### Task 1.1: Adversarial fixtures
 
-- [ ] **Step 1: Write failing test**
+- [x] **Step 1: Write failing test**
 
 Create `tests/test_adversarial.py`:
 ```python
@@ -339,20 +341,20 @@ def test_adversarial_fixtures_ids_unique():
     assert len(ids) == len(set(ids)), "Duplicate fixture IDs"
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 ```bash
 python3 -m pytest tests/test_adversarial.py -v -o "addopts="
 ```
 Expected: ImportError / ModuleNotFoundError
 
-- [ ] **Step 3: Create `atomics/eval/adversarial/__init__.py`**
+- [x] **Step 3: Create `atomics/eval/adversarial/__init__.py`**
 
 ```python
 """Adversarial LLM resilience evaluation."""
 ```
 
-- [ ] **Step 4: Create `atomics/eval/adversarial/fixtures.py`**
+- [x] **Step 4: Create `atomics/eval/adversarial/fixtures.py`**
 
 ```python
 """Adversarial eval fixtures — prompts designed to manipulate or jailbreak LLMs.
@@ -602,14 +604,14 @@ ADVERSARIAL_FIXTURES: list[AdversarialFixture] = [
 ]
 ```
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 ```bash
 python3 -m pytest tests/test_adversarial.py::test_adversarial_fixture_dataclass tests/test_adversarial.py::test_adversarial_fixtures_list_not_empty tests/test_adversarial.py::test_adversarial_fixtures_all_have_required_fields tests/test_adversarial.py::test_adversarial_fixtures_ids_unique -v -o "addopts="
 ```
 Expected: 4 PASSes
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add atomics/eval/adversarial/ tests/test_adversarial.py
@@ -620,7 +622,7 @@ git commit -m "feat(adversarial): fixture dataclass and 13-fixture library"
 
 ### Task 1.2: Resistance scorer
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Add to `tests/test_adversarial.py`:
 ```python
@@ -655,14 +657,14 @@ def test_resistance_label_from_score():
     assert _label_from_score(1.0) == "resisted"
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 ```bash
 python3 -m pytest tests/test_adversarial.py::test_resistance_result_dataclass tests/test_adversarial.py::test_resistance_score_normalisation tests/test_adversarial.py::test_resistance_label_from_score -v -o "addopts="
 ```
 Expected: ImportError
 
-- [ ] **Step 3: Create `atomics/eval/adversarial/scorer.py`**
+- [x] **Step 3: Create `atomics/eval/adversarial/scorer.py`**
 
 ```python
 """Resistance scorer — inverted judge for adversarial eval.
@@ -816,14 +818,14 @@ async def score_resistance(
     )
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 ```bash
 python3 -m pytest tests/test_adversarial.py::test_resistance_result_dataclass tests/test_adversarial.py::test_resistance_score_normalisation tests/test_adversarial.py::test_resistance_label_from_score -v -o "addopts="
 ```
 Expected: 3 PASSes
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add atomics/eval/adversarial/scorer.py tests/test_adversarial.py
@@ -834,7 +836,7 @@ git commit -m "feat(adversarial): resistance scorer with inverted judge rubric"
 
 ### Task 1.3: Adversarial runner + repository method
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Add to `tests/test_adversarial.py`:
 ```python
@@ -925,14 +927,14 @@ def test_save_adversarial_result(tmp_path):
     assert row["resistance_label"] == "resisted"
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 ```bash
 python3 -m pytest tests/test_adversarial.py::test_run_adversarial_returns_summary tests/test_adversarial.py::test_save_adversarial_result -v -o "addopts="
 ```
 Expected: ImportError
 
-- [ ] **Step 3: Create `atomics/eval/adversarial/runner.py`**
+- [x] **Step 3: Create `atomics/eval/adversarial/runner.py`**
 
 ```python
 """Adversarial eval runner — execute fixtures and score LLM resistance."""
@@ -1105,7 +1107,7 @@ async def run_adversarial(
     )
 ```
 
-- [ ] **Step 4: Add `save_adversarial_result` to `atomics/storage/repository.py`**
+- [x] **Step 4: Add `save_adversarial_result` to `atomics/storage/repository.py`**
 
 Add the following method to the `MetricsRepository` class, after `save_task_result`:
 
@@ -1162,14 +1164,14 @@ Also add this import at the top of `repository.py` if not present:
 import uuid
 ```
 
-- [ ] **Step 5: Run all adversarial tests**
+- [x] **Step 5: Run all adversarial tests**
 
 ```bash
 python3 -m pytest tests/test_adversarial.py -v -o "addopts="
 ```
 Expected: all pass
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add atomics/eval/adversarial/runner.py atomics/storage/repository.py tests/test_adversarial.py
@@ -1180,7 +1182,7 @@ git commit -m "feat(adversarial): runner, summary dataclass, repository save met
 
 ### Task 1.4: CLI command `atomics adversarial`
 
-- [ ] **Step 1: Write failing test**
+- [x] **Step 1: Write failing test**
 
 Add to `tests/test_cli.py`:
 ```python
@@ -1193,14 +1195,14 @@ def test_cli_adversarial_help():
     assert "adversarial" in result.output.lower() or "resistance" in result.output.lower()
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 ```bash
 python3 -m pytest tests/test_cli.py::test_cli_adversarial_help -v -o "addopts="
 ```
 Expected: FAIL (no adversarial command)
 
-- [ ] **Step 3: Add `adversarial` command to `atomics/cli.py`**
+- [x] **Step 3: Add `adversarial` command to `atomics/cli.py`**
 
 Find the block where other top-level commands are registered (e.g. near the `eval` command definition). Add the following command:
 
@@ -1313,21 +1315,21 @@ def adversarial_cmd(
             console.print(f"  • {fr.fixture.id} [{fr.fixture.severity}] {fr.fixture.category}")
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 ```bash
 python3 -m pytest tests/test_cli.py::test_cli_adversarial_help -v -o "addopts="
 ```
 Expected: PASS
 
-- [ ] **Step 5: Run full test suite — no regressions**
+- [x] **Step 5: Run full test suite — no regressions**
 
 ```bash
 python3 -m pytest tests/ -v -o "addopts="
 ```
 Expected: all pass
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add atomics/cli.py tests/test_cli.py
@@ -1349,7 +1351,7 @@ git commit -m "feat(adversarial): CLI command with per-fixture progress and summ
 
 ### Task 2.1: Red/Blue fixtures
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Create `tests/test_redblue.py`:
 ```python
@@ -1402,20 +1404,20 @@ def test_redblue_valid_categories():
         assert f.category in blue_cats, f"{f.id}: bad category {f.category}"
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 ```bash
 python3 -m pytest tests/test_redblue.py -v -o "addopts="
 ```
 Expected: ImportError
 
-- [ ] **Step 3: Create `atomics/eval/redblue/__init__.py`**
+- [x] **Step 3: Create `atomics/eval/redblue/__init__.py`**
 
 ```python
 """Red/blue team LLM capability evaluation."""
 ```
 
-- [ ] **Step 4: Create `atomics/eval/redblue/fixtures.py`**
+- [x] **Step 4: Create `atomics/eval/redblue/fixtures.py`**
 
 ```python
 """Red/blue team capability fixtures.
@@ -1749,14 +1751,14 @@ BLUE_FIXTURES: list[RedBlueFixture] = [
 ALL_FIXTURES: list[RedBlueFixture] = RED_FIXTURES + BLUE_FIXTURES
 ```
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 ```bash
 python3 -m pytest tests/test_redblue.py -v -o "addopts="
 ```
 Expected: all pass
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add atomics/eval/redblue/ tests/test_redblue.py
@@ -1767,7 +1769,7 @@ git commit -m "feat(redblue): fixture dataclass and 10-fixture library (5 red + 
 
 ### Task 2.2: Red/Blue runner + CLI command
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Add to `tests/test_redblue.py`:
 ```python
@@ -1829,14 +1831,14 @@ def test_cli_redblue_help():
     assert "mode" in result.output.lower()
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 ```bash
 python3 -m pytest tests/test_redblue.py::test_run_redblue_all_returns_summary tests/test_redblue.py::test_cli_redblue_help -v -o "addopts="
 ```
 Expected: ImportError / no such command
 
-- [ ] **Step 3: Create `atomics/eval/redblue/runner.py`**
+- [x] **Step 3: Create `atomics/eval/redblue/runner.py`**
 
 ```python
 """Red/blue team capability eval runner.
@@ -2033,7 +2035,7 @@ async def run_redblue(
     )
 ```
 
-- [ ] **Step 4: Add `redblue` CLI command to `atomics/cli.py`**
+- [x] **Step 4: Add `redblue` CLI command to `atomics/cli.py`**
 
 Add after the `adversarial_cmd`:
 
@@ -2180,21 +2182,21 @@ def save_task_result(self, result: TaskResult, *, suite: str = "eval") -> None:
     self._conn.commit()
 ```
 
-- [ ] **Step 5: Run all redblue tests**
+- [x] **Step 5: Run all redblue tests**
 
 ```bash
 python3 -m pytest tests/test_redblue.py -v -o "addopts="
 ```
 Expected: all pass
 
-- [ ] **Step 6: Run full test suite — no regressions**
+- [x] **Step 6: Run full test suite — no regressions**
 
 ```bash
 python3 -m pytest tests/ -v -o "addopts="
 ```
 Expected: all pass
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add atomics/eval/redblue/runner.py atomics/cli.py atomics/storage/repository.py tests/test_redblue.py
@@ -2219,7 +2221,7 @@ git commit -m "feat(redblue): runner, summary, CLI command, suite column in repo
 
 ### Task 3.1: Probe config loader
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Create `tests/test_probe.py`:
 ```python
@@ -2291,20 +2293,20 @@ def test_valid_artifact_types():
     assert "api-response" in VALID_ARTIFACT_TYPES
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 ```bash
 python3 -m pytest tests/test_probe.py -v -o "addopts="
 ```
 Expected: ImportError
 
-- [ ] **Step 3: Create `atomics/probe/__init__.py`**
+- [x] **Step 3: Create `atomics/probe/__init__.py`**
 
 ```python
 """Live ecosystem artifact probing — config-driven, no hardcoded targets."""
 ```
 
-- [ ] **Step 4: Create `atomics/probe/config.py`**
+- [x] **Step 4: Create `atomics/probe/config.py`**
 
 ```python
 """Probe target configuration loader.
@@ -2402,14 +2404,14 @@ def load_probe_config(path: Path) -> list[ProbeTarget]:
     return targets
 ```
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 ```bash
 python3 -m pytest tests/test_probe.py::test_probe_target_dataclass tests/test_probe.py::test_load_probe_config_from_yaml tests/test_probe.py::test_load_probe_config_invalid_type tests/test_probe.py::test_valid_artifact_types -v -o "addopts="
 ```
 Expected: all pass
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add atomics/probe/ tests/test_probe.py
@@ -2420,7 +2422,7 @@ git commit -m "feat(probe): config loader, ProbeTarget dataclass, VALID_ARTIFACT
 
 ### Task 3.2: Connectors and checks
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Add to `tests/test_probe.py`:
 ```python
@@ -2471,14 +2473,14 @@ def test_build_check_unknown_type_raises():
         pass
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 ```bash
 python3 -m pytest tests/test_probe.py::test_fetch_file_artifact tests/test_probe.py::test_build_check_access_log -v -o "addopts="
 ```
 Expected: ImportError
 
-- [ ] **Step 3: Create `atomics/probe/connectors.py`**
+- [x] **Step 3: Create `atomics/probe/connectors.py`**
 
 ```python
 """Artifact connectors — pull content from file or HTTP sources.
@@ -2550,7 +2552,7 @@ def _fetch_http(target: ProbeTarget) -> str:
         raise ProbeConnectorError(f"HTTP fetch failed for '{target.name}' at {url}: {exc}") from exc
 ```
 
-- [ ] **Step 4: Create `atomics/probe/checks.py`**
+- [x] **Step 4: Create `atomics/probe/checks.py`**
 
 ```python
 """LLM analysis task builders — one per artifact type.
@@ -2721,14 +2723,14 @@ def _api_response_check(content: str) -> tuple[str, list[str]]:
     return prompt, criteria
 ```
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 ```bash
 python3 -m pytest tests/test_probe.py -v -o "addopts="
 ```
 Expected: all pass
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add atomics/probe/connectors.py atomics/probe/checks.py tests/test_probe.py
@@ -2739,7 +2741,7 @@ git commit -m "feat(probe): connectors (file/http) and per-artifact-type check b
 
 ### Task 3.3: Probe runner + repository + CLI
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Add to `tests/test_probe.py`:
 ```python
@@ -2827,14 +2829,14 @@ def test_cli_probe_help():
     assert "probe" in result.output.lower()
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 ```bash
 python3 -m pytest tests/test_probe.py::test_run_probe_with_file_target tests/test_probe.py::test_save_probe_result tests/test_probe.py::test_cli_probe_help -v -o "addopts="
 ```
 Expected: ImportError / no command
 
-- [ ] **Step 3: Create `atomics/probe/runner.py`**
+- [x] **Step 3: Create `atomics/probe/runner.py`**
 
 ```python
 """Probe runner — fetch artifacts, analyse with LLM, score with judge."""
@@ -2989,7 +2991,7 @@ async def run_probe(
     )
 ```
 
-- [ ] **Step 4: Add `save_probe_result` to `atomics/storage/repository.py`**
+- [x] **Step 4: Add `save_probe_result` to `atomics/storage/repository.py`**
 
 Add to `MetricsRepository`:
 ```python
@@ -3026,7 +3028,7 @@ def save_probe_result(self, run_id: str, result: "ProbeCheckResult") -> None:  #
     self._conn.commit()
 ```
 
-- [ ] **Step 5: Add `probe` CLI command to `atomics/cli.py`**
+- [x] **Step 5: Add `probe` CLI command to `atomics/cli.py`**
 
 ```python
 @cli.command("probe")
@@ -3144,21 +3146,21 @@ def probe_cmd(
             console.print(f"  • {r.target_name}: {(r.prev_score or 0)*100:.1f}% → {(r.score or 0)*100:.1f}%")
 ```
 
-- [ ] **Step 6: Run all probe tests**
+- [x] **Step 6: Run all probe tests**
 
 ```bash
 python3 -m pytest tests/test_probe.py -v -o "addopts="
 ```
 Expected: all pass
 
-- [ ] **Step 7: Run full test suite — no regressions**
+- [x] **Step 7: Run full test suite — no regressions**
 
 ```bash
 python3 -m pytest tests/ -v -o "addopts="
 ```
 Expected: all pass
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add atomics/probe/runner.py atomics/storage/repository.py atomics/cli.py tests/test_probe.py
@@ -3171,7 +3173,7 @@ git commit -m "feat(probe): runner, probe results repository method, CLI command
 
 ### Task 4.1: README updates
 
-- [ ] **Step 1: Add new sections to `README.md`**
+- [x] **Step 1: Add new sections to `README.md`**
 
 Add a new top-level section after the existing "Eval" section:
 
@@ -3270,11 +3272,11 @@ Supported artifact types: `json-security-report`, `inference-api`, `access-log`,
 `k8s-audit-log`, `config-file`, `api-response`
 ```
 
-- [ ] **Step 2: Bump version in `pyproject.toml`**
+- [x] **Step 2: Bump version in `pyproject.toml`**
 
 Change `version = "0.4.0"` to `version = "0.5.0"`.
 
-- [ ] **Step 3: Commit docs**
+- [x] **Step 3: Commit docs**
 
 ```bash
 git add README.md pyproject.toml
@@ -3285,21 +3287,21 @@ git commit -m "docs: add red/blue team suites section, bump version to 0.5.0"
 
 ### Task 4.2: Final verification
 
-- [ ] **Step 1: Run full test suite**
+- [x] **Step 1: Run full test suite**
 
 ```bash
 python3 -m pytest tests/ -v -o "addopts=" 2>&1 | tail -20
 ```
 Expected: all pass, zero failures
 
-- [ ] **Step 2: Verify all three new commands are registered**
+- [x] **Step 2: Verify all three new commands are registered**
 
 ```bash
 python3 -m atomics --help
 ```
 Expected: `adversarial`, `redblue`, `probe` all appear in the command list
 
-- [ ] **Step 3: Smoke-test CLI help for each command**
+- [x] **Step 3: Smoke-test CLI help for each command**
 
 ```bash
 python3 -m atomics adversarial --help
@@ -3308,7 +3310,7 @@ python3 -m atomics probe --help
 ```
 Expected: all exit 0, show correct flags
 
-- [ ] **Step 4: Verify uv works**
+- [x] **Step 4: Verify uv works**
 
 ```bash
 cd /Users/tms/stoneburner && uv run python3 -m atomics --help
@@ -3316,7 +3318,7 @@ uv run python3 -m pytest tests/ -o "addopts=" -q
 ```
 Expected: all pass under uv
 
-- [ ] **Step 5: Final commit**
+- [x] **Step 5: Final commit**
 
 ```bash
 git add -A
