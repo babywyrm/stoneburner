@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 import logging
 import uuid
 from dataclasses import dataclass
@@ -170,7 +171,7 @@ async def run_eval(
             logger.warning("[eval] %s failed: %s", fixture.id, task_result.error_message)
             if on_fixture_done is not None:
                 import asyncio
-                if asyncio.iscoroutinefunction(on_fixture_done):
+                if inspect.iscoroutinefunction(on_fixture_done):
                     await on_fixture_done(fr)
                 else:
                     on_fixture_done(fr)
@@ -217,7 +218,7 @@ async def run_eval(
 
         if on_fixture_done is not None:
             import asyncio
-            if asyncio.iscoroutinefunction(on_fixture_done):
+            if inspect.iscoroutinefunction(on_fixture_done):
                 await on_fixture_done(fr)
             else:
                 on_fixture_done(fr)

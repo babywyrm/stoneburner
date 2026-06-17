@@ -85,8 +85,12 @@ MODEL_CLASS_MAP: dict[str, ModelClass] = {
     "phi4:latest": ModelClass.MID,
     "qwen2.5-coder:14b": ModelClass.MID,
     "qwen3:14b": ModelClass.MID,
+    "qwen3.5:4b": ModelClass.MID,
     "dolphin3:8b": ModelClass.MID,
     "dolphin3:latest": ModelClass.MID,
+    "deepseek-r1:7b": ModelClass.MID,
+    "phi4-reasoning:14b": ModelClass.MID,
+    "mistral-small3.2:24b": ModelClass.HEAVY,
 }
 
 
@@ -108,8 +112,9 @@ THINKING_CAPABLE: frozenset[str] = frozenset({
     "gpt-5", "gpt-5-turbo", "gpt-5.3", "gpt-5.5",
     # Ollama — qwen3 family and deepseek-r1 use <think> tags
     "qwen3:0.6b", "qwen3:1.7b", "qwen3:4b", "qwen3:14b", "qwen3:32b", "qwen3:72b",
-    "qwen3.5:0.8b", "qwen3.5:2b",
-    "deepseek-r1:14b", "deepseek-r1:32b", "deepseek-r1:70b",
+    "qwen3.5:0.8b", "qwen3.5:2b", "qwen3.5:4b",
+    "deepseek-r1:7b", "deepseek-r1:14b", "deepseek-r1:32b", "deepseek-r1:70b",
+    "phi4-reasoning:14b",
 })
 
 # Default thinking budget (tokens) per provider family

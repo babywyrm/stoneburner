@@ -8,6 +8,7 @@ Supports:
 
 from __future__ import annotations
 
+import inspect
 import logging
 import math
 import uuid
@@ -277,8 +278,7 @@ async def run_adversarial(
         fixture_results.append(fr)
 
         if on_fixture_done is not None:
-            import asyncio as _a
-            if _a.iscoroutinefunction(on_fixture_done):
+            if inspect.iscoroutinefunction(on_fixture_done):
                 await on_fixture_done(fr)
             else:
                 on_fixture_done(fr)
