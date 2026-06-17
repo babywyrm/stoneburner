@@ -6,6 +6,7 @@ but run against security-domain fixtures tagged as red or blue team.
 
 from __future__ import annotations
 
+import inspect
 import logging
 import uuid
 from dataclasses import dataclass, field
@@ -145,8 +146,7 @@ async def run_redblue(
             fr = RedBlueFixtureResult(fixture=fixture, task_result=task_result, judge=None)
             results.append(fr)
             if on_fixture_done:
-                import asyncio as _a
-                if _a.iscoroutinefunction(on_fixture_done):
+                if inspect.iscoroutinefunction(on_fixture_done):
                     await on_fixture_done(fr)
                 else:
                     on_fixture_done(fr)
@@ -174,8 +174,7 @@ async def run_redblue(
         results.append(fr)
 
         if on_fixture_done:
-            import asyncio as _a
-            if _a.iscoroutinefunction(on_fixture_done):
+            if inspect.iscoroutinefunction(on_fixture_done):
                 await on_fixture_done(fr)
             else:
                 on_fixture_done(fr)
