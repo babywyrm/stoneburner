@@ -27,6 +27,7 @@ async def run_archreview(
     judge_model: str | None,
     rounds: int = 1,
     objective: bool = True,
+    max_output_tokens: int = 2048,
     run_id: str = "",
 ) -> list[ArchReviewResult]:
     """Run the analysis `rounds` times against `under_test`, scoring each round."""
@@ -42,7 +43,8 @@ async def run_archreview(
         )
         try:
             resp = await under_test.generate(
-                task, system=system, model=under_test_model, max_tokens=2048,
+                task, system=system, model=under_test_model,
+                max_tokens=max_output_tokens,
                 thinking=False, temperature=0.0,
             )
         except Exception as exc:  # noqa: BLE001 — record, never abort the batch

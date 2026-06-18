@@ -64,6 +64,20 @@ async def test_run_archreview_scores_objective_and_judge():
     assert not r.parse_failed
     assert under_test.calls[0]["thinking"] is False
     assert under_test.calls[0]["temperature"] == 0.0
+    assert under_test.calls[0]["max_tokens"] == 2048
+
+
+@pytest.mark.asyncio
+async def test_run_archreview_uses_custom_max_output_tokens():
+    pack = EvidencePack(text="PACK", content_hash="deadbeef", file_count=3, truncated=False)
+    under_test = _Provider("ollama", _GOOD, model="qwen2.5:14b")
+    results = await run_archreview(
+        spec=_spec(), tier="floor", pack=pack,
+        under_test=under_test, under_test_model="qwen2.5:14b",
+        judge=None, judge_model=None, rounds=1, max_output_tokens=512,
+    )
+    assert results[0].objective_recall == 1.0
+    assert under_test.calls[0]["max_tokens"] == 512
 
 
 @pytest.mark.asyncio
