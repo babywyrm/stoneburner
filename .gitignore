@@ -51,6 +51,11 @@ coverage.xml
 profiles/local/
 qa/local/
 
+# Active planning docs are kept local-only (committed on the planning-local
+# branch), never pushed to origin. Archived docs under archive/ remain tracked.
+docs/superpowers/specs/
+docs/superpowers/plans/
+
 # Node (optional workers)
 node_modules/
 workers/npm/node_modules/
