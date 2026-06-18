@@ -8,7 +8,7 @@ from pathlib import Path
 
 logger = logging.getLogger("atomics.schema")
 
-SCHEMA_VERSION = 14
+SCHEMA_VERSION = 15
 
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -225,6 +225,38 @@ CREATE TABLE IF NOT EXISTS baselines (
 
 CREATE INDEX IF NOT EXISTS idx_baselines_name ON baselines(name);
 CREATE INDEX IF NOT EXISTS idx_baselines_suite ON baselines(suite);
+
+CREATE TABLE IF NOT EXISTS archreview_results (
+    result_id               TEXT PRIMARY KEY,
+    run_id                  TEXT NOT NULL,
+    repo                    TEXT NOT NULL,
+    tier                    TEXT NOT NULL,
+    model                   TEXT NOT NULL,
+    provider                TEXT NOT NULL,
+    round                   INTEGER DEFAULT 1,
+    objective_recall        REAL DEFAULT NULL,
+    objective_precision     REAL DEFAULT NULL,
+    objective_f             REAL DEFAULT NULL,
+    judge_score             REAL DEFAULT NULL,
+    judge_rematch_recall    REAL DEFAULT NULL,
+    finding_count           INTEGER DEFAULT 0,
+    parse_failed            INTEGER DEFAULT 0,
+    tokens_in               INTEGER DEFAULT 0,
+    tokens_out              INTEGER DEFAULT 0,
+    cost_usd                REAL DEFAULT 0.0,
+    latency_ms              REAL DEFAULT 0.0,
+    judge_model             TEXT DEFAULT '',
+    pack_hash               TEXT DEFAULT '',
+    findings_json           TEXT DEFAULT '[]',
+    matched_categories_json TEXT DEFAULT '[]',
+    error_class             TEXT DEFAULT '',
+    error_message           TEXT DEFAULT '',
+    timestamp               TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_archreview_results_run_id ON archreview_results(run_id);
+CREATE INDEX IF NOT EXISTS idx_archreview_results_repo ON archreview_results(repo);
+CREATE INDEX IF NOT EXISTS idx_archreview_results_model ON archreview_results(model);
 """
 
 
@@ -264,6 +296,7 @@ def init_db(db_path: Path) -> sqlite3.Connection:
             "DROP TABLE IF EXISTS scenario_results;"
             "DROP TABLE IF EXISTS soak_results;"
             "DROP TABLE IF EXISTS baselines;"
+            "DROP TABLE IF EXISTS archreview_results;"
             "DROP TABLE IF EXISTS runs;"
             "DROP TABLE IF EXISTS schedules;"
             "DROP TABLE IF EXISTS schema_version;"

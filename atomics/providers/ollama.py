@@ -34,11 +34,13 @@ class OllamaProvider(BaseProvider):
         default_model: str = "qwen2.5:7b",
         *,
         timeout: float = 300.0,
+        context_tokens: int | None = None,
         client: object | None = None,
     ) -> None:
         self._host = host.rstrip("/")
         self._default_model = default_model
         self._timeout = timeout
+        self._context_tokens = context_tokens
         self._client = client or httpx.AsyncClient()
 
     @property
@@ -67,6 +69,10 @@ class OllamaProvider(BaseProvider):
         options: dict = {}
         if temperature is not None:
             options["temperature"] = temperature
+        if max_tokens:
+            options["num_predict"] = max_tokens
+        if self._context_tokens:
+            options["num_ctx"] = self._context_tokens
         if thinking_budget and use_thinking:
             options["num_predict"] = max_tokens + thinking_budget
         if not use_thinking and _model_supports_thinking(model):
@@ -78,6 +84,11 @@ class OllamaProvider(BaseProvider):
             "stream": False,
             "system": system or "You are a helpful assistant.",
         }
+        # Newer Ollama builds expose native thinking via a top-level `thinking`
+        # field. Use the native switch in addition to prompt tags so qwen/deepseek
+        # models don't spend the whole response budget in hidden reasoning.
+        if thinking is not None:
+            body["think"] = thinking
         if options:
             body["options"] = options
 

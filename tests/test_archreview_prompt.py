@@ -1,0 +1,53 @@
+from atomics.archreview.prompt import build_analysis_prompt, parse_findings
+
+
+def test_prompt_includes_pack_and_taxonomy():
+    sys_p, task_p = build_analysis_prompt("PACK-CONTENT-HERE")
+    assert "security architect" in sys_p.lower()
+    assert "PACK-CONTENT-HERE" in task_p
+    assert "broken_access_control" in task_p  # taxonomy enumerated
+
+
+def test_parse_strict_block():
+    raw = (
+        "Summary: trust boundaries are weak.\n"
+        "CATEGORY: injection | LOCATION: routes/search.ts | SEVERITY: high | "
+        "WHY: unsanitized query passed to db.\n"
+        "CATEGORY: xss | LOCATION: views/p.html | SEVERITY: medium | "
+        "WHY: reflected user input.\n"
+    )
+    findings = parse_findings(raw)
+    cats = {f.category for f in findings}
+    assert cats == {"injection", "xss"}
+    assert findings[0].location == "routes/search.ts"
+
+
+def test_parse_tolerates_markdown_and_reordering():
+    raw = (
+        "- **LOCATION**: a.ts — **CATEGORY**: SQL Injection — "
+        "**SEVERITY**: high — **WHY**: concatenated SQL\n"
+    )
+    findings = parse_findings(raw)
+    assert len(findings) == 1
+    assert findings[0].category == "injection"
+
+
+def test_parse_unmappable_category_marked_unknown():
+    raw = "CATEGORY: frobnication | LOCATION: x | SEVERITY: low | WHY: n/a\n"
+    findings = parse_findings(raw)
+    assert findings[0].category == "unknown"
+
+
+def test_parse_pipe_delimited_without_labels():
+    raw = (
+        "## Findings\n"
+        "injection | routes/search.ts | high | unsanitized query passed to db.\n"
+        "broken access control | routes/users.ts | medium | missing authorization.\n"
+    )
+    findings = parse_findings(raw)
+    assert [f.category for f in findings] == ["injection", "broken_access_control"]
+    assert findings[0].location == "routes/search.ts"
+
+
+def test_parse_empty_returns_empty_list():
+    assert parse_findings("no findings here, all good") == []

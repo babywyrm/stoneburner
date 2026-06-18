@@ -1,0 +1,44 @@
+repo:
+  name: juice-shop
+  git_ref: REPLACE_WITH_PINNED_COMMIT_SHA
+  path_env: JUICE_SHOP_PATH
+tiers:
+  floor:
+    budget_tokens: 16000
+    priority:
+      - "routes/**"
+      - "lib/**"
+      - "models/**"
+      - "server.ts"
+      - "package.json"
+    exclude:
+      - "node_modules/**"
+      - "frontend/dist/**"
+      - "test/**"
+      - "data/static/i18n/**"
+  expanded:
+    budget_tokens: 128000
+    priority:
+      - "routes/**"
+      - "lib/**"
+      - "models/**"
+      - "server.ts"
+    exclude:
+      - "node_modules/**"
+      - "frontend/dist/**"
+answer_key:
+  version: 1
+  categories:
+    - {id: broken_access_control, weight: 18.0}
+    - {id: injection, weight: 12.0}
+    - {id: xss, weight: 10.0}
+    - {id: broken_authentication, weight: 9.0}
+    - {id: sensitive_data_exposure, weight: 8.0}
+    - {id: improper_input_validation, weight: 7.0}
+    - {id: security_misconfiguration, weight: 6.0}
+    - {id: cryptographic_issues, weight: 5.0}
+    - {id: vulnerable_components, weight: 4.0}
+    - {id: xxe, weight: 3.0}
+    - {id: insecure_deserialization, weight: 3.0}
+    - {id: broken_anti_automation, weight: 3.0}
+    - {id: miscellaneous, weight: 2.0}

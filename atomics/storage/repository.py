@@ -685,3 +685,41 @@ class MetricsRepository:
             ),
         )
         self._conn.commit()
+
+    def save_archreview_result(self, r: object) -> None:
+        """Persist an ArchReviewResult from atomics.archreview."""
+        import json as _json
+
+        result_id = uuid.uuid4().hex[:12]
+        now = datetime.now(UTC).isoformat()
+
+        findings_data = [
+            {"category": f.category, "location": f.location,
+             "severity": f.severity, "rationale": f.rationale}
+            for f in r.findings
+        ]
+
+        self._conn.execute(
+            """
+            INSERT INTO archreview_results
+            (result_id, run_id, repo, tier, model, provider, round,
+             objective_recall, objective_precision, objective_f, judge_score,
+             judge_rematch_recall, finding_count, parse_failed,
+             tokens_in, tokens_out, cost_usd, latency_ms, judge_model,
+             pack_hash, findings_json, matched_categories_json,
+             error_class, error_message, timestamp)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                result_id, r.run_id, r.repo, r.tier, r.model, r.provider, r.round,
+                r.objective_recall, r.objective_precision, r.objective_f,
+                r.judge_score, r.judge_rematch_recall, len(r.findings),
+                1 if r.parse_failed else 0, r.tokens_in, r.tokens_out,
+                r.cost_usd, r.latency_ms, r.judge_model, r.pack_hash,
+                _json.dumps(findings_data),
+                _json.dumps(r.matched_categories),
+                r.error_class or "", r.error_message or "", now,
+            ),
+        )
+        self._conn.commit()
