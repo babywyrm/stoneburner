@@ -383,7 +383,7 @@ Archreview scores **category-level architecture coverage**, not every individual
 
 **Answer keys are pluggable per repo** (`atomics/archreview/repos/<name>.yaml`). The first target, OWASP Juice Shop, derives its key from the project's machine-readable `challenges.yml` (per-category weight = summed challenge difficulty); other repos can author or seed a key. Set the repo path env var the spec names (e.g. `JUICE_SHOP_PATH`) to point at a local checkout.
 
-The comparison table reports `Judge` as the normalized reasoning score and `Judge Model` as the provider/model that produced it (for example, `ollama:deepseek-r1:7b`). Ollama runs request enough `num_ctx` for the selected evidence tier and disable hidden thinking for archreview calls so the output budget is spent on parseable findings rather than native reasoning-only output.
+The comparison table reports `Judge` as the normalized reasoning score and `Judge Model` as the provider/model that produced it (for example, `ollama:deepseek-r1:7b`). Ollama runs request enough `num_ctx` for the selected evidence tier and disable hidden thinking for archreview calls so the output budget is spent on parseable findings rather than native reasoning-only output. The run header prints the requested context and reserved answer budget (`context=... reserve=... overhead=...`). If a model stops at `done_reason=length` with only a token or two of visible output, the runner records `ContextExhausted` instead of treating the result as a normal low-recall answer.
 
 ```bash
 JUICE_SHOP_PATH=~/juice-shop atomics archreview --repo juice-shop \
