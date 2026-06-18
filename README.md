@@ -383,7 +383,7 @@ Archreview scores **category-level architecture coverage**, not every individual
 
 **Answer keys are pluggable per repo** (`atomics/archreview/repos/<name>.yaml`). The first target, OWASP Juice Shop, derives its key from the project's machine-readable `challenges.yml` (per-category weight = summed challenge difficulty); other repos can author or seed a key. Set the repo path env var the spec names (e.g. `JUICE_SHOP_PATH`) to point at a local checkout.
 
-The comparison table reports `Judge` as the normalized reasoning score and `Judge Model` as the provider/model that produced it (for example, `ollama:deepseek-r1:7b`). Ollama runs request enough `num_ctx` for the selected evidence tier and disable hidden thinking for archreview calls so the output budget is spent on parseable findings rather than native reasoning-only output. The run header prints the requested context and reserved answer budget (`context=... reserve=... overhead=...`). If a model stops at `done_reason=length` with only a token or two of visible output, the runner records `ContextExhausted` instead of treating the result as a normal low-recall answer. For slow local models, lower `--max-output-tokens` (for example `512` or `768`) to get a concise top-findings sample without waiting for a full 2048-token answer.
+The comparison table reports `Judge` as the normalized reasoning score and `Judge Model` as the provider/model that produced it (for example, `ollama:deepseek-r1:7b`). Ollama runs request enough `num_ctx` for the selected evidence tier and disable hidden thinking for archreview calls so the output budget is spent on parseable findings rather than native reasoning-only output. The run header prints the requested context and reserved answer budget (`context=... reserve=... overhead=...`). If a model stops at `done_reason=length` with only a token or two of visible output, the runner records `ContextExhausted` instead of treating the result as a normal low-recall answer. For slow local models, lower `--max-output-tokens` (for example `512` or `768`) to get a concise top-findings sample without waiting for a full 2048-token answer; raise `--inference-timeout` when long-context prompt processing is healthy but slower than the default request timeout.
 
 ```bash
 JUICE_SHOP_PATH=~/juice-shop atomics archreview --repo juice-shop \
@@ -478,6 +478,7 @@ stoneburner/
 | `atomics archreview --repo juice-shop --models qwen3.5:4b` | Security-architecture repo benchmark with objective category recall/precision |
 | `atomics archreview --tier wide --rounds 3` | Use the local-friendly broader evidence pack and report multi-round stability |
 | `atomics archreview --tier wide --max-output-tokens 512` | Cap local generation for faster top-findings triage |
+| `atomics archreview --tier wide --inference-timeout 900` | Allow slower local long-context runs to finish |
 | `atomics archreview --tier expanded --rounds 3` | Use the largest evidence pack for large-context/cloud backends |
 | `atomics models` | List available models on Ollama host with class/thinking annotations |
 | `atomics sweep` | Multi-model eval sweep with ranked comparison |
