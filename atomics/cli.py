@@ -2940,7 +2940,7 @@ def scenario(
 @click.option("--judge-provider", "judge_provider_name", type=PROVIDER_CHOICES, default="ollama", show_default=True)
 @click.option("--judge-model", type=str, default=None)
 @click.option("--judge-host", type=str, default=None)
-@click.option("--tier", type=click.Choice(["floor", "expanded"]), default="floor", show_default=True)
+@click.option("--tier", type=click.Choice(["floor", "wide", "expanded"]), default="floor", show_default=True)
 @click.option("--rounds", type=int, default=1, show_default=True)
 @click.option("--judge-only", is_flag=True, default=False, help="Skip objective scoring (no answer key needed)")
 @click.option("--verbose", "-v", is_flag=True, default=False,

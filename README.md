@@ -377,9 +377,9 @@ Benchmark how well models reason about the security architecture of a whole repo
 - **Objective score** — difficulty-weighted OWASP-category **recall** and **precision** against a per-repo answer key. Deterministic and reproducible: it depends only on which categories the model surfaces, not on a judge's opinion.
 - **Reasoning score** — a separate judge model rates the architectural reasoning quality (trust-boundary identification, data-flow correctness, prioritization) 0–10. The judge is self-judge-guarded — a warning fires when the judge is the same provider+model as the model under test, since that biases the score.
 
-**Tiered context** keeps the comparison fair across context windows: the `floor` tier (16k-token pack) fits small local models, while `expanded` (128k) lets larger models see more. Packs are byte-identical for a given repo+tier (sorted ordering, deterministic truncation, content-hashed), so every model in a run sees the same input and re-runs are reproducible. Multi-round runs report finding-set **stability** (mean pairwise Jaccard) and recall stdev.
+**Tiered context** keeps the comparison fair across context windows: the `floor` tier (16k-token pack) fits small local models, `wide` (48k) gives local brainbox models a broader but realistic repo slice, and `expanded` (128k) lets larger-context backends see more. Packs are byte-identical for a given repo+tier (sorted ordering, deterministic truncation, content-hashed), so every model in a run sees the same input and re-runs are reproducible. Multi-round runs report finding-set **stability** (mean pairwise Jaccard) and recall stdev.
 
-Archreview scores **category-level architecture coverage**, not every individual bug instance. For example, `vulnerable_components` means the model surfaced that answer-key category at least once; it does not mean it enumerated every vulnerable dependency or every planted Juice Shop challenge. On `floor`, the model sees the prioritized top slice of the repo until the token budget is reached (the command prints the file count, pack hash, and `(truncated)` when applicable). Use `expanded` when you want a broader repo slice and likely higher recall.
+Archreview scores **category-level architecture coverage**, not every individual bug instance. For example, `vulnerable_components` means the model surfaced that answer-key category at least once; it does not mean it enumerated every vulnerable dependency or every planted Juice Shop challenge. On `floor`, the model sees the prioritized top slice of the repo until the token budget is reached (the command prints the file count, pack hash, and `(truncated)` when applicable). Use `wide` for serious local Ollama runs, and `expanded` when you want the broadest repo slice on a backend with enough usable context.
 
 **Answer keys are pluggable per repo** (`atomics/archreview/repos/<name>.yaml`). The first target, OWASP Juice Shop, derives its key from the project's machine-readable `challenges.yml` (per-category weight = summed challenge difficulty); other repos can author or seed a key. Set the repo path env var the spec names (e.g. `JUICE_SHOP_PATH`) to point at a local checkout.
 
@@ -476,7 +476,8 @@ stoneburner/
 | `atomics eval --fixtures ev-19` | Run a fixture subset for a fast spot-check |
 | `atomics eval --extra-judges ollama:mistral:7b` | Multi-judge consensus scoring |
 | `atomics archreview --repo juice-shop --models qwen3.5:4b` | Security-architecture repo benchmark with objective category recall/precision |
-| `atomics archreview --tier expanded --rounds 3` | Use a larger evidence pack and report multi-round stability |
+| `atomics archreview --tier wide --rounds 3` | Use the local-friendly broader evidence pack and report multi-round stability |
+| `atomics archreview --tier expanded --rounds 3` | Use the largest evidence pack for large-context/cloud backends |
 | `atomics models` | List available models on Ollama host with class/thinking annotations |
 | `atomics sweep` | Multi-model eval sweep with ranked comparison |
 | `atomics stress` | Ramp concurrency to find GPU saturation point |
