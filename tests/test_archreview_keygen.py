@@ -43,6 +43,10 @@ def test_load_repo_spec(tmp_path, monkeypatch):
             budget_tokens: 48000
             priority: ["routes/**", "lib/**"]
             exclude: ["node_modules/**"]
+          local:
+            budget_tokens: 32000
+            priority: ["routes/**", "lib/**"]
+            exclude: ["node_modules/**"]
         answer_key:
           version: 1
           categories:
@@ -54,5 +58,6 @@ def test_load_repo_spec(tmp_path, monkeypatch):
     spec = load_repo_spec(p)
     assert spec.name == "demo"
     assert spec.tier("floor").budget_tokens == 16000
+    assert spec.tier("local").budget_tokens == 32000
     assert spec.tier("wide").budget_tokens == 48000
     assert spec.answer_key.weights["injection"] == 7.5

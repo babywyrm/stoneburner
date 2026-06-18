@@ -178,6 +178,42 @@ def test_archreview_cli_accepts_wide_tier_for_local_models(tmp_path, monkeypatch
     assert "context=54144" in result.output
 
 
+def test_archreview_cli_accepts_local_tier_for_brainbox_models(tmp_path, monkeypatch):
+    monkeypatch.setenv("JUICE_SHOP_PATH", str(tmp_path))
+    (tmp_path / "server.ts").write_text("// app\n")
+
+    built = []
+
+    class _FakeOllamaProvider:
+        name = "ollama"
+
+        def __init__(self, *, host, default_model, timeout, context_tokens=None):
+            self._default_model = default_model
+            self._context_tokens = context_tokens
+            built.append(self)
+
+        @property
+        def default_model(self):
+            return self._default_model
+
+    runner = CliRunner()
+    with patch("atomics.providers.ollama.OllamaProvider", _FakeOllamaProvider):
+        with patch("atomics.archreview.runner.run_archreview") as m:
+            async def _shim(**kwargs):
+                return _fake_results()
+            m.side_effect = _shim
+            result = runner.invoke(cli, [
+                "archreview", "--repo", "juice-shop",
+                "--models", "qwen3.5:4b", "--provider", "ollama",
+                "--judge-provider", "ollama", "--judge-model", "deepseek-r1:7b",
+                "--tier", "local", "--no-save",
+            ])
+    assert result.exit_code == 0, result.output
+    assert built[-1]._context_tokens == 38144
+    assert "tier=local" in result.output
+    assert "context=38144" in result.output
+
+
 def test_archreview_cli_max_output_tokens_adjusts_reserve_and_runner_arg(tmp_path, monkeypatch):
     monkeypatch.setenv("JUICE_SHOP_PATH", str(tmp_path))
     (tmp_path / "server.ts").write_text("// app\n")
