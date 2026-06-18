@@ -75,7 +75,7 @@ def test_target_from_text_full():
         INFERENCE_MODEL=gemma3:4b
         INFERENCE_THINK=false
         INFERENCE_API_KEY=
-        INFERENCE_RESOLVED_BY=agentic-bootstrap
+        INFERENCE_RESOLVED_BY=control-plane-resolver
     """)
     t = inference.InferenceTarget.from_text(text)
     assert t.backend == "ollama"
@@ -85,7 +85,7 @@ def test_target_from_text_full():
     assert t.api_key == ""
     assert t.difficulty == "easy"
     assert t.pool == "brainbox"
-    assert t.resolved_by == "agentic-bootstrap"
+    assert t.resolved_by == "control-plane-resolver"
 
 
 def test_target_think_parsing():

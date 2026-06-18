@@ -112,7 +112,7 @@ INFERENCE_API_KEY=
 
 # PROVENANCE
 INFERENCE_RESOLVED_AT=2026-06-06T17:00:00Z
-INFERENCE_RESOLVED_BY=agentic-bootstrap
+INFERENCE_RESOLVED_BY=control-plane-resolver
 ```
 
 ## Consuming it from Python
