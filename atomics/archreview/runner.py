@@ -12,6 +12,9 @@ from atomics.providers.base import BaseProvider
 
 logger = logging.getLogger("atomics.archreview.runner")
 
+_CONTEXT_EXHAUSTED_TEXT_CHARS = 40
+_CONTEXT_EXHAUSTED_OUTPUT_TOKENS = 8
+
 
 async def run_archreview(
     *,
@@ -52,6 +55,23 @@ async def run_archreview(
         result.tokens_out = resp.output_tokens
         result.cost_usd = resp.estimated_cost_usd
         result.latency_ms = resp.latency_ms
+
+        raw = resp.raw or {}
+        if (
+            raw.get("done_reason") == "length"
+            and (
+                len(resp.text.strip()) <= _CONTEXT_EXHAUSTED_TEXT_CHARS
+                or resp.output_tokens <= _CONTEXT_EXHAUSTED_OUTPUT_TOKENS
+            )
+        ):
+            result.parse_failed = True
+            result.error_class = "ContextExhausted"
+            result.error_message = (
+                "model stopped at context/output length before producing findings; "
+                "try a smaller evidence tier or a larger context window"
+            )
+            results.append(result)
+            continue
 
         findings = parse_findings(resp.text)
         result.findings = findings

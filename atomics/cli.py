@@ -3023,12 +3023,21 @@ def archreview(repo_name, models_csv, provider_name, ollama_host, vllm_host,
         console.print(f"[red]Set {spec.path_env} to the local {spec.name} checkout.[/red]")
         sys.exit(1)
 
-    pack = build_pack(Path(repo_dir), spec.tier(tier))
+    tier_config = spec.tier(tier)
+    archreview_max_output_tokens = 2048
+    archreview_prompt_overhead_tokens = 4096
+    archreview_context_tokens = (
+        tier_config.budget_tokens
+        + archreview_prompt_overhead_tokens
+        + archreview_max_output_tokens
+    )
+    pack = build_pack(Path(repo_dir), tier_config)
     console.print(f"[bold]archreview[/bold] repo=[cyan]{spec.name}[/cyan] tier={tier} "
                   f"pack={pack.file_count} files hash={pack.content_hash[:12]} "
+                  f"context={archreview_context_tokens} reserve={archreview_max_output_tokens} "
+                  f"overhead={archreview_prompt_overhead_tokens} "
                   f"{'(truncated)' if pack.truncated else ''}")
 
-    archreview_context_tokens = spec.tier(tier).budget_tokens + 4096
     judge_provider = _build_provider(
         judge_provider_name,
         judge_model,

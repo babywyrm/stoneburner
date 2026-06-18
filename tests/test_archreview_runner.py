@@ -94,3 +94,28 @@ async def test_run_archreview_records_provider_error():
     )
     assert results[0].error_message is not None
     assert results[0].error_class == "RuntimeError"
+
+
+@pytest.mark.asyncio
+async def test_run_archreview_marks_tiny_length_response_as_context_exhausted():
+    class _LengthStop(_Provider):
+        async def generate(self, prompt, *, system="", model=None, max_tokens=1024,
+                           thinking=None, thinking_budget=None, temperature=None):
+            self.calls.append({
+                "model": model, "max_tokens": max_tokens,
+                "thinking": thinking, "temperature": temperature,
+            })
+            return ProviderResponse(text="Based", input_tokens=132095, output_tokens=1,
+                                    total_tokens=132096, model=self._model,
+                                    latency_ms=5.0, estimated_cost_usd=0.0,
+                                    raw={"done_reason": "length"})
+
+    pack = EvidencePack(text="P", content_hash="h", file_count=1, truncated=False)
+    results = await run_archreview(
+        spec=_spec(), tier="expanded", pack=pack,
+        under_test=_LengthStop("ollama", "", model="m"), under_test_model="m",
+        judge=_Provider("ollama", _JUDGE, model="j"), judge_model="j", rounds=1,
+    )
+    assert results[0].error_class == "ContextExhausted"
+    assert results[0].parse_failed is True
+    assert results[0].judge_score is None
