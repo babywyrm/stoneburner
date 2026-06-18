@@ -2942,13 +2942,15 @@ def scenario(
 @click.option("--judge-host", type=str, default=None)
 @click.option("--tier", type=click.Choice(["floor", "wide", "expanded"]), default="floor", show_default=True)
 @click.option("--rounds", type=int, default=1, show_default=True)
+@click.option("--max-output-tokens", type=click.IntRange(min=128), default=2048, show_default=True,
+              help="Maximum generated tokens for each model-under-test analysis")
 @click.option("--judge-only", is_flag=True, default=False, help="Skip objective scoring (no answer key needed)")
 @click.option("--verbose", "-v", is_flag=True, default=False,
               help="Stream per-model/per-round progress: findings and scores as they complete")
 @click.option("--save/--no-save", "save_results", default=True)
 def archreview(repo_name, models_csv, provider_name, ollama_host, vllm_host,
                region, judge_provider_name, judge_model, judge_host, tier, rounds,
-               judge_only, verbose, save_results):
+               max_output_tokens, judge_only, verbose, save_results):
     """Benchmark models on a security-architecture review of a repo."""
     import asyncio
     import os
@@ -3024,7 +3026,7 @@ def archreview(repo_name, models_csv, provider_name, ollama_host, vllm_host,
         sys.exit(1)
 
     tier_config = spec.tier(tier)
-    archreview_max_output_tokens = 2048
+    archreview_max_output_tokens = max_output_tokens
     archreview_prompt_overhead_tokens = 4096
     archreview_context_tokens = (
         tier_config.budget_tokens
@@ -3085,6 +3087,7 @@ def archreview(repo_name, models_csv, provider_name, ollama_host, vllm_host,
                 under_test=test_provider, under_test_model=mdl,
                 judge=judge_provider, judge_model=judge_model,
                 rounds=rounds, objective=not judge_only,
+                max_output_tokens=max_output_tokens,
             )
             if repo:
                 for r in results:
