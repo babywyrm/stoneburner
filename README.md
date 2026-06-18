@@ -370,6 +370,28 @@ fixtures:
 
 ---
 
+## Security-Architecture Benchmark (`atomics archreview`)
+
+Benchmark how well models reason about the security architecture of a whole repository — measuring frontier models against local brainbox models on the same task. The model under test receives a deterministic evidence pack of the codebase and emits structured findings; those findings are scored two independent ways:
+
+- **Objective score** — difficulty-weighted OWASP-category **recall** and **precision** against a per-repo answer key. Deterministic and reproducible: it depends only on which categories the model surfaces, not on a judge's opinion.
+- **Reasoning score** — a separate judge model rates the architectural reasoning quality (trust-boundary identification, data-flow correctness, prioritization) 0–10. The judge is self-judge-guarded — a warning fires when the judge is the same provider+model as the model under test, since that biases the score.
+
+**Tiered context** keeps the comparison fair across context windows: the `floor` tier (16k-token pack) fits small local models, while `expanded` (128k) lets larger models see more. Packs are byte-identical for a given repo+tier (sorted ordering, deterministic truncation, content-hashed), so every model in a run sees the same input and re-runs are reproducible. Multi-round runs report finding-set **stability** (mean pairwise Jaccard) and recall stdev.
+
+**Answer keys are pluggable per repo** (`atomics/archreview/repos/<name>.yaml`). The first target, OWASP Juice Shop, derives its key from the project's machine-readable `challenges.yml` (per-category weight = summed challenge difficulty); other repos can author or seed a key. Set the repo path env var the spec names (e.g. `JUICE_SHOP_PATH`) to point at a local checkout.
+
+```bash
+JUICE_SHOP_PATH=~/juice-shop atomics archreview --repo juice-shop \
+  --models "qwen2.5:14b,qwen3.5:4b" --provider ollama \
+  --judge-provider claude --judge-model claude-opus-4-7 \
+  --tier floor --rounds 3
+```
+
+Results persist to `archreview_results` (schema v15). Use `--judge-only` to skip objective scoring when a repo has no answer key, and `--no-save` for a dry run.
+
+---
+
 ## Architecture
 
 ```
