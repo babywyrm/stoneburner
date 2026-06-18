@@ -109,6 +109,65 @@ async def test_ollama_generate_uses_configured_timeout():
 
 
 @pytest.mark.asyncio
+async def test_ollama_generate_sets_num_predict_from_max_tokens():
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.raise_for_status = MagicMock()
+    mock_response.json.return_value = {
+        "response": "ok", "eval_count": 5, "prompt_eval_count": 3, "eval_duration": 1,
+    }
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock(return_value=mock_response)
+
+    provider = OllamaProvider(host="http://fake:11434", client=mock_client)
+    await provider.generate("hi", max_tokens=321)
+
+    body = mock_client.post.call_args.kwargs["json"]
+    assert body["options"]["num_predict"] == 321
+
+
+@pytest.mark.asyncio
+async def test_ollama_generate_sets_configured_context_tokens():
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.raise_for_status = MagicMock()
+    mock_response.json.return_value = {
+        "response": "ok", "eval_count": 5, "prompt_eval_count": 3, "eval_duration": 1,
+    }
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock(return_value=mock_response)
+
+    provider = OllamaProvider(
+        host="http://fake:11434",
+        context_tokens=20096,
+        client=mock_client,
+    )
+    await provider.generate("hi", max_tokens=2048)
+
+    body = mock_client.post.call_args.kwargs["json"]
+    assert body["options"]["num_predict"] == 2048
+    assert body["options"]["num_ctx"] == 20096
+
+
+@pytest.mark.asyncio
+async def test_ollama_generate_forwards_native_think_flag():
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.raise_for_status = MagicMock()
+    mock_response.json.return_value = {
+        "response": "ok", "eval_count": 5, "prompt_eval_count": 3, "eval_duration": 1,
+    }
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock(return_value=mock_response)
+
+    provider = OllamaProvider(host="http://fake:11434", client=mock_client)
+    await provider.generate("hi", thinking=False)
+
+    body = mock_client.post.call_args.kwargs["json"]
+    assert body["think"] is False
+
+
+@pytest.mark.asyncio
 async def test_ollama_generate_zero_eval_duration():
     mock_response = MagicMock()
     mock_response.status_code = 200

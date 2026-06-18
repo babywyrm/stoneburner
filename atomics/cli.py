@@ -837,7 +837,12 @@ def eval(
     _setup_logging(settings.log_level)
     console = Console()
 
-    def _build_provider(name: str, mdl: str | None, host: str | None):
+    def _build_provider(
+        name: str,
+        mdl: str | None,
+        host: str | None,
+        context_tokens: int | None = None,
+    ):
         if name == "claude":
             if not settings.anthropic_api_key:
                 console.print("[red]ANTHROPIC_API_KEY not set.[/red]")
@@ -862,6 +867,7 @@ def eval(
                 host=host or settings.ollama_host,
                 default_model=mdl or settings.ollama_model,
                 timeout=settings.ollama_timeout,
+                context_tokens=context_tokens,
             )
         elif name == "vllm":
             from atomics.providers.vllm import VllmProvider
@@ -2922,3 +2928,189 @@ def scenario(
         repo.save_scenario_result(result)
         repo.close()
         console.print(f"\n[dim]Results saved to database.[/dim]")
+
+
+@cli.command()
+@click.option("--repo", "repo_name", required=True, help="Repo spec under atomics/archreview/repos/")
+@click.option("--models", "models_csv", required=True, help="Comma-separated models under test")
+@click.option("--provider", "provider_name", type=PROVIDER_CHOICES, default="ollama", show_default=True)
+@click.option("--ollama-host", type=str, default=None)
+@click.option("--vllm-host", "vllm_host", type=str, default=None)
+@click.option("--region", type=str, default="us-east-1", help="AWS region for Bedrock")
+@click.option("--judge-provider", "judge_provider_name", type=PROVIDER_CHOICES, default="ollama", show_default=True)
+@click.option("--judge-model", type=str, default=None)
+@click.option("--judge-host", type=str, default=None)
+@click.option("--tier", type=click.Choice(["floor", "expanded"]), default="floor", show_default=True)
+@click.option("--rounds", type=int, default=1, show_default=True)
+@click.option("--judge-only", is_flag=True, default=False, help="Skip objective scoring (no answer key needed)")
+@click.option("--verbose", "-v", is_flag=True, default=False,
+              help="Stream per-model/per-round progress: findings and scores as they complete")
+@click.option("--save/--no-save", "save_results", default=True)
+def archreview(repo_name, models_csv, provider_name, ollama_host, vllm_host,
+               region, judge_provider_name, judge_model, judge_host, tier, rounds,
+               judge_only, verbose, save_results):
+    """Benchmark models on a security-architecture review of a repo."""
+    import asyncio
+    import os
+    from pathlib import Path
+
+    from atomics.archreview.keygen import load_repo_spec
+    from atomics.archreview.pack import build_pack
+    from atomics.archreview.runner import run_archreview
+    from atomics.archreview.scorer import compute_robustness
+    from atomics.eval.judge import detect_self_judge
+
+    settings = load_settings()
+    _setup_logging(settings.log_level)
+    console = Console()
+
+    def _build_provider(
+        name: str,
+        mdl: str | None,
+        host: str | None,
+        context_tokens: int | None = None,
+    ):
+        if name == "claude":
+            if not settings.anthropic_api_key:
+                console.print("[red]ANTHROPIC_API_KEY not set.[/red]")
+                sys.exit(1)
+            from atomics.providers.claude import ClaudeProvider
+            return ClaudeProvider(
+                api_key=settings.anthropic_api_key,
+                default_model=mdl or settings.default_model,
+            )
+        elif name == "bedrock":
+            from atomics.providers.bedrock import BedrockProvider
+            return BedrockProvider(region=region, model_id=mdl or "us.anthropic.claude-sonnet-4-6")
+        elif name == "openai":
+            from atomics.providers.openai import OpenAIProvider
+            if settings.openai_api_key:
+                return OpenAIProvider(api_key=settings.openai_api_key, default_model=mdl or "gpt-4o")
+            console.print("[red]OPENAI_API_KEY not set.[/red]")
+            sys.exit(1)
+        elif name == "ollama":
+            from atomics.providers.ollama import OllamaProvider
+            return OllamaProvider(
+                host=host or settings.ollama_host,
+                default_model=mdl or settings.ollama_model,
+                timeout=settings.ollama_timeout,
+                context_tokens=context_tokens,
+            )
+        elif name == "vllm":
+            from atomics.providers.vllm import VllmProvider
+            return VllmProvider(
+                base_url=vllm_host or settings.vllm_host,
+                default_model=mdl or settings.vllm_model,
+                timeout=settings.vllm_timeout,
+            )
+        elif name == "brain-gateway":
+            from atomics.providers.brain_gateway import BrainGatewayProvider
+            return BrainGatewayProvider(
+                url=host or settings.brain_gateway_url,
+                default_model=mdl,
+            )
+        console.print(f"[red]Unknown provider: {name}[/red]")
+        sys.exit(1)
+
+    spec_path = Path(__file__).parent / "archreview" / "repos" / f"{repo_name}.yaml"
+    if not spec_path.exists():
+        console.print(f"[red]Unknown repo spec: {repo_name}[/red] (looked in {spec_path})")
+        sys.exit(1)
+    spec = load_repo_spec(spec_path)
+
+    repo_dir = os.environ.get(spec.path_env)
+    if not repo_dir or not Path(repo_dir).is_dir():
+        console.print(f"[red]Set {spec.path_env} to the local {spec.name} checkout.[/red]")
+        sys.exit(1)
+
+    pack = build_pack(Path(repo_dir), spec.tier(tier))
+    console.print(f"[bold]archreview[/bold] repo=[cyan]{spec.name}[/cyan] tier={tier} "
+                  f"pack={pack.file_count} files hash={pack.content_hash[:12]} "
+                  f"{'(truncated)' if pack.truncated else ''}")
+
+    archreview_context_tokens = spec.tier(tier).budget_tokens + 4096
+    judge_provider = _build_provider(
+        judge_provider_name,
+        judge_model,
+        judge_host or ollama_host or settings.ollama_host,
+        context_tokens=8192 if judge_provider_name == "ollama" else None,
+    )
+
+    repo = None
+    if save_results:
+        from atomics.storage.repository import MetricsRepository
+        repo = MetricsRepository(settings.db_path)
+
+    judge_label = f"{judge_provider_name}:{judge_model or judge_provider.default_model or 'default'}"
+
+    table = Table(title=f"archreview — {spec.name} ({tier})", show_lines=True)
+    table.add_column("Model", no_wrap=True)
+    for col in ("Recall", "Prec", "Obj-F", "Judge"):
+        table.add_column(col)
+    table.add_column("Judge Model", no_wrap=True)
+    for col in ("Stability", "Findings"):
+        table.add_column(col)
+
+    models = [m.strip() for m in models_csv.split(",") if m.strip()]
+
+    # Drive every model in a SINGLE event loop. The judge provider is built once
+    # and its async HTTP client binds to whatever loop first uses it; a per-model
+    # asyncio.run() would close that loop after model 1 and break the judge on
+    # later models ("Event loop is closed").
+    async def _run_all() -> None:
+        for mdl in models:
+            test_provider = _build_provider(provider_name, mdl,
+                                            ollama_host if provider_name == "ollama" else vllm_host,
+                                            context_tokens=archreview_context_tokens
+                                            if provider_name == "ollama" else None)
+            collisions = detect_self_judge(test_provider, mdl, [(judge_provider, judge_model)])
+            if collisions:
+                console.print(f"[yellow]warning:[/yellow] judge collides with model under test: {collisions}")
+
+            if verbose:
+                console.print(f"\n[bold]→ analyzing with [cyan]{mdl}[/cyan][/bold] "
+                              f"({provider_name}, {rounds} round{'s' if rounds != 1 else ''})…")
+
+            results = await run_archreview(
+                spec=spec, tier=tier, pack=pack,
+                under_test=test_provider, under_test_model=mdl,
+                judge=judge_provider, judge_model=judge_model,
+                rounds=rounds, objective=not judge_only,
+            )
+            if repo:
+                for r in results:
+                    repo.save_archreview_result(r)
+
+            if verbose:
+                for r in results:
+                    if r.error_message:
+                        console.print(f"  [red]round {r.round}: {r.error_class}: {r.error_message}[/red]")
+                        continue
+                    judge_str = f"{r.judge_score:.2f}" if r.judge_score is not None else "—"
+                    flag = " [yellow](parse failed)[/yellow]" if r.parse_failed else ""
+                    console.print(
+                        f"  [dim]round {r.round}:[/dim] recall=[green]{r.objective_recall:.2f}[/green] "
+                        f"prec={r.objective_precision:.2f} obj-f={r.objective_f:.2f} "
+                        f"judge=[magenta]{judge_str}[/magenta] findings={len(r.findings)}"
+                        f" matched={r.matched_categories or '—'}{flag}"
+                    )
+                    for f in r.findings:
+                        console.print(f"      [dim]•[/dim] {f.category} · {f.location} · {f.severity}")
+
+            cat_sets = [{f.category for f in r.findings} for r in results]
+            recalls = [r.objective_recall for r in results]
+            stability, _sd = compute_robustness(cat_sets, recalls)
+            avg = lambda xs: round(sum(xs) / len(xs), 3) if xs else 0.0  # noqa: E731
+            judge_vals = [r.judge_score for r in results if r.judge_score is not None]
+            table.add_row(
+                mdl, str(avg(recalls)), str(avg([r.objective_precision for r in results])),
+                str(avg([r.objective_f for r in results])),
+                str(avg(judge_vals) if judge_vals else "—"),
+                judge_label, str(stability), str(round(sum(len(r.findings) for r in results) / len(results), 1)),
+            )
+
+    asyncio.run(_run_all())
+
+    console.print(table)
+    if repo:
+        repo.close()

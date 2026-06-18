@@ -17,7 +17,48 @@ def _tmp_repo() -> MetricsRepository:
 
 
 def test_schema_version_is_current():
-    assert SCHEMA_VERSION == 14
+    assert SCHEMA_VERSION == 15
+
+
+def test_archreview_results_table_exists(tmp_path):
+    conn = init_db(tmp_path / "t.db")
+    conn.execute(
+        "INSERT INTO archreview_results "
+        "(result_id, run_id, repo, tier, model, provider, round, "
+        " objective_recall, objective_precision, objective_f, judge_score, "
+        " finding_count, parse_failed, tokens_in, tokens_out, cost_usd, "
+        " latency_ms, findings_json, matched_categories_json, timestamp) "
+        "VALUES ('r1','run1','juice-shop','floor','qwen2.5:14b','ollama',1, "
+        " 0.7,0.8,0.74,0.66,11,0,1200,400,0.0,8300.0,'[]','[]','2026-01-01')"
+    )
+    row = conn.execute(
+        "SELECT objective_recall FROM archreview_results WHERE result_id='r1'"
+    ).fetchone()
+    assert row[0] == 0.7
+
+
+def test_save_archreview_result_roundtrip(tmp_path):
+    from atomics.storage.repository import MetricsRepository
+    from atomics.archreview.models import ArchReviewResult, Finding
+
+    repo = MetricsRepository(tmp_path / "m.db")
+    r = ArchReviewResult(
+        run_id="run1", repo="juice-shop", tier="floor", model="qwen2.5:14b",
+        provider="ollama", round=1,
+        findings=[Finding("injection", "a.ts", "high", "raw sql")],
+        objective_recall=0.7, objective_precision=0.8, objective_f=0.74,
+        judge_score=0.66, matched_categories=["injection"], tokens_in=1200,
+        tokens_out=400, latency_ms=8300.0, pack_hash="abc123",
+    )
+    repo.save_archreview_result(r)
+    row = repo._conn.execute(
+        "SELECT repo, objective_recall, finding_count, matched_categories_json "
+        "FROM archreview_results WHERE run_id='run1'"
+    ).fetchone()
+    assert row[0] == "juice-shop"
+    assert row[1] == 0.7
+    assert row[2] == 1
+    assert "injection" in row[3]
 
 
 def test_adversarial_results_table_exists(tmp_path):
