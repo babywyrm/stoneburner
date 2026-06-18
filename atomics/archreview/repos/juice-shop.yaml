@@ -16,6 +16,19 @@ tiers:
       - "frontend/dist/**"
       - "test/**"
       - "data/static/i18n/**"
+  wide:
+    budget_tokens: 48000
+    priority:
+      - "routes/**"
+      - "lib/**"
+      - "models/**"
+      - "server.ts"
+      - "package.json"
+    exclude:
+      - "node_modules/**"
+      - "frontend/dist/**"
+      - "test/**"
+      - "data/static/i18n/**"
   expanded:
     budget_tokens: 128000
     priority:
