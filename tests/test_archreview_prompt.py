@@ -49,5 +49,19 @@ def test_parse_pipe_delimited_without_labels():
     assert findings[0].location == "routes/search.ts"
 
 
+def test_parse_pipe_delimited_with_labeled_location_severity_why():
+    raw = (
+        "SECURITY_MISCONFIGURATION | FILE: .well-known/security.txt | "
+        "SEVERITY: low | WHY: Contact email is publicly exposed.\n"
+        "INJECTION | ROUTE: routes/login.ts (line 173) | "
+        "SEVERITY: critical | WHY: String interpolation in SQL query.\n"
+    )
+    findings = parse_findings(raw)
+    assert [f.category for f in findings] == ["security_misconfiguration", "injection"]
+    assert findings[0].location == ".well-known/security.txt"
+    assert findings[1].location == "routes/login.ts (line 173)"
+    assert findings[1].severity == "critical"
+
+
 def test_parse_empty_returns_empty_list():
     assert parse_findings("no findings here, all good") == []

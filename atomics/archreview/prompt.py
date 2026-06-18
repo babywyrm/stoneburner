@@ -47,6 +47,13 @@ _PIPE_RE = re.compile(
     r"(?P<why>.+?)\s*$",
     re.IGNORECASE,
 )
+_HYBRID_PIPE_RE = re.compile(
+    r"^\s*(?P<cat>[a-z][a-z0-9_ -]{1,80})\s*[|]\s*"
+    r"(?:location|file|route|area)\s*[:=-]?\s*(?P<loc>[^|\n]{1,200})\s*[|]\s*"
+    r"severity\s*[:=-]?\s*(?P<sev>low|medium|high|critical)\s*[|]\s*"
+    r"(?:why|rationale)\s*[:=-]?\s*(?P<why>.+?)\s*$",
+    re.IGNORECASE,
+)
 
 
 def build_analysis_prompt(pack_text: str) -> tuple[str, str]:
@@ -90,10 +97,11 @@ def parse_findings(raw: str) -> list[Finding]:
     if findings:
         return findings
 
-    # Common near-miss: models preserve the pipe-delimited field order but drop
-    # labels, e.g. "injection | routes/search.ts | high | raw SQL".
+    # Common near-misses: models preserve pipe-delimited field order but drop
+    # some or all labels, e.g. "injection | routes/search.ts | high | raw SQL"
+    # or "INJECTION | ROUTE: routes/login.ts | SEVERITY: high | WHY: raw SQL".
     for line in raw.splitlines():
-        m = _PIPE_RE.match(line)
+        m = _HYBRID_PIPE_RE.match(line) or _PIPE_RE.match(line)
         if not m:
             continue
         findings.append(_mk_finding(m.group("cat"), m.group("loc"),
