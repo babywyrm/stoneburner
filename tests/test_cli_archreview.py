@@ -217,6 +217,40 @@ def test_archreview_cli_max_output_tokens_adjusts_reserve_and_runner_arg(tmp_pat
     assert "reserve=512" in result.output
 
 
+def test_archreview_cli_inference_timeout_overrides_ollama_timeout(tmp_path, monkeypatch):
+    monkeypatch.setenv("JUICE_SHOP_PATH", str(tmp_path))
+    (tmp_path / "server.ts").write_text("// app\n")
+
+    built = []
+
+    class _FakeOllamaProvider:
+        name = "ollama"
+
+        def __init__(self, *, host, default_model, timeout, context_tokens=None):
+            self._default_model = default_model
+            self._timeout = timeout
+            built.append(self)
+
+        @property
+        def default_model(self):
+            return self._default_model
+
+    runner = CliRunner()
+    with patch("atomics.providers.ollama.OllamaProvider", _FakeOllamaProvider):
+        with patch("atomics.archreview.runner.run_archreview") as m:
+            async def _shim(**kwargs):
+                return _fake_results()
+            m.side_effect = _shim
+            result = runner.invoke(cli, [
+                "archreview", "--repo", "juice-shop",
+                "--models", "mistral-small3.2:24b", "--provider", "ollama",
+                "--judge-provider", "ollama", "--judge-model", "deepseek-r1:7b",
+                "--tier", "wide", "--inference-timeout", "900", "--no-save",
+            ])
+    assert result.exit_code == 0, result.output
+    assert [p._timeout for p in built] == [900.0, 900.0]
+
+
 def test_archreview_cli_unknown_repo_errors():
     runner = CliRunner()
     result = runner.invoke(cli, ["archreview", "--repo", "does-not-exist",

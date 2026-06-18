@@ -2944,13 +2944,15 @@ def scenario(
 @click.option("--rounds", type=int, default=1, show_default=True)
 @click.option("--max-output-tokens", type=click.IntRange(min=128), default=2048, show_default=True,
               help="Maximum generated tokens for each model-under-test analysis")
+@click.option("--inference-timeout", type=float, default=None,
+              help="Per-request provider timeout in seconds (useful for slow local Ollama/vLLM runs)")
 @click.option("--judge-only", is_flag=True, default=False, help="Skip objective scoring (no answer key needed)")
 @click.option("--verbose", "-v", is_flag=True, default=False,
               help="Stream per-model/per-round progress: findings and scores as they complete")
 @click.option("--save/--no-save", "save_results", default=True)
 def archreview(repo_name, models_csv, provider_name, ollama_host, vllm_host,
                region, judge_provider_name, judge_model, judge_host, tier, rounds,
-               max_output_tokens, judge_only, verbose, save_results):
+               max_output_tokens, inference_timeout, judge_only, verbose, save_results):
     """Benchmark models on a security-architecture review of a repo."""
     import asyncio
     import os
@@ -2995,7 +2997,7 @@ def archreview(repo_name, models_csv, provider_name, ollama_host, vllm_host,
             return OllamaProvider(
                 host=host or settings.ollama_host,
                 default_model=mdl or settings.ollama_model,
-                timeout=settings.ollama_timeout,
+                timeout=inference_timeout or settings.ollama_timeout,
                 context_tokens=context_tokens,
             )
         elif name == "vllm":
@@ -3003,7 +3005,7 @@ def archreview(repo_name, models_csv, provider_name, ollama_host, vllm_host,
             return VllmProvider(
                 base_url=vllm_host or settings.vllm_host,
                 default_model=mdl or settings.vllm_model,
-                timeout=settings.vllm_timeout,
+                timeout=inference_timeout or settings.vllm_timeout,
             )
         elif name == "brain-gateway":
             from atomics.providers.brain_gateway import BrainGatewayProvider
