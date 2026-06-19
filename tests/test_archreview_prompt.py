@@ -63,5 +63,43 @@ def test_parse_pipe_delimited_with_labeled_location_severity_why():
     assert findings[1].severity == "critical"
 
 
+def test_parse_markdown_table_rows():
+    """Models that default to markdown tables should be parsed."""
+    raw = (
+        "## Findings\n"
+        "| injection | routes/search.ts | high | unsanitized query passed to db |\n"
+        "| broken_access_control | routes/users.ts | medium | missing authorization check |\n"
+    )
+    findings = parse_findings(raw)
+    assert [f.category for f in findings] == ["injection", "broken_access_control"]
+    assert findings[0].severity == "high"
+
+
+def test_parse_markdown_table_with_header():
+    """Full markdown table including a header/separator row."""
+    raw = (
+        "| Category | Location | Severity | Why |\n"
+        "|---|---|---|---|\n"
+        "| xss | views/user.html | medium | reflected input |\n"
+        "| injection | routes/login.ts | critical | raw SQL |\n"
+    )
+    findings = parse_findings(raw)
+    cats = {f.category for f in findings}
+    assert "xss" in cats
+    assert "injection" in cats
+
+
+def test_parse_numbered_bold_list():
+    """1. **Category** — location — severity — why"""
+    raw = (
+        "1. **Injection** — routes/login.ts — high — unsanitized SQL\n"
+        "2. **XSS** — views/profile.html — medium — reflected input\n"
+    )
+    findings = parse_findings(raw)
+    assert len(findings) == 2
+    assert findings[0].category == "injection"
+    assert findings[1].category == "xss"
+
+
 def test_parse_empty_returns_empty_list():
     assert parse_findings("no findings here, all good") == []

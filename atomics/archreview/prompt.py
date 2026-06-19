@@ -17,10 +17,14 @@ Review the repository below for security-architecture weaknesses.
 
 First give a SHORT architecture & trust-boundary summary (3-5 sentences).
 
-Then list findings. Emit EACH finding on its own line in EXACTLY this format:
-CATEGORY: <one of: {categories}> | LOCATION: <file or area> | SEVERITY: <low|medium|high|critical> | WHY: <1-2 sentences>
+Then list findings. Output EACH finding on its own line using EXACTLY this \
+format — no markdown, no numbering, no table, no extra punctuation:
+CATEGORY: <value> | LOCATION: <file or area> | SEVERITY: <low|medium|high|critical> | WHY: <1-2 sentences>
 
-Use only categories from the list. One line per finding. Do not number them.
+Valid CATEGORY values: {categories}
+
+Example (do not copy — write real findings):
+CATEGORY: injection | LOCATION: routes/login.ts | SEVERITY: critical | WHY: unsanitized user input passed directly to SQL query.
 
 REPOSITORY:
 {pack}
@@ -54,6 +58,24 @@ _HYBRID_PIPE_RE = re.compile(
     r"(?:why|rationale)\s*[:=-]?\s*(?P<why>.+?)\s*$",
     re.IGNORECASE,
 )
+# Markdown table row: | cat | location | severity | why |
+# Skips separator rows like |---|---|---|---| and header rows whose first cell
+# isn't a recognizable category.
+_MD_TABLE_ROW_RE = re.compile(
+    r"^\s*[|]\s*(?P<cat>[a-z][a-z0-9_ -]{1,80})\s*[|]\s*"
+    r"(?P<loc>[^|\n]{1,200})\s*[|]\s*"
+    r"(?P<sev>low|medium|high|critical)\s*[|]\s*"
+    r"(?P<why>[^|\n]+?)\s*[|]?\s*$",
+    re.IGNORECASE,
+)
+# Numbered/bulleted bold list: 1. **Category** — location — severity — why
+_BOLD_LIST_RE = re.compile(
+    r"^\s*(?:\d+\.|[-*])\s+\*\*(?P<cat>[^*]+)\*\*\s*[—\-]\s*"
+    r"(?P<loc>[^—\-\n]+?)\s*[—\-]\s*"
+    r"(?P<sev>low|medium|high|critical)\s*[—\-]\s*"
+    r"(?P<why>.+?)\s*$",
+    re.IGNORECASE,
+)
 
 
 def build_analysis_prompt(pack_text: str) -> tuple[str, str]:
@@ -80,7 +102,13 @@ def parse_findings(raw: str) -> list[Finding]:
     """Parse a model's analysis into findings. Strict pass, then lenient."""
     findings: list[Finding] = []
     for m in _LINE_RE.finditer(raw):
-        findings.append(_mk_finding(m.group("cat"), m.group("loc"),
+        # Skip markdown table header rows — _LINE_RE matches "CATEGORY | LOCATION
+        # | SEVERITY | WHY" as a finding with blank/whitespace fields.
+        cat_raw = m.group("cat").strip()
+        loc_raw = m.group("loc").strip()
+        if not cat_raw or not loc_raw:
+            continue
+        findings.append(_mk_finding(cat_raw, loc_raw,
                                     m.group("sev"), m.group("why")))
     if findings:
         return findings
@@ -92,6 +120,9 @@ def parse_findings(raw: str) -> list[Finding]:
         cat, loc, sev, why = (_FIELD_CAT.search(line), _FIELD_LOC.search(line),
                               _FIELD_SEV.search(line), _FIELD_WHY.search(line))
         if cat and loc and sev and why:
+            # Skip header rows where 'category' is the label, not a category value.
+            if normalize_category(_clean(cat.group(1))) is None:
+                continue
             findings.append(_mk_finding(cat.group(1), loc.group(1),
                                         sev.group(1), why.group(1)))
     if findings:
@@ -101,7 +132,44 @@ def parse_findings(raw: str) -> list[Finding]:
     # some or all labels, e.g. "injection | routes/search.ts | high | raw SQL"
     # or "INJECTION | ROUTE: routes/login.ts | SEVERITY: high | WHY: raw SQL".
     for line in raw.splitlines():
+        if re.match(r"^\s*[|][\s\-:|]+[|]", line):
+            continue  # markdown separator row
         m = _HYBRID_PIPE_RE.match(line) or _PIPE_RE.match(line)
+        if not m:
+            continue
+        # Skip header rows: first cell is a label word (Category, Finding, etc.)
+        # not a recognizable category value.
+        if normalize_category(_clean(m.group("cat"))) is None:
+            continue
+        findings.append(_mk_finding(m.group("cat"), m.group("loc"),
+                                    m.group("sev"), m.group("why")))
+    if findings:
+        return findings
+
+    # Markdown table rows: | cat | location | severity | why |
+    # Skip separator rows (only dashes/spaces) and header rows (first cell
+    # not a recognizable category).
+    for line in raw.splitlines():
+        if re.match(r"^\s*[|][\s\-:|]+[|]", line):
+            continue  # separator/header row
+        m = _MD_TABLE_ROW_RE.match(line)
+        if not m:
+            continue
+        cat_norm = normalize_category(_clean(m.group("cat")))
+        if cat_norm is None:
+            continue  # skip header rows whose first cell isn't a category
+        findings.append(Finding(
+            category=cat_norm.value,
+            location=_clean(m.group("loc")),
+            severity=_clean(m.group("sev")).lower(),
+            rationale=_clean(m.group("why")),
+        ))
+    if findings:
+        return findings
+
+    # Numbered/bulleted bold list: 1. **Category** — location — severity — why
+    for line in raw.splitlines():
+        m = _BOLD_LIST_RE.match(line)
         if not m:
             continue
         findings.append(_mk_finding(m.group("cat"), m.group("loc"),
