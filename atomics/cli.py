@@ -3035,11 +3035,15 @@ def archreview(repo_name, models_csv, provider_name, ollama_host, vllm_host,
         + archreview_prompt_overhead_tokens
         + archreview_max_output_tokens
     )
+    import uuid as _uuid_mod
+    archreview_run_id = _uuid_mod.uuid4().hex[:12]
+
     pack = build_pack(Path(repo_dir), tier_config)
     console.print(f"[bold]archreview[/bold] repo=[cyan]{spec.name}[/cyan] tier={tier} "
                   f"pack={pack.file_count} files hash={pack.content_hash[:12]} "
                   f"context={archreview_context_tokens} reserve={archreview_max_output_tokens} "
                   f"overhead={archreview_prompt_overhead_tokens} "
+                  f"run_id={archreview_run_id} "
                   f"{'(truncated)' if pack.truncated else ''}")
 
     judge_provider = _build_provider(
@@ -3090,6 +3094,7 @@ def archreview(repo_name, models_csv, provider_name, ollama_host, vllm_host,
                 judge=judge_provider, judge_model=judge_model,
                 rounds=rounds, objective=not judge_only,
                 max_output_tokens=max_output_tokens,
+                run_id=archreview_run_id,
             )
             if repo:
                 for r in results:
