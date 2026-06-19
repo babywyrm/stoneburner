@@ -98,6 +98,18 @@ def _mk_finding(cat_raw: str, loc: str, sev: str, why: str) -> Finding:
     )
 
 
+def _deduplicate(findings: list[Finding]) -> list[Finding]:
+    """Remove exact (category, location) duplicates, preserving first occurrence."""
+    seen: set[tuple[str, str]] = set()
+    out: list[Finding] = []
+    for f in findings:
+        key = (f.category, f.location.strip().lower()[:80])
+        if key not in seen:
+            seen.add(key)
+            out.append(f)
+    return out
+
+
 def parse_findings(raw: str) -> list[Finding]:
     """Parse a model's analysis into findings. Strict pass, then lenient."""
     findings: list[Finding] = []
@@ -111,7 +123,7 @@ def parse_findings(raw: str) -> list[Finding]:
         findings.append(_mk_finding(cat_raw, loc_raw,
                                     m.group("sev"), m.group("why")))
     if findings:
-        return findings
+        return _deduplicate(findings)
 
     # Lenient: scan line-by-line for any line carrying all four fields.
     for line in raw.splitlines():
@@ -126,7 +138,7 @@ def parse_findings(raw: str) -> list[Finding]:
             findings.append(_mk_finding(cat.group(1), loc.group(1),
                                         sev.group(1), why.group(1)))
     if findings:
-        return findings
+        return _deduplicate(findings)
 
     # Common near-misses: models preserve pipe-delimited field order but drop
     # some or all labels, e.g. "injection | routes/search.ts | high | raw SQL"
@@ -144,7 +156,7 @@ def parse_findings(raw: str) -> list[Finding]:
         findings.append(_mk_finding(m.group("cat"), m.group("loc"),
                                     m.group("sev"), m.group("why")))
     if findings:
-        return findings
+        return _deduplicate(findings)
 
     # Markdown table rows: | cat | location | severity | why |
     # Skip separator rows (only dashes/spaces) and header rows (first cell
@@ -174,4 +186,4 @@ def parse_findings(raw: str) -> list[Finding]:
             continue
         findings.append(_mk_finding(m.group("cat"), m.group("loc"),
                                     m.group("sev"), m.group("why")))
-    return findings
+    return _deduplicate(findings)
