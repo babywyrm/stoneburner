@@ -7,6 +7,7 @@ Usage:
 
 from __future__ import annotations
 
+import sqlite3
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -97,7 +98,7 @@ def compute_regression(
 
 
 def save_baseline(
-    conn,
+    conn: sqlite3.Connection,
     name: str,
     suite: str,
     model: str,
@@ -144,7 +145,7 @@ def save_baseline(
     )
 
 
-def load_baseline(conn, name: str, suite: str = "soak") -> BaselineRecord | None:
+def load_baseline(conn: sqlite3.Connection, name: str, suite: str = "soak") -> BaselineRecord | None:
     """Load a named baseline from the DB. Returns None if not found."""
     row = conn.execute(
         "SELECT * FROM baselines WHERE name = ? AND suite = ?",
@@ -168,7 +169,7 @@ def load_baseline(conn, name: str, suite: str = "soak") -> BaselineRecord | None
     )
 
 
-def list_baselines(conn) -> list[BaselineRecord]:
+def list_baselines(conn: sqlite3.Connection) -> list[BaselineRecord]:
     """Return all stored baselines ordered by suite, name."""
     rows = conn.execute(
         "SELECT * FROM baselines ORDER BY suite, name"
