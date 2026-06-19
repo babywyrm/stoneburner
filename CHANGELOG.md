@@ -12,7 +12,9 @@
 - **`archreview` Ollama context wiring** — evidence packs now request explicit `num_ctx` and `num_predict` so the model's context window is large enough for the prompt and there is always reserved output room. `ContextExhausted` is recorded instead of a misleading parse-failed/zero-recall result when a model stops before producing findings.
 - **`archreview` evidence tiers** — added `local` (32k) between `floor` and `wide` for practical brainbox runs. `--max-output-tokens` and `--inference-timeout` CLI flags for controlling slow local inference. `--verbose` flag streams per-model/per-round findings and scores as they complete.
 - **`archreview` judge identity** — `Judge Model` column in the comparison table shows `provider:model` (e.g. `ollama:deepseek-r1:7b`) so multi-model runs are unambiguous.
-- **`pack.py` type annotation** — `build_pack(cfg)` parameter typed as `TierConfig` (was bare `object`). Zero untyped parameters across the `atomics/archreview/` package.
+- **`archreview` finding deduplication** — `parse_findings()` collapses exact (category, location) pairs emitted multiple times by looping models (e.g. the same route listed 7× by qwen2.5:7b). Same category at different locations remains distinct. Applied at all five fallback passes.
+- **`pack.py` type annotation** — `build_pack(cfg)` parameter typed as `TierConfig` (import added); zero untyped parameters across the `atomics/archreview/` package.
+- **Test quality** — fixed pre-existing coroutine-never-awaited warning in `test_adversarial.py` by converting the nested sync side-effect to an async function; suite now runs with zero warnings.
 
 ## 0.6.0 (2026-06-16) — Security suites, vLLM provider, judge accuracy & token-burn fidelity
 
