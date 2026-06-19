@@ -385,6 +385,10 @@ Archreview scores **category-level architecture coverage**, not every individual
 
 The comparison table reports `Judge` as the normalized reasoning score and `Judge Model` as the provider/model that produced it (for example, `ollama:deepseek-r1:7b`). Ollama runs request enough `num_ctx` for the selected evidence tier and disable hidden thinking for archreview calls so the output budget is spent on parseable findings rather than native reasoning-only output. The run header prints the requested context and reserved answer budget (`context=... reserve=... overhead=...`). If a model stops at `done_reason=length` with only a token or two of visible output, the runner records `ContextExhausted` instead of treating the result as a normal low-recall answer. For slow local models, lower `--max-output-tokens` (for example `512` or `768`) to get a concise top-findings sample without waiting for a full 2048-token answer; raise `--inference-timeout` when long-context prompt processing is healthy but slower than the default request timeout.
 
+**Parser tolerance.** The findings parser handles every common model output format without configuration: canonical labeled lines (`CATEGORY: … | LOCATION: … | SEVERITY: … | WHY: …`), markdown table rows (`| injection | routes/x.ts | high | why |`), numbered/bold lists (`1. **Injection** — routes/x.ts — high — why`), and hybrid labeled-pipe (`INJECTION | ROUTE: … | SEVERITY: high | WHY: …`). Markdown table header and separator rows are always skipped.
+
+**Taxonomy.** The fixed OWASP-style category set covers both web and non-web repositories. Common findings from Go APIs, Rust services, IaC, and infrastructure code map automatically: `path traversal`, `race condition`, `hardcoded credentials`, `ssti`, `dependency confusion`, `dos`, and 25+ more synonyms are pre-mapped without any configuration.
+
 ```bash
 JUICE_SHOP_PATH=~/juice-shop atomics archreview --repo juice-shop \
   --models "qwen2.5:14b,qwen3.5:4b" --provider ollama \

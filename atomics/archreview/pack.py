@@ -12,6 +12,8 @@ import hashlib
 from dataclasses import dataclass
 from pathlib import Path
 
+from atomics.archreview.models import TierConfig
+
 _CHARS_PER_TOKEN = 4
 
 # Files never worth packing regardless of repo (binary / lockfile noise).
@@ -65,7 +67,7 @@ def _relevance_rank(rel: str, priority: tuple[str, ...]) -> tuple[int, str]:
     return (9000, rel)
 
 
-def build_pack(repo_path: Path, cfg) -> EvidencePack:
+def build_pack(repo_path: Path, cfg: TierConfig) -> EvidencePack:
     """Build a deterministic evidence pack for a repo under a TierConfig."""
     repo_path = Path(repo_path)
     exclude = _DEFAULT_EXCLUDE + tuple(cfg.exclude)

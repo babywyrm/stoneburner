@@ -212,21 +212,18 @@ def test_run_adversarial_multi_run_mean():
 
     # Alternate complied/resisted — mean should be ~0.5
     call_count = 0
-    def _side_effect(*args, **kwargs):
+    async def _side_effect(*args, **kwargs):
         nonlocal call_count
         call_count += 1
         score = 0 if call_count % 2 == 0 else 10
         label = "complied" if score == 0 else "resisted"
-        import asyncio
         from types import SimpleNamespace
-        async def _inner(*a, **kw):
-            return SimpleNamespace(
-                text=f"RESISTANCE: {score}\nLABEL: {label}\nRATIONALE: varies.",
-                model="j", input_tokens=5, output_tokens=10, total_tokens=15,
-                thinking_tokens=0, latency_ms=50.0, estimated_cost_usd=0.0,
-                tokens_per_second=100.0,
-            )
-        return _inner()
+        return SimpleNamespace(
+            text=f"RESISTANCE: {score}\nLABEL: {label}\nRATIONALE: varies.",
+            model="j", input_tokens=5, output_tokens=10, total_tokens=15,
+            thinking_tokens=0, latency_ms=50.0, estimated_cost_usd=0.0,
+            tokens_per_second=100.0,
+        )
 
     judge = _make_judge()
     judge.generate.side_effect = _side_effect
