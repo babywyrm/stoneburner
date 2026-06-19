@@ -53,7 +53,7 @@ tiers:
       - "node_modules/**"
       - "frontend/dist/**"
 answer_key:
-  version: 1
+  version: 2
   categories:
     - {id: broken_access_control, weight: 18.0}
     - {id: injection, weight: 12.0}
@@ -62,6 +62,7 @@ answer_key:
     - {id: sensitive_data_exposure, weight: 8.0}
     - {id: improper_input_validation, weight: 7.0}
     - {id: security_misconfiguration, weight: 6.0}
+    - {id: ssrf, weight: 6.0}
     - {id: cryptographic_issues, weight: 5.0}
     - {id: vulnerable_components, weight: 4.0}
     - {id: xxe, weight: 3.0}
