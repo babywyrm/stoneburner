@@ -6,6 +6,7 @@ import asyncio
 import shutil
 import subprocess
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 import httpx
@@ -224,7 +225,7 @@ async def run_stress(
     max_concurrency: int = 8,
     phase_seconds: float = 15.0,
     num_predict: int = 2048,
-    on_phase: object = None,
+    on_phase: Callable[[object], None] | None = None,
 ) -> StressResult:
     """Ramp concurrency from 1 to max_concurrency, spending phase_seconds at each level."""
     gpu_name, vram_total = _get_gpu_info()
@@ -341,7 +342,7 @@ async def run_stress_provider(
     max_concurrency: int = 8,
     phase_seconds: float = 15.0,
     num_predict: int = 2048,
-    on_phase: object = None,
+    on_phase: Callable[[object], None] | None = None,
 ) -> StressResult:
     """Ramp concurrency against any BaseProvider (cloud or local)."""
     result = StressResult(
@@ -375,7 +376,7 @@ async def run_stress_provider(
             result.saturation_concurrency = conc
 
         if on_phase:
-            on_phase(phase)  # type: ignore[operator]
+            on_phase(phase)
 
     result.duration_seconds = time.monotonic() - t0
     return result
@@ -427,7 +428,7 @@ async def run_stress_profile(
     profile: object,
     max_concurrency: int = 8,
     phase_seconds: float = 15.0,
-    on_phase=None,
+    on_phase: Callable[[object], None] | None = None,
 ) -> StressResult:
     """Stress test against a custom target profile — ramp concurrency."""
     from atomics.profiles import TargetProfile
