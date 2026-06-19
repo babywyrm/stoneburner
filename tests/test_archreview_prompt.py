@@ -101,5 +101,25 @@ def test_parse_numbered_bold_list():
     assert findings[1].category == "xss"
 
 
+def test_parse_deduplicates_same_category_location():
+    """Duplicate (category, location) pairs from looping models are collapsed."""
+    raw = "\n".join([
+        "CATEGORY: improper_input_validation | LOCATION: routes/basketItems.ts | SEVERITY: medium | WHY: repeated finding."
+    ] * 7)
+    findings = parse_findings(raw)
+    assert len(findings) == 1
+    assert findings[0].category == "improper_input_validation"
+
+
+def test_parse_keeps_same_category_different_locations():
+    """Same category at different locations are distinct findings."""
+    raw = (
+        "CATEGORY: injection | LOCATION: routes/login.ts | SEVERITY: high | WHY: a.\n"
+        "CATEGORY: injection | LOCATION: routes/search.ts | SEVERITY: high | WHY: b.\n"
+    )
+    findings = parse_findings(raw)
+    assert len(findings) == 2
+
+
 def test_parse_empty_returns_empty_list():
     assert parse_findings("no findings here, all good") == []
