@@ -1,0 +1,203 @@
+#!/usr/bin/env bash
+# brain-swap — Hard-switch between Ollama and vLLM on a single-GPU brainbox.
+#
+# Handles the FULL lifecycle for ALL vLLM serving units (there are several —
+# one per box/model — plus the LiteLLM gateway), not a single hardcoded unit:
+#   - switching to Ollama  : stop + DISABLE every vLLM unit (so systemd cannot
+#                            auto-restart them and they don't return on boot),
+#                            record which were enabled, free the GPU, start Ollama
+#   - switching to vLLM     : stop Ollama, RE-ENABLE + start the recorded units
+#                            (or all discovered units if no record), then the gateway
+#
+# Why the rewrite: the old version only knew about one unit (vllm-qwen25-3b) and
+# ran its kills without privilege + a case-sensitive `pkill -f vllm` that both
+# missed VLLM::EngineCore workers and could match brain-swap's own shell. The
+# other enabled units (Restart=always) simply respawned. This version stops the
+# systemd cgroups (clean, no pattern matching) and only sweeps the GPU for orphans.
+#
+# Usage:
+#   brain-swap ollama                 # stop+disable all vLLM, start Ollama
+#   brain-swap vllm                   # stop Ollama, re-enable+start recorded vLLM units
+#   brain-swap vllm --units "a.service b.service"   # restore a specific set
+#   brain-swap status                 # show units + GPU
+#   brain-swap kill                   # stop everything, free GPU (no disable)
+
+set -euo pipefail
+
+OLLAMA_UNIT="${OLLAMA_UNIT:-ollama.service}"
+GATEWAY_UNIT="${GATEWAY_UNIT:-litellm-gateway.service}"
+OLLAMA_PORT="${OLLAMA_PORT:-11434}"
+GATEWAY_PORT="${GATEWAY_PORT:-8000}"
+READINESS_TIMEOUT="${READINESS_TIMEOUT:-180}"
+STATE_DIR="${STATE_DIR:-/var/lib/brain-swap}"
+STATE_FILE="$STATE_DIR/managed-vllm-units"
+
+# ── privilege helpers ────────────────────────────────────────────────────────
+_is_root() { [[ ${EUID:-$(id -u)} -eq 0 ]]; }
+_sc()   { if _is_root; then systemctl "$@"; else sudo systemctl "$@"; fi; }
+_priv() { if _is_root; then "$@"; else sudo "$@"; fi; }
+
+# ── discovery: every vLLM serving unit FILE, regardless of current state ───────
+_vllm_units() {
+  systemctl list-unit-files --no-legend 'vllm-*.service' 2>/dev/null | awk '{print $1}'
+}
+
+_gpu_pids() { nvidia-smi --query-compute-apps=pid --format=csv,noheader 2>/dev/null | tr -d ' '; }
+_vram()     { nvidia-smi --query-gpu=memory.used,memory.total --format=csv,noheader 2>/dev/null; }
+
+# Sweep any GPU compute processes still holding VRAM (orphans not in a cgroup).
+_kill_gpu() {
+  local pids p; pids=$(_gpu_pids)
+  if [[ -n "$pids" ]]; then
+    echo "  freeing GPU procs: $(echo "$pids" | tr '\n' ' ')"
+    for p in $pids; do _priv kill -9 "$p" 2>/dev/null || true; done
+    sleep 2
+  fi
+}
+
+_wait_port() {
+  local port="$1" label="$2" waited=0
+  echo -n "  waiting for $label on :$port "
+  while (( waited < READINESS_TIMEOUT )); do
+    if curl -s -m 2 "http://localhost:$port/v1/models" >/dev/null 2>&1 || \
+       curl -s -m 2 "http://localhost:$port/api/tags"   >/dev/null 2>&1; then
+      echo " ready (${waited}s)"; return 0
+    fi
+    echo -n "."; sleep 5; waited=$((waited + 5))
+  done
+  echo " TIMEOUT after ${READINESS_TIMEOUT}s"; return 1
+}
+
+# systemctl is-active/is-enabled PRINT the status but exit non-zero for
+# inactive/disabled — capture the string and swallow the exit with `|| true`
+# (a trailing `|| echo` would append a spurious second line).
+_act() { systemctl is-active "$1" 2>/dev/null || true; }
+_ena() { systemctl is-enabled "$1" 2>/dev/null || true; }
+
+cmd_status() {
+  echo "=== Brain Status ==="
+  printf "  %-28s %-10s %s\n" "$OLLAMA_UNIT" "$(_act "$OLLAMA_UNIT")" "$(_ena "$OLLAMA_UNIT")"
+  local u
+  for u in $(_vllm_units); do
+    printf "  %-28s %-10s %s\n" "$u" "$(_act "$u")" "$(_ena "$u")"
+  done
+  printf "  %-28s %-10s %s\n" "$GATEWAY_UNIT" "$(_act "$GATEWAY_UNIT")" "$(_ena "$GATEWAY_UNIT")"
+  echo "  GPU VRAM: $(_vram)"
+  local p; p=$(_gpu_pids); [[ -n "$p" ]] && echo "  GPU PIDs: $(echo "$p" | tr '\n' ' ')"
+  [[ -f "$STATE_FILE" ]] && echo "  saved vLLM set: $(tr '\n' ' ' < "$STATE_FILE")"
+  return 0
+}
+
+# Record currently-enabled vLLM units (so `vllm` restores exactly them), then
+# stop + disable all of them and the gateway.
+_stop_disable_vllm() {
+  local u enabled=()
+  for u in $(_vllm_units); do
+    systemctl is-enabled "$u" >/dev/null 2>&1 && enabled+=("$u")
+  done
+  if [[ ${#enabled[@]} -gt 0 ]]; then
+    _priv mkdir -p "$STATE_DIR"
+    printf '%s\n' "${enabled[@]}" | _priv tee "$STATE_FILE" >/dev/null
+    echo "  recorded units to restore later: ${enabled[*]}"
+  fi
+  # vLLM ignores SIGTERM, so a graceful `stop` blocks ~TimeoutStopSec (≈90s) PER
+  # unit. SIGKILL the cgroups first so the subsequent disable/stop returns fast.
+  for u in $(_vllm_units) "$GATEWAY_UNIT"; do
+    _sc kill --signal=SIGKILL "$u" >/dev/null 2>&1 || true
+  done
+  sleep 1
+  for u in $(_vllm_units) "$GATEWAY_UNIT"; do
+    _sc disable --now "$u" >/dev/null 2>&1 || true
+    _sc reset-failed "$u" >/dev/null 2>&1 || true
+  done
+}
+
+cmd_ollama() {
+  echo ">>> Switching to Ollama (stop + disable ALL vLLM units)..."
+  _stop_disable_vllm
+  sleep 2
+  _kill_gpu
+  echo "  starting $OLLAMA_UNIT"
+  _sc enable --now "$OLLAMA_UNIT" >/dev/null 2>&1 || _sc start "$OLLAMA_UNIT"
+  _wait_port "$OLLAMA_PORT" "Ollama" || true
+  echo "  VRAM: $(_vram)"
+  echo "  Done — Ollama only."
+}
+
+cmd_vllm() {
+  local override_units=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --units) override_units="$2"; shift 2 ;;
+      *) echo "Unknown option: $1"; exit 1 ;;
+    esac
+  done
+
+  echo ">>> Switching to vLLM (stop Ollama, restore vLLM units)..."
+  _sc stop "$OLLAMA_UNIT" >/dev/null 2>&1 || true
+  sleep 2
+  _kill_gpu
+
+  local units
+  if [[ -n "$override_units" ]]; then
+    units="$override_units"
+  elif [[ -s "$STATE_FILE" ]]; then
+    units="$(cat "$STATE_FILE")"
+    echo "  restoring recorded set: $(echo "$units" | tr '\n' ' ')"
+  else
+    units="$(_vllm_units)"
+    echo "  (no saved state; starting ALL discovered vLLM units)"
+  fi
+
+  local u
+  for u in $units; do
+    echo "  enabling + starting $u"
+    _sc enable --now "$u" >/dev/null 2>&1 || _sc start "$u" || true
+  done
+  echo "  enabling + starting $GATEWAY_UNIT"
+  _sc enable --now "$GATEWAY_UNIT" >/dev/null 2>&1 || _sc start "$GATEWAY_UNIT" || true
+
+  _wait_port "$GATEWAY_PORT" "LiteLLM gateway" || true
+  echo "  VRAM: $(_vram)"
+  echo "  Models available via gateway:"
+  curl -s "http://localhost:$GATEWAY_PORT/v1/models" 2>/dev/null | \
+    python3 -c 'import sys,json;[print(f"    {m[\"id\"]}") for m in json.load(sys.stdin).get("data",[])]' 2>/dev/null || echo "    (check manually)"
+}
+
+cmd_kill() {
+  echo ">>> Stopping ALL inference (no disable)..."
+  local u
+  # SIGKILL first (vLLM ignores SIGTERM) so stop returns immediately.
+  for u in $(_vllm_units) "$GATEWAY_UNIT" "$OLLAMA_UNIT"; do
+    _sc kill --signal=SIGKILL "$u" >/dev/null 2>&1 || true
+  done
+  sleep 1
+  for u in $(_vllm_units) "$GATEWAY_UNIT" "$OLLAMA_UNIT"; do
+    _sc stop "$u" >/dev/null 2>&1 || true
+    _sc reset-failed "$u" >/dev/null 2>&1 || true
+  done
+  sleep 1
+  _kill_gpu
+  echo "  VRAM: $(_vram)"
+  echo "  Done — all inference stopped."
+}
+
+usage() {
+  cat >&2 <<EOF
+Usage: brain-swap {ollama|vllm|status|kill} [options]
+  ollama                 Stop + disable ALL vLLM units, start Ollama
+  vllm [--units "..."]   Stop Ollama, re-enable + start recorded vLLM units (+gateway)
+  status                 Show all units (active/enabled) + GPU
+  kill                   Stop everything, free GPU (does not disable)
+EOF
+  exit 1
+}
+
+[[ $# -lt 1 ]] && usage
+case "$1" in
+  status) cmd_status ;;
+  kill)   cmd_kill ;;
+  ollama) cmd_ollama ;;
+  vllm)   shift; cmd_vllm "$@" ;;
+  *)      usage ;;
+esac
