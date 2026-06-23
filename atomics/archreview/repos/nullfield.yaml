@@ -1,0 +1,61 @@
+repo:
+  name: nullfield
+  git_ref: main
+  path_env: NULLFIELD_PATH
+tiers:
+  floor:
+    budget_tokens: 16000
+    priority:
+      - "cmd/nullfield/main.go"
+      - "pkg/proxy/handler.go"
+      - "pkg/policy/**"
+      - "README.md"
+    exclude:
+      - "vendor/**"
+      - "bin/**"
+      - "tests/**"
+  local:
+    budget_tokens: 32000
+    priority:
+      - "cmd/**"
+      - "pkg/**"
+      - "policies/**"
+      - "README.md"
+      - "api/**"
+    exclude:
+      - "vendor/**"
+      - "bin/**"
+  wide:
+    budget_tokens: 48000
+    priority:
+      - "cmd/**"
+      - "pkg/**"
+      - "policies/**"
+      - "api/**"
+      - "internal/**"
+      - "examples/**"
+    exclude:
+      - "vendor/**"
+  expanded:
+    budget_tokens: 128000
+    priority:
+      - "cmd/**"
+      - "pkg/**"
+      - "policies/**"
+      - "api/**"
+      - "internal/**"
+    exclude:
+      - "vendor/**"
+answer_key:
+  version: 2
+  categories:
+    - {id: pep_pdp_split, weight: 15.0}
+    - {id: five_action_model, weight: 14.0}
+    - {id: credential_stripping, weight: 12.0}
+    - {id: hold_timeout_fail_closed, weight: 11.0}
+    - {id: circuit_breaker, weight: 10.0}
+    - {id: tls_mesh_assumption, weight: 9.0}
+    - {id: admin_api_surface, weight: 8.0}
+    - {id: identity_validation, weight: 7.0}
+    - {id: audit_logging, weight: 7.0}
+    - {id: budget_enforcement, weight: 7.0}
