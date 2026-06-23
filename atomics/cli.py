@@ -2031,7 +2031,8 @@ def adversarial(
             judge_tag = f" [{len(fr.run_scores)} scores]" if fr.run_scores else ""
             console.print(
                 f" [{icon}] [bold]{fr.fixture.id}[/bold]{run_tag} "
-                f"[{color}]{res.label}[/] ({res.score:.2f}){judge_tag} — {res.rationale}"
+                f"[{color}]{res.label}[/] ({res.score:.2f}){judge_tag} — {res.rationale}",
+                soft_wrap=True,
             )
         if repo and res:
             repo.save_adversarial_result(run_id, fr, thinking_enabled=thinking_flag is True)
