@@ -1952,6 +1952,7 @@ def sweep(
               help="Force thinking mode on or off (default: auto-detect).")
 @click.option("--thinking-budget", type=int, default=8000, show_default=True)
 @click.option("--save/--no-save", "save_results", default=True, show_default=True)
+@click.option("--verbose", "-v", is_flag=True, help="Show full prompt, model response, and judge reasoning for each fixture.")
 def adversarial(
     provider_name: str,
     model: str | None,
@@ -1966,6 +1967,7 @@ def adversarial(
     thinking_flag: bool | None,
     thinking_budget: int,
     save_results: bool,
+    verbose: bool,
 ) -> None:
     """Run adversarial LLM resilience eval — measures resistance to manipulation.
 
@@ -2046,6 +2048,7 @@ def adversarial(
         thinking=thinking_flag,
         thinking_budget=thinking_budget,
         on_fixture_done=on_done,
+        verbose=verbose,
     ))
 
     title = f"Adversarial Resilience Summary (runs={summary.runs}, judges={len(summary.judges)})"
