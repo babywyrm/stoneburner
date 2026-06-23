@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
 from atomics.eval.adversarial.fixtures import ADVERSARIAL_FIXTURES, AdversarialFixture
+from atomics.eval.adversarial.zerotrust import ZEROTRUST_FIXTURES
 from atomics.eval.adversarial.scorer import ResistanceResult, _label_from_score, score_resistance
 from atomics.eval.judge import detect_self_judge
 from atomics.providers.base import BaseProvider
@@ -183,7 +184,7 @@ async def run_adversarial(
 
     fixture_results: list[AdversarialFixtureResult] = []
 
-    fixtures = ADVERSARIAL_FIXTURES
+    fixtures = ADVERSARIAL_FIXTURES + ZEROTRUST_FIXTURES
     if categories:
         fixtures = [f for f in fixtures if f.category in categories]
 

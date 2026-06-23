@@ -1978,7 +1978,7 @@ def adversarial(
       atomics adversarial --runs 3 --extra-judges "ollama:deepseek-r1:14b@http://ollama-host:11434"
     """
     from atomics.eval.adversarial.runner import run_adversarial
-    from atomics.eval.adversarial.fixtures import ADVERSARIAL_FIXTURES
+    from atomics.eval.adversarial import ALL_FIXTURES
 
     console = Console()
     settings = load_settings()
@@ -2009,7 +2009,7 @@ def adversarial(
         f"({model or 'default'})\n"
         f"Judge: [cyan]{judge_provider_name}[/cyan] ({judge_label}) | "
         f"Runs per fixture: [bold]{runs}[/bold]\n"
-        f"Fixtures: [bold]{len(ADVERSARIAL_FIXTURES)}[/bold] | "
+        f"Fixtures: [bold]{len(ALL_FIXTURES)}[/bold] | "
         f"Categories: [bold]{category or 'all'}[/bold]\n"
     )
 
