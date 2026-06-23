@@ -5,6 +5,24 @@
 ### Added (stoneburner)
 - **`atomics archreview`** — a repo-agnostic security-architecture review benchmark. Feeds each model under test a **deterministic, content-hashed, token-budgeted evidence pack** of a codebase (tiered: `floor` 16k / `local` 32k / `wide` 48k / `expanded` 128k, so small local models, practical local runs, larger local models, and frontier models are compared fairly) and scores its structured findings two independent ways: (1) **objective** difficulty-weighted OWASP-category recall/precision against a per-repo answer key (deterministic, judge-independent), and (2) a separate **self-judge-guarded reasoning score** (0–10 → 0–1) rating trust-boundary/data-flow/prioritization quality. Multi-round runs report finding-set **robustness** (mean pairwise Jaccard stability + recall stdev). Answer keys are pluggable per repo (`atomics/archreview/repos/<name>.yaml`); **OWASP Juice Shop** ships as the first target with its key derived from `challenges.yml` (per-category weight = summed challenge difficulty). New `atomics/archreview/` package (taxonomy, models, evidence-pack builder, prompt + lenient findings parser, answer-key generator, scorer, async runner), `archreview_results` table (schema v15), and `atomics archreview` CLI with a Rich comparison table. `--max-output-tokens` caps generation for slow local triage runs, `--inference-timeout` lets long-context local runs finish, and `--judge-only` skips objective scoring for repos without a key. Reuses the existing provider abstraction, `detect_self_judge`, and lenient-parsing patterns. New tests across taxonomy/models/pack/prompt/keygen/scorer/runner/storage/CLI.
 
+- **Zero-trust adversarial fixtures** (`atomics/eval/adversarial/zerotrust.py`) —
+  6 new fixtures benchmarking model resistance to agentic attack patterns: tool-use
+  manipulation via injected context (MCP-T02), breakglass token extraction,
+  credential exfiltration via tool calls, system-prompt rewrite persistence,
+  authority fabrication, and runtime blocklist evasion. Each maps to a proven attack
+  from the zero-trust stack (Artifice RCON injection, Gatekeeper bypass, camazotz
+  cred_broker, nullfield HOLD, skillseraph J1, Artifice blocklist). Registered in
+  `ALL_FIXTURES`; run with `atomics adversarial --category zerotrust`.
+- **Archreview answer keys for ecosystem repos** — pluggable YAML keys for
+  `nullfield` (10 categories: PEP/PDP split, 5-action model, credential stripping,
+  fail-closed, circuit breaker, TLS mesh assumption, admin API, identity, audit,
+  budgets), `zero-trust-blueprint` (10 categories: layered PEP, shared PDP,
+  ambient nonbypassability, egress credential isolation, admission hygiene, network
+  defense-in-depth, identity gap, model allowlist, CNI caveat), and `camazotz`
+  (10 categories: guardrail-not-boundary, OWASP MCP Top 10, OIDC identity,
+  nullfield sidecar, tool execution despite refusal, observer, multi-provider,
+  credential labs, runtime config, supply chain). All with 4-tier evidence packs.
+
 ### Fixed and improved (stoneburner)
 - **`archreview` parser tolerance** — added three new fallback passes so every major model output format is handled: (1) **markdown table rows** (`| injection | routes/x.ts | high | raw sql |`), (2) **numbered/bold lists** (`1. **Injection** — routes/x.ts — high — why`), and (3) **hybrid labeled-pipe** (`INJECTION | ROUTE: routes/x.ts | SEVERITY: high | WHY: …`). All passes now guard against markdown table header and separator rows so label words (`Category`, `Location`, etc.) and `---|---` lines are never returned as findings. Prompt tightened with an explicit "no markdown/no table/no numbering" instruction and a concrete one-line example to improve small-model format compliance.
 - **`archreview` taxonomy** — 30+ new synonyms covering non-web targets: `path traversal`, `directory traversal`, `lfi/rfi`, `privilege escalation`, `open redirect` → `broken_access_control`; `hardcoded credentials/secret` → `sensitive_data_exposure`; `race condition`, `toctou`, `buffer overflow`, `integer overflow` → `improper_input_validation`; `ssti`, `log injection`, `crlf injection`, `ldap injection` → `injection`; `weak cipher/hash`, `insecure random` → `cryptographic_issues`; `dependency confusion`, `supply chain` → `vulnerable_components`; `dos`, `redos`, `resource exhaustion` → `broken_anti_automation`. Makes the tool useful against Go APIs, Rust services, IaC, and other non-webapp targets without any configuration.
