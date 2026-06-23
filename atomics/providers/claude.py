@@ -40,7 +40,7 @@ class ClaudeProvider(BaseProvider):
     def __init__(
         self,
         api_key: str,
-        default_model: str = "claude-sonnet-4-20250514",
+        default_model: str = "claude-sonnet-4-6",
         *,
         client: object | None = None,
     ) -> None:

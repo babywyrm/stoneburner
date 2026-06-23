@@ -28,7 +28,7 @@ def test_bedrock_provider_implements_interface():
 def test_claude_cost_estimation():
     from atomics.providers.claude import _estimate_cost
 
-    cost = _estimate_cost("claude-sonnet-4-20250514", 1000, 500)
+    cost = _estimate_cost("claude-sonnet-4-6", 1000, 500)
     expected = (1000 * 3.0 + 500 * 15.0) / 1_000_000
     assert abs(cost - expected) < 0.000001
 
@@ -38,7 +38,7 @@ def test_claude_cost_estimation_cache_aware():
 
     # input rate 3.0/M, output 15.0/M; cache write 1.25x, cache read 0.10x.
     cost = _estimate_cost(
-        "claude-sonnet-4-20250514",
+        "claude-sonnet-4-6",
         input_tokens=1000,
         output_tokens=500,
         cache_read_tokens=2000,
@@ -57,8 +57,8 @@ def test_claude_cost_estimation_cache_defaults_to_zero():
     """Cache args are optional — omitting them matches the no-cache cost."""
     from atomics.providers.claude import _estimate_cost
 
-    assert _estimate_cost("claude-sonnet-4-20250514", 1000, 500) == _estimate_cost(
-        "claude-sonnet-4-20250514", 1000, 500, 0, 0
+    assert _estimate_cost("claude-sonnet-4-6", 1000, 500) == _estimate_cost(
+        "claude-sonnet-4-6", 1000, 500, 0, 0
     )
 
 

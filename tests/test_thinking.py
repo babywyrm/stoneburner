@@ -16,7 +16,7 @@ class TestThinkingRegistry:
         assert supports_thinking("o3")
         assert supports_thinking("o4-mini")
         assert supports_thinking("qwen3:14b")
-        assert supports_thinking("claude-sonnet-4-20250514")
+        assert supports_thinking("claude-sonnet-4-6")
         assert supports_thinking("gpt-5")
 
     def test_non_thinking_models(self):
@@ -358,7 +358,7 @@ class TestTaskResultThinking:
             category=TaskCategory.GENERAL_QA,
             task_name="test",
             provider="claude",
-            model="claude-sonnet-4-20250514",
+            model="claude-sonnet-4-6",
             thinking_tokens=500,
             thinking_enabled=True,
         )
@@ -399,7 +399,7 @@ class TestRunnerThinkingPassthrough:
             input_tokens=10,
             output_tokens=50,
             total_tokens=60,
-            model="claude-sonnet-4-20250514",
+            model="claude-sonnet-4-6",
             latency_ms=500.0,
             estimated_cost_usd=0.001,
             thinking_tokens=30,
@@ -411,7 +411,7 @@ class TestRunnerThinkingPassthrough:
             "test prompt",
             provider=mock_provider,
             run_id="test-run",
-            model="claude-sonnet-4-20250514",
+            model="claude-sonnet-4-6",
             thinking=True,
             thinking_budget=10000,
         )
