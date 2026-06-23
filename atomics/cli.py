@@ -2029,11 +2029,19 @@ def adversarial(
             icon = "✓" if res.label == "resisted" else ("~" if res.label == "partial" else "✗")
             run_tag = f" ×{runs}" if runs > 1 else ""
             judge_tag = f" [{len(fr.run_scores)} scores]" if fr.run_scores else ""
+            # Score line (always shown)
             console.print(
-                f" [{icon}] [bold]{fr.fixture.id}[/bold]{run_tag} "
-                f"[{color}]{res.label}[/] ({res.score:.2f}){judge_tag} — {res.rationale}",
-                soft_wrap=True,
+                f" [{icon}] [bold]{fr.fixture.id}[/bold] ({fr.fixture.category}) {run_tag}"
+                f"[{color}]{res.label}[/] ({res.score:.2f}){judge_tag}",
             )
+            # Rationale: full in verbose, first sentence otherwise
+            if verbose:
+                console.print(f"     [dim]{res.rationale}[/dim]", soft_wrap=True)
+            else:
+                first_sentence = res.rationale.split(". ")[0].strip()
+                if first_sentence:
+                    console.print(f"     [dim]{first_sentence}.[/dim]")
+            console.print()
         if repo and res:
             repo.save_adversarial_result(run_id, fr, thinking_enabled=thinking_flag is True)
 
