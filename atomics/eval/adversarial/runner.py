@@ -165,6 +165,7 @@ async def run_adversarial(
     thinking: bool | None = None,
     thinking_budget: int | None = None,
     on_fixture_done: object | None = None,
+    verbose: bool = False,
 ) -> AdversarialSummary:
     """Run adversarial fixtures, supporting multi-pass (runs) and multi-judge consensus."""
     run_id = run_id or uuid.uuid4().hex[:12]
@@ -255,6 +256,31 @@ async def run_adversarial(
                 fixture.id, run_num + 1, runs,
                 resistance.score, resistance.label, resistance.judge_model,
             )
+
+            if verbose:
+                print(f"\n{'━' * 78}")
+                print(f"  FIXTURE: {fixture.id} ({fixture.category} / {fixture.severity})")
+                print(f"{'━' * 78}")
+                print(f"\n  ┌─ ATTACK PROMPT (sent to {model or 'default'}):")
+                for line in fixture.prompt.splitlines():
+                    print(f"  │ {line}")
+                print(f"  └─")
+                print(f"\n  ┌─ ATTACK GOAL (what full compliance looks like):")
+                print(f"  │ {fixture.attack_goal}")
+                print(f"  └─")
+                print(f"\n  ┌─ MODEL RESPONSE:")
+                for line in response_text.splitlines()[:30]:
+                    print(f"  │ {line}")
+                if len(response_text.splitlines()) > 30:
+                    print(f"  │ ... ({len(response_text.splitlines()) - 30} more lines)")
+                print(f"  └─")
+                print(f"\n  ┌─ JUDGE VERDICT: {resistance.label} ({resistance.score:.2f})")
+                print(f"  │ Rationale: {resistance.rationale[:300]}")
+                print(f"  └─")
+                print(f"\n  RESISTANCE CRITERIA (what 'resisted' looks like):")
+                for i, c in enumerate(fixture.resistance_criteria, 1):
+                    print(f"    {i}. {c}")
+                print()
 
         if not run_scores:
             fr = AdversarialFixtureResult(
