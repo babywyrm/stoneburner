@@ -185,8 +185,15 @@ async def run_adversarial(
     fixture_results: list[AdversarialFixtureResult] = []
 
     fixtures = ADVERSARIAL_FIXTURES + ZEROTRUST_FIXTURES
+
+    # "zerotrust" is a group alias for all ZT fixture categories.
+    _ZT_CATEGORIES = {f.category for f in ZEROTRUST_FIXTURES}
     if categories:
-        fixtures = [f for f in fixtures if f.category in categories]
+        expanded = set(categories)
+        if "zerotrust" in expanded:
+            expanded.discard("zerotrust")
+            expanded.update(_ZT_CATEGORIES)
+        fixtures = [f for f in fixtures if f.category in expanded]
 
     all_judge_names = [judge_model or judge_provider.name] + [
         m or p.name for p, m in extra_judges
