@@ -7,7 +7,7 @@ from atomics.providers import pricing
 
 def test_estimate_cost_basic_no_cache():
     cost = pricing.estimate_cost(
-        "claude-sonnet-4-20250514",
+        "claude-sonnet-4-6",
         1000,
         500,
         table=pricing.CLAUDE_PRICING,
@@ -18,7 +18,7 @@ def test_estimate_cost_basic_no_cache():
 
 def test_estimate_cost_cache_aware():
     cost = pricing.estimate_cost(
-        "claude-sonnet-4-20250514",
+        "claude-sonnet-4-6",
         1000,
         500,
         table=pricing.CLAUDE_PRICING,
@@ -58,8 +58,8 @@ def test_provider_wrappers_delegate_to_central():
     from atomics.providers.claude import _estimate_cost as claude_cost
     from atomics.providers.openai import _estimate_cost as openai_cost
 
-    assert claude_cost("claude-sonnet-4-20250514", 1000, 500, 2000, 400) == pricing.estimate_cost(
-        "claude-sonnet-4-20250514",
+    assert claude_cost("claude-sonnet-4-6", 1000, 500, 2000, 400) == pricing.estimate_cost(
+        "claude-sonnet-4-6",
         1000,
         500,
         table=pricing.CLAUDE_PRICING,

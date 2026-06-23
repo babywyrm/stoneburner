@@ -74,12 +74,12 @@ async def test_claude_generate_captures_cache_tokens():
 
     fake_client = type("FakeClient", (), {"messages": FakeMessages()})()
     provider = ClaudeProvider(api_key="fake", client=fake_client)
-    resp = await provider.generate("hi", model="claude-sonnet-4-20250514")
+    resp = await provider.generate("hi", model="claude-sonnet-4-6")
 
     assert resp.cache_read_tokens == 2000
     assert resp.cache_write_tokens == 400
     # Cost must reflect the cached-token discount/premium.
-    expected = round(_estimate_cost("claude-sonnet-4-20250514", 10, 20, 2000, 400), 6)
+    expected = round(_estimate_cost("claude-sonnet-4-6", 10, 20, 2000, 400), 6)
     assert resp.estimated_cost_usd == expected
 
 

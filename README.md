@@ -45,7 +45,7 @@ Stoneburner auto-detects models with thinking/reasoning capabilities and handles
 uv run atomics run --provider ollama -m qwen3:14b -n 5
 
 # Explicit control
-uv run atomics run --provider claude -m claude-sonnet-4-20250514 --thinking -n 5
+uv run atomics run --provider claude -m claude-sonnet-4-6 --thinking -n 5
 uv run atomics run --provider openai -m o3 --no-thinking -n 5
 
 # Custom thinking budget (Claude)

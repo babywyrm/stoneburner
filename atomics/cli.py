@@ -1941,7 +1941,7 @@ def sweep(
 @click.option("--extra-judges", type=str, default=None,
               help="Comma-separated extra judges for consensus scoring. "
                    "Format: provider:model or provider:model@host. "
-                   "Example: ollama:deepseek-r1:14b,claude:claude-sonnet-4-20250514")
+                   "Example: ollama:deepseek-r1:14b,claude:claude-sonnet-4-6")
 @click.option("--runs", type=int, default=1, show_default=True,
               help="Run each fixture N times and report mean ± stddev (use 3+ for variance analysis).")
 @click.option("--category", type=str, default=None,
@@ -1976,7 +1976,7 @@ def adversarial(
     \b
     Examples:
       atomics adversarial --provider ollama -m qwen3:14b --runs 3
-      atomics adversarial --judge-model deepseek-r1:14b --extra-judges "claude:claude-sonnet-4-20250514"
+      atomics adversarial --judge-model deepseek-r1:14b --extra-judges "claude:claude-sonnet-4-6"
       atomics adversarial --runs 3 --extra-judges "ollama:deepseek-r1:14b@http://ollama-host:11434"
     """
     from atomics.eval.adversarial.runner import run_adversarial

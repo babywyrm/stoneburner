@@ -17,12 +17,14 @@ CACHE_WRITE_MULTIPLIER = 1.25
 CACHE_READ_MULTIPLIER = 0.10
 
 CLAUDE_PRICING: dict[str, Price] = {
+    # Current (validated against live API 2026-06-22)
     "claude-opus-4-6": (5.0, 25.0),
     "claude-sonnet-4-6": (3.0, 15.0),
-    "claude-haiku-4-5-20251001": (1.0, 5.0),
-    "claude-haiku-4-5": (1.0, 5.0),
-    "claude-sonnet-4-5-20250929": (3.0, 15.0),
     "claude-sonnet-4-5": (3.0, 15.0),
+    "claude-sonnet-4-5-20250929": (3.0, 15.0),
+    "claude-haiku-4-5": (1.0, 5.0),
+    "claude-haiku-4-5-20251001": (1.0, 5.0),
+    # Deprecated (kept for historical cost lookups on stored results)
     "claude-sonnet-4-20250514": (3.0, 15.0),
     "claude-opus-4-20250514": (15.0, 75.0),
 }

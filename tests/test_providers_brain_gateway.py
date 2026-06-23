@@ -45,7 +45,7 @@ async def test_brain_gateway_generate_success():
             "input_tokens": 12,
             "output_tokens": 3,
             "cost_usd": 0.000081,
-            "model": "claude-sonnet-4-20250514",
+            "model": "claude-sonnet-4-6",
         },
     })
 
@@ -73,7 +73,7 @@ async def test_brain_gateway_generate_success():
     assert resp.input_tokens == 12
     assert resp.output_tokens == 3
     assert resp.total_tokens == 15
-    assert resp.model == "claude-sonnet-4-20250514"
+    assert resp.model == "claude-sonnet-4-6"
     assert resp.estimated_cost_usd == 0.000081
     assert resp.latency_ms > 0
 
