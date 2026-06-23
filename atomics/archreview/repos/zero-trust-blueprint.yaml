@@ -1,0 +1,54 @@
+repo:
+  name: zero-trust-blueprint
+  git_ref: main
+  path_env: ZEROTRUST_BLUEPRINT_PATH
+tiers:
+  floor:
+    budget_tokens: 16000
+    priority:
+      - "STACK.md"
+      - "WHY.md"
+      - "policy/authz.rego"
+      - "deploy.sh"
+      - "manifests/22-ambient/**"
+    exclude:
+      - "examples/**"
+      - "observability/**"
+  local:
+    budget_tokens: 32000
+    priority:
+      - "STACK.md"
+      - "WHY.md"
+      - "README.md"
+      - "STATUS.md"
+      - "policy/**"
+      - "manifests/**"
+    exclude:
+      - "examples/**/node_modules/**"
+  wide:
+    budget_tokens: 48000
+    priority:
+      - "*.md"
+      - "policy/**"
+      - "manifests/**"
+      - "examples/camazotz/**"
+      - "examples/envoy-ai-gateway/**"
+    exclude: []
+  expanded:
+    budget_tokens: 128000
+    priority:
+      - "**"
+    exclude: []
+answer_key:
+  version: 2
+  categories:
+    - {id: layered_pep_architecture, weight: 16.0}
+    - {id: shared_pdp_deny_default, weight: 14.0}
+    - {id: ambient_mesh_nonbypassability, weight: 13.0}
+    - {id: egress_credential_isolation, weight: 12.0}
+    - {id: mcp_aware_enforcement, weight: 11.0}
+    - {id: admission_hygiene, weight: 8.0}
+    - {id: network_policy_defense_depth, weight: 7.0}
+    - {id: identity_gap_phase3, weight: 7.0}
+    - {id: model_allowlist_egress, weight: 6.0}
+    - {id: cni_enforcement_caveat, weight: 6.0}

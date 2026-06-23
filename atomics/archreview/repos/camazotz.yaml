@@ -1,0 +1,64 @@
+repo:
+  name: camazotz
+  git_ref: main
+  path_env: CAMAZOTZ_PATH
+tiers:
+  floor:
+    budget_tokens: 16000
+    priority:
+      - "brain_gateway/app/main.py"
+      - "brain_gateway/app/brain/**"
+      - "camazotz_modules/secrets_lab/**"
+      - "README.md"
+    exclude:
+      - "node_modules/**"
+      - "frontend/dist/**"
+      - "coverage*"
+      - "__pycache__/**"
+  local:
+    budget_tokens: 32000
+    priority:
+      - "brain_gateway/**"
+      - "camazotz_modules/**"
+      - "contracts/**"
+      - "README.md"
+    exclude:
+      - "node_modules/**"
+      - "frontend/dist/**"
+      - "__pycache__/**"
+  wide:
+    budget_tokens: 48000
+    priority:
+      - "brain_gateway/**"
+      - "camazotz_modules/**"
+      - "contracts/**"
+      - "compose/**"
+      - "kube/**"
+      - "deploy/**"
+    exclude:
+      - "node_modules/**"
+      - "frontend/dist/**"
+  expanded:
+    budget_tokens: 128000
+    priority:
+      - "brain_gateway/**"
+      - "camazotz_modules/**"
+      - "compose/**"
+      - "kube/**"
+      - "deploy/**"
+      - "integrations/**"
+    exclude:
+      - "node_modules/**"
+answer_key:
+  version: 2
+  categories:
+    - {id: llm_guardrail_not_security_boundary, weight: 16.0}
+    - {id: owasp_mcp_top10_coverage, weight: 14.0}
+    - {id: identity_integration_oidc, weight: 11.0}
+    - {id: nullfield_sidecar_enforcement, weight: 11.0}
+    - {id: tool_execution_despite_refusal, weight: 10.0}
+    - {id: observer_audit_timeline, weight: 8.0}
+    - {id: multi_provider_brain_switching, weight: 8.0}
+    - {id: credential_lab_seeding, weight: 7.0}
+    - {id: runtime_config_api, weight: 7.0}
+    - {id: supply_chain_dependency_surface, weight: 8.0}
