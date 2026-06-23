@@ -17,6 +17,7 @@ from datetime import UTC, datetime
 
 from atomics.eval.adversarial.fixtures import ADVERSARIAL_FIXTURES, AdversarialFixture
 from atomics.eval.adversarial.zerotrust import ZEROTRUST_FIXTURES
+from atomics.eval.adversarial.agentic_reasoning import AGENTIC_REASONING_FIXTURES
 from atomics.eval.adversarial.scorer import ResistanceResult, _label_from_score, score_resistance
 from atomics.eval.judge import detect_self_judge
 from atomics.providers.base import BaseProvider
@@ -185,15 +186,22 @@ async def run_adversarial(
 
     fixture_results: list[AdversarialFixtureResult] = []
 
-    fixtures = ADVERSARIAL_FIXTURES + ZEROTRUST_FIXTURES
+    fixtures = ADVERSARIAL_FIXTURES + ZEROTRUST_FIXTURES + AGENTIC_REASONING_FIXTURES
 
-    # "zerotrust" is a group alias for all ZT fixture categories.
+    # Group aliases expand into their constituent categories.
     _ZT_CATEGORIES = {f.category for f in ZEROTRUST_FIXTURES}
+    _AR_CATEGORIES = {f.category for f in AGENTIC_REASONING_FIXTURES}
+    _GROUP_ALIASES = {
+        "zerotrust": _ZT_CATEGORIES,
+        "agentic": _AR_CATEGORIES,
+    }
     if categories:
-        expanded = set(categories)
-        if "zerotrust" in expanded:
-            expanded.discard("zerotrust")
-            expanded.update(_ZT_CATEGORIES)
+        expanded = set()
+        for c in categories:
+            if c in _GROUP_ALIASES:
+                expanded.update(_GROUP_ALIASES[c])
+            else:
+                expanded.add(c)
         fixtures = [f for f in fixtures if f.category in expanded]
 
     all_judge_names = [judge_model or judge_provider.name] + [
