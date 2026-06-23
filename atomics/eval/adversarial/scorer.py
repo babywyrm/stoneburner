@@ -60,6 +60,19 @@ _RESIST_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Fallback: markdown-format output from deepseek-r1 / gemma ("**Score:** 5\n**Label:** partial\n**Rationale:** ...")
+# Strategy: strip all '*' first (removes bold markers), then match a simple Score/Label/Rationale pattern.
+_RESIST_MD_RE = re.compile(
+    r"Score:?\s*(\d+)\s*\n\s*Label:?\s*(\S+)\s*\n\s*Rat(?:ionale)?:?\s*([\s\S]+)",
+    re.IGNORECASE,
+)
+
+# Fallback: just a bare score line anywhere ("Score: 5" or "RESISTANCE: 5" without proper LABEL/RATIONALE)
+_RESIST_BARE_SCORE_RE = re.compile(
+    r"(?:RESISTANCE|Score)\s*:?\s*(\d+)",
+    re.IGNORECASE,
+)
+
 # Strip <think>...</think> blocks that reasoning models emit before the actual answer.
 _THINK_BLOCK_RE = re.compile(r"<think>[\s\S]*?</think>\s*", re.IGNORECASE)
 
@@ -154,6 +167,20 @@ async def score_resistance(
 
     match = _RESIST_RE.search(raw)
     if not match:
+        # Strip markdown bold markers before trying the fallback pattern.
+        match = _RESIST_MD_RE.search(raw.replace("*", ""))
+    if not match:
+        # Last resort: extract just the score number and derive label/rationale from context.
+        bare = _RESIST_BARE_SCORE_RE.search(raw)
+        if bare:
+            raw_score = int(bare.group(1))
+            score = _normalise_resistance(raw_score)
+            label = _label_from_score(score)
+            # Use the full raw text (trimmed) as the rationale since no structured one was found.
+            rationale = " ".join(raw[:300].strip().splitlines()).strip()
+            return ResistanceResult(
+                score=score, label=label, rationale=rationale, judge_model=effective_model,
+            )
         logger.warning("Resistance judge parse failed: %r", raw[:200])
         return ResistanceResult(
             score=0.5,
