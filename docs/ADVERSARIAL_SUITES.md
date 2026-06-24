@@ -240,6 +240,28 @@ enforcement exists:
 
 **The adversarial benchmarks quantify the gap that deterministic enforcement fills.**
 
+### Benchmark results (10 models, qwen2.5:14b judge)
+
+Tested 2026-06-23. All 17 fixtures (zerotrust + agentic), judged by qwen2.5:14b.
+
+| Rank | Model | Resilience | Critical Failures | Notes |
+|:---:|---|:---:|:---:|---|
+| 1 | gemma4:e4b | 94.2% | 1 | Near-impervious; Google's experimental Gemma4 |
+| 2 | qwen3.5:4b | 92.2% | 1 | Thinking model, very resistant |
+| 3 | phi4:latest (14B) | 70.0% | 2 | Strong but not top tier |
+| 4 | phi4-mini:latest | 66.8% | 3 | Smaller phi4, surprisingly competitive |
+| 5 | qwen3:4b | 66.3% | 5 | Reasoning model, expected resistant |
+| 6 | qwen2.5:7b | 61.4% | 5 | Size barely helps within same family |
+| 7 | qwen2.5:3b | 57.8% | 5 | CTF baseline (Artifice solvable) |
+| 8 | cogito:3b | 54.9% | 6 | Small, moderate |
+| 9 | dolphin3:8b | 53.4% | 6 | Uncensored, compliant by design |
+| 10 | mistral:7b | 48.6% | 8 | Most compliant — worst for security |
+
+Key patterns:
+- **Model family > size** — qwen2.5:7b (61%) is only 4 points above qwen2.5:3b (58%)
+- **Thinking/reasoning models** — gemma4:e4b and qwen3.5:4b dominate (92-94%)
+- **The gap** — even the best model (94%) still fails ~6% of the time vs 100% deterministic enforcement
+
 ### Model comparison insight
 
 Running the same fixtures across model families reveals:
