@@ -2,7 +2,11 @@
 
 ## Unreleased
 
-### Added (stoneburner)
+_Nothing yet._
+
+## 0.7.0 (2026-06-23) — Adversarial security suites, reasoning-model judge support, archreview keys
+
+### Added
 - **`atomics archreview`** — a repo-agnostic security-architecture review benchmark. Feeds each model under test a **deterministic, content-hashed, token-budgeted evidence pack** of a codebase (tiered: `floor` 16k / `local` 32k / `wide` 48k / `expanded` 128k, so small local models, practical local runs, larger local models, and frontier models are compared fairly) and scores its structured findings two independent ways: (1) **objective** difficulty-weighted OWASP-category recall/precision against a per-repo answer key (deterministic, judge-independent), and (2) a separate **self-judge-guarded reasoning score** (0–10 → 0–1) rating trust-boundary/data-flow/prioritization quality. Multi-round runs report finding-set **robustness** (mean pairwise Jaccard stability + recall stdev). Answer keys are pluggable per repo (`atomics/archreview/repos/<name>.yaml`); **OWASP Juice Shop** ships as the first target with its key derived from `challenges.yml` (per-category weight = summed challenge difficulty). New `atomics/archreview/` package (taxonomy, models, evidence-pack builder, prompt + lenient findings parser, answer-key generator, scorer, async runner), `archreview_results` table (schema v15), and `atomics archreview` CLI with a Rich comparison table. `--max-output-tokens` caps generation for slow local triage runs, `--inference-timeout` lets long-context local runs finish, and `--judge-only` skips objective scoring for repos without a key. Reuses the existing provider abstraction, `detect_self_judge`, and lenient-parsing patterns. New tests across taxonomy/models/pack/prompt/keygen/scorer/runner/storage/CLI.
 
 - **Zero-trust adversarial fixtures** (`atomics/eval/adversarial/zerotrust.py`) —
@@ -23,7 +27,34 @@
   nullfield sidecar, tool execution despite refusal, observer, multi-provider,
   credential labs, runtime config, supply chain). All with 4-tier evidence packs.
 
-### Fixed and improved (stoneburner)
+- **Agentic-reasoning adversarial fixtures** (`atomics/eval/adversarial/agentic_reasoning.py`) —
+  11 fixtures across 5 categories testing model reasoning about security architecture:
+  MCP protocol (tool-output injection, dangerous tool selection, cross-server exfil),
+  supply-chain trust (dependency-planted configs, review suppression), delegation
+  (credential forwarding, privilege escalation through depth), egress awareness
+  (credential sprawl, secrets-in-prompts), admission (LLM-as-policy antipattern,
+  deterministic vs non-deterministic). Group alias: `--category agentic`.
+- **`--verbose` flag** for adversarial eval — dumps the full attack prompt, model
+  response, judge rationale, and resistance criteria for each fixture.
+- **Reasoning-model judge support** — deepseek-r1, phi4-reasoning, gemma4, and
+  functiongemma can now be used as judges. Three-pass score parsing (standard →
+  markdown → bare-score), `<think>` block stripping, sentiment-based fallback,
+  and score-rationale contradiction detection.
+- **ADVERSARIAL_SUITES.md** — comprehensive docs covering flow, scoring, all
+  suites, 10-model benchmark leaderboard, and ecosystem context.
+- **Total adversarial fixtures: 32** (base 15 + zerotrust 6 + agentic 11).
+
+### Fixed and improved
+- **Ollama provider** — explicitly set `think=false` for non-thinking models,
+  preventing Ollama from auto-enabling thinking and returning empty responses
+  (affected gemma4:e4b).
+- **Claude provider default** — updated from deprecated `claude-sonnet-4-20250514`
+  (404) to `claude-sonnet-4-6` (verified valid). All tests, CLI, and README updated.
+- **Adversarial scorer** — multi-format judge output parsing, sentiment fallback,
+  contradiction detector, lenient label resolution (numeric labels), increased
+  max_tokens for judge calls (128→512).
+- **CLI output** — category shown per fixture, first-sentence rationale in default
+  mode (full in --verbose), soft-wrap for long lines, spacing fixes.
 - **`archreview` parser tolerance** — added three new fallback passes so every major model output format is handled: (1) **markdown table rows** (`| injection | routes/x.ts | high | raw sql |`), (2) **numbered/bold lists** (`1. **Injection** — routes/x.ts — high — why`), and (3) **hybrid labeled-pipe** (`INJECTION | ROUTE: routes/x.ts | SEVERITY: high | WHY: …`). All passes now guard against markdown table header and separator rows so label words (`Category`, `Location`, etc.) and `---|---` lines are never returned as findings. Prompt tightened with an explicit "no markdown/no table/no numbering" instruction and a concrete one-line example to improve small-model format compliance.
 - **`archreview` taxonomy** — 30+ new synonyms covering non-web targets: `path traversal`, `directory traversal`, `lfi/rfi`, `privilege escalation`, `open redirect` → `broken_access_control`; `hardcoded credentials/secret` → `sensitive_data_exposure`; `race condition`, `toctou`, `buffer overflow`, `integer overflow` → `improper_input_validation`; `ssti`, `log injection`, `crlf injection`, `ldap injection` → `injection`; `weak cipher/hash`, `insecure random` → `cryptographic_issues`; `dependency confusion`, `supply chain` → `vulnerable_components`; `dos`, `redos`, `resource exhaustion` → `broken_anti_automation`. Makes the tool useful against Go APIs, Rust services, IaC, and other non-webapp targets without any configuration.
 - **`archreview` Juice Shop answer key v2** — added `ssrf` (weight 6.0, matches Juice Shop `challenges.yml` difficulty 6 and the confirmed surface in `routes/profileImageUrlUpload.ts`). Total weight 90 → 96. Frontier models that surface SSRF as the correct architectural category are no longer precision-penalized.
