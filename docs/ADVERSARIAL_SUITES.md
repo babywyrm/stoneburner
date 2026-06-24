@@ -240,27 +240,29 @@ enforcement exists:
 
 **The adversarial benchmarks quantify the gap that deterministic enforcement fills.**
 
-### Benchmark results (10 models, qwen2.5:14b judge)
+### Benchmark results (10 models, all 32 fixtures, qwen2.5:14b judge)
 
-Tested 2026-06-23. All 17 fixtures (zerotrust + agentic), judged by qwen2.5:14b.
+Tested 2026-06-23. All 32 fixtures (base 15 + zerotrust 6 + agentic 11), judged
+by qwen2.5:14b (consistent, zero parse failures).
 
 | Rank | Model | Resilience | Critical Failures | Notes |
 |:---:|---|:---:|:---:|---|
-| 1 | gemma4:e4b | 94.2% | 1 | Near-impervious; Google's experimental Gemma4 |
-| 2 | qwen3.5:4b | 92.2% | 1 | Thinking model, very resistant |
-| 3 | phi4:latest (14B) | 70.0% | 2 | Strong but not top tier |
-| 4 | phi4-mini:latest | 66.8% | 3 | Smaller phi4, surprisingly competitive |
-| 5 | qwen3:4b | 66.3% | 5 | Reasoning model, expected resistant |
-| 6 | qwen2.5:7b | 61.4% | 5 | Size barely helps within same family |
-| 7 | qwen2.5:3b | 57.8% | 5 | CTF baseline (Artifice solvable) |
-| 8 | cogito:3b | 54.9% | 6 | Small, moderate |
-| 9 | dolphin3:8b | 53.4% | 6 | Uncensored, compliant by design |
-| 10 | mistral:7b | 48.6% | 8 | Most compliant — worst for security |
+| 1 | qwen3.5:4b | 95.2% | 0 | Thinking model — near-impervious |
+| 2 | gemma4:e4b | 86.7% | 3 | Strong; falls on MCP protocol + supply-chain |
+| 3 | phi4:latest (14B) | 82.9% | 2 | Solid across all categories |
+| 4 | phi4-mini:latest | 74.0% | 6 | Smaller phi4, surprisingly competitive |
+| 5 | qwen3:4b | 68.5% | 8 | Reasoning model but more gaps than expected |
+| 6 | cogito:3b | 61.8% | 10 | Small model, many critical failures |
+| 7 | qwen2.5:7b | 58.9% | 8 | Size barely helps within same family |
+| 8 | qwen2.5:3b | 55.6% | 8 | CTF baseline (Artifice solvable) |
+| 9 | mistral:7b | 54.0% | 8 | Compliant — poor for security |
+| 10 | dolphin3:8b | 48.5% | 11 | Uncensored — worst for security |
 
 Key patterns:
-- **Model family > size** — qwen2.5:7b (61%) is only 4 points above qwen2.5:3b (58%)
-- **Thinking/reasoning models** — gemma4:e4b and qwen3.5:4b dominate (92-94%)
-- **The gap** — even the best model (94%) still fails ~6% of the time vs 100% deterministic enforcement
+- **Thinking models dominate** — qwen3.5:4b (95%) is the only model with zero critical failures
+- **Model family > size** — qwen2.5:7b (59%) is only 3 points above qwen2.5:3b (56%)
+- **The gap** — even the best model (95%) still has partial compliance on 3 fixtures vs 100% deterministic enforcement
+- **Production implication** — every model below 90% needs infrastructure-level gates to compensate
 
 ### Model comparison insight
 
@@ -312,3 +314,15 @@ flowchart TD
 Each tool tests a different axis. Stoneburner stays on model reasoning; mcpnuke
 stays on infrastructure probing; skillseraph stays on config-at-rest. They
 complement each other without overlapping.
+
+---
+
+## Future considerations
+
+- `--json-out` for adversarial results — machine-readable export for dashboards/CI
+- `--compare` mode — run two models side-by-side, diff per-fixture scores
+- SQLite storage integration — persist results across runs for trend tracking
+- Deepseek-r1 judge helper — handle step-by-step prose and markdown formatting
+- Additional fixture categories — multi-turn manipulation, RAG poisoning, tool-description injection
+- Per-category weighting — custom weight profiles for different threat models
+- CI gate mode — `--fail-on-resilience 60` to fail if overall drops below threshold
