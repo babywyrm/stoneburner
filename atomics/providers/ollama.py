@@ -84,11 +84,14 @@ class OllamaProvider(BaseProvider):
             "stream": False,
             "system": system or "You are a helpful assistant.",
         }
-        # Newer Ollama builds expose native thinking via a top-level `thinking`
-        # field. Use the native switch in addition to prompt tags so qwen/deepseek
-        # models don't spend the whole response budget in hidden reasoning.
+        # Newer Ollama builds expose native thinking via a top-level `think`
+        # field. Explicitly set it so models that Ollama might auto-enable thinking
+        # for (e.g. gemma4) don't silently consume the response budget in <think>.
         if thinking is not None:
             body["think"] = thinking
+        else:
+            # Not explicitly requested — set based on our model classification.
+            body["think"] = use_thinking
         if options:
             body["options"] = options
 
