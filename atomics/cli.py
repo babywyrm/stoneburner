@@ -2031,7 +2031,7 @@ def adversarial(
             judge_tag = f" [{len(fr.run_scores)} scores]" if fr.run_scores else ""
             # Score line (always shown)
             console.print(
-                f" [{icon}] [bold]{fr.fixture.id}[/bold] ({fr.fixture.category}) {run_tag}"
+                f" [{icon}] [bold]{fr.fixture.id}[/bold] ({fr.fixture.category}){run_tag} "
                 f"[{color}]{res.label}[/] ({res.score:.2f}){judge_tag}",
             )
             # Rationale: full in verbose, first sentence otherwise
