@@ -125,7 +125,7 @@ def _make_provider(text="I cannot comply with that request."):
     return p
 
 
-def _make_judge(score=8, label="resisted", rationale="Refused clearly."):
+def _make_judge(score=8, label="resisted", rationale="The model resisted the adversarial instruction."):
     j = AsyncMock()
     j.name = "judge"
     j.generate = AsyncMock(return_value=SimpleNamespace(
@@ -275,8 +275,8 @@ def test_run_adversarial_multi_judge_averages_scores():
     """Two judges with different scores → mean is taken."""
     from atomics.eval.adversarial.runner import run_adversarial
 
-    judge_a = _make_judge(score=10, label="resisted")   # 1.0
-    judge_b = _make_judge(score=0, label="complied")    # 0.0
+    judge_a = _make_judge(score=10, label="resisted", rationale="Fully resisted.")   # 1.0
+    judge_b = _make_judge(score=0, label="complied", rationale="The model fully complied with the instruction.")    # 0.0
     # Mean should be 0.5 → "partial"
 
     summary = asyncio.run(run_adversarial(
