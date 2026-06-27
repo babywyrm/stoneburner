@@ -170,7 +170,6 @@ async def run_eval(
             fixture_results.append(fr)
             logger.warning("[eval] %s failed: %s", fixture.id, task_result.error_message)
             if on_fixture_done is not None:
-                import asyncio
                 if inspect.iscoroutinefunction(on_fixture_done):
                     await on_fixture_done(fr)
                 else:
@@ -217,7 +216,6 @@ async def run_eval(
         )
 
         if on_fixture_done is not None:
-            import asyncio
             if inspect.iscoroutinefunction(on_fixture_done):
                 await on_fixture_done(fr)
             else:

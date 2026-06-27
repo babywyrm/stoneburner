@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
 
 from atomics.eval.judge import score_response
 from atomics.probe.checks import build_check

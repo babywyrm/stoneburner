@@ -8,7 +8,7 @@ Each handler receives the raw artifact content and returns a dict with:
 
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
 _HANDLERS: dict[str, Callable[[str], dict]] = {}
 

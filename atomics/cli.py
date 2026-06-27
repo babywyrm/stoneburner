@@ -761,7 +761,7 @@ def _print_narrative(console: Console, rows: list[dict], by: str) -> None:
     if all_costs:
         total_api_spend = sum(all_costs)
         console.print(
-            f"\n[bold]Data privacy:[/bold] Every token sent to an external API "
+            "\n[bold]Data privacy:[/bold] Every token sent to an external API "
             "transits third-party infrastructure. Self-hosted inference eliminates "
             "this exposure entirely — critical for regulated industries or sensitive workloads."
         )
@@ -1034,7 +1034,7 @@ def eval(
 
     if repo:
         repo.close()
-        console.print(f"\n[dim]Results saved to database. Run [bold]atomics compare --narrative[/bold] after evaluating multiple providers.[/dim]")
+        console.print("\n[dim]Results saved to database. Run [bold]atomics compare --narrative[/bold] after evaluating multiple providers.[/dim]")
 
 
 @cli.command()
@@ -1247,7 +1247,7 @@ def stress(
         repo = MetricsRepository(settings.db_path)
         repo.save_stress_result(result)
         repo.close()
-        console.print(f"\n[dim]Results saved to database.[/dim]")
+        console.print("\n[dim]Results saved to database.[/dim]")
 
 
 @cli.command()
@@ -1284,7 +1284,7 @@ def capacity(
       atomics capacity --users 100 --peak-tps 107 --single-latency 15000
       atomics capacity --users 50 --think-time 600 --model qwen2.5:7b
     """
-    from atomics.capacity import CapacityProjection, LoadProfile, project_capacity
+    from atomics.capacity import LoadProfile, project_capacity
 
     settings = load_settings()
     console = Console()
@@ -1418,8 +1418,6 @@ def export_tasks(
       atomics export --suite sweep -o out.jsonl
       atomics export --suite all --format csv -o all_metrics.csv
     """
-    import csv as _csv
-    import json as _json
 
     settings = load_settings()
     from atomics.exporters import write_tasks_export
@@ -1925,7 +1923,7 @@ def sweep(
         for r in results:
             repo.save_sweep_result(r)
         repo.close()
-        console.print(f"\n[dim]Sweep results saved to database.[/dim]")
+        console.print("\n[dim]Sweep results saved to database.[/dim]")
 
 
 # ── atomics adversarial ───────────────────────────────────────────────────────
@@ -1979,8 +1977,8 @@ def adversarial(
       atomics adversarial --judge-model deepseek-r1:14b --extra-judges "claude:claude-sonnet-4-6"
       atomics adversarial --runs 3 --extra-judges "ollama:deepseek-r1:14b@http://ollama-host:11434"
     """
-    from atomics.eval.adversarial.runner import run_adversarial
     from atomics.eval.adversarial import ALL_FIXTURES
+    from atomics.eval.adversarial.runner import run_adversarial
 
     console = Console()
     settings = load_settings()
@@ -2115,8 +2113,8 @@ def redblue(
     save_results: bool,
 ) -> None:
     """Run red/blue team LLM capability eval — offensive and defensive security tasks."""
+    from atomics.eval.redblue.fixtures import ALL_FIXTURES, BLUE_FIXTURES, RED_FIXTURES
     from atomics.eval.redblue.runner import run_redblue
-    from atomics.eval.redblue.fixtures import RED_FIXTURES, BLUE_FIXTURES, ALL_FIXTURES
 
     console = Console()
     fixture_count = {"red": len(RED_FIXTURES), "blue": len(BLUE_FIXTURES), "all": len(ALL_FIXTURES)}[mode]
@@ -2214,7 +2212,8 @@ def probe(
 ) -> None:
     """Run LLM-evaluated live ecosystem health probes against configured artifact targets."""
     from pathlib import Path
-    from atomics.probe.config import load_probe_config, ProbeTarget
+
+    from atomics.probe.config import ProbeTarget, load_probe_config
     from atomics.probe.runner import run_probe
 
     console = Console()
@@ -2517,11 +2516,11 @@ def soak(
         repo = MetricsRepository(settings.db_path)
         repo.save_soak_result(result)
         repo.close()
-        console.print(f"\n[dim]Results saved to database.[/dim]")
+        console.print("\n[dim]Results saved to database.[/dim]")
 
     if save_baseline_name or compare_baseline_name:
+        from atomics.regression import compute_regression, load_baseline, save_baseline
         from atomics.storage.schema import init_db
-        from atomics.regression import save_baseline, load_baseline, compute_regression
         conn = init_db(settings.db_path)
 
     if save_baseline_name:
@@ -2539,7 +2538,7 @@ def soak(
         console.print(f"\n[green]Baseline '[bold]{save_baseline_name}[/bold]' saved.[/green]")
 
     if compare_baseline_name:
-        from atomics.regression import load_baseline, compute_regression
+        from atomics.regression import compute_regression, load_baseline
         from atomics.storage.schema import init_db
         conn = init_db(settings.db_path)
         bl = load_baseline(conn, compare_baseline_name, "soak")
@@ -2646,7 +2645,8 @@ def qa(
     """
     import asyncio as _asyncio
     import logging as _logging
-    from atomics.qa_runner import load_qa_suite, run_qa_suite, QAResult
+
+    from atomics.qa_runner import QAResult, load_qa_suite, run_qa_suite
 
     _logging.getLogger("httpx").setLevel(_logging.WARNING)
     _logging.getLogger("httpcore").setLevel(_logging.WARNING)
@@ -2939,7 +2939,7 @@ def scenario(
         repo = MetricsRepository(settings.db_path)
         repo.save_scenario_result(result)
         repo.close()
-        console.print(f"\n[dim]Results saved to database.[/dim]")
+        console.print("\n[dim]Results saved to database.[/dim]")
 
 
 @cli.command()

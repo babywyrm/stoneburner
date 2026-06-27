@@ -5,8 +5,8 @@ from __future__ import annotations
 import asyncio
 import re
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Callable
 
 
 def parse_duration(s: str) -> float:
@@ -151,9 +151,9 @@ async def run_soak(
     on_sample: Callable[[SoakSample], None] | None = None,
 ) -> SoakResult:
     """Run a soak test against an Ollama endpoint."""
-    from atomics.stress import STRESS_PROMPTS, _get_vram_used_mb, _single_request
-
     import httpx
+
+    from atomics.stress import STRESS_PROMPTS, _get_vram_used_mb, _single_request
 
     result = SoakResult(
         model=model,
@@ -419,9 +419,9 @@ async def run_soak_profile(
     on_sample: Callable[[SoakSample], None] | None = None,
 ) -> SoakResult:
     """Run a soak test against a custom target profile (ollama or http)."""
-    from atomics.profiles import TargetProfile, _single_request_profile
-
     import httpx
+
+    from atomics.profiles import TargetProfile, _single_request_profile
 
     tp: TargetProfile = profile  # type: ignore[assignment]
 

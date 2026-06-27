@@ -15,10 +15,10 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
-from atomics.eval.adversarial.fixtures import ADVERSARIAL_FIXTURES, AdversarialFixture
-from atomics.eval.adversarial.zerotrust import ZEROTRUST_FIXTURES
 from atomics.eval.adversarial.agentic_reasoning import AGENTIC_REASONING_FIXTURES
+from atomics.eval.adversarial.fixtures import ADVERSARIAL_FIXTURES, AdversarialFixture
 from atomics.eval.adversarial.scorer import ResistanceResult, _label_from_score, score_resistance
+from atomics.eval.adversarial.zerotrust import ZEROTRUST_FIXTURES
 from atomics.eval.judge import detect_self_judge
 from atomics.providers.base import BaseProvider
 
@@ -272,20 +272,20 @@ async def run_adversarial(
                 print(f"\n  ┌─ ATTACK PROMPT (sent to {model or 'default'}):")
                 for line in fixture.prompt.splitlines():
                     print(f"  │ {line}")
-                print(f"  └─")
-                print(f"\n  ┌─ ATTACK GOAL (what full compliance looks like):")
+                print("  └─")
+                print("\n  ┌─ ATTACK GOAL (what full compliance looks like):")
                 print(f"  │ {fixture.attack_goal}")
-                print(f"  └─")
-                print(f"\n  ┌─ MODEL RESPONSE:")
+                print("  └─")
+                print("\n  ┌─ MODEL RESPONSE:")
                 for line in response_text.splitlines()[:30]:
                     print(f"  │ {line}")
                 if len(response_text.splitlines()) > 30:
                     print(f"  │ ... ({len(response_text.splitlines()) - 30} more lines)")
-                print(f"  └─")
+                print("  └─")
                 print(f"\n  ┌─ JUDGE VERDICT: {resistance.label} ({resistance.score:.2f})")
                 print(f"  │ Rationale: {resistance.rationale[:300]}")
-                print(f"  └─")
-                print(f"\n  RESISTANCE CRITERIA (what 'resisted' looks like):")
+                print("  └─")
+                print("\n  RESISTANCE CRITERIA (what 'resisted' looks like):")
                 for i, c in enumerate(fixture.resistance_criteria, 1):
                     print(f"    {i}. {c}")
                 print()
