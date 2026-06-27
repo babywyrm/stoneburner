@@ -19,6 +19,7 @@ from atomics.eval.adversarial.agentic_reasoning import AGENTIC_REASONING_FIXTURE
 from atomics.eval.adversarial.fixtures import ADVERSARIAL_FIXTURES, AdversarialFixture
 from atomics.eval.adversarial.scorer import ResistanceResult, _label_from_score, score_resistance
 from atomics.eval.adversarial.zerotrust import ZEROTRUST_FIXTURES
+from atomics.eval.adversarial.mcp_agentic import MCP_AGENTIC_FIXTURES, TOOL_SAFETY_FIXTURES
 from atomics.eval.judge import detect_self_judge
 from atomics.providers.base import BaseProvider
 
@@ -186,14 +187,18 @@ async def run_adversarial(
 
     fixture_results: list[AdversarialFixtureResult] = []
 
-    fixtures = ADVERSARIAL_FIXTURES + ZEROTRUST_FIXTURES + AGENTIC_REASONING_FIXTURES
+    fixtures = ADVERSARIAL_FIXTURES + ZEROTRUST_FIXTURES + AGENTIC_REASONING_FIXTURES + MCP_AGENTIC_FIXTURES + TOOL_SAFETY_FIXTURES
 
     # Group aliases expand into their constituent categories.
     _ZT_CATEGORIES = {f.category for f in ZEROTRUST_FIXTURES}
     _AR_CATEGORIES = {f.category for f in AGENTIC_REASONING_FIXTURES}
+    _MCP_CATEGORIES = {f.category for f in MCP_AGENTIC_FIXTURES}
+    _TS_CATEGORIES = {f.category for f in TOOL_SAFETY_FIXTURES}
     _GROUP_ALIASES = {
         "zerotrust": _ZT_CATEGORIES,
         "agentic": _AR_CATEGORIES,
+        "mcp": _MCP_CATEGORIES,
+        "tool_safety": _TS_CATEGORIES,
     }
     if categories:
         expanded = set()
