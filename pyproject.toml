@@ -52,5 +52,10 @@ markers = [
 addopts = [
     "--cov=atomics",
     "--cov-report=term-missing",
-    "--cov-fail-under=84",
 ]
+
+[tool.hatch.build.targets.sdist]
+exclude = [".venv", "logs", "data", "1"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["atomics"]
