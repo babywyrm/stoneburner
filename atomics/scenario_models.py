@@ -151,15 +151,15 @@ def parse_workload_flag(flag: str) -> WorkloadSpec:
 
 def load_scenario_yaml(path: str) -> list[WorkloadSpec]:
     """Load workload specs from a YAML scenario file."""
-    import yaml
-
     from pathlib import Path
+
+    import yaml
 
     content = Path(path).read_text()
     data = yaml.safe_load(content)
 
     if not isinstance(data, dict) or "workloads" not in data:
-        raise ValueError(f"Scenario file must have a 'workloads' key at the top level")
+        raise ValueError("Scenario file must have a 'workloads' key at the top level")
 
     specs: list[WorkloadSpec] = []
     for i, entry in enumerate(data["workloads"]):
