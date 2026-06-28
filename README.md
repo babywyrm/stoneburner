@@ -121,6 +121,17 @@ uv run atomics tiers
 
 Stoneburner includes three purpose-built security testing suites. These complement tools like `mcpnuke` (infrastructure scanning) by focusing on *LLM reasoning quality and resilience* rather than raw infrastructure probing.
 
+**Fixture categories (48 total):** prompt injection, role confusion, context escape,
+instruction override, social engineering, data exfil, tool manipulation, breakglass
+extraction, credential exfil, behavior persistence, blocklist evasion,
+**MCP/agentic resistance** (tool-call compliance, authority fabrication, breakglass
+injection, context poisoning, agent-loop escape), and **tool-use safety** (dangerous
+operations presented as legitimate requests).
+
+**Cost visibility:** when using a paid judge (e.g. Claude), per-fixture and total
+cost is displayed inline. Use `--judge-provider claude --judge-model claude-haiku-4-5-20251001`
+for calibrated low-cost judging.
+
 > **Two independent axes — score them separately.** `redblue` measures
 > **capability** (can the model *do* security work) and `adversarial` measures
 > **resilience** (does the model *resist* being manipulated). A model can be
@@ -132,6 +143,9 @@ Stoneburner includes three purpose-built security testing suites. These compleme
 > Run both suites and weigh them together.
 
 ### `atomics adversarial` — Resilience Eval
+
+> **Latest leaderboard:** [`docs/LEADERBOARD.md`](docs/LEADERBOARD.md) — 9-model
+> sweep with per-category resistance scores (2026-06-27).
 
 Tests whether a model resists adversarial manipulation: prompt injection, role confusion, jailbreaks, social engineering, and data exfiltration attempts. Uses an inverted scoring model — higher scores mean better resistance.
 
