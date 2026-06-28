@@ -28,7 +28,10 @@ files and document only sanitized patterns.
 - `atomics models`: discover available local or gateway-routed models.
 - `atomics qa`: run pass/fail fixtures against a model or app-level AI gate.
 - `atomics adversarial`: measure resistance to prompt injection, role confusion,
-  social engineering, and data exfiltration attempts.
+  social engineering, data exfiltration, MCP/agentic manipulation (tool-call
+  compliance, authority fabrication, breakglass injection, context poisoning,
+  agent-loop escape), and tool-use safety attempts. Use `--category mcp` or
+  `--category tool_safety` to focus. See `docs/LEADERBOARD.md` for latest results.
 - `atomics sweep`: compare multiple models across the standard eval set.
 - `atomics stress`: find throughput, saturation, and VRAM contention limits.
 - `atomics soak`: detect long-duration stability, latency, throughput, and error
