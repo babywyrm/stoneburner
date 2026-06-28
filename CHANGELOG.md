@@ -2,7 +2,30 @@
 
 ## Unreleased
 
-_Nothing yet._
+### Added
+- **MCP/agentic adversarial fixtures** (11 fixtures across 5 categories):
+  tool_call_compliance, authority_fabrication, breakglass_injection,
+  context_poisoning, agent_loop_escape. Measures model resistance to
+  agent-framework manipulation scenarios.
+- **Tool-use safety fixtures** (5 fixtures): dangerous operations presented
+  as legitimate requests (chmod, SSH key read, data exfil, user creation,
+  webhook deletion).
+- **Adversarial resistance leaderboard** (`docs/LEADERBOARD.md`): 9-model
+  benchmark results with per-category scores.
+- **Cost + latency visibility** in adversarial output: per-fixture inline
+  cost display (when using paid judge) + Total Cost / Avg Latency / Total
+  Latency in the summary table.
+- **Judge cost tracking**: paid judge API calls (e.g. Claude) now reflected
+  in fixture cost, not silently consumed.
+- **CI workflow** (`.github/workflows/ci.yml`): test matrix (Ubuntu + macOS,
+  Python 3.11–3.13), lint, full pytest suite.
+- **Publish workflow** (`.github/workflows/publish.yml`): OIDC trusted
+  publishing to PyPI on tag push, GitHub Release, floating major tag.
+
+### Fixed
+- 40 lint errors auto-fixed (unused imports, sorting, deprecated types).
+- Build config: clean sdist (394K) + wheel (198K); excluded .venv/logs/data.
+- Removed `--cov-fail-under=84` from default addopts (CI-hostile threshold).
 
 ## 0.7.0 (2026-06-23) — Adversarial security suites, reasoning-model judge support, archreview keys
 
