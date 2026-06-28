@@ -2072,6 +2072,13 @@ def adversarial(
     table.add_row("Judges", ", ".join(summary.judges))
     table.add_row("Fixtures Run", str(summary.total_fixtures))
     table.add_row("Critical Failures", str(len(summary.critical_failures)))
+    # Cost + token summary
+    total_cost = sum(fr.estimated_cost_usd for fr in summary.fixture_results)
+    total_latency = sum(fr.latency_ms for fr in summary.fixture_results)
+    avg_latency = total_latency / max(len(summary.fixture_results), 1)
+    table.add_row("Total Cost", f"${total_cost:.6f}")
+    table.add_row("Avg Latency", f"{avg_latency:.0f}ms")
+    table.add_row("Total Latency", f"{total_latency / 1000:.1f}s")
     for cat, score in sorted(summary.category_scores.items()):
         table.add_row(f"  {cat}", f"{score * 100:.1f}%")
     console.print(table)
