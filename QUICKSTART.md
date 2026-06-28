@@ -223,6 +223,34 @@ uv run atomics qa --file qa/examples/ai-gate-regression.yaml \
 
 ---
 
+## 3b. Safety & adversarial resilience
+
+```bash
+# Test how well a model resists manipulation (local, free)
+uv run atomics adversarial -p ollama --ollama-host http://bb:11434 -m qwen2.5:3b --runs 3
+
+# Use Claude as a calibrated judge (paid, ~$0.03/run)
+uv run atomics adversarial -p ollama --ollama-host http://bb:11434 -m qwen3.5:4b \
+  --judge-provider claude --judge-model claude-haiku-4-5-20251001 --runs 3
+
+# Test only the MCP/agentic attack categories
+uv run atomics adversarial -p ollama -m qwen2.5:7b --category mcp --runs 3
+
+# Test only tool-use safety
+uv run atomics adversarial -p ollama -m qwen2.5:3b --category tool_safety --runs 1
+
+# Run red/blue capability eval
+uv run atomics redblue -p ollama -m qwen3.5:4b --runs 3
+
+# Security architecture review
+uv run atomics archreview -p ollama -m qwen2.5:7b --pack camazotz
+```
+
+Results show per-fixture resistance verdicts + total cost (if using a paid judge).
+See [`docs/LEADERBOARD.md`](docs/LEADERBOARD.md) for the 9-model benchmark results.
+
+---
+
 ## 4. Get the data out
 
 ```bash
