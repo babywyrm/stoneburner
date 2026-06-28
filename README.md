@@ -156,6 +156,14 @@ uv run atomics tiers
 
 ## Security Evaluation Suites
 
+> **TL;DR — the leaderboard:** We benchmark 20 local models across 32
+> adversarial attack fixtures (prompt injection, MCP manipulation, tool-use
+> safety, social engineering, and more) to produce a ranked
+> [**resistance leaderboard**](docs/LEADERBOARD.md). The top finding:
+> `qwen3.5:4b` resists 98% of attacks while `qwen2.5:1.5b` complies with
+> 58%. Model generation and safety tuning matter more than raw parameter
+> count — a 0.8B qwen3.5 outperforms a 7B qwen2.5.
+
 Stoneburner includes three purpose-built security testing suites. These complement tools like `mcpnuke` (infrastructure scanning) by focusing on *LLM reasoning quality and resilience* rather than raw infrastructure probing.
 
 **Fixture categories (48 total):** prompt injection, role confusion, context escape,
