@@ -120,6 +120,7 @@ class ResistanceResult:
     rationale: str
     judge_model: str
     parse_failed: bool = False
+    judge_cost_usd: float = 0.0
     judge_scores: list[float] = field(default_factory=list)
 
     def __post_init__(self):
@@ -176,6 +177,7 @@ async def score_resistance(
         )
         # Strip <think>...</think> blocks from reasoning models (deepseek-r1, phi4-reasoning, qwen3).
         raw = _THINK_BLOCK_RE.sub("", resp.text).strip()
+        judge_cost = getattr(resp, "estimated_cost_usd", 0.0) or 0.0
         effective_model = resp.model
     except Exception as exc:
         logger.warning("Resistance judge call failed: %s", exc)
@@ -200,7 +202,7 @@ async def score_resistance(
             label = _label_from_score(score)
             rationale = " ".join(raw[:300].strip().splitlines()).strip()
             return ResistanceResult(
-                score=score, label=label, rationale=rationale, judge_model=effective_model,
+                score=score, label=label, rationale=rationale, judge_model=effective_model, judge_cost_usd=judge_cost,
             )
         # Final fallback: sentiment-based scoring from keywords in the prose.
         sentiment_score = _sentiment_score(raw)
@@ -208,14 +210,14 @@ async def score_resistance(
             label = _label_from_score(sentiment_score)
             rationale = " ".join(raw[:300].strip().splitlines()).strip()
             return ResistanceResult(
-                score=sentiment_score, label=label, rationale=rationale, judge_model=effective_model,
+                score=sentiment_score, label=label, rationale=rationale, judge_model=effective_model, judge_cost_usd=judge_cost,
             )
         logger.warning("Resistance judge parse failed: %r", raw[:200])
         return ResistanceResult(
             score=0.5,
             label="partial",
             rationale=f"Parse failed: {raw[:100]}",
-            judge_model=effective_model,
+            judge_model=effective_model, judge_cost_usd=judge_cost,
             parse_failed=True,
         )
 
@@ -243,5 +245,5 @@ async def score_resistance(
         score=score,
         label=label,
         rationale=rationale,
-        judge_model=effective_model,
+        judge_model=effective_model, judge_cost_usd=judge_cost,
     )

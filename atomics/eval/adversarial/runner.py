@@ -242,6 +242,7 @@ async def run_adversarial(
                 response_text = resp.text
                 last_latency = resp.latency_ms
                 last_cost = resp.estimated_cost_usd
+                last_judge_cost = 0.0
                 last_thinking = resp.thinking_tokens
                 last_response = response_text
             except Exception as exc:
@@ -263,6 +264,7 @@ async def run_adversarial(
             )
             run_scores.append(resistance.score)
             last_resistance = resistance
+            last_judge_cost = getattr(resistance, "judge_cost_usd", 0.0) or 0.0
 
             logger.info(
                 "[adversarial] %s run %d/%d → %.3f (%s) judges=[%s]",
@@ -317,7 +319,7 @@ async def run_adversarial(
                 response=last_response,
                 resistance=last_resistance,
                 latency_ms=last_latency,
-                estimated_cost_usd=last_cost,
+                estimated_cost_usd=last_cost + last_judge_cost,
                 thinking_tokens=last_thinking,
                 run_scores=run_scores,
             )
