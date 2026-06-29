@@ -118,4 +118,15 @@ def run_doctor(settings: AtomicsSettings | None = None) -> int:
         if shutil.which(binary):
             console.print(f"[green]{binary}[/green] found ({desc})")
 
+    # Keychain secrets
+    from atomics.secrets import keychain_available, list_secrets
+    if keychain_available():
+        stored = list_secrets()
+        if stored:
+            console.print(f"[green]OS keychain:[/green] {len(stored)} secret(s) stored ({', '.join(stored)})")
+        else:
+            console.print("[dim]OS keychain: available, no secrets stored (use 'atomics secrets set' to add)[/dim]")
+    else:
+        console.print("[yellow]OS keychain: not available (secrets fallback disabled)[/yellow]")
+
     return 1 if errors else 0

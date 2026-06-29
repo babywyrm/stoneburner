@@ -459,6 +459,33 @@ Results persist to `archreview_results` (schema v15). Use `--judge-only` to skip
 
 ---
 
+## Secrets Management
+
+Stoneburner uses a layered resolution for API keys and secrets:
+
+| Priority | Source | Example |
+|----------|--------|---------|
+| 1 (highest) | Environment variable | `export ANTHROPIC_API_KEY=sk-ant-...` |
+| 2 | `.env` file in project dir | `ANTHROPIC_API_KEY=sk-ant-...` in `.env` |
+| 3 (fallback) | OS keychain | `atomics secrets set ANTHROPIC_API_KEY` |
+
+The OS keychain (macOS Keychain, Linux secret-service) stores secrets encrypted
+by the operating system — no plaintext files needed.
+
+```bash
+# Store a key securely (prompted, hidden input)
+atomics secrets set ANTHROPIC_API_KEY
+
+# Verify it's stored
+atomics secrets list
+
+# Use it — load_settings() checks the keychain automatically
+atomics provider-test -p claude
+
+# Remove when done
+atomics secrets delete ANTHROPIC_API_KEY
+```
+
 ## Architecture
 
 ```

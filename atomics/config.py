@@ -55,4 +55,15 @@ class AtomicsSettings(BaseSettings):
 
 
 def load_settings() -> AtomicsSettings:
-    return AtomicsSettings()
+    """Load settings with layered secret resolution: env -> .env -> keychain."""
+    settings = AtomicsSettings()
+
+    # Backfill empty API keys from OS keychain (layer 3)
+    from atomics.secrets import get_secret
+
+    if not settings.anthropic_api_key:
+        settings.anthropic_api_key = get_secret("ANTHROPIC_API_KEY") or ""
+    if not settings.openai_api_key:
+        settings.openai_api_key = get_secret("OPENAI_API_KEY") or ""
+
+    return settings
