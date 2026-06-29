@@ -18,6 +18,8 @@ uv sync
 
 # 2. Pick a backend — set whichever you'll use
 export ANTHROPIC_API_KEY=sk-ant-...        # Claude (default provider)
+# Or store securely in the OS keychain (no plaintext file needed):
+# atomics secrets set ANTHROPIC_API_KEY
 export OPENAI_API_KEY=sk-...               # OpenAI / o-series
 export ATOMICS_OLLAMA_HOST=http://gpu:11434  # local Ollama (zero cost)
 

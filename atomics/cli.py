@@ -3152,3 +3152,98 @@ def archreview(repo_name, models_csv, provider_name, ollama_host, vllm_host,
     console.print(table)
     if repo:
         repo.close()
+
+
+# ── atomics secrets ───────────────────────────────────────────────────────────
+
+
+@cli.group("secrets")
+def secrets_group():
+    """Manage API keys and secrets in the OS keychain.
+
+    Secrets stored here are used as the last-resort fallback when an API key
+    is not set via environment variable or .env file.
+
+    Resolution order (first found wins):
+      1. Environment variable (e.g. ANTHROPIC_API_KEY=...)
+      2. .env file in the project directory
+      3. OS keychain (managed by this command)
+    """
+
+
+@secrets_group.command("set")
+@click.argument("key")
+def secrets_set(key: str):
+    """Store a secret in the OS keychain.
+
+    The value is prompted interactively (hidden input — not echoed to terminal).
+
+    Example: atomics secrets set ANTHROPIC_API_KEY
+    """
+    from atomics.secrets import set_secret, keychain_available
+
+    if not keychain_available():
+        click.echo("Error: no OS keychain backend available.", err=True)
+        raise SystemExit(1)
+
+    key = key.upper()
+    value = click.prompt(f"Enter value for {key}", hide_input=True, confirmation_prompt=True)
+    if not value.strip():
+        click.echo("Error: empty value — not stored.", err=True)
+        raise SystemExit(1)
+
+    set_secret(key, value.strip())
+    click.echo(f"Stored: {key}")
+
+
+@secrets_group.command("get")
+@click.argument("key")
+def secrets_get(key: str):
+    """Retrieve a secret from the OS keychain (for piping or debugging).
+
+    Example: atomics secrets get ANTHROPIC_API_KEY
+    """
+    from atomics.secrets import get_secret
+
+    key = key.upper()
+    value = get_secret(key)
+    if value is None:
+        click.echo(f"Not found: {key}", err=True)
+        raise SystemExit(1)
+    click.echo(value)
+
+
+@secrets_group.command("list")
+def secrets_list():
+    """List secret keys stored in the OS keychain (names only, never values)."""
+    from atomics.secrets import list_secrets, keychain_available
+
+    if not keychain_available():
+        click.echo("No OS keychain backend available.")
+        return
+
+    stored = list_secrets()
+    if not stored:
+        click.echo("No secrets stored in the keychain.")
+        return
+
+    click.echo(f"{len(stored)} secret(s) in keychain:")
+    for key in stored:
+        click.echo(f"  {key}")
+
+
+@secrets_group.command("delete")
+@click.argument("key")
+def secrets_delete(key: str):
+    """Remove a secret from the OS keychain.
+
+    Example: atomics secrets delete ANTHROPIC_API_KEY
+    """
+    from atomics.secrets import delete_secret
+
+    key = key.upper()
+    if delete_secret(key):
+        click.echo(f"Deleted: {key}")
+    else:
+        click.echo(f"Not found or could not delete: {key}", err=True)
+        raise SystemExit(1)
