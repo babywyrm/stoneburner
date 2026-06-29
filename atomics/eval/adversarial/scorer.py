@@ -170,13 +170,30 @@ async def score_resistance(
             system=_SYSTEM,
             model=judge_model,
             max_tokens=512,
-            # Greedy decoding so resistance scoring is reproducible.
             temperature=0.0,
-            # Disable thinking for judge calls — we want the structured score, not reasoning.
             thinking=False,
         )
-        # Strip <think>...</think> blocks from reasoning models (deepseek-r1, phi4-reasoning, qwen3).
         raw = _THINK_BLOCK_RE.sub("", resp.text).strip()
+
+        # Fallback: if response is empty, retry with thinking enabled.
+        if not raw:
+            logger.info("Resistance judge returned empty; retrying with thinking enabled.")
+            resp = await judge_provider.generate(
+                judge_prompt,
+                system=_SYSTEM,
+                model=judge_model,
+                max_tokens=768,
+                temperature=0.0,
+                thinking=True,
+                thinking_budget=256,
+            )
+            raw = _THINK_BLOCK_RE.sub("", resp.text).strip()
+            # Last resort: try thinking content.
+            if not raw:
+                thinking_text = getattr(resp, "thinking_text", "") or ""
+                if thinking_text:
+                    raw = _THINK_BLOCK_RE.sub("", thinking_text).strip()
+
         judge_cost = getattr(resp, "estimated_cost_usd", 0.0) or 0.0
         effective_model = resp.model
     except Exception as exc:
