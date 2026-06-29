@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import sys
+import time
 
 import click
 from rich.console import Console
@@ -16,21 +17,84 @@ from atomics.models import BurnTier
 
 
 def _setup_logging(level: str) -> None:
+    numeric = getattr(logging, level.upper(), logging.INFO)
     logging.basicConfig(
-        level=getattr(logging, level.upper(), logging.INFO),
+        level=logging.WARNING,
         format="%(message)s",
         datefmt="[%X]",
         handlers=[RichHandler(rich_tracebacks=True, markup=True)],
+        force=True,
     )
+    # Only our own loggers get the requested level; third-party stays quiet.
+    logging.getLogger("atomics").setLevel(numeric)
 
 
 TIER_CHOICES = click.Choice([t.value for t in BurnTier], case_sensitive=False)
 
 
+class FixtureProgress:
+    """Real-time progress tracker for long-running fixture-based evals."""
+
+    def __init__(self, total: int, console: Console, label: str = "fixture"):
+        self.total = total
+        self.console = console
+        self.label = label
+        self._start = time.monotonic()
+        self._fixture_times: list[float] = []
+        self._current_start: float | None = None
+        self._status = None
+
+    def on_start(self, index: int, fixture_id: str, category: str) -> None:
+        self._current_start = time.monotonic()
+        elapsed = time.monotonic() - self._start
+        eta = self._estimate_remaining(index)
+        eta_str = f" | ETA remaining: {self._fmt_duration(eta)}" if eta is not None else ""
+        # Start a live spinner that shows elapsed time updating in real-time
+        status_msg = (
+            f"[{index + 1}/{self.total}] {fixture_id} ({category}) "
+            f"— generating...{eta_str}"
+        )
+        self._status = self.console.status(status_msg, spinner="dots")
+        self._status.start()
+
+    def on_done(self, index: int) -> None:
+        if self._status:
+            self._status.stop()
+            self._status = None
+        if self._current_start is not None:
+            self._fixture_times.append(time.monotonic() - self._current_start)
+            self._current_start = None
+
+    def _estimate_remaining(self, current_index: int) -> float | None:
+        if not self._fixture_times:
+            return None
+        avg = sum(self._fixture_times) / len(self._fixture_times)
+        remaining = self.total - current_index
+        return avg * remaining
+
+    @staticmethod
+    def _fmt_duration(seconds: float) -> str:
+        if seconds < 60:
+            return f"{seconds:.0f}s"
+        m, s = divmod(int(seconds), 60)
+        return f"{m}m{s:02d}s"
+
+
 @click.group()
 @click.version_option(package_name="atomics")
-def cli() -> None:
+@click.option("-v", "--verbose", is_flag=True, default=False, help="Enable verbose/debug output.")
+@click.option("--progress/--no-progress", default=True, show_default=True,
+              help="Show real-time progress during long runs.")
+@click.pass_context
+def cli(ctx: click.Context, verbose: bool, progress: bool) -> None:
     """Atomics — Agentic token usage benchmarking platform."""
+    ctx.ensure_object(dict)
+    ctx.obj["verbose"] = verbose
+    ctx.obj["progress"] = progress
+    if verbose:
+        _setup_logging("DEBUG")
+    else:
+        _setup_logging("WARNING")
 
 
 PROVIDER_CHOICES = click.Choice(["claude", "bedrock", "openai", "ollama", "vllm", "brain-gateway"], case_sensitive=False)
@@ -2020,8 +2084,36 @@ def adversarial(
 
     run_id = __import__("uuid").uuid4().hex[:12]
 
+    # Compute actual fixture count (may be filtered by --category)
+    from atomics.eval.adversarial.runner import (
+        ADVERSARIAL_FIXTURES, ZEROTRUST_FIXTURES,
+        AGENTIC_REASONING_FIXTURES, MCP_AGENTIC_FIXTURES, TOOL_SAFETY_FIXTURES,
+    )
+    _all = ADVERSARIAL_FIXTURES + ZEROTRUST_FIXTURES + AGENTIC_REASONING_FIXTURES + MCP_AGENTIC_FIXTURES + TOOL_SAFETY_FIXTURES
+    if categories:
+        _ZT = {f.category for f in ZEROTRUST_FIXTURES}
+        _AR = {f.category for f in AGENTIC_REASONING_FIXTURES}
+        _MCP = {f.category for f in MCP_AGENTIC_FIXTURES}
+        _TS = {f.category for f in TOOL_SAFETY_FIXTURES}
+        _GROUPS = {"zerotrust": _ZT, "agentic": _AR, "mcp": _MCP, "tool_safety": _TS}
+        expanded = set()
+        for c in categories:
+            expanded.update(_GROUPS.get(c, {c}))
+        _all = [f for f in _all if f.category in expanded]
+    adv_fixture_count = len(_all)
+
+    ctx = click.get_current_context()
+    show_progress = ctx.obj.get("progress", True) if ctx.obj else True
+    progress = FixtureProgress(adv_fixture_count, console, label="adversarial") if show_progress else None
+
+    def on_start(idx, fixture):
+        if progress:
+            progress.on_start(idx, fixture.id, fixture.category)
+
     def on_done(fr):
         res = fr.resistance
+        if progress:
+            progress.on_done(0)
         if res:
             color = "green" if res.label == "resisted" else ("yellow" if res.label == "partial" else "red")
             icon = "✓" if res.label == "resisted" else ("~" if res.label == "partial" else "✗")
@@ -2054,6 +2146,7 @@ def adversarial(
         run_id=run_id,
         thinking=thinking_flag,
         thinking_budget=thinking_budget,
+        on_fixture_start=on_start,
         on_fixture_done=on_done,
         verbose=verbose,
     ))
@@ -2150,15 +2243,30 @@ def redblue(
             trigger="manual",
         )
 
+    ctx = click.get_current_context()
+    show_progress = ctx.obj.get("progress", True) if ctx.obj else True
+    verbose = ctx.obj.get("verbose", False) if ctx.obj else False
+    progress = FixtureProgress(fixture_count, console, label="redblue") if show_progress else None
+
+    def on_start(idx, fixture):
+        if progress:
+            progress.on_start(idx, fixture.id, fixture.category)
+
     def on_done(fr):
         j = fr.judge
+        if progress:
+            progress.on_done(0)
         if j:
             pct = int(j.score * 100)
             color = "green" if pct >= 80 else ("yellow" if pct >= 60 else "red")
             console.print(
-                f" [{fr.fixture.team.upper()}] [bold]{fr.fixture.id}[/bold] "
+                f"       [{fr.fixture.team.upper()}] [bold]{fr.fixture.id}[/bold] "
                 f"[{color}]{pct}%[/] ({fr.fixture.category}) — {j.rationale[:80]}"
             )
+            if verbose:
+                console.print(f"       [dim]Response ({fr.task_result.output_tokens} tokens, "
+                              f"{fr.task_result.latency_ms:.0f}ms):[/dim]")
+                console.print(f"       [dim]{(fr.task_result.response or '')[:200]}...[/dim]")
         if repo:
             repo.save_task_result(fr.task_result, suite=f"redblue-{fr.fixture.team}")
 
@@ -2171,6 +2279,7 @@ def redblue(
         run_id=run_id,
         thinking=thinking_flag,
         thinking_budget=thinking_budget,
+        on_fixture_start=on_start,
         on_fixture_done=on_done,
     ))
 

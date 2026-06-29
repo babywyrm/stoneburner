@@ -79,6 +79,7 @@ async def run_redblue(
     run_id: str | None = None,
     thinking: bool | None = None,
     thinking_budget: int | None = None,
+    on_fixture_start: object | None = None,
     on_fixture_done: object | None = None,
 ) -> RedBlueSummary:
     """Run red/blue fixtures against provider, judge with quality scorer."""
@@ -100,7 +101,13 @@ async def run_redblue(
 
     results: list[RedBlueFixtureResult] = []
 
-    for fixture in fixture_set:
+    for idx, fixture in enumerate(fixture_set):
+        if on_fixture_start:
+            if inspect.iscoroutinefunction(on_fixture_start):
+                await on_fixture_start(idx, fixture)
+            else:
+                on_fixture_start(idx, fixture)
+
         logger.info(
             "[redblue] %s (%s/%s) %s",
             fixture.id, fixture.team, fixture.category, fixture.prompt[:60],
