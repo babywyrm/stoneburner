@@ -3,29 +3,28 @@
 ## Unreleased
 
 ### Added
-- **MCP/agentic adversarial fixtures** (11 fixtures across 5 categories):
-  tool_call_compliance, authority_fabrication, breakglass_injection,
-  context_poisoning, agent_loop_escape. Measures model resistance to
-  agent-framework manipulation scenarios.
-- **Tool-use safety fixtures** (5 fixtures): dangerous operations presented
-  as legitimate requests (chmod, SSH key read, data exfil, user creation,
-  webhook deletion).
-- **Adversarial resistance leaderboard** (`docs/LEADERBOARD.md`): 9-model
-  benchmark results with per-category scores.
-- **Cost + latency visibility** in adversarial output: per-fixture inline
-  cost display (when using paid judge) + Total Cost / Avg Latency / Total
-  Latency in the summary table.
-- **Judge cost tracking**: paid judge API calls (e.g. Claude) now reflected
-  in fixture cost, not silently consumed.
-- **CI workflow** (`.github/workflows/ci.yml`): test matrix (Ubuntu + macOS,
-  Python 3.11–3.13), lint, full pytest suite.
-- **Publish workflow** (`.github/workflows/publish.yml`): OIDC trusted
-  publishing to PyPI on tag push, GitHub Release, floating major tag.
+- **Progress tracker for long-running evals** — group-level `--verbose/-v` and
+  `--progress/--no-progress` flags. Live Rich spinner shows fixture ID, category,
+  and ETA during inference. Works across `redblue` and `adversarial` commands.
+- **Resilient judge scoring for thinking-mode models** — judge calls now use a
+  3-tier fallback: (1) `thinking=False` direct response, (2) retry with thinking
+  enabled if response empty, (3) parse from thinking content as last resort. Works
+  across all providers (Ollama, Claude, OpenAI, vLLM) without model-specific config.
+- **qwen3.6 model research** (`docs/model-notes/qwen/`): architecture analysis,
+  speed/quality benchmarks, deployment role recommendations. Key finding: qwen3.6
+  MoE (35B-A3B) at 61 tok/s validated as superior judge model (stricter, more
+  discerning than qwen2.5:7b).
+- **Red/Blue capability leaderboard** (`docs/LEADERBOARD-REDBLUE.md`): 20-model
+  overnight sweep results with resistance-vs-capability 2x2 matrix.
+- **OS-keychain secrets layer** (`atomics secrets set/get/list/delete`): layered
+  resolution (env → .env → keychain) with macOS Keychain / Linux secret-service.
 
 ### Fixed
-- 40 lint errors auto-fixed (unused imports, sorting, deprecated types).
-- Build config: clean sdist (394K) + wheel (198K); excluded .venv/logs/data.
-- Removed `--cov-fail-under=84` from default addopts (CI-hostile threshold).
+- **redblue persistence** — FK constraint failure when saving fixture results
+  (missing parent `runs` row). Now creates run row before fixture processing.
+- **Judge parse failures with thinking models** — qwen3.6, deepseek-r1, and
+  other thinking-capable models produced empty responses when used as judge,
+  causing "Parse failed" on all fixtures. Fixed via thinking-aware fallback chain.
 
 ## 0.7.0 (2026-06-23) — Adversarial security suites, reasoning-model judge support, archreview keys
 
