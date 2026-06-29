@@ -256,15 +256,55 @@ async def score_response(
     )
 
     async def _ask(text: str, system: str) -> tuple[str, str]:
+        """Ask the judge model and return (text, model_name).
+
+        Strategy for thinking-capable models:
+        1. First attempt: thinking=False for a direct structured response.
+        2. If the response is empty (model requires thinking to produce output),
+           retry with thinking enabled and use the visible response.
+        3. If still empty but thinking_text has content, attempt to parse scores
+           from the thinking output as a last resort.
+
+        This handles qwen3.6, deepseek-r1, gemma4, and future thinking models
+        without hardcoding model-specific behavior.
+        """
         resp = await judge_provider.generate(
             text,
             system=system,
             model=judge_model,
             max_tokens=128,
-            # Greedy decoding so the same response scores identically run-to-run.
             temperature=0.0,
+            thinking=False,
         )
-        return resp.text.strip(), resp.model
+        result_text = resp.text.strip()
+
+        if result_text:
+            return result_text, resp.model
+
+        # Fallback: response was empty — try with thinking enabled (some models
+        # need to "think" before they can produce any output at all).
+        logger.info("Judge returned empty with thinking=False; retrying with thinking enabled.")
+        resp = await judge_provider.generate(
+            text,
+            system=system,
+            model=judge_model,
+            max_tokens=512,
+            temperature=0.0,
+            thinking=True,
+            thinking_budget=256,
+        )
+        result_text = resp.text.strip()
+
+        if result_text:
+            return result_text, resp.model
+
+        # Last resort: check if scores are embedded in the thinking output.
+        thinking_text = getattr(resp, "thinking_text", "") or ""
+        if thinking_text:
+            logger.info("Judge visible response empty; attempting parse from thinking content.")
+            return thinking_text.strip(), resp.model
+
+        return "", resp.model
 
     try:
         raw, effective_model = await _ask(judge_prompt, _JUDGE_SYSTEM)
