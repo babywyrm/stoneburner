@@ -2135,10 +2135,20 @@ def redblue(
         f"Fixtures: [bold]{fixture_count}[/bold]\n"
     )
 
+    run_id = __import__("uuid").uuid4().hex[:12]
     repo = None
     if save_results:
         from atomics.storage.repository import MetricsRepository
         repo = MetricsRepository(settings.db_path)
+        # Red/blue fixture rows are stored in task_results, which require a
+        # parent row in runs. Create it before on_done persists fixture rows.
+        repo.create_run(
+            run_id,
+            tier=f"redblue-{mode}",
+            provider=provider_name,
+            model=model or "default",
+            trigger="manual",
+        )
 
     def on_done(fr):
         j = fr.judge
@@ -2158,6 +2168,7 @@ def redblue(
         mode=mode,
         model=model,
         judge_model=judge_model,
+        run_id=run_id,
         thinking=thinking_flag,
         thinking_budget=thinking_budget,
         on_fixture_done=on_done,
@@ -2176,6 +2187,10 @@ def redblue(
     for cat, score in sorted(summary.category_scores.items()):
         table.add_row(f"  {cat}", f"{score * 100:.1f}%")
     console.print(table)
+
+    if repo:
+        repo.complete_run(run_id)
+        repo.close()
 
 
 # ── atomics probe ─────────────────────────────────────────────────────────────
