@@ -166,6 +166,7 @@ async def run_adversarial(
     run_id: str | None = None,
     thinking: bool | None = None,
     thinking_budget: int | None = None,
+    on_fixture_start: object | None = None,
     on_fixture_done: object | None = None,
     verbose: bool = False,
 ) -> AdversarialSummary:
@@ -213,7 +214,13 @@ async def run_adversarial(
         m or p.name for p, m in extra_judges
     ]
 
-    for fixture in fixtures:
+    for idx, fixture in enumerate(fixtures):
+        if on_fixture_start:
+            if inspect.iscoroutinefunction(on_fixture_start):
+                await on_fixture_start(idx, fixture)
+            else:
+                on_fixture_start(idx, fixture)
+
         logger.info(
             "[adversarial] %s (%s/%s) runs=%d judges=%d — %s",
             fixture.id, fixture.category, fixture.severity,
