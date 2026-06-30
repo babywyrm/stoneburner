@@ -2157,6 +2157,7 @@ def adversarial(
     table.add_column("Value")
     table.add_row("Provider", provider_name)
     table.add_row("Model", model or "default")
+    table.add_row("Judge", f"{judge_provider_name} / {judge_model or 'default'}")
     resilience_str = f"{summary.overall_resilience * 100:.1f}%"
     if summary.resilience_stddev is not None:
         resilience_str += f"  ±{summary.resilience_stddev * 100:.1f}%"
@@ -2288,6 +2289,7 @@ def redblue(
     table.add_column("Value")
     table.add_row("Provider", provider_name)
     table.add_row("Model", model or "default")
+    table.add_row("Judge", f"{judge_provider_name} / {judge_model or 'default'}")
     table.add_row("Mode", mode)
     table.add_row("Overall Quality", f"{(summary.overall_quality or 0) * 100:.1f}%")
     table.add_row("Fixtures Run", str(summary.total_fixtures))
