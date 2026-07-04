@@ -151,16 +151,48 @@ def test_secrets_get_not_found():
         assert "Not found" in result.output
 
 
-def test_secrets_get_found():
+def test_secrets_get_masks_by_default():
+    """Without --show, the value must not be printed (secure by default)."""
     from click.testing import CliRunner
 
     from atomics.cli import cli
 
-    with patch("keyring.get_password", return_value="test-value"):
+    secret = "sk-ant-supersecretvalue12345"
+    with patch("keyring.get_password", return_value=secret):
         runner = CliRunner()
         result = runner.invoke(cli, ["secrets", "get", "ANTHROPIC_API_KEY"])
         assert result.exit_code == 0
-        assert "test-value" in result.output
+        assert secret not in result.output
+        assert "set" in result.output
+        assert "--show" in result.output
+
+
+def test_secrets_get_show_reveals_value():
+    """With --show, the raw value is printed for piping."""
+    from click.testing import CliRunner
+
+    from atomics.cli import cli
+
+    secret = "sk-ant-supersecretvalue12345"
+    with patch("keyring.get_password", return_value=secret):
+        runner = CliRunner()
+        result = runner.invoke(cli, ["secrets", "get", "ANTHROPIC_API_KEY", "--show"])
+        assert result.exit_code == 0
+        assert secret in result.output
+
+
+def test_secrets_get_mask_never_reveals_short_secret():
+    """Short values are fully masked (no tail preview)."""
+    from click.testing import CliRunner
+
+    from atomics.cli import cli
+
+    with patch("keyring.get_password", return_value="short"):
+        runner = CliRunner()
+        result = runner.invoke(cli, ["secrets", "get", "ANTHROPIC_API_KEY"])
+        assert result.exit_code == 0
+        assert "short" not in result.output
+        assert "****" in result.output
 
 
 def test_secrets_delete_success():

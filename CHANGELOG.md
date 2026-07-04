@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased — structure & hardening
+
+### Added
+- **ARCHITECTURE.md** — layer map, the load-bearing primitives, how to add an
+  eval suite, and the security model. Linked from the README for contributors.
+- **`atomics/stats.py`** — single home for the percentile helper that was
+  copy-pasted across 5 modules.
+- **Type checking in CI** — ship a `py.typed` marker (PEP 561) and add a mypy
+  gate. Config type-checks the package with a documented override list for the
+  duck-typed boundaries still on the Phase-C cleanup list.
+
+### Changed
+- **Single provider factory** — `eval`/`archreview` no longer carry their own
+  `_build_provider`; all commands use `_make_provider` (now takes optional
+  `region`/`context_tokens`/`inference_timeout`).
+
+### Security
+- **`atomics secrets get` no longer prints the value by default.** It reports
+  presence + a masked preview; use `--show` to print the raw value for piping.
+  Removes accidental secret exposure via terminal scrollback / shell history.
+
 ## 0.8.0 (2026-07-04) — New adversarial suites, export/compare/CI plumbing, redblue variance
 
 ### Added
