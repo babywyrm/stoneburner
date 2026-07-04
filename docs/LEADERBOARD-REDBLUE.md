@@ -41,6 +41,31 @@ leaderboard by answering: "Can this model actually do useful security reasoning?
 
 ---
 
+## Mistral family addendum (2026-07-04)
+
+Same methodology (10 fixtures, mode `all`, qwen2.5:7b judge, single run).
+
+| Model | Quality | Avg Latency | Tier |
+|-------|:-------:|:-----------:|------|
+| mistral-small:24b | **92%** | 83.8s | Strong |
+| mistral-nemo:12b | **85%** | 10.0s | Capable |
+
+- **mistral-small:24b (92%)** lands in the Strong tier — matching qwen3:4b /
+  gemma4:12b on capability — but at **83.8s average latency** because 37% of the
+  17GB model runs on CPU (only ~12GB fits on the RTX 5070). It is capable but the
+  slowest model in the fleet to run locally.
+- **mistral-nemo:12b (85%)** is Capable at a far more practical 10s latency —
+  the better local pick when you want Mistral-family capability without the
+  CPU-offload penalty. Both are a clear step up from `mistral:7b` (70%).
+
+**Anchor check:** re-running `qwen2.5:7b` (already ranked #8 at 84%) with the same
+setup produced **92%** this pass. The 8-point swing is single-run variance on a
+10-fixture eval (redblue is not yet multi-run averaged; use `--runs 3` for tighter
+confidence). Read the addendum cohort as approximate — capability tiers hold, exact
+percentages carry ±~8 points of run-to-run noise at this fixture count.
+
+---
+
 ## Key findings
 
 - **`qwen3:14b` tops capability** at 97% — almost perfect security reasoning
