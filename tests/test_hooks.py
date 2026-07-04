@@ -67,11 +67,11 @@ def test_notify_macos_runs_osascript(monkeypatch):
 
 def test_notify_linux_notify_send():
     """Line 56: Linux + notify-send path uses notify_run_complete."""
-    from unittest.mock import patch, MagicMock
+    from datetime import UTC, datetime
+    from unittest.mock import patch
+
     from atomics.hooks import notify_run_complete
     from atomics.models import RunSummary
-
-    from datetime import datetime, UTC
     summary = RunSummary(
         run_id="test123", total_tasks=2, successful_tasks=2,
         failed_tasks=0, total_tokens=500, total_cost_usd=0.005,

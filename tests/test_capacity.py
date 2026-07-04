@@ -2,17 +2,14 @@
 
 from __future__ import annotations
 
-import pytest
-
 from atomics.capacity import (
-    CapacityScenario,
     CapacityProjection,
+    CapacityScenario,
     LoadProfile,
-    project_capacity,
-    interpolate_latency,
     estimate_concurrency,
+    interpolate_latency,
+    project_capacity,
 )
-
 
 # ── Stress data fixtures ─────────────────────────────────────────────────────
 
@@ -179,6 +176,7 @@ def test_project_capacity_custom_burst():
 def test_cli_capacity_from_manual_params(monkeypatch, tmp_path):
     """atomics capacity with manual --peak-tps and --single-latency should work."""
     from click.testing import CliRunner
+
     from atomics.cli import cli
 
     monkeypatch.setenv("ATOMICS_DB_PATH", str(tmp_path / "test.db"))
@@ -196,9 +194,10 @@ def test_cli_capacity_from_manual_params(monkeypatch, tmp_path):
 def test_cli_capacity_from_db(monkeypatch, tmp_path):
     """atomics capacity --model should pull stress data from DB."""
     from click.testing import CliRunner
+
     from atomics.cli import cli
     from atomics.storage.repository import MetricsRepository
-    from atomics.stress import StressResult, ConcurrencyResult
+    from atomics.stress import ConcurrencyResult, StressResult
 
     repo = MetricsRepository(tmp_path / "test.db")
     sr = StressResult(
@@ -238,6 +237,7 @@ def test_cli_capacity_from_db(monkeypatch, tmp_path):
 
 def test_cli_capacity_help():
     from click.testing import CliRunner
+
     from atomics.cli import cli
 
     runner = CliRunner()

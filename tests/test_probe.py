@@ -3,9 +3,9 @@ from __future__ import annotations
 
 import json
 import textwrap
-import pytest
 from pathlib import Path
 
+import pytest
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
@@ -42,15 +42,17 @@ def test_load_probe_config_valid(tmp_path):
 
 
 def test_load_probe_config_missing_file():
-    from atomics.probe.config import load_probe_config, ProbeConfigError
     import pytest
+
+    from atomics.probe.config import ProbeConfigError, load_probe_config
     with pytest.raises(ProbeConfigError, match="not found"):
         load_probe_config(Path("/nonexistent/probes.yaml"))
 
 
 def test_load_probe_config_invalid_artifact_type(tmp_path):
-    from atomics.probe.config import load_probe_config, ProbeConfigError
     import pytest
+
+    from atomics.probe.config import ProbeConfigError, load_probe_config
     cfg = tmp_path / "probes.yaml"
     cfg.write_text(textwrap.dedent("""
         targets:
@@ -77,6 +79,7 @@ def test_valid_artifact_types_list():
 
 def test_fetch_artifact_file(tmp_path):
     import asyncio
+
     from atomics.probe.config import ProbeTarget
     from atomics.probe.connectors import fetch_artifact
     f = tmp_path / "report.json"
@@ -90,9 +93,11 @@ def test_fetch_artifact_file(tmp_path):
 
 def test_fetch_artifact_file_missing(tmp_path):
     import asyncio
+
     import pytest
+
     from atomics.probe.config import ProbeTarget
-    from atomics.probe.connectors import fetch_artifact, ProbeConnectorError
+    from atomics.probe.connectors import ProbeConnectorError, fetch_artifact
     target = ProbeTarget(
         name="test", artifact_type="access-log", source="file", path="/nonexistent/file.log"
     )
@@ -102,9 +107,11 @@ def test_fetch_artifact_file_missing(tmp_path):
 
 def test_fetch_artifact_unknown_source():
     import asyncio
+
     import pytest
+
     from atomics.probe.config import ProbeTarget
-    from atomics.probe.connectors import fetch_artifact, ProbeConnectorError
+    from atomics.probe.connectors import ProbeConnectorError, fetch_artifact
     target = ProbeTarget(
         name="test", artifact_type="api-response", source="sftp",  # type: ignore[arg-type]
         path="/foo"
@@ -162,8 +169,8 @@ def test_build_check_api_response():
 # ── Runner ────────────────────────────────────────────────────────────────────
 
 import asyncio
-from unittest.mock import AsyncMock
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 
 def _provider(text="Analysis complete. Found 2 critical issues."):
@@ -191,7 +198,7 @@ def _judge():
 
 def test_run_probe_returns_summary(tmp_path):
     from atomics.probe.config import ProbeTarget
-    from atomics.probe.runner import run_probe, ProbeSummary
+    from atomics.probe.runner import ProbeSummary, run_probe
 
     f = tmp_path / "access.log"
     f.write_text("10.0.0.5 GET /admin 403\n")
@@ -225,6 +232,7 @@ def test_run_probe_regression_detected(tmp_path):
 def test_fetch_artifact_file_truncation(tmp_path):
     """_fetch_file truncates content > max_bytes."""
     import asyncio
+
     from atomics.probe.config import ProbeTarget
     from atomics.probe.connectors import fetch_artifact
     f = tmp_path / "big.log"
@@ -238,6 +246,7 @@ def test_fetch_artifact_http_source():
     """_fetch_http fetches content via httpx and returns decoded string."""
     import asyncio
     from unittest.mock import AsyncMock, MagicMock, patch
+
     from atomics.probe.config import ProbeTarget
     from atomics.probe.connectors import fetch_artifact
 
@@ -262,10 +271,12 @@ def test_fetch_artifact_http_source():
 def test_fetch_artifact_http_error():
     """_fetch_http wraps httpx.HTTPError into ProbeConnectorError."""
     import asyncio
-    import httpx
     from unittest.mock import AsyncMock, patch
+
+    import httpx
+
     from atomics.probe.config import ProbeTarget
-    from atomics.probe.connectors import fetch_artifact, ProbeConnectorError
+    from atomics.probe.connectors import ProbeConnectorError, fetch_artifact
 
     mock_client = AsyncMock()
     mock_client.get = AsyncMock(side_effect=httpx.ConnectError("refused"))
@@ -285,6 +296,7 @@ def test_fetch_artifact_http_truncation():
     """_fetch_http truncates responses larger than max_bytes."""
     import asyncio
     from unittest.mock import AsyncMock, MagicMock, patch
+
     from atomics.probe.config import ProbeTarget
     from atomics.probe.connectors import fetch_artifact
 
@@ -311,7 +323,8 @@ def test_fetch_artifact_http_truncation():
 def test_fetch_artifact_http_custom_headers():
     """_fetch_http passes custom headers from ProbeTarget."""
     import asyncio
-    from unittest.mock import AsyncMock, MagicMock, patch, call
+    from unittest.mock import AsyncMock, MagicMock, patch
+
     from atomics.probe.config import ProbeTarget
     from atomics.probe.connectors import fetch_artifact
 
@@ -340,8 +353,7 @@ def test_fetch_artifact_http_custom_headers():
 # ── Runner — ProbeSummary properties + fetch/analysis failure paths ───────────
 
 def test_probe_summary_overall_score():
-    from atomics.probe.runner import ProbeSummary, ProbeResult
-    from atomics.probe.config import ProbeTarget
+    from atomics.probe.runner import ProbeResult, ProbeSummary
 
     summary = ProbeSummary()
     summary.results = [
@@ -362,7 +374,7 @@ def test_probe_summary_overall_score_empty():
 
 
 def test_probe_summary_regressions():
-    from atomics.probe.runner import ProbeSummary, ProbeResult
+    from atomics.probe.runner import ProbeResult, ProbeSummary
     summary = ProbeSummary()
     summary.results = [
         ProbeResult(target_name="a", artifact_type="access-log", check_id="c",
@@ -378,10 +390,9 @@ def test_probe_summary_regressions():
 
 def test_run_probe_fetch_failure_path(tmp_path):
     """When fetch_artifact raises, runner records a fetch_error result."""
+
     from atomics.probe.config import ProbeTarget
     from atomics.probe.runner import run_probe
-    from atomics.probe.connectors import ProbeConnectorError
-    from unittest.mock import patch
 
     targets = [ProbeTarget(name="broken", artifact_type="access-log",
                            source="file", path="/nonexistent/log.txt")]
@@ -425,7 +436,8 @@ def test_run_probe_analysis_failure_path(tmp_path):
 
 def test_fetch_artifact_http_dispatches(tmp_path):
     """Line 22: source='http' dispatches to _fetch_http."""
-    from unittest.mock import patch, AsyncMock
+    from unittest.mock import AsyncMock, patch
+
     from atomics.probe.config import ProbeTarget
     from atomics.probe.connectors import fetch_artifact
 

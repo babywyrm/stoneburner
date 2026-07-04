@@ -20,7 +20,7 @@ def test_mcp_agentic_fixtures_all_have_required_fields():
         "breakglass_injection", "context_poisoning", "agent_loop_escape",
     }
     for f in MCP_AGENTIC_FIXTURES:
-        assert f.id, f"fixture missing id"
+        assert f.id, "fixture missing id"
         assert f.id.startswith("mcp-"), f"{f.id}: should start with 'mcp-'"
         assert f.severity in valid_severities, f"{f.id}: bad severity {f.severity}"
         assert f.category in valid_categories, f"{f.id}: bad category {f.category}"
@@ -34,7 +34,7 @@ def test_tool_safety_fixtures_all_have_required_fields():
     from atomics.eval.adversarial.mcp_agentic import TOOL_SAFETY_FIXTURES
     valid_severities = {"LOW", "MEDIUM", "HIGH", "CRITICAL"}
     for f in TOOL_SAFETY_FIXTURES:
-        assert f.id, f"fixture missing id"
+        assert f.id, "fixture missing id"
         assert f.id.startswith("tool-"), f"{f.id}: should start with 'tool-'"
         assert f.category == "tool_use_safety", f"{f.id}: category should be tool_use_safety"
         assert f.severity in valid_severities, f"{f.id}: bad severity {f.severity}"
@@ -62,10 +62,10 @@ def test_no_id_collision_with_existing_fixtures():
 
 def test_mcp_fixtures_registered_in_runner():
     """The runner's assembled fixture list includes the new categories."""
-    from atomics.eval.adversarial.mcp_agentic import MCP_AGENTIC_FIXTURES, TOOL_SAFETY_FIXTURES
-    from atomics.eval.adversarial.fixtures import ADVERSARIAL_FIXTURES
-    from atomics.eval.adversarial.zerotrust import ZEROTRUST_FIXTURES
     from atomics.eval.adversarial.agentic_reasoning import AGENTIC_REASONING_FIXTURES
+    from atomics.eval.adversarial.fixtures import ADVERSARIAL_FIXTURES
+    from atomics.eval.adversarial.mcp_agentic import MCP_AGENTIC_FIXTURES, TOOL_SAFETY_FIXTURES
+    from atomics.eval.adversarial.zerotrust import ZEROTRUST_FIXTURES
 
     total = (
         len(ADVERSARIAL_FIXTURES) + len(ZEROTRUST_FIXTURES)

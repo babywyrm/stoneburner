@@ -38,8 +38,8 @@ def test_archreview_results_table_exists(tmp_path):
 
 
 def test_save_archreview_result_roundtrip(tmp_path):
-    from atomics.storage.repository import MetricsRepository
     from atomics.archreview.models import ArchReviewResult, Finding
+    from atomics.storage.repository import MetricsRepository
 
     repo = MetricsRepository(tmp_path / "m.db")
     r = ArchReviewResult(
@@ -182,6 +182,7 @@ def test_query_task_results_suite_filter():
 
 def test_cli_export_suite_choices_include_eval_redblue():
     from click.testing import CliRunner
+
     from atomics.cli import cli
     result = CliRunner().invoke(cli, ["export", "--help"])
     assert result.exit_code == 0

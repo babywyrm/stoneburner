@@ -1,5 +1,9 @@
 from atomics.archreview.models import (
-    Finding, TierConfig, AnswerKey, RepoSpec, ArchReviewResult,
+    AnswerKey,
+    ArchReviewResult,
+    Finding,
+    RepoSpec,
+    TierConfig,
 )
 
 

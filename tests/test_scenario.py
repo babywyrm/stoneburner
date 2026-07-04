@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 import asyncio
-import tempfile
 from pathlib import Path
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -18,13 +17,11 @@ from atomics.scenario_models import (
     parse_workload_flag,
 )
 from atomics.scenario_prompts import (
-    BUILTIN_PROMPTS,
     EVAL_PROMPTS,
     GATE_PROMPTS,
     load_custom_prompts,
     resolve_prompts,
 )
-
 
 # ── WorkloadSpec ──────────────────────────────────────────────────────────────
 
@@ -337,6 +334,7 @@ class TestRunner:
 class TestCLI:
     def test_scenario_help(self) -> None:
         from click.testing import CliRunner
+
         from atomics.cli import cli
 
         runner = CliRunner()
@@ -346,6 +344,7 @@ class TestCLI:
 
     def test_scenario_no_args(self) -> None:
         from click.testing import CliRunner
+
         from atomics.cli import cli
 
         runner = CliRunner()
@@ -354,6 +353,7 @@ class TestCLI:
 
     def test_scenario_mutual_exclusion(self, tmp_path: Path) -> None:
         from click.testing import CliRunner
+
         from atomics.cli import cli
 
         f = tmp_path / "s.yaml"
@@ -412,6 +412,7 @@ class TestRamp:
 
     def test_run_scenario_accepts_ramp_seconds(self):
         import inspect
+
         from atomics.scenario import run_scenario
         sig = inspect.signature(run_scenario)
         assert "ramp_seconds" in sig.parameters
@@ -419,14 +420,16 @@ class TestRamp:
 
     def test_run_workload_accepts_ramp_seconds(self):
         import inspect
+
         from atomics.scenario import _run_workload
         sig = inspect.signature(_run_workload)
         assert "ramp_seconds" in sig.parameters
 
     def test_ramp_stored_on_result(self):
         """run_scenario propagates ramp_seconds to ScenarioResult."""
-        from atomics.scenario import run_scenario
         import asyncio
+
+        from atomics.scenario import run_scenario
 
         async def _fake_request(client, host, model, prompt, num_predict):
             await asyncio.sleep(0.001)
@@ -450,6 +453,7 @@ class TestRamp:
 
     def test_scenario_cli_ramp_flag(self):
         from click.testing import CliRunner
+
         from atomics.cli import cli
         runner = CliRunner()
         result = runner.invoke(cli, ["scenario", "--help"])
@@ -457,9 +461,11 @@ class TestRamp:
 
     def test_ramp_zero_no_delay(self):
         """With ramp=0, all workers start immediately (delays all 0)."""
-        from atomics.scenario import _run_workload
         import asyncio
+
         import httpx
+
+        from atomics.scenario import _run_workload
 
         start_times: list[float] = []
 
@@ -504,9 +510,10 @@ class TestScenarioProfileBranch:
 
     def test_profile_workload_uses_profile_request(self):
         """When a WorkloadSpec has a profile path, _run_workload routes via _single_request_profile."""
-        from unittest.mock import patch, AsyncMock, MagicMock
-        from atomics.scenario import run_scenario, WorkloadSpec
         import asyncio
+        from unittest.mock import patch
+
+        from atomics.scenario import WorkloadSpec, run_scenario
 
         async def _fake_profile_req(client, profile, prompt):
             return ("ok", 150.0, "pass")
@@ -538,9 +545,10 @@ class TestScenarioProfileBranch:
 
     def test_profile_workload_prompts_from_profile(self):
         """WorkloadSpec with no prompts gets prompts from loaded profile."""
-        from unittest.mock import patch
-        from atomics.scenario import run_scenario, WorkloadSpec
         import asyncio
+        from unittest.mock import patch
+
+        from atomics.scenario import WorkloadSpec, run_scenario
 
         async def _fake_profile_req(client, profile, prompt):
             return ("ok", 100.0, "pass")
@@ -568,9 +576,10 @@ class TestScenarioProfileBranch:
 
     def test_on_baseline_done_callback_with_profile(self):
         """on_baseline_done fires for profile-based workloads."""
-        from unittest.mock import patch
-        from atomics.scenario import run_scenario, WorkloadSpec
         import asyncio
+        from unittest.mock import patch
+
+        from atomics.scenario import WorkloadSpec, run_scenario
 
         baselines_seen: list[str] = []
 

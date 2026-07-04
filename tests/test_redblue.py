@@ -28,12 +28,12 @@ def test_blue_fixtures_not_empty():
 
 
 def test_all_fixtures_combined():
-    from atomics.eval.redblue.fixtures import ALL_FIXTURES, RED_FIXTURES, BLUE_FIXTURES
+    from atomics.eval.redblue.fixtures import ALL_FIXTURES, BLUE_FIXTURES, RED_FIXTURES
     assert len(ALL_FIXTURES) == len(RED_FIXTURES) + len(BLUE_FIXTURES)
 
 
 def test_all_fixtures_team_assignment():
-    from atomics.eval.redblue.fixtures import RED_FIXTURES, BLUE_FIXTURES
+    from atomics.eval.redblue.fixtures import BLUE_FIXTURES, RED_FIXTURES
     for f in RED_FIXTURES:
         assert f.team == "red", f"{f.id} should be red"
     for f in BLUE_FIXTURES:
@@ -54,8 +54,8 @@ def test_all_fixtures_valid_complexity():
 
 
 import asyncio
-from unittest.mock import AsyncMock
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 
 def _provider(text="The Metasploit module search command is: search type:exploit"):
@@ -83,22 +83,22 @@ def _judge(score=0.8, rationale="Correct and well-structured."):
 
 
 def test_run_redblue_returns_summary():
-    from atomics.eval.redblue.runner import run_redblue, RedBlueSummary
+    from atomics.eval.redblue.runner import RedBlueSummary, run_redblue
     summary = asyncio.run(run_redblue(_provider(), judge_provider=_judge()))
     assert isinstance(summary, RedBlueSummary)
     assert summary.total_fixtures > 0
 
 
 def test_run_redblue_red_only():
-    from atomics.eval.redblue.runner import run_redblue
     from atomics.eval.redblue.fixtures import RED_FIXTURES
+    from atomics.eval.redblue.runner import run_redblue
     summary = asyncio.run(run_redblue(_provider(), judge_provider=_judge(), mode="red"))
     assert summary.total_fixtures == len(RED_FIXTURES)
 
 
 def test_run_redblue_blue_only():
-    from atomics.eval.redblue.runner import run_redblue
     from atomics.eval.redblue.fixtures import BLUE_FIXTURES
+    from atomics.eval.redblue.runner import run_redblue
     summary = asyncio.run(run_redblue(_provider(), judge_provider=_judge(), mode="blue"))
     assert summary.total_fixtures == len(BLUE_FIXTURES)
 
@@ -111,6 +111,7 @@ def test_run_redblue_per_category_scores():
 
 def test_cli_redblue_help():
     from click.testing import CliRunner
+
     from atomics.cli import cli
     runner = CliRunner()
     result = runner.invoke(cli, ["redblue", "--help"])
@@ -153,6 +154,7 @@ def test_run_redblue_multi_run_mean_written():
 
 def test_cli_redblue_runs_flag_present():
     from click.testing import CliRunner
+
     from atomics.cli import cli
     result = CliRunner().invoke(cli, ["redblue", "--help"])
     assert "--runs" in result.output
@@ -162,6 +164,7 @@ def test_cli_redblue_runs_flag_present():
 
 def test_redblue_summary_to_dict_serializable():
     import json
+
     from atomics.eval.redblue.runner import run_redblue
     summary = asyncio.run(run_redblue(_provider(), judge_provider=_judge(), mode="red"))
     d = summary.to_dict()
@@ -176,6 +179,7 @@ def test_redblue_summary_to_dict_serializable():
 
 def test_cli_redblue_json_out_flag_present():
     from click.testing import CliRunner
+
     from atomics.cli import cli
     result = CliRunner().invoke(cli, ["redblue", "--help"])
     assert "--json-out" in result.output
@@ -184,8 +188,8 @@ def test_cli_redblue_json_out_flag_present():
 # ── Thinking-aware output budget ─────────────────────────────────────────────
 
 def test_output_budget_expands_for_thinking_models():
-    from atomics.eval.redblue.runner import _output_budget, _THINKING_MIN_OUTPUT_TOKENS
     from atomics.eval.redblue.fixtures import RED_FIXTURES
+    from atomics.eval.redblue.runner import _THINKING_MIN_OUTPUT_TOKENS, _output_budget
     fx = RED_FIXTURES[0]
     # explicit thinking=True → expanded
     assert _output_budget(fx, thinking=True, model="qwen2.5:7b") == max(
@@ -196,8 +200,8 @@ def test_output_budget_expands_for_thinking_models():
 
 
 def test_output_budget_unchanged_for_nonthinking():
-    from atomics.eval.redblue.runner import _output_budget
     from atomics.eval.redblue.fixtures import RED_FIXTURES
+    from atomics.eval.redblue.runner import _output_budget
     fx = RED_FIXTURES[0]
     assert _output_budget(fx, thinking=False, model="qwen2.5:7b") == fx.max_output_tokens
     assert _output_budget(fx, thinking=None, model="qwen2.5:7b") == fx.max_output_tokens
@@ -226,17 +230,16 @@ def test_run_redblue_all_runs_failed_records_failure():
 
 
 import asyncio as _asyncio
-from types import SimpleNamespace
-from unittest.mock import AsyncMock
 
 
 def _make_summary_with_results():
     """Build a RedBlueSummary with stubbed results for property testing."""
-    from atomics.eval.redblue.runner import RedBlueSummary, RedBlueFixtureResult
-    from atomics.eval.redblue.fixtures import RedBlueFixture
-    from atomics.eval.judge import JudgeResult
-    from atomics.models import TaskResult, TaskStatus, TaskCategory
     from datetime import UTC, datetime
+
+    from atomics.eval.judge import JudgeResult
+    from atomics.eval.redblue.fixtures import RedBlueFixture
+    from atomics.eval.redblue.runner import RedBlueFixtureResult, RedBlueSummary
+    from atomics.models import TaskCategory, TaskResult, TaskStatus
 
     def _fixture(fid: str, team: str, category: str) -> RedBlueFixture:
         return RedBlueFixture(
@@ -284,8 +287,9 @@ def test_redblue_summary_overall_quality():
 
 
 def test_redblue_summary_overall_quality_no_results():
-    from atomics.eval.redblue.runner import RedBlueSummary
     from datetime import UTC, datetime
+
+    from atomics.eval.redblue.runner import RedBlueSummary
     now = datetime.now(UTC)
     empty = RedBlueSummary(run_id="x", provider="m", model="m", mode="all",
                            started_at=now, completed_at=now, results=[])
@@ -307,8 +311,9 @@ def test_redblue_summary_avg_latency_ms():
 
 
 def test_redblue_summary_avg_latency_empty():
-    from atomics.eval.redblue.runner import RedBlueSummary
     from datetime import UTC, datetime
+
+    from atomics.eval.redblue.runner import RedBlueSummary
     now = datetime.now(UTC)
     empty = RedBlueSummary(run_id="x", provider="m", model="m", mode="all",
                            started_at=now, completed_at=now, results=[])

@@ -1,5 +1,6 @@
 """Tests for CLI commands (non-network)."""
 
+from datetime import UTC
 from types import SimpleNamespace
 
 import pytest
@@ -692,7 +693,6 @@ def test_cli_provider_test_success(monkeypatch):
 
 def test_cli_models_command(monkeypatch):
     """atomics models should list Ollama models with class/thinking annotations."""
-    from unittest.mock import AsyncMock
 
     mock_models = [
         {"name": "qwen2.5:7b", "size_gb": 4.7, "parameter_size": "7.6B",
@@ -845,12 +845,13 @@ def test_cli_sweep_requires_models_or_all_local(monkeypatch):
 
 def test_cli_sweep_verbose_shows_replies(monkeypatch):
     """atomics sweep --verbose should print actual model replies."""
-    from atomics.sweep import ModelSweepResult
-    from atomics.eval.runner import EvalRunSummary, FixtureResult
+    from datetime import UTC, datetime
+
     from atomics.eval.fixtures import EvalFixture
     from atomics.eval.judge import JudgeResult
-    from atomics.models import TaskComplexity, TaskResult, TaskCategory, TaskStatus
-    from datetime import datetime, UTC
+    from atomics.eval.runner import EvalRunSummary, FixtureResult
+    from atomics.models import TaskCategory, TaskComplexity, TaskResult, TaskStatus
+    from atomics.sweep import ModelSweepResult
 
     fixture = EvalFixture(
         id="ev-01", prompt="What is X?", complexity=TaskComplexity.LIGHT,
@@ -904,12 +905,13 @@ def test_cli_sweep_verbose_shows_replies(monkeypatch):
 
 def test_cli_sweep_no_verbose_hides_replies(monkeypatch):
     """Without --verbose, sweep should NOT print full replies."""
-    from atomics.sweep import ModelSweepResult
-    from atomics.eval.runner import EvalRunSummary, FixtureResult
+    from datetime import UTC, datetime
+
     from atomics.eval.fixtures import EvalFixture
     from atomics.eval.judge import JudgeResult
-    from atomics.models import TaskComplexity, TaskResult, TaskCategory, TaskStatus
-    from datetime import datetime, UTC
+    from atomics.eval.runner import EvalRunSummary, FixtureResult
+    from atomics.models import TaskCategory, TaskComplexity, TaskResult, TaskStatus
+    from atomics.sweep import ModelSweepResult
 
     fixture = EvalFixture(
         id="ev-01", prompt="What is X?", complexity=TaskComplexity.LIGHT,
@@ -966,8 +968,9 @@ def test_cli_sweep_no_verbose_hides_replies(monkeypatch):
 
 def test_cli_run_with_mocked_vllm(monkeypatch, tmp_path):
     """atomics run --provider vllm should construct VllmProvider and run."""
-    from unittest.mock import AsyncMock, MagicMock
     from types import SimpleNamespace
+    from unittest.mock import AsyncMock, MagicMock
+
     from atomics.models import BurnTier
 
     fake_resp = SimpleNamespace(
@@ -994,13 +997,13 @@ def test_cli_run_with_mocked_vllm(monkeypatch, tmp_path):
 
     monkeypatch.setattr("atomics.providers.vllm.VllmProvider", FakeVllm)
 
+    from datetime import datetime
+
     from atomics.core.engine import LoopEngine
     from atomics.models import RunSummary
-
-    from datetime import datetime, timezone
     fake_summary = RunSummary(
         run_id="test-vllm-001",
-        started_at=datetime.now(timezone.utc),
+        started_at=datetime.now(UTC),
         total_tasks=1, total_tokens=30, total_cost_usd=0.0,
         avg_tokens_per_task=30.0, avg_latency_ms=120.0,
         tier=BurnTier.EZ, provider="vllm",
@@ -1023,7 +1026,6 @@ def test_cli_run_with_mocked_vllm(monkeypatch, tmp_path):
 
 def test_cli_provider_test_vllm_success(monkeypatch, tmp_path):
     """atomics provider-test --provider vllm should connect and generate."""
-    from unittest.mock import AsyncMock
     from types import SimpleNamespace
 
     fake_resp = SimpleNamespace(

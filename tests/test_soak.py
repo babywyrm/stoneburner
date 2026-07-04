@@ -16,10 +16,11 @@ from atomics.soak import (
     _compute_verdict,
     _drift_pct,
     _linear_slope,
-    _percentile as _soak_percentile,
     parse_duration,
 )
-
+from atomics.soak import (
+    _percentile as _soak_percentile,
+)
 
 # ── Duration parsing ──────────────────────────────────────────────────────────
 
@@ -368,6 +369,7 @@ class TestSoakStorage:
 class TestSoakCLI:
     def test_help_renders(self):
         from click.testing import CliRunner
+
         from atomics.cli import cli
 
         runner = CliRunner()
@@ -379,6 +381,7 @@ class TestSoakCLI:
 
     def test_duration_flag_parsing(self):
         from click.testing import CliRunner
+
         from atomics.cli import cli
 
         runner = CliRunner()
@@ -387,6 +390,7 @@ class TestSoakCLI:
 
     def test_no_args_shows_error(self):
         from click.testing import CliRunner
+
         from atomics.cli import cli
 
         runner = CliRunner()
@@ -399,7 +403,7 @@ class TestSoakCLI:
 
 class TestSchemaVersion:
     def test_soak_table_exists(self):
-        from atomics.storage.schema import SCHEMA_VERSION, init_db
+        from atomics.storage.schema import init_db
 
         tmp = tempfile.mktemp(suffix=".db")
         conn = init_db(Path(tmp))
@@ -427,6 +431,7 @@ class TestThinkTime:
     def test_run_soak_accepts_think_time_param(self):
         """run_soak signature includes think_time_seconds."""
         import inspect
+
         from atomics.soak import run_soak
         sig = inspect.signature(run_soak)
         assert "think_time_seconds" in sig.parameters
@@ -435,6 +440,7 @@ class TestThinkTime:
     def test_run_soak_provider_accepts_think_time_param(self):
         """run_soak_provider signature includes think_time_seconds."""
         import inspect
+
         from atomics.soak import run_soak_provider
         sig = inspect.signature(run_soak_provider)
         assert "think_time_seconds" in sig.parameters
@@ -443,6 +449,7 @@ class TestThinkTime:
     def test_run_soak_profile_accepts_think_time_param(self):
         """run_soak_profile signature includes think_time_seconds."""
         import inspect
+
         from atomics.soak import run_soak_profile
         sig = inspect.signature(run_soak_profile)
         assert "think_time_seconds" in sig.parameters
@@ -451,6 +458,7 @@ class TestThinkTime:
     def test_think_time_guard_in_source(self):
         """soak.py contains the think_time guard inside worker bodies."""
         import inspect
+
         from atomics import soak as soak_module
         source = inspect.getsource(soak_module)
         assert "think_time_seconds > 0" in source
@@ -460,6 +468,7 @@ class TestThinkTime:
 class TestThinkTimeCLI:
     def test_think_time_flag_in_help(self):
         from click.testing import CliRunner
+
         from atomics.cli import cli
 
         runner = CliRunner()
@@ -468,6 +477,7 @@ class TestThinkTimeCLI:
 
     def test_think_time_passed_to_runner(self):
         from click.testing import CliRunner
+
         from atomics.cli import cli
         from atomics.soak import SoakResult
 
@@ -579,7 +589,7 @@ class TestRunSoakProvider:
 
     @pytest.mark.asyncio
     async def test_provider_callback_fires(self):
-        from atomics.soak import run_soak_provider, SoakSample
+        from atomics.soak import run_soak_provider
         received: list[SoakSample] = []
 
         def on_sample(s: SoakSample) -> None:
@@ -715,7 +725,7 @@ class TestRunSoakProfile:
 
     @pytest.mark.asyncio
     async def test_profile_callback_fires(self):
-        from atomics.soak import run_soak_profile, SoakSample
+        from atomics.soak import run_soak_profile
         received: list[SoakSample] = []
 
         def on_sample(s: SoakSample) -> None:
@@ -786,6 +796,7 @@ class TestRunSoakProfile:
     @pytest.mark.asyncio
     async def test_profile_no_prompts_falls_back_to_stress_prompts(self):
         from types import SimpleNamespace
+
         from atomics.soak import run_soak_profile
         profile_no_prompts = SimpleNamespace(
             type="ollama", name="no-prompts", model="m",

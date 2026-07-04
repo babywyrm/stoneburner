@@ -6,9 +6,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from atomics.providers.base import BaseProvider, ProviderResponse
+from atomics.providers.base import BaseProvider
 from atomics.providers.vllm import VllmProvider
-
 
 # ---------------------------------------------------------------------------
 # Interface / construction

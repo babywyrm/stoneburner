@@ -4,9 +4,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
-
 # ── Module tests ──────────────────────────────────────────────────────────────
 
 
@@ -132,6 +129,7 @@ def test_empty_when_neither_env_nor_keychain(monkeypatch):
 
 def test_secrets_list_cli():
     from click.testing import CliRunner
+
     from atomics.cli import cli
 
     with patch("keyring.get_password", return_value=None):
@@ -143,6 +141,7 @@ def test_secrets_list_cli():
 
 def test_secrets_get_not_found():
     from click.testing import CliRunner
+
     from atomics.cli import cli
 
     with patch("keyring.get_password", return_value=None):
@@ -154,6 +153,7 @@ def test_secrets_get_not_found():
 
 def test_secrets_get_found():
     from click.testing import CliRunner
+
     from atomics.cli import cli
 
     with patch("keyring.get_password", return_value="test-value"):
@@ -165,6 +165,7 @@ def test_secrets_get_found():
 
 def test_secrets_delete_success():
     from click.testing import CliRunner
+
     from atomics.cli import cli
 
     with patch("keyring.delete_password"):

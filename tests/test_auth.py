@@ -15,7 +15,6 @@ from atomics.auth.oauth import OAuthPKCEAuth, _generate_pkce
 from atomics.auth.profiles import OPENAI_PROFILE, get_profile, list_profiles
 from atomics.auth.store import CachedTokens, TokenStore
 
-
 # ── ApiKeyAuth ──────────────────────────────────────────
 
 
@@ -435,7 +434,6 @@ async def test_oauth_validate_exception_returns_false(tmp_path: Path):
 @pytest.mark.asyncio
 async def test_oauth_get_headers_triggers_refresh(tmp_path: Path):
     """get_headers() calls _refresh when token needs_refresh."""
-    import asyncio as aio
     from unittest.mock import AsyncMock, patch
 
     store = TokenStore(tmp_path / "auth.json")
@@ -686,8 +684,9 @@ async def test_oauth_device_code_flow_slow_down(tmp_path: Path):
 @pytest.mark.asyncio
 async def test_oauth_device_code_flow_unknown_error(tmp_path: Path):
     """_device_code_flow calls raise_for_status on unrecognised error codes."""
-    import httpx
     from unittest.mock import AsyncMock, MagicMock, patch
+
+    import httpx
 
     device_resp = MagicMock()
     device_resp.raise_for_status = MagicMock()
@@ -775,7 +774,6 @@ async def test_oauth_login_browser_delegates(tmp_path: Path):
 @pytest.mark.asyncio
 async def test_oauth_browser_flow(tmp_path: Path):
     """_browser_flow opens browser, awaits callback code, and exchanges it."""
-    import asyncio as aio
     from unittest.mock import AsyncMock, MagicMock, patch
 
     store = TokenStore(tmp_path / "auth.json")
@@ -821,9 +819,7 @@ def _run_until_future_done(loop, future, timeout=3.0):
 def test_callback_handler_success():
     """Handler.do_GET with valid state and code sets the future result."""
     import asyncio as aio
-    import threading
-    from io import BytesIO
-    from http.server import HTTPServer
+
     from atomics.auth.oauth import _start_callback_server
 
     loop = aio.new_event_loop()
@@ -851,8 +847,10 @@ def test_callback_handler_success():
 def test_callback_handler_state_mismatch():
     """Handler.do_GET with wrong state sets RuntimeError on the future."""
     import asyncio as aio
+    import urllib.error
+    import urllib.request
+
     from atomics.auth.oauth import _start_callback_server
-    import urllib.request, urllib.error
 
     loop = aio.new_event_loop()
     future: aio.Future[str] = loop.create_future()
@@ -881,8 +879,10 @@ def test_callback_handler_state_mismatch():
 def test_callback_handler_oauth_error():
     """Handler.do_GET with error param sets RuntimeError on the future."""
     import asyncio as aio
+    import urllib.error
+    import urllib.request
+
     from atomics.auth.oauth import _start_callback_server
-    import urllib.request, urllib.error
 
     loop = aio.new_event_loop()
     future: aio.Future[str] = loop.create_future()
