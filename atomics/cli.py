@@ -46,7 +46,6 @@ class FixtureProgress:
 
     def on_start(self, index: int, fixture_id: str, category: str) -> None:
         self._current_start = time.monotonic()
-        elapsed = time.monotonic() - self._start
         eta = self._estimate_remaining(index)
         eta_str = f" | ETA remaining: {self._fmt_duration(eta)}" if eta is not None else ""
         # Start a live spinner that shows elapsed time updating in real-time
@@ -907,47 +906,10 @@ def eval(
         host: str | None,
         context_tokens: int | None = None,
     ):
-        if name == "claude":
-            if not settings.anthropic_api_key:
-                console.print("[red]ANTHROPIC_API_KEY not set.[/red]")
-                sys.exit(1)
-            from atomics.providers.claude import ClaudeProvider
-            return ClaudeProvider(
-                api_key=settings.anthropic_api_key,
-                default_model=mdl or settings.default_model,
-            )
-        elif name == "bedrock":
-            from atomics.providers.bedrock import BedrockProvider
-            return BedrockProvider(region=region, model_id=mdl or "us.anthropic.claude-sonnet-4-6")
-        elif name == "openai":
-            from atomics.providers.openai import OpenAIProvider
-            if settings.openai_api_key:
-                return OpenAIProvider(api_key=settings.openai_api_key, default_model=mdl or "gpt-4o")
-            console.print("[red]OPENAI_API_KEY not set.[/red]")
-            sys.exit(1)
-        elif name == "ollama":
-            from atomics.providers.ollama import OllamaProvider
-            return OllamaProvider(
-                host=host or settings.ollama_host,
-                default_model=mdl or settings.ollama_model,
-                timeout=settings.ollama_timeout,
-                context_tokens=context_tokens,
-            )
-        elif name == "vllm":
-            from atomics.providers.vllm import VllmProvider
-            return VllmProvider(
-                base_url=vllm_host or settings.vllm_host,
-                default_model=mdl or settings.vllm_model,
-                timeout=settings.vllm_timeout,
-            )
-        elif name == "brain-gateway":
-            from atomics.providers.brain_gateway import BrainGatewayProvider
-            return BrainGatewayProvider(
-                url=host or settings.brain_gateway_url,
-                default_model=mdl,
-            )
-        console.print(f"[red]Unknown provider: {name}[/red]")
-        sys.exit(1)
+        return _make_provider(
+            name, mdl, host, settings,
+            vllm_host=vllm_host, region=region, context_tokens=context_tokens,
+        )
 
     test_provider = _build_provider(provider_name, model, ollama_host)
     # Judge host falls back to: --judge-host → --ollama-host → ATOMICS_OLLAMA_HOST env/.env
@@ -1783,8 +1745,23 @@ def show_tiers() -> None:
 
 # ── Shared provider builder for new suites ────────────────────────────────────
 
-def _make_provider(name: str, mdl: str | None, host: str | None, settings, *, vllm_host: str | None = None):
-    """Build a provider instance — mirrors the pattern inside eval()."""
+def _make_provider(
+    name: str,
+    mdl: str | None,
+    host: str | None,
+    settings,
+    *,
+    vllm_host: str | None = None,
+    region: str = "us-east-1",
+    context_tokens: int | None = None,
+    inference_timeout: int | None = None,
+):
+    """Build a provider instance. Single factory for every command.
+
+    Optional params cover the variations different commands need:
+    `region` (bedrock), `context_tokens` (ollama long-context), and
+    `inference_timeout` (override the configured per-backend request timeout).
+    """
     if name == "claude":
         if not settings.anthropic_api_key:
             click.echo("Error: ANTHROPIC_API_KEY not set.", err=True)
@@ -1793,7 +1770,7 @@ def _make_provider(name: str, mdl: str | None, host: str | None, settings, *, vl
         return ClaudeProvider(api_key=settings.anthropic_api_key, default_model=mdl or settings.default_model)
     if name == "bedrock":
         from atomics.providers.bedrock import BedrockProvider
-        return BedrockProvider(region="us-east-1", model_id=mdl or "us.anthropic.claude-sonnet-4-6")
+        return BedrockProvider(region=region, model_id=mdl or "us.anthropic.claude-sonnet-4-6")
     if name == "openai":
         if not settings.openai_api_key:
             click.echo("Error: OPENAI_API_KEY not set.", err=True)
@@ -1805,7 +1782,7 @@ def _make_provider(name: str, mdl: str | None, host: str | None, settings, *, vl
         return VllmProvider(
             base_url=vllm_host or settings.vllm_host,
             default_model=mdl or settings.vllm_model,
-            timeout=settings.vllm_timeout,
+            timeout=inference_timeout or settings.vllm_timeout,
         )
     if name == "brain-gateway":
         from atomics.providers.brain_gateway import BrainGatewayProvider
@@ -1814,7 +1791,8 @@ def _make_provider(name: str, mdl: str | None, host: str | None, settings, *, vl
     return OllamaProvider(
         host=host or settings.ollama_host,
         default_model=mdl or settings.ollama_model,
-        timeout=settings.ollama_timeout,
+        timeout=inference_timeout or settings.ollama_timeout,
+        context_tokens=context_tokens,
     )
 
 
@@ -3253,47 +3231,11 @@ def archreview(repo_name, models_csv, provider_name, ollama_host, vllm_host,
         host: str | None,
         context_tokens: int | None = None,
     ):
-        if name == "claude":
-            if not settings.anthropic_api_key:
-                console.print("[red]ANTHROPIC_API_KEY not set.[/red]")
-                sys.exit(1)
-            from atomics.providers.claude import ClaudeProvider
-            return ClaudeProvider(
-                api_key=settings.anthropic_api_key,
-                default_model=mdl or settings.default_model,
-            )
-        elif name == "bedrock":
-            from atomics.providers.bedrock import BedrockProvider
-            return BedrockProvider(region=region, model_id=mdl or "us.anthropic.claude-sonnet-4-6")
-        elif name == "openai":
-            from atomics.providers.openai import OpenAIProvider
-            if settings.openai_api_key:
-                return OpenAIProvider(api_key=settings.openai_api_key, default_model=mdl or "gpt-4o")
-            console.print("[red]OPENAI_API_KEY not set.[/red]")
-            sys.exit(1)
-        elif name == "ollama":
-            from atomics.providers.ollama import OllamaProvider
-            return OllamaProvider(
-                host=host or settings.ollama_host,
-                default_model=mdl or settings.ollama_model,
-                timeout=inference_timeout or settings.ollama_timeout,
-                context_tokens=context_tokens,
-            )
-        elif name == "vllm":
-            from atomics.providers.vllm import VllmProvider
-            return VllmProvider(
-                base_url=vllm_host or settings.vllm_host,
-                default_model=mdl or settings.vllm_model,
-                timeout=inference_timeout or settings.vllm_timeout,
-            )
-        elif name == "brain-gateway":
-            from atomics.providers.brain_gateway import BrainGatewayProvider
-            return BrainGatewayProvider(
-                url=host or settings.brain_gateway_url,
-                default_model=mdl,
-            )
-        console.print(f"[red]Unknown provider: {name}[/red]")
-        sys.exit(1)
+        return _make_provider(
+            name, mdl, host, settings,
+            vllm_host=vllm_host, region=region,
+            context_tokens=context_tokens, inference_timeout=inference_timeout,
+        )
 
     spec_path = Path(__file__).parent / "archreview" / "repos" / f"{repo_name}.yaml"
     if not spec_path.exists():
@@ -3440,7 +3382,7 @@ def secrets_set(key: str):
 
     Example: atomics secrets set ANTHROPIC_API_KEY
     """
-    from atomics.secrets import set_secret, keychain_available
+    from atomics.secrets import keychain_available, set_secret
 
     if not keychain_available():
         click.echo("Error: no OS keychain backend available.", err=True)
@@ -3476,7 +3418,7 @@ def secrets_get(key: str):
 @secrets_group.command("list")
 def secrets_list():
     """List secret keys stored in the OS keychain (names only, never values)."""
-    from atomics.secrets import list_secrets, keychain_available
+    from atomics.secrets import keychain_available, list_secrets
 
     if not keychain_available():
         click.echo("No OS keychain backend available.")
