@@ -557,3 +557,72 @@ def test_cli_redblue_has_runs_flag():
     result = CliRunner().invoke(cli, ["redblue", "--help"])
     assert result.exit_code == 0
     assert "--runs" in result.output
+
+
+# ── Summary edge cases (empty / parse-failed) ───────────────────────────────
+
+def _empty_summary(fixture_results):
+    from atomics.eval.adversarial.runner import AdversarialSummary
+    from datetime import UTC, datetime
+    return AdversarialSummary(
+        run_id="r", provider="ollama", model="m", judge_provider="ollama",
+        judge_model="j", judges=["j"], runs=1,
+        started_at=datetime.now(UTC), completed_at=datetime.now(UTC),
+        fixture_results=fixture_results,
+    )
+
+
+def test_overall_resilience_empty_is_zero():
+    s = _empty_summary([])
+    assert s.overall_resilience == 0.0
+    assert s.category_scores == {}
+    assert s.critical_failures == []
+
+
+def test_run_adversarial_generate_failure_records_none_resistance():
+    """When generation raises for every run, the fixture has no resistance result."""
+    from atomics.eval.adversarial.runner import run_adversarial
+    p = AsyncMock()
+    p.name = "mock"
+    p.generate = AsyncMock(side_effect=RuntimeError("boom"))
+    summary = asyncio.run(run_adversarial(
+        p, judge_provider=_make_judge(), categories=["prompt_injection"],
+    ))
+    assert summary.total_fixtures > 0
+    assert all(fr.resistance is None for fr in summary.fixture_results)
+    # nothing scored → overall resilience is 0.0, no crash
+    assert summary.overall_resilience == 0.0
+
+
+def test_run_adversarial_verbose_smoke(capsys):
+    """verbose=True prints the prompt/response/verdict block without error."""
+    from atomics.eval.adversarial.runner import run_adversarial
+    asyncio.run(run_adversarial(
+        _make_provider(), judge_provider=_make_judge(),
+        categories=["prompt_injection"], verbose=True,
+    ))
+    out = capsys.readouterr().out
+    assert "ATTACK PROMPT" in out
+    assert "JUDGE VERDICT" in out
+
+
+def test_to_dict_handles_failed_fixture():
+    """A fixture whose generation failed (resistance=None) serializes cleanly."""
+    from atomics.eval.adversarial.runner import AdversarialFixtureResult
+    from atomics.eval.adversarial.fixtures import AdversarialFixture
+    fx = AdversarialFixture(
+        id="adv-01", category="prompt_injection", severity="CRITICAL",
+        prompt="p", attack_goal="g", resistance_criteria=["r"],
+    )
+    fr = AdversarialFixtureResult(
+        fixture=fx, response="", resistance=None,
+        latency_ms=0.0, estimated_cost_usd=0.0, thinking_tokens=0, run_scores=[],
+    )
+    d = _empty_summary([fr]).to_dict()
+    assert d["total_fixtures"] == 1
+    f0 = d["fixtures"][0]
+    assert f0["score"] is None
+    assert f0["parse_failed"] is True
+    assert f0["label"] is None
+    import json
+    json.dumps(d)  # must not raise

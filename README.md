@@ -565,6 +565,16 @@ stoneburner/
 | `atomics eval` | Run evaluation suite against a provider |
 | `atomics eval --fixtures ev-19` | Run a fixture subset for a fast spot-check |
 | `atomics eval --extra-judges ollama:mistral:7b` | Multi-judge consensus scoring |
+| `atomics adversarial` | Adversarial resilience eval — resistance to manipulation (64 fixtures) |
+| `atomics adversarial --category tool_desc_injection` | Run one suite/group (also: multiturn, rag_poisoning, mcp, zerotrust, agentic) |
+| `atomics adversarial --runs 3` | Variance-aware scoring (mean ± stddev) |
+| `atomics adversarial --compare mistral-small:24b` | Run a second model on the same fixtures, print a per-fixture diff |
+| `atomics adversarial --json-out run.json` | Write full per-fixture results as JSON |
+| `atomics adversarial --fail-on-resilience 60` | CI gate — non-zero exit if resilience < 60% |
+| `atomics redblue --mode all` | Red/blue security capability eval (offensive + defensive) |
+| `atomics redblue --runs 3 --json-out rb.json` | Variance-aware capability scoring + JSON export |
+| `atomics probe --probes-file probes.yaml` | Live ecosystem probe against real artifacts |
+| `atomics secrets set ANTHROPIC_API_KEY` | Store an API key in the OS keychain (also: get/list/delete) |
 | `atomics archreview --repo juice-shop --models qwen3.5:4b` | Security-architecture repo benchmark with objective category recall/precision |
 | `atomics archreview --tier local --max-output-tokens 512` | Practical brainbox repo review tier for local models |
 | `atomics archreview --tier wide --rounds 3` | Use the local-friendly broader evidence pack and report multi-round stability |
@@ -590,6 +600,9 @@ stoneburner/
 | `atomics export --suite stress` | Export stress test history |
 | `atomics export --suite sweep -o out.jsonl` | Export sweep results to file |
 | `atomics export --suite soak` | Export soak test history |
+| `atomics export --suite adversarial` | Export adversarial results (from `adversarial_results`) |
+| `atomics export --suite redblue` | Export only redblue task rows (suite-isolated) |
+| `atomics export --suite eval` | Export only eval task rows (suite-isolated) |
 | `atomics export --suite all --format csv -o all.csv` | Export all suites as CSV |
 | `atomics compare --output results.json` | Write comparison JSON alongside table |
 | `atomics doctor` | Check installation health and config |

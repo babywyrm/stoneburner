@@ -235,21 +235,30 @@ uv run atomics adversarial -p ollama --ollama-host http://bb:11434 -m qwen2.5:3b
 uv run atomics adversarial -p ollama --ollama-host http://bb:11434 -m qwen3.5:4b \
   --judge-provider claude --judge-model claude-haiku-4-5-20251001 --runs 3
 
-# Test only the MCP/agentic attack categories
-uv run atomics adversarial -p ollama -m qwen2.5:7b --category mcp --runs 3
+# Test only one suite/group: mcp, tool_safety, zerotrust, agentic,
+# multiturn, rag_poisoning, tool_desc_injection
+uv run atomics adversarial -p ollama -m qwen2.5:7b --category tool_desc_injection --runs 3
 
-# Test only tool-use safety
-uv run atomics adversarial -p ollama -m qwen2.5:3b --category tool_safety --runs 1
+# Compare two models on the same fixtures (per-fixture diff + overall delta)
+uv run atomics adversarial -p ollama -m mistral-nemo:12b --compare mistral-small:24b --runs 3
 
-# Run red/blue capability eval
-uv run atomics redblue -p ollama -m qwen3.5:4b --runs 3
+# Export the full run as JSON for a dashboard / notebook
+uv run atomics adversarial -p ollama -m qwen2.5:7b --json-out run.json
+
+# CI gate: fail the build if resilience drops below 60%
+uv run atomics adversarial -p ollama -m qwen2.5:7b --fail-on-resilience 60
+
+# Run red/blue capability eval (variance-aware + JSON export)
+uv run atomics redblue -p ollama -m qwen3.5:4b --runs 3 --json-out redblue.json
 
 # Security architecture review
 uv run atomics archreview -p ollama -m qwen2.5:7b --pack camazotz
 ```
 
 Results show per-fixture resistance verdicts + total cost (if using a paid judge).
-See [`docs/LEADERBOARD.md`](docs/LEADERBOARD.md) for the 9-model benchmark results.
+See [`docs/LEADERBOARD.md`](docs/LEADERBOARD.md) and
+[`docs/ADVERSARIAL_SUITES.md`](docs/ADVERSARIAL_SUITES.md) for the full 64-fixture
+suite breakdown and benchmark results.
 
 ---
 
@@ -259,6 +268,9 @@ See [`docs/LEADERBOARD.md`](docs/LEADERBOARD.md) for the 9-model benchmark resul
 uv run atomics compare --output results.json          # comparison JSON
 uv run atomics export --suite all --format csv -o all.csv
 uv run atomics export --suite sweep -o sweep.jsonl
+uv run atomics export --suite adversarial -o adv.jsonl   # adversarial results
+uv run atomics export --suite redblue -o redblue.jsonl   # redblue rows only
+uv run atomics export --suite eval -o eval.jsonl         # eval rows only
 ```
 
 ---
