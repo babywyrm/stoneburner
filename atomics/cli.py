@@ -1441,9 +1441,9 @@ def doctor() -> None:
 @cli.command("export")
 @click.option(
     "--suite",
-    type=click.Choice(["tasks", "stress", "sweep", "soak", "all"]),
+    type=click.Choice(["tasks", "stress", "sweep", "soak", "adversarial", "all"]),
     default="tasks",
-    help="Which suite to export: tasks (default), stress, sweep, soak, or all",
+    help="Which suite to export: tasks (default), stress, sweep, soak, adversarial, or all",
 )
 @click.option(
     "--since-hours",
@@ -1507,6 +1507,9 @@ def export_tasks(
             if limit:
                 rows = rows[:limit]
             _write_generic_export(rows, fmt, out_file)
+        elif suite == "adversarial":
+            rows = repo.get_adversarial_results(limit=limit)
+            _write_generic_export(rows, fmt, out_file)
         elif suite == "all":
             all_rows: list[dict] = []
             task_rows = repo.query_task_results(since_hours=since_hours, limit=limit)
@@ -1521,6 +1524,9 @@ def export_tasks(
                 all_rows.append(r)
             for r in repo.get_soak_results():
                 r["_suite"] = "soak"
+                all_rows.append(r)
+            for r in repo.get_adversarial_results():
+                r["_suite"] = "adversarial"
                 all_rows.append(r)
             if limit:
                 all_rows = all_rows[:limit]
@@ -2007,13 +2013,22 @@ def sweep(
 @click.option("--runs", type=int, default=1, show_default=True,
               help="Run each fixture N times and report mean ± stddev (use 3+ for variance analysis).")
 @click.option("--category", type=str, default=None,
-              help="Comma-separated categories to run (default: all). "
-                   "Options: prompt_injection,role_confusion,context_escape,"
-                   "instruction_override,social_engineering,data_exfil_attempt")
+              help="Comma-separated categories or group aliases to run (default: all). "
+                   "Group aliases: zerotrust, agentic, mcp, tool_safety, multiturn, "
+                   "rag_poisoning, tool_desc_injection. "
+                   "Base categories: prompt_injection, role_confusion, context_escape, "
+                   "instruction_override, social_engineering, data_exfil_attempt.")
 @click.option("--thinking/--no-thinking", "thinking_flag", default=None,
               help="Force thinking mode on or off (default: auto-detect).")
 @click.option("--thinking-budget", type=int, default=8000, show_default=True)
 @click.option("--save/--no-save", "save_results", default=True, show_default=True)
+@click.option("--json-out", "json_out", type=click.Path(dir_okay=False, writable=True), default=None,
+              help="Write the full run (per-fixture scores, rationales, latency, cost) as JSON to this file.")
+@click.option("--compare", "compare_model", type=str, default=None,
+              help="Run a second model on the same fixtures and print a per-fixture diff. "
+                   "Format: model, provider:model, or provider:model@host.")
+@click.option("--fail-on-resilience", "fail_on_resilience", type=float, default=None,
+              help="Exit non-zero if overall severity-weighted resilience %% is below this threshold (CI gate).")
 @click.option("--verbose", "-v", is_flag=True, help="Show full prompt, model response, and judge reasoning for each fixture.")
 def adversarial(
     provider_name: str,
@@ -2029,6 +2044,9 @@ def adversarial(
     thinking_flag: bool | None,
     thinking_budget: int,
     save_results: bool,
+    json_out: str | None,
+    compare_model: str | None,
+    fail_on_resilience: float | None,
     verbose: bool,
 ) -> None:
     """Run adversarial LLM resilience eval — measures resistance to manipulation.
@@ -2041,7 +2059,7 @@ def adversarial(
       atomics adversarial --judge-model deepseek-r1:14b --extra-judges "claude:claude-sonnet-4-6"
       atomics adversarial --runs 3 --extra-judges "ollama:deepseek-r1:14b@http://ollama-host:11434"
     """
-    from atomics.eval.adversarial import ALL_FIXTURES
+    from atomics.eval.adversarial import select_fixtures
     from atomics.eval.adversarial.runner import run_adversarial
 
     console = Console()
@@ -2049,6 +2067,7 @@ def adversarial(
     provider = _make_provider(provider_name, model, ollama_host, settings, vllm_host=vllm_host)
     judge = _make_provider(judge_provider_name, judge_model, judge_host or ollama_host, settings, vllm_host=vllm_host)
     categories = [c.strip() for c in category.split(",")] if category else None
+    selected_count = len(select_fixtures(categories))
 
     # Parse --extra-judges "ollama:deepseek-r1:14b@http://host:port,claude:model"
     extra_judge_pairs: list[tuple] = []
@@ -2073,7 +2092,7 @@ def adversarial(
         f"({model or 'default'})\n"
         f"Judge: [cyan]{judge_provider_name}[/cyan] ({judge_label}) | "
         f"Runs per fixture: [bold]{runs}[/bold]\n"
-        f"Fixtures: [bold]{len(ALL_FIXTURES)}[/bold] | "
+        f"Fixtures: [bold]{selected_count}[/bold] | "
         f"Categories: [bold]{category or 'all'}[/bold]\n"
     )
 
@@ -2083,24 +2102,21 @@ def adversarial(
         repo = MetricsRepository(settings.db_path)
 
     run_id = __import__("uuid").uuid4().hex[:12]
+    if repo:
+        # Parent run row so the adversarial run is listable/queryable alongside
+        # other suites; the results themselves land in adversarial_results.
+        repo.create_run(
+            run_id,
+            tier="adversarial",
+            provider=provider_name,
+            model=model or "default",
+            trigger="manual",
+        )
 
-    # Compute actual fixture count (may be filtered by --category)
-    from atomics.eval.adversarial.runner import (
-        ADVERSARIAL_FIXTURES, ZEROTRUST_FIXTURES,
-        AGENTIC_REASONING_FIXTURES, MCP_AGENTIC_FIXTURES, TOOL_SAFETY_FIXTURES,
-    )
-    _all = ADVERSARIAL_FIXTURES + ZEROTRUST_FIXTURES + AGENTIC_REASONING_FIXTURES + MCP_AGENTIC_FIXTURES + TOOL_SAFETY_FIXTURES
-    if categories:
-        _ZT = {f.category for f in ZEROTRUST_FIXTURES}
-        _AR = {f.category for f in AGENTIC_REASONING_FIXTURES}
-        _MCP = {f.category for f in MCP_AGENTIC_FIXTURES}
-        _TS = {f.category for f in TOOL_SAFETY_FIXTURES}
-        _GROUPS = {"zerotrust": _ZT, "agentic": _AR, "mcp": _MCP, "tool_safety": _TS}
-        expanded = set()
-        for c in categories:
-            expanded.update(_GROUPS.get(c, {c}))
-        _all = [f for f in _all if f.category in expanded]
-    adv_fixture_count = len(_all)
+    # Actual fixture count (may be filtered by --category) via the single source
+    # of truth so header/progress/run all agree.
+    from atomics.eval.adversarial import select_fixtures
+    adv_fixture_count = len(select_fixtures(categories))
 
     ctx = click.get_current_context()
     show_progress = ctx.obj.get("progress", True) if ctx.obj else True
@@ -2184,6 +2200,97 @@ def adversarial(
         for fr in summary.critical_failures:
             console.print(f"  • {fr.fixture.id} [{fr.fixture.severity}] {fr.fixture.category}")
 
+    if repo:
+        repo.complete_adversarial_run(run_id)
+
+    # ── --compare: run a second model on the same fixtures and diff ──────────
+    compare_summary = None
+    if compare_model:
+        cmp_host = None
+        spec = compare_model.strip()
+        if "@" in spec:
+            spec, cmp_host = spec.rsplit("@", 1)
+        if ":" in spec:
+            cmp_provider_name, cmp_model = spec.split(":", 1)
+        else:
+            cmp_provider_name, cmp_model = provider_name, spec
+        cmp_provider = _make_provider(
+            cmp_provider_name, cmp_model, cmp_host or ollama_host, settings, vllm_host=vllm_host,
+        )
+        console.print(
+            f"\n[bold]Compare run[/bold] — model B: [cyan]{cmp_provider_name}[/cyan] ({cmp_model})\n"
+        )
+        cmp_run_id = __import__("uuid").uuid4().hex[:12]
+        compare_summary = asyncio.run(run_adversarial(
+            cmp_provider,
+            judge_provider=judge,
+            model=cmp_model,
+            judge_model=judge_model,
+            extra_judges=extra_judge_pairs,
+            categories=categories,
+            runs=runs,
+            run_id=cmp_run_id,
+            thinking=thinking_flag,
+            thinking_budget=thinking_budget,
+        ))
+        if repo:
+            for fr in compare_summary.fixture_results:
+                if fr.resistance:
+                    repo.save_adversarial_result(cmp_run_id, fr, thinking_enabled=thinking_flag is True)
+
+        a_label = f"{model or 'default'}"
+        b_label = f"{cmp_model or 'default'}"
+        diff = Table(title=f"Per-fixture comparison: A={a_label}  vs  B={b_label}")
+        diff.add_column("Fixture")
+        diff.add_column("Sev")
+        diff.add_column(f"A ({a_label})", justify="right")
+        diff.add_column(f"B ({b_label})", justify="right")
+        diff.add_column("Δ (B−A)", justify="right")
+        b_by_id = {fr.fixture.id: fr for fr in compare_summary.fixture_results}
+        for fr in summary.fixture_results:
+            b = b_by_id.get(fr.fixture.id)
+            a_score = fr.resistance.score if fr.resistance else None
+            b_score = b.resistance.score if (b and b.resistance) else None
+            a_txt = f"{a_score:.2f}" if a_score is not None else "—"
+            b_txt = f"{b_score:.2f}" if b_score is not None else "—"
+            if a_score is not None and b_score is not None:
+                delta = b_score - a_score
+                color = "green" if delta > 0.05 else ("red" if delta < -0.05 else "dim")
+                d_txt = f"[{color}]{delta:+.2f}[/{color}]"
+            else:
+                d_txt = "—"
+            diff.add_row(fr.fixture.id, fr.fixture.severity, a_txt, b_txt, d_txt)
+        console.print(diff)
+        console.print(
+            f"\nOverall resilience — A: [bold]{summary.overall_resilience * 100:.1f}%[/bold]  "
+            f"B: [bold]{compare_summary.overall_resilience * 100:.1f}%[/bold]  "
+            f"Δ: [bold]{(compare_summary.overall_resilience - summary.overall_resilience) * 100:+.1f}%[/bold]"
+        )
+
+    # ── --json-out: machine-readable export ─────────────────────────────────
+    if json_out:
+        import json as _json
+        payload = {"model_a": summary.to_dict()}
+        if compare_summary is not None:
+            payload["model_b"] = compare_summary.to_dict()
+        with open(json_out, "w", encoding="utf-8") as fh:
+            _json.dump(payload, fh, indent=2)
+        console.print(f"\n[dim]Wrote JSON results to {json_out}[/dim]")
+
+    # ── --fail-on-resilience: CI gate ───────────────────────────────────────
+    if fail_on_resilience is not None:
+        actual = summary.overall_resilience * 100
+        if actual < fail_on_resilience:
+            console.print(
+                f"\n[bold red]FAIL[/bold red] — resilience {actual:.1f}% is below "
+                f"threshold {fail_on_resilience:.1f}%"
+            )
+            raise SystemExit(1)
+        console.print(
+            f"\n[bold green]PASS[/bold green] — resilience {actual:.1f}% meets "
+            f"threshold {fail_on_resilience:.1f}%"
+        )
+
 
 # ── atomics redblue ───────────────────────────────────────────────────────────
 
@@ -2197,6 +2304,8 @@ def adversarial(
 @click.option("--judge-host", type=str, default=None)
 @click.option("--mode", type=click.Choice(["red", "blue", "all"]), default="all", show_default=True,
               help="Which fixture set to run.")
+@click.option("--runs", type=int, default=1, show_default=True,
+              help="Run each fixture N times and report mean ± stddev (use 3+ for variance analysis).")
 @click.option("--thinking/--no-thinking", "thinking_flag", default=None)
 @click.option("--thinking-budget", type=int, default=8000, show_default=True)
 @click.option("--save/--no-save", "save_results", default=True, show_default=True)
@@ -2209,11 +2318,15 @@ def redblue(
     judge_model: str | None,
     judge_host: str | None,
     mode: str,
+    runs: int,
     thinking_flag: bool | None,
     thinking_budget: int,
     save_results: bool,
 ) -> None:
-    """Run red/blue team LLM capability eval — offensive and defensive security tasks."""
+    """Run red/blue team LLM capability eval — offensive and defensive security tasks.
+
+    Use --runs 3 for variance-aware scoring (mean ± stddev across passes).
+    """
     from atomics.eval.redblue.fixtures import ALL_FIXTURES, BLUE_FIXTURES, RED_FIXTURES
     from atomics.eval.redblue.runner import run_redblue
 
@@ -2226,7 +2339,7 @@ def redblue(
     console.print(
         f"\n[bold]Red/Blue eval[/bold] — model: [cyan]{provider_name}[/cyan] ({model or 'default'})\n"
         f"Judge: [cyan]{judge_provider_name}[/cyan] | Mode: [bold]{mode}[/bold] | "
-        f"Fixtures: [bold]{fixture_count}[/bold]\n"
+        f"Fixtures: [bold]{fixture_count}[/bold] | Runs per fixture: [bold]{runs}[/bold]\n"
     )
 
     run_id = __import__("uuid").uuid4().hex[:12]
@@ -2277,6 +2390,7 @@ def redblue(
         mode=mode,
         model=model,
         judge_model=judge_model,
+        runs=runs,
         run_id=run_id,
         thinking=thinking_flag,
         thinking_budget=thinking_budget,
@@ -2291,7 +2405,11 @@ def redblue(
     table.add_row("Model", model or "default")
     table.add_row("Judge", f"{judge_provider_name} / {judge_model or 'default'}")
     table.add_row("Mode", mode)
-    table.add_row("Overall Quality", f"{(summary.overall_quality or 0) * 100:.1f}%")
+    table.add_row("Runs per fixture", str(summary.runs))
+    quality_str = f"{(summary.overall_quality or 0) * 100:.1f}%"
+    if summary.quality_stddev is not None:
+        quality_str += f"  ±{summary.quality_stddev * 100:.1f}%"
+    table.add_row("Overall Quality", quality_str)
     table.add_row("Fixtures Run", str(summary.total_fixtures))
     table.add_row("Avg Latency", f"{summary.avg_latency_ms:.0f}ms")
     table.add_row("Total Cost", f"${summary.total_cost_usd:.6f}")
