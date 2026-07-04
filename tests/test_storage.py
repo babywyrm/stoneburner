@@ -127,6 +127,42 @@ def test_schema_fresh_start_on_version_mismatch(tmp_path):
     conn2.close()
 
 
+def test_schema_migration_backs_up_before_wipe(tmp_path):
+    """The pre-wipe backup exists and still holds the old data."""
+    import sqlite3
+
+    db_path = tmp_path / "migrate.db"
+    conn = sqlite3.connect(str(db_path))
+    conn.executescript("""
+        CREATE TABLE schema_version (version INTEGER PRIMARY KEY);
+        INSERT INTO schema_version (version) VALUES (1);
+        CREATE TABLE runs (run_id TEXT PRIMARY KEY, started_at TEXT NOT NULL);
+        INSERT INTO runs (run_id, started_at) VALUES ('keepme', '2026-01-01');
+    """)
+    conn.commit()
+    conn.close()
+
+    conn2 = init_db(db_path)
+    conn2.close()
+
+    backups = list(tmp_path.glob("migrate.db.v1.*.bak"))
+    assert len(backups) == 1, f"expected one backup, found {backups}"
+
+    # The backup still contains the pre-migration row.
+    bconn = sqlite3.connect(str(backups[0]))
+    old = bconn.execute("SELECT run_id FROM runs").fetchall()
+    bconn.close()
+    assert old == [("keepme",)]
+
+
+def test_schema_no_backup_on_fresh_db(tmp_path):
+    """A brand-new DB (version 0) is not backed up — nothing to preserve."""
+    db_path = tmp_path / "fresh.db"
+    conn = init_db(db_path)
+    conn.close()
+    assert list(tmp_path.glob("*.bak")) == []
+
+
 def test_schedules_table_exists(tmp_path):
     db_path = tmp_path / "sched.db"
     conn = init_db(db_path)
