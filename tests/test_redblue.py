@@ -118,6 +118,46 @@ def test_cli_redblue_help():
     assert "red" in result.output.lower()
 
 
+# ── Multi-run (--runs N) support ─────────────────────────────────────────────
+
+def test_run_redblue_runs_default_is_one():
+    from atomics.eval.redblue.runner import run_redblue
+    summary = asyncio.run(run_redblue(_provider(), judge_provider=_judge(), mode="red"))
+    assert summary.runs == 1
+    assert summary.quality_stddev is None
+
+
+def test_run_redblue_multi_run_records_scores_and_stddev():
+    """runs=3 records per-run scores; identical scores → stddev 0.0."""
+    from atomics.eval.redblue.runner import run_redblue
+    summary = asyncio.run(run_redblue(
+        _provider(), judge_provider=_judge(score=0.8), mode="red", runs=3,
+    ))
+    assert summary.runs == 3
+    assert summary.quality_stddev == 0.0
+    for r in summary.results:
+        if r.judge and not r.judge.parse_failed:
+            assert len(r.run_scores) == 3
+
+
+def test_run_redblue_multi_run_mean_written():
+    """The mean across runs is written to the persisted accuracy score."""
+    from atomics.eval.redblue.runner import run_redblue
+    summary = asyncio.run(run_redblue(
+        _provider(), judge_provider=_judge(score=0.6), mode="red", runs=2,
+    ))
+    for r in summary.results:
+        if r.judge and not r.judge.parse_failed:
+            assert abs(r.task_result.accuracy_score - r.judge.score) < 1e-6
+
+
+def test_cli_redblue_runs_flag_present():
+    from click.testing import CliRunner
+    from atomics.cli import cli
+    result = CliRunner().invoke(cli, ["redblue", "--help"])
+    assert "--runs" in result.output
+
+
 # ── RedBlueSummary computed properties ───────────────────────────────────────
 
 

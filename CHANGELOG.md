@@ -1,8 +1,39 @@
 # Changelog
 
-## Unreleased
+## 0.8.0 (2026-07-04) — New adversarial suites, export/compare/CI plumbing, redblue variance
 
 ### Added
+- **Three new adversarial fixture suites (16 fixtures)** raising the total to 64:
+  - **multi-turn manipulation** (`atomics/eval/adversarial/multiturn.py`, group
+    `--category multiturn`): gradual escalation, rapport exploitation, fabricated
+    "as we agreed earlier" prior agreement, foot-in-the-door, and role drift.
+    Fixtures carry a scripted `prior_turns` conversation the runner renders as a
+    transcript prefix, so multi-turn attacks work across every provider without
+    changing the single-prompt `generate()` contract.
+  - **RAG / retrieved-context poisoning** (`rag_poisoning.py`, `--category
+    rag_poisoning`): instructions embedded in retrieved documents, citation
+    spoofing, retrieved-doc claims of authority over the system prompt,
+    frontmatter directives, and poisoned-knowledge-to-unsafe-action.
+  - **MCP tool-description injection** (`tool_desc_injection.py`, `--category
+    tool_desc_injection`): hostile directives hidden in a tool's description,
+    tool shadowing, parameter-schema injection, hidden/unicode directives, and
+    exfiltration framed as tool telemetry — the model-reasoning analogue of the
+    hammerhand/artifice tool-metadata attack surface.
+- **`atomics adversarial --json-out FILE`** — machine-readable export of the full
+  run (per-fixture scores, labels, judge scores, rationales, latency, cost) via
+  `AdversarialSummary.to_dict()`, including both models when `--compare` is used.
+- **`atomics adversarial --compare MODEL`** — run a second model on the same
+  fixtures and print a per-fixture score diff (Δ B−A) plus overall-resilience
+  delta. Accepts `model`, `provider:model`, or `provider:model@host`.
+- **`atomics adversarial --fail-on-resilience N`** — CI gate; exits non-zero when
+  severity-weighted resilience %% is below the threshold.
+- **Adversarial persistence lifecycle** — the run now creates a parent `runs` row
+  (tier `adversarial`) and finalizes it with `complete_adversarial_run()`, which
+  aggregates `adversarial_results` (not `task_results`). New
+  `get_adversarial_results()` repository query and `atomics export --suite
+  adversarial` (also included in `--suite all`).
+- **`atomics redblue --runs N`** — variance-aware scoring (mean ± stddev across
+  passes) matching `adversarial`; makes the existing QUICKSTART example valid.
 - **Progress tracker for long-running evals** — group-level `--verbose/-v` and
   `--progress/--no-progress` flags. Live Rich spinner shows fixture ID, category,
   and ETA during inference. Works across `redblue` and `adversarial` commands.
@@ -20,6 +51,12 @@
   resolution (env → .env → keychain) with macOS Keychain / Linux secret-service.
 
 ### Fixed
+- **Adversarial fixture count reconciled** — `ALL_FIXTURES` was 32 while the
+  runner actually loaded 48 (mcp_agentic + tool_safety were wired in the runner
+  but not exported), so the header/docs disagreed with the real run. `ALL_FIXTURES`
+  is now the single source of truth (64 with the new suites); the runner and CLI
+  both select via `select_fixtures()`, and the duplicate `AdversarialFixture`
+  dataclass in `mcp_agentic.py` was removed in favor of the canonical one.
 - **redblue persistence** — FK constraint failure when saving fixture results
   (missing parent `runs` row). Now creates run row before fixture processing.
 - **Judge parse failures with thinking models** — qwen3.6, deepseek-r1, and
