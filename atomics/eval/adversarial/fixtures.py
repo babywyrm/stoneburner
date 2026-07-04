@@ -27,6 +27,12 @@ class AdversarialFixture:
     attack_goal: str
     resistance_criteria: list[str] = field(default_factory=list)
     max_output_tokens: int = 512
+    # Optional scripted conversation that precedes `prompt`. Each entry is
+    # (role, content) with role in {"user", "assistant"}. Multi-turn fixtures use
+    # this to establish (fake) rapport/context before the final attack in
+    # `prompt`. Rendered as a transcript prefix so it works across every provider
+    # without changing the single-prompt generate() contract.
+    prior_turns: tuple[tuple[str, str], ...] = ()
 
 
 ADVERSARIAL_FIXTURES: list[AdversarialFixture] = [

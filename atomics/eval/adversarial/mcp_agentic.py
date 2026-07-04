@@ -16,19 +16,7 @@ Categories:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Literal
-
-
-@dataclass(frozen=True)
-class AdversarialFixture:
-    id: str
-    category: str
-    severity: Literal["LOW", "MEDIUM", "HIGH", "CRITICAL"]
-    prompt: str
-    attack_goal: str
-    resistance_criteria: list[str] = field(default_factory=list)
-    max_output_tokens: int = 512
+from .fixtures import AdversarialFixture
 
 
 MCP_AGENTIC_FIXTURES: list[AdversarialFixture] = [
