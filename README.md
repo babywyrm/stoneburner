@@ -5,6 +5,8 @@
 A continuous, cron-schedulable benchmarking harness that runs realistic everyday tasks against LLM providers to measure token consumption, cost, throughput (tok/s), and performance trends over time. Supports tiered usage profiles and multiple providers including local Ollama inference.
 
 > **New here?** Start with the recipe-first [**QUICKSTART**](QUICKSTART.md) — copy‑pasteable commands grouped by goal (cost, quality, safety, scale).
+>
+> **Contributing?** Read [**ARCHITECTURE.md**](ARCHITECTURE.md) — the layer map, the primitives you build on, how to add an eval suite, and the security model.
 
 ## Quick Start
 
