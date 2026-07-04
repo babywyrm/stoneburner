@@ -354,3 +354,206 @@ def test_helpful_request_fixture_exists():
 def test_fixture_count_includes_new():
     from atomics.eval.adversarial.fixtures import ADVERSARIAL_FIXTURES
     assert len(ADVERSARIAL_FIXTURES) == 15
+
+
+# ── New fixture suites: multiturn / rag_poisoning / tool_desc_injection ─────
+
+def test_new_suites_registered_in_all_fixtures():
+    from atomics.eval.adversarial import (
+        ALL_FIXTURES, MULTITURN_FIXTURES, RAG_POISONING_FIXTURES,
+        TOOL_DESC_INJECTION_FIXTURES,
+    )
+    assert len(MULTITURN_FIXTURES) >= 5
+    assert len(RAG_POISONING_FIXTURES) >= 5
+    assert len(TOOL_DESC_INJECTION_FIXTURES) >= 5
+    all_ids = {f.id for f in ALL_FIXTURES}
+    for suite in (MULTITURN_FIXTURES, RAG_POISONING_FIXTURES, TOOL_DESC_INJECTION_FIXTURES):
+        for f in suite:
+            assert f.id in all_ids, f"{f.id} not in ALL_FIXTURES"
+
+
+def test_all_fixtures_ids_globally_unique():
+    from atomics.eval.adversarial import ALL_FIXTURES
+    ids = [f.id for f in ALL_FIXTURES]
+    dupes = {i for i in ids if ids.count(i) > 1}
+    assert not dupes, f"Duplicate fixture IDs across suites: {dupes}"
+
+
+def test_all_fixtures_valid_severity():
+    from atomics.eval.adversarial import ALL_FIXTURES
+    valid = {"LOW", "MEDIUM", "HIGH", "CRITICAL"}
+    for f in ALL_FIXTURES:
+        assert f.severity in valid, f"{f.id}: bad severity {f.severity}"
+        assert f.prompt and f.attack_goal and f.resistance_criteria, f"{f.id}: empty field"
+
+
+def test_group_aliases_cover_new_suites():
+    from atomics.eval.adversarial import GROUP_ALIASES, select_fixtures
+    for alias in ("multiturn", "rag_poisoning", "tool_desc_injection"):
+        assert alias in GROUP_ALIASES
+        assert len(select_fixtures([alias])) >= 5
+
+
+def test_select_fixtures_default_is_all():
+    from atomics.eval.adversarial import ALL_FIXTURES, select_fixtures
+    assert len(select_fixtures(None)) == len(ALL_FIXTURES)
+    assert len(select_fixtures([])) == len(ALL_FIXTURES)
+
+
+def test_select_fixtures_group_and_concrete_category():
+    from atomics.eval.adversarial import select_fixtures
+    # group alias
+    mt = select_fixtures(["multiturn"])
+    assert all(f.id.startswith("mt-") for f in mt)
+    # concrete category
+    esc = select_fixtures(["escalation_gradual"])
+    assert esc and all(f.category == "escalation_gradual" for f in esc)
+
+
+# ── Multi-turn prior_turns rendering ────────────────────────────────────────
+
+def test_prior_turns_field_defaults_empty():
+    from atomics.eval.adversarial.fixtures import AdversarialFixture
+    f = AdversarialFixture(
+        id="x-1", category="prompt_injection", severity="LOW",
+        prompt="hi", attack_goal="g", resistance_criteria=["r"],
+    )
+    assert f.prior_turns == ()
+
+
+def test_render_prompt_single_turn_unchanged():
+    from atomics.eval.adversarial.runner import _render_prompt
+    from atomics.eval.adversarial.fixtures import AdversarialFixture
+    f = AdversarialFixture(
+        id="x-1", category="prompt_injection", severity="LOW",
+        prompt="just this", attack_goal="g", resistance_criteria=["r"],
+    )
+    assert _render_prompt(f) == "just this"
+
+
+def test_render_prompt_multiturn_builds_transcript():
+    from atomics.eval.adversarial.runner import _render_prompt
+    from atomics.eval.adversarial.fixtures import AdversarialFixture
+    f = AdversarialFixture(
+        id="x-2", category="escalation_gradual", severity="HIGH",
+        prompt="final ask", attack_goal="g", resistance_criteria=["r"],
+        prior_turns=(("user", "hello"), ("assistant", "hi there")),
+    )
+    out = _render_prompt(f)
+    assert "User: hello" in out
+    assert "Assistant: hi there" in out
+    assert "User: final ask" in out
+    assert out.rstrip().endswith("Assistant:")
+
+
+def test_multiturn_fixtures_have_prior_turns():
+    from atomics.eval.adversarial import MULTITURN_FIXTURES
+    assert all(f.prior_turns for f in MULTITURN_FIXTURES)
+    for f in MULTITURN_FIXTURES:
+        for role, content in f.prior_turns:
+            assert role in ("user", "assistant")
+            assert content
+
+
+# ── AdversarialSummary.to_dict (--json-out) ─────────────────────────────────
+
+def test_summary_to_dict_serializable():
+    import json
+    from atomics.eval.adversarial.runner import run_adversarial
+    summary = asyncio.run(run_adversarial(
+        _make_provider(),
+        judge_provider=_make_judge(),
+        categories=["prompt_injection"],
+    ))
+    d = summary.to_dict()
+    # round-trips through JSON
+    text = json.dumps(d)
+    assert '"overall_resilience"' in text
+    assert d["total_fixtures"] == len(d["fixtures"])
+    assert "run_id" in d and "category_scores" in d
+    f0 = d["fixtures"][0]
+    for key in ("id", "category", "severity", "score", "label", "rationale"):
+        assert key in f0
+
+
+# ── Adversarial persistence lifecycle ───────────────────────────────────────
+
+def test_complete_adversarial_run_and_query(tmp_path):
+    from atomics.storage.repository import MetricsRepository
+    from atomics.eval.adversarial.runner import AdversarialFixtureResult
+    from atomics.eval.adversarial.fixtures import AdversarialFixture
+    from atomics.eval.adversarial.scorer import ResistanceResult
+
+    repo = MetricsRepository(tmp_path / "adv.db")
+    repo.create_run("run-xyz", tier="adversarial", provider="ollama", model="m")
+    fixture = AdversarialFixture(
+        id="adv-01", category="prompt_injection", severity="CRITICAL",
+        prompt="p", attack_goal="g", resistance_criteria=["r"],
+    )
+    fr = AdversarialFixtureResult(
+        fixture=fixture, response="no",
+        resistance=ResistanceResult(score=0.8, label="resisted", rationale="ok", judge_model="j"),
+        latency_ms=100.0, estimated_cost_usd=0.0, thinking_tokens=0, run_scores=[0.8],
+    )
+    repo.save_adversarial_result("run-xyz", fr)
+    repo.complete_adversarial_run("run-xyz")
+
+    rows = repo.get_adversarial_results(run_id="run-xyz")
+    assert len(rows) == 1
+    assert rows[0]["resistance_label"] == "resisted"
+    # parent run row was finalized
+    run = repo._conn.execute(
+        "SELECT completed_at, total_tasks FROM runs WHERE run_id='run-xyz'"
+    ).fetchone()
+    assert run["completed_at"] is not None
+    assert run["total_tasks"] == 1
+
+
+def test_get_adversarial_results_limit(tmp_path):
+    from atomics.storage.repository import MetricsRepository
+    from atomics.eval.adversarial.runner import AdversarialFixtureResult
+    from atomics.eval.adversarial.fixtures import AdversarialFixture
+    from atomics.eval.adversarial.scorer import ResistanceResult
+
+    repo = MetricsRepository(tmp_path / "adv2.db")
+    repo.create_run("r1", tier="adversarial", provider="ollama", model="m")
+    for i in range(3):
+        fx = AdversarialFixture(
+            id=f"adv-{i:02d}", category="prompt_injection", severity="LOW",
+            prompt="p", attack_goal="g", resistance_criteria=["r"],
+        )
+        fr = AdversarialFixtureResult(
+            fixture=fx, response="x",
+            resistance=ResistanceResult(score=0.5, label="partial", rationale="h", judge_model="j"),
+            latency_ms=1.0, estimated_cost_usd=0.0, thinking_tokens=0,
+        )
+        repo.save_adversarial_result("r1", fr)
+    assert len(repo.get_adversarial_results(limit=2)) == 2
+    assert len(repo.get_adversarial_results()) == 3
+
+
+# ── New CLI flags ───────────────────────────────────────────────────────────
+
+def test_cli_adversarial_new_flags_present():
+    from click.testing import CliRunner
+    from atomics.cli import cli
+    result = CliRunner().invoke(cli, ["adversarial", "--help"])
+    assert result.exit_code == 0
+    for flag in ("--json-out", "--compare", "--fail-on-resilience"):
+        assert flag in result.output
+
+
+def test_cli_export_suite_includes_adversarial():
+    from click.testing import CliRunner
+    from atomics.cli import cli
+    result = CliRunner().invoke(cli, ["export", "--help"])
+    assert result.exit_code == 0
+    assert "adversarial" in result.output
+
+
+def test_cli_redblue_has_runs_flag():
+    from click.testing import CliRunner
+    from atomics.cli import cli
+    result = CliRunner().invoke(cli, ["redblue", "--help"])
+    assert result.exit_code == 0
+    assert "--runs" in result.output
