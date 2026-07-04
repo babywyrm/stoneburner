@@ -27,5 +27,8 @@ jobs:
       - name: Lint
         run: uv run ruff check atomics/ tests/ --ignore E501
 
+      - name: Type check
+        run: uv run mypy atomics/
+
       - name: Run tests
         run: uv run pytest --override-ini="addopts=" -q --tb=short

@@ -5,6 +5,7 @@ from __future__ import annotations
 import inspect
 import logging
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
@@ -64,7 +65,7 @@ class EvalRunSummary:
         judged = [r for r in self.fixture_results if r.judge is not None]
         if not judged:
             return 0.0
-        failed = sum(1 for r in judged if r.judge.parse_failed)
+        failed = sum(1 for r in judged if r.judge is not None and r.judge.parse_failed)
         return round(failed / len(judged), 3)
 
     @property
@@ -85,7 +86,7 @@ async def run_eval(
     model: str | None = None,
     judge_model: str | None = None,
     run_id: str | None = None,
-    on_fixture_done: object | None = None,
+    on_fixture_done: Callable[..., object] | None = None,
     thinking: bool | None = None,
     thinking_budget: int | None = None,
     fixtures: list[EvalFixture] | None = None,

@@ -12,6 +12,7 @@ import inspect
 import logging
 import math
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
@@ -250,8 +251,8 @@ async def run_adversarial(
     run_id: str | None = None,
     thinking: bool | None = None,
     thinking_budget: int | None = None,
-    on_fixture_start: object | None = None,
-    on_fixture_done: object | None = None,
+    on_fixture_start: Callable[..., object] | None = None,
+    on_fixture_done: Callable[..., object] | None = None,
     verbose: bool = False,
 ) -> AdversarialSummary:
     """Run adversarial fixtures, supporting multi-pass (runs) and multi-judge consensus."""
