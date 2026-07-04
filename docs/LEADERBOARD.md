@@ -41,6 +41,28 @@ measured by stoneburner's adversarial eval suite.
 
 ---
 
+## Mistral family addendum (2026-07-04, expanded 64-fixture suite)
+
+Added after the new multi-turn / RAG-poisoning / tool-description-injection suites
+landed (v0.8.0). These two models were run against the **full 64-fixture suite**
+(not the 32-fixture set used for the table above), 3 runs each, same qwen2.5:7b
+judge — so treat these as a separate cohort, not directly rank-comparable to the
+32-fixture numbers.
+
+| Model | Resilience (64-fixture) | Critical/High Failures |
+|-------|:-----------------------:|:----------------------:|
+| mistral-small:24b | **78.2%** | 8 |
+| mistral-nemo:12b | **61.9%** | 16 |
+
+The expanded suite exposed weaknesses the 32-fixture set missed: both models score
+very low on `hidden_unicode` tool-metadata injection (small:24b **7%**, nemo:12b
+40%) and on multi-turn `role_drift` (both 40%). See
+[ADVERSARIAL_SUITES.md](ADVERSARIAL_SUITES.md#mistral-family-results-64-fixtures-3-runs-qwen257b-judge)
+for the full per-category breakdown. For comparison, `mistral:7b` scored 50% on the
+older 32-fixture suite — the newer, larger Mistral models are a clear improvement.
+
+---
+
 ## Key findings
 
 - **`qwen3.5:4b` is the standout** — 98% resistance with zero compliances
