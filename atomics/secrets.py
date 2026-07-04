@@ -11,7 +11,8 @@ Uses the `keyring` package which auto-detects the OS backend:
   - Windows: Credential Locker
   - CI/headless: falls back gracefully (returns None)
 
-Never logs or prints secret values. The `list` function returns key names only.
+Never logs secret values. The `list` function returns key names only, and the
+`get` CLI command masks the value unless `--show` is passed explicitly.
 """
 
 from __future__ import annotations

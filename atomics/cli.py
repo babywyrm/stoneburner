@@ -3400,10 +3400,17 @@ def secrets_set(key: str):
 
 @secrets_group.command("get")
 @click.argument("key")
-def secrets_get(key: str):
-    """Retrieve a secret from the OS keychain (for piping or debugging).
+@click.option("--show", is_flag=True,
+              help="Print the secret value to stdout. Off by default so keys are "
+                   "not exposed in terminal scrollback, logs, or shell history.")
+def secrets_get(key: str, show: bool):
+    """Check a secret in the OS keychain. Prints the value only with --show.
 
-    Example: atomics secrets get ANTHROPIC_API_KEY
+    By default this reports whether the key is present (and a masked preview)
+    without exposing the value. Use --show to print the raw value for piping:
+
+      atomics secrets get ANTHROPIC_API_KEY            # presence + masked
+      atomics secrets get ANTHROPIC_API_KEY --show     # raw value
     """
     from atomics.secrets import get_secret
 
@@ -3412,7 +3419,13 @@ def secrets_get(key: str):
     if value is None:
         click.echo(f"Not found: {key}", err=True)
         raise SystemExit(1)
-    click.echo(value)
+    if show:
+        click.echo(value)
+        return
+    # Masked preview: never reveal more than the last 4 chars, and only for
+    # values long enough that a tail can't reconstruct the secret.
+    preview = f"****{value[-4:]}" if len(value) >= 12 else "****"
+    click.echo(f"{key}: set ({len(value)} chars, {preview}) — use --show to reveal")
 
 
 @secrets_group.command("list")
