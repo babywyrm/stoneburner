@@ -10,6 +10,7 @@ import inspect
 import logging
 import math
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
@@ -156,8 +157,8 @@ async def run_redblue(
     run_id: str | None = None,
     thinking: bool | None = None,
     thinking_budget: int | None = None,
-    on_fixture_start: object | None = None,
-    on_fixture_done: object | None = None,
+    on_fixture_start: Callable[..., object] | None = None,
+    on_fixture_done: Callable[..., object] | None = None,
 ) -> RedBlueSummary:
     """Run red/blue fixtures against provider, judge with quality scorer.
 

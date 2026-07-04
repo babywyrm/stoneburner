@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import time
 from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 import httpx
 
@@ -22,13 +23,16 @@ from atomics.scenario_models import (
 from atomics.scenario_prompts import resolve_prompts
 from atomics.stress import _single_request
 
+if TYPE_CHECKING:
+    from atomics.profiles import TargetProfile
+
 
 async def _run_workload(
     client: httpx.AsyncClient,
     host: str,
     spec: WorkloadSpec,
     duration_seconds: float,
-    loaded_profile: object | None = None,
+    loaded_profile: TargetProfile | None = None,
     ramp_seconds: float = 0.0,
 ) -> WorkloadResult:
     """Run a single workload at its specified concurrency for a fixed duration.
@@ -83,7 +87,7 @@ async def _run_baseline(
     client: httpx.AsyncClient,
     host: str,
     spec: WorkloadSpec,
-    loaded_profile: object | None = None,
+    loaded_profile: TargetProfile | None = None,
 ) -> float:
     """Run a workload solo for a short period, return its P50 latency."""
     result = await _run_workload(client, host, spec, BASELINE_DURATION_SECONDS, loaded_profile)

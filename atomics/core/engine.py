@@ -168,7 +168,6 @@ class LoopEngine:
 
         summary = self._repo.complete_run(self._run_id)
         if self._trigger == "scheduled":
-            schedule_id = f"%.{self._tier.value}.{self._provider.name}"
             status = "success" if summary.failed_tasks == 0 else "failed"
             for sched in self._repo.get_schedules():
                 if sched["tier"] == self._tier.value and sched["provider"] == self._provider.name:

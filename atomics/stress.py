@@ -278,7 +278,7 @@ async def _single_request_provider(
     num_predict: int,
 ) -> tuple[int, int, float, float, float]:
     """Fire one request via BaseProvider. Returns (out_tokens, in_tokens, latency_ms, tps, cost)."""
-    resp = await provider.generate(prompt, max_tokens=num_predict)  # type: ignore[union-attr]
+    resp = await provider.generate(prompt, max_tokens=num_predict)  # type: ignore[attr-defined]
     tps = resp.tokens_per_second
     if tps is None and resp.output_tokens > 0 and resp.latency_ms > 0:
         tps = resp.output_tokens / (resp.latency_ms / 1000)

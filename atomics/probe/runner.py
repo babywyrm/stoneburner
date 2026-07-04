@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from atomics.eval.judge import score_response
@@ -53,7 +54,7 @@ async def run_probe(
     thinking_budget: int | None = None,
     prev_scores: dict[str, float] | None = None,
     regression_threshold: float = 0.10,
-    on_result: object | None = None,
+    on_result: Callable[..., object] | None = None,
 ) -> ProbeSummary:
     """Run LLM probe checks against a list of configured artifact targets."""
     prev_scores = prev_scores or {}

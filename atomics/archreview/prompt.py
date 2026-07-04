@@ -146,7 +146,7 @@ def parse_findings(raw: str) -> list[Finding]:
     for line in raw.splitlines():
         if re.match(r"^\s*[|][\s\-:|]+[|]", line):
             continue  # markdown separator row
-        m = _HYBRID_PIPE_RE.match(line) or _PIPE_RE.match(line)
+        m = _HYBRID_PIPE_RE.match(line) or _PIPE_RE.match(line)  # type: ignore[assignment]
         if not m:
             continue
         # Skip header rows: first cell is a label word (Category, Finding, etc.)
@@ -164,7 +164,7 @@ def parse_findings(raw: str) -> list[Finding]:
     for line in raw.splitlines():
         if re.match(r"^\s*[|][\s\-:|]+[|]", line):
             continue  # separator/header row
-        m = _MD_TABLE_ROW_RE.match(line)
+        m = _MD_TABLE_ROW_RE.match(line)  # type: ignore[assignment]
         if not m:
             continue
         cat_norm = normalize_category(_clean(m.group("cat")))
@@ -181,7 +181,7 @@ def parse_findings(raw: str) -> list[Finding]:
 
     # Numbered/bulleted bold list: 1. **Category** — location — severity — why
     for line in raw.splitlines():
-        m = _BOLD_LIST_RE.match(line)
+        m = _BOLD_LIST_RE.match(line)  # type: ignore[assignment]
         if not m:
             continue
         findings.append(_mk_finding(m.group("cat"), m.group("loc"),

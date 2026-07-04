@@ -55,7 +55,7 @@ def _drift_pct(values: list[float]) -> float:
     """Compute drift percentage over a time series using linear regression."""
     if len(values) < 2:
         return 0.0
-    xs = list(range(len(values)))
+    xs = [float(i) for i in range(len(values))]
     slope = _linear_slope(xs, values)
     first = values[0]
     if first == 0:
