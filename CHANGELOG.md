@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- **`atomics redblue --json-out FILE`** — machine-readable run export via
+  `RedBlueSummary.to_dict()`, matching the adversarial command.
+- **Suite-isolated export** — `query_task_results` gains `suite`/`suite_prefix`
+  filters; `atomics export --suite eval` and `--suite redblue` now return only
+  those rows instead of all `task_results` blended together.
+
+### Fixed
+- **redblue truncated thinking models** — fixtures cap `max_output_tokens` at
+  1024, which is sized for the visible answer; with thinking enabled, reasoning
+  models spent that budget on hidden reasoning and got cut off, scoring as a
+  capability gap. The runner now raises the budget to >=4096 when thinking is
+  active (explicit `--thinking` or an auto-detected reasoning model).
+
 ## 0.8.0 (2026-07-04) — New adversarial suites, export/compare/CI plumbing, redblue variance
 
 ### Added

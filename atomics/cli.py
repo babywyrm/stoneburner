@@ -1441,9 +1441,10 @@ def doctor() -> None:
 @cli.command("export")
 @click.option(
     "--suite",
-    type=click.Choice(["tasks", "stress", "sweep", "soak", "adversarial", "all"]),
+    type=click.Choice(["tasks", "eval", "redblue", "stress", "sweep", "soak", "adversarial", "all"]),
     default="tasks",
-    help="Which suite to export: tasks (default), stress, sweep, soak, adversarial, or all",
+    help="Which suite to export: tasks (all task_results), eval, redblue, stress, "
+         "sweep, soak, adversarial, or all",
 )
 @click.option(
     "--since-hours",
@@ -1491,6 +1492,12 @@ def export_tasks(
     try:
         if suite == "tasks":
             rows = repo.query_task_results(since_hours=since_hours, limit=limit)
+            write_tasks_export(rows, fmt, out_file)
+        elif suite == "eval":
+            rows = repo.query_task_results(since_hours=since_hours, limit=limit, suite="eval")
+            write_tasks_export(rows, fmt, out_file)
+        elif suite == "redblue":
+            rows = repo.query_task_results(since_hours=since_hours, limit=limit, suite_prefix="redblue-")
             write_tasks_export(rows, fmt, out_file)
         elif suite == "stress":
             rows = repo.get_stress_results()
@@ -2309,6 +2316,8 @@ def adversarial(
 @click.option("--thinking/--no-thinking", "thinking_flag", default=None)
 @click.option("--thinking-budget", type=int, default=8000, show_default=True)
 @click.option("--save/--no-save", "save_results", default=True, show_default=True)
+@click.option("--json-out", "json_out", type=click.Path(dir_okay=False, writable=True), default=None,
+              help="Write the full run (per-fixture scores, rationales, latency, cost) as JSON to this file.")
 def redblue(
     provider_name: str,
     model: str | None,
@@ -2322,6 +2331,7 @@ def redblue(
     thinking_flag: bool | None,
     thinking_budget: int,
     save_results: bool,
+    json_out: str | None,
 ) -> None:
     """Run red/blue team LLM capability eval — offensive and defensive security tasks.
 
@@ -2420,6 +2430,12 @@ def redblue(
     if repo:
         repo.complete_run(run_id)
         repo.close()
+
+    if json_out:
+        import json as _json
+        with open(json_out, "w", encoding="utf-8") as fh:
+            _json.dump(summary.to_dict(), fh, indent=2)
+        console.print(f"\n[dim]Wrote JSON results to {json_out}[/dim]")
 
 
 # ── atomics probe ─────────────────────────────────────────────────────────────

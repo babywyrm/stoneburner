@@ -336,13 +336,26 @@ class MetricsRepository:
         *,
         since_hours: float | None = None,
         limit: int | None = None,
+        suite: str | None = None,
+        suite_prefix: str | None = None,
     ) -> list[dict]:
-        """Return task rows for export, newest first."""
+        """Return task rows for export, newest first.
+
+        `suite` matches an exact suite value; `suite_prefix` matches with a
+        trailing wildcard (e.g. "redblue-" selects redblue-red + redblue-blue),
+        so callers can isolate a suite instead of getting all task_results mixed.
+        """
         clauses: list[str] = []
         params: list = []
         if since_hours is not None:
             clauses.append("started_at >= datetime('now', ?)")
             params.append(f"-{since_hours} hours")
+        if suite is not None:
+            clauses.append("suite = ?")
+            params.append(suite)
+        if suite_prefix is not None:
+            clauses.append("suite LIKE ?")
+            params.append(f"{suite_prefix}%")
         where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
         sql = f"SELECT * FROM task_results {where} ORDER BY started_at DESC"
         if limit is not None:
