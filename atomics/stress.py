@@ -11,6 +11,8 @@ from dataclasses import dataclass, field
 
 import httpx
 
+from atomics.stats import percentile as _percentile
+
 STRESS_PROMPTS = [
     (
         "Write a detailed technical analysis of how GPU memory bandwidth affects "
@@ -98,16 +100,6 @@ class StressResult:
     total_cost_usd: float = 0.0
 
 
-def _percentile(values: list[float], pct: float) -> float:
-    if not values:
-        return 0.0
-    s = sorted(values)
-    k = (len(s) - 1) * (pct / 100)
-    f = int(k)
-    c = f + 1
-    if c >= len(s):
-        return s[f]
-    return s[f] + (k - f) * (s[c] - s[f])
 
 
 def _get_gpu_info() -> tuple[str, float | None]:
