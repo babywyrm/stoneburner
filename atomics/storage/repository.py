@@ -196,6 +196,52 @@ class MetricsRepository:
         )
         self._conn.commit()
 
+    def complete_adversarial_run(self, run_id: str) -> None:
+        """Finalize a run whose results live in adversarial_results (not task_results).
+
+        The generic `complete_run` aggregates `task_results`, so adversarial runs
+        need their own completion that reads the right table. Sets completed_at
+        and rolls up count/cost/latency for `atomics report`-style listing.
+        """
+        now = datetime.now(UTC).isoformat()
+        row = self._conn.execute(
+            """
+            SELECT
+                COUNT(*) AS total,
+                COALESCE(SUM(estimated_cost_usd), 0.0) AS cost,
+                COALESCE(AVG(latency_ms), 0.0) AS avg_lat
+            FROM adversarial_results WHERE run_id = ?
+            """,
+            (run_id,),
+        ).fetchone()
+        self._conn.execute(
+            """
+            UPDATE runs SET
+                completed_at = ?, total_tasks = ?, successful_tasks = ?,
+                total_cost_usd = ?, avg_latency_ms = ?
+            WHERE run_id = ?
+            """,
+            (now, row[0], row[0], row[1], row[2], run_id),
+        )
+        self._conn.commit()
+
+    def get_adversarial_results(
+        self, *, limit: int | None = None, run_id: str | None = None
+    ) -> list[dict]:
+        """Return adversarial result rows for export, newest first."""
+        clauses: list[str] = []
+        params: list = []
+        if run_id is not None:
+            clauses.append("run_id = ?")
+            params.append(run_id)
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        sql = f"SELECT * FROM adversarial_results {where} ORDER BY timestamp DESC"
+        if limit is not None:
+            sql += " LIMIT ?"
+            params.append(limit)
+        rows = self._conn.execute(sql, params).fetchall()
+        return [dict(r) for r in rows]
+
     def save_probe_result(self, run_id: str, result: object) -> None:
         r = result
         self._conn.execute(

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import inspect
 import logging
+import math
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -30,6 +31,8 @@ class RedBlueFixtureResult:
     fixture: RedBlueFixture
     task_result: TaskResult
     judge: JudgeResult | None
+    # Per-run judge scores when runs > 1 (mean is written to task_result/judge).
+    run_scores: list[float] = field(default_factory=list)
 
 
 @dataclass
@@ -40,6 +43,7 @@ class RedBlueSummary:
     mode: str
     started_at: datetime
     completed_at: datetime
+    runs: int = 1
     results: list[RedBlueFixtureResult] = field(default_factory=list)
 
     @property
@@ -50,6 +54,20 @@ class RedBlueSummary:
     def overall_quality(self) -> float | None:
         scored = [r.judge.score for r in self.results if r.judge and not r.judge.parse_failed]
         return round(sum(scored) / len(scored), 3) if scored else None
+
+    @property
+    def quality_stddev(self) -> float | None:
+        """Stddev across per-run scores — only meaningful when runs > 1."""
+        if self.runs <= 1:
+            return None
+        all_scores: list[float] = []
+        for r in self.results:
+            all_scores.extend(r.run_scores)
+        if len(all_scores) < 2:
+            return None
+        mean = sum(all_scores) / len(all_scores)
+        variance = sum((s - mean) ** 2 for s in all_scores) / len(all_scores)
+        return round(math.sqrt(variance), 3)
 
     @property
     def category_scores(self) -> dict[str, float]:
@@ -76,13 +94,19 @@ async def run_redblue(
     mode: str = "all",
     model: str | None = None,
     judge_model: str | None = None,
+    runs: int = 1,
     run_id: str | None = None,
     thinking: bool | None = None,
     thinking_budget: int | None = None,
     on_fixture_start: object | None = None,
     on_fixture_done: object | None = None,
 ) -> RedBlueSummary:
-    """Run red/blue fixtures against provider, judge with quality scorer."""
+    """Run red/blue fixtures against provider, judge with quality scorer.
+
+    runs>1 re-generates and re-scores each fixture N times; the mean score is
+    written to the result and per-run scores are kept for variance reporting.
+    """
+    runs = max(1, runs)
     if detect_self_judge(provider, model, [(judge_provider, judge_model)]):
         logger.warning(
             "Self-judging detected: the model under test is also the judge. "
@@ -112,72 +136,98 @@ async def run_redblue(
             "[redblue] %s (%s/%s) %s",
             fixture.id, fixture.team, fixture.category, fixture.prompt[:60],
         )
-        task_result = TaskResult(
-            run_id=run_id,
-            category=TaskCategory.GENERAL_QA,
-            task_name=fixture.id,
-            provider=provider.name,
-            model=model or "default",
-            status=TaskStatus.PENDING,
-            thinking_enabled=bool(thinking),
-        )
+        run_scores: list[float] = []
+        last_task_result: TaskResult | None = None
+        last_judge: JudgeResult | None = None
+        failed_task: TaskResult | None = None
 
-        try:
-            resp = await provider.generate(
-                fixture.prompt,
-                system="You are a highly knowledgeable security engineering assistant.",
-                model=model,
-                max_tokens=fixture.max_output_tokens,
-                thinking=thinking,
-                thinking_budget=thinking_budget,
+        for run_num in range(runs):
+            task_result = TaskResult(
+                run_id=run_id,
+                category=TaskCategory.GENERAL_QA,
+                task_name=fixture.id,
+                provider=provider.name,
+                model=model or "default",
+                status=TaskStatus.PENDING,
+                thinking_enabled=bool(thinking),
             )
-            task_result.status = TaskStatus.SUCCESS
-            task_result.response = resp.text
-            task_result.prompt = fixture.prompt
-            task_result.input_tokens = resp.input_tokens
-            task_result.output_tokens = resp.output_tokens
-            task_result.total_tokens = resp.total_tokens
-            task_result.thinking_tokens = resp.thinking_tokens
-            task_result.latency_ms = resp.latency_ms
-            task_result.estimated_cost_usd = resp.estimated_cost_usd
-            task_result.tokens_per_second = resp.tokens_per_second
-            task_result.completed_at = datetime.now(UTC)
-        except Exception as exc:
-            # Fall back to repr for exceptions with an empty str (e.g. ReadTimeout).
-            err = (str(exc) or repr(exc))[:500]
-            logger.warning("[redblue] %s generate failed: %s", fixture.id, err)
-            task_result.status = TaskStatus.FAILED
-            task_result.error_class = type(exc).__name__
-            task_result.error_message = err
-            task_result.completed_at = datetime.now(UTC)
-            fr = RedBlueFixtureResult(fixture=fixture, task_result=task_result, judge=None)
-            results.append(fr)
-            if on_fixture_done:
-                if inspect.iscoroutinefunction(on_fixture_done):
-                    await on_fixture_done(fr)
-                else:
-                    on_fixture_done(fr)
-            continue
 
-        judge = await score_response(
-            fixture.prompt,
-            resp.text,
-            judge_provider=judge_provider,
-            judge_model=judge_model,
-            gold_criteria=fixture.gold_criteria,
-            max_response_chars=char_budget_for_tokens(fixture.max_output_tokens),
-        )
-        task_result.accuracy_score = judge.score
-        task_result.judge_model = judge.judge_model
-        task_result.quality_rationale = judge.rationale
-        task_result.criteria_coverage = judge.criteria_coverage
+            try:
+                resp = await provider.generate(
+                    fixture.prompt,
+                    system="You are a highly knowledgeable security engineering assistant.",
+                    model=model,
+                    max_tokens=fixture.max_output_tokens,
+                    thinking=thinking,
+                    thinking_budget=thinking_budget,
+                )
+                task_result.status = TaskStatus.SUCCESS
+                task_result.response = resp.text
+                task_result.prompt = fixture.prompt
+                task_result.input_tokens = resp.input_tokens
+                task_result.output_tokens = resp.output_tokens
+                task_result.total_tokens = resp.total_tokens
+                task_result.thinking_tokens = resp.thinking_tokens
+                task_result.latency_ms = resp.latency_ms
+                task_result.estimated_cost_usd = resp.estimated_cost_usd
+                task_result.tokens_per_second = resp.tokens_per_second
+                task_result.completed_at = datetime.now(UTC)
+            except Exception as exc:
+                # Fall back to repr for exceptions with an empty str (e.g. ReadTimeout).
+                err = (str(exc) or repr(exc))[:500]
+                logger.warning(
+                    "[redblue] %s run %d generate failed: %s",
+                    fixture.id, run_num + 1, err,
+                )
+                task_result.status = TaskStatus.FAILED
+                task_result.error_class = type(exc).__name__
+                task_result.error_message = err
+                task_result.completed_at = datetime.now(UTC)
+                failed_task = task_result
+                continue
 
-        logger.info(
-            "[redblue] %s → %.3f — %s",
-            fixture.id, judge.score, judge.rationale[:80],
-        )
+            judge = await score_response(
+                fixture.prompt,
+                resp.text,
+                judge_provider=judge_provider,
+                judge_model=judge_model,
+                gold_criteria=fixture.gold_criteria,
+                max_response_chars=char_budget_for_tokens(fixture.max_output_tokens),
+            )
+            task_result.accuracy_score = judge.score
+            task_result.judge_model = judge.judge_model
+            task_result.quality_rationale = judge.rationale
+            task_result.criteria_coverage = judge.criteria_coverage
+            if not judge.parse_failed:
+                run_scores.append(judge.score)
+            last_task_result = task_result
+            last_judge = judge
 
-        fr = RedBlueFixtureResult(fixture=fixture, task_result=task_result, judge=judge)
+            logger.info(
+                "[redblue] %s run %d/%d → %.3f — %s",
+                fixture.id, run_num + 1, runs, judge.score, judge.rationale[:80],
+            )
+
+        if last_task_result is None:
+            # Every run failed — record the last failure.
+            fr = RedBlueFixtureResult(
+                fixture=fixture,
+                task_result=failed_task,  # type: ignore[arg-type]
+                judge=None,
+            )
+        else:
+            # Write the mean score across runs to the persisted result.
+            if run_scores:
+                mean_score = round(sum(run_scores) / len(run_scores), 3)
+                last_task_result.accuracy_score = mean_score
+                if last_judge:
+                    last_judge.score = mean_score
+            fr = RedBlueFixtureResult(
+                fixture=fixture,
+                task_result=last_task_result,
+                judge=last_judge,
+                run_scores=run_scores,
+            )
         results.append(fr)
 
         if on_fixture_done:
@@ -193,5 +243,6 @@ async def run_redblue(
         mode=mode,
         started_at=started_at,
         completed_at=datetime.now(UTC),
+        runs=runs,
         results=results,
     )
