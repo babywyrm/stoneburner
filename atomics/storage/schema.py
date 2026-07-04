@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import sqlite3
+from datetime import UTC, datetime
 from pathlib import Path
 
 logger = logging.getLogger("atomics.schema")
@@ -268,11 +269,30 @@ def _get_schema_version(conn: sqlite3.Connection) -> int:
         return 0
 
 
+def _backup_before_wipe(conn: sqlite3.Connection, db_path: Path, current: int) -> Path:
+    """WAL-safe snapshot of the DB before a destructive schema reset.
+
+    Uses SQLite's online backup API (not a file copy) so in-flight WAL data is
+    captured. Returns the backup path so callers/logs can point users to it.
+    """
+    stamp = datetime.now(UTC).strftime("%Y%m%d%H%M%S")
+    backup_path = db_path.with_name(f"{db_path.name}.v{current}.{stamp}.bak")
+    backup_conn = sqlite3.connect(str(backup_path))
+    try:
+        with backup_conn:
+            conn.backup(backup_conn)
+    finally:
+        backup_conn.close()
+    return backup_path
+
+
 def init_db(db_path: Path) -> sqlite3.Connection:
     """Initialize the database, creating tables if needed.
 
-    On schema version mismatch the DB is wiped and recreated (fresh-start
-    policy while the project is pre-1.0).
+    On a schema version bump the tables are reset (fresh-start policy while the
+    project is pre-1.0), but the existing DB is first snapshotted to a
+    timestamped ``.bak`` beside it, so historical metrics are recoverable rather
+    than silently lost.
     """
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(db_path), check_same_thread=False)
@@ -282,11 +302,18 @@ def init_db(db_path: Path) -> sqlite3.Connection:
 
     current = _get_schema_version(conn)
     if current != 0 and current < SCHEMA_VERSION:
-        logger.info(
-            "Schema version %d → %d: dropping all tables for fresh start.",
-            current,
-            SCHEMA_VERSION,
-        )
+        try:
+            backup_path = _backup_before_wipe(conn, db_path, current)
+            logger.warning(
+                "Schema version %d → %d: backed up existing DB to %s, then "
+                "resetting tables.",
+                current, SCHEMA_VERSION, backup_path,
+            )
+        except sqlite3.Error as exc:
+            logger.warning(
+                "Schema version %d → %d: backup failed (%s); resetting tables.",
+                current, SCHEMA_VERSION, exc,
+            )
         conn.executescript(
             "DROP TABLE IF EXISTS task_results;"
             "DROP TABLE IF EXISTS adversarial_results;"
