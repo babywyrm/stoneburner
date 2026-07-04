@@ -203,6 +203,25 @@ def test_output_budget_unchanged_for_nonthinking():
     assert _output_budget(fx, thinking=None, model="qwen2.5:7b") == fx.max_output_tokens
 
 
+def test_run_redblue_all_runs_failed_records_failure():
+    """When every run raises, the fixture is recorded as FAILED with no judge."""
+    from atomics.eval.redblue.runner import run_redblue
+    from atomics.models import TaskStatus
+
+    p = AsyncMock()
+    p.name = "mock"
+    p.generate = AsyncMock(side_effect=RuntimeError("boom"))
+
+    summary = asyncio.run(run_redblue(p, judge_provider=_judge(), mode="red", runs=2))
+    assert summary.total_fixtures == len(summary.results)
+    for r in summary.results:
+        assert r.judge is None
+        assert r.task_result.status == TaskStatus.FAILED
+        assert r.task_result.error_class == "RuntimeError"
+    # overall_quality is None when nothing scored
+    assert summary.overall_quality is None
+
+
 # ── RedBlueSummary computed properties ───────────────────────────────────────
 
 
