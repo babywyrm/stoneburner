@@ -158,6 +158,51 @@ def test_cli_redblue_runs_flag_present():
     assert "--runs" in result.output
 
 
+# ── --json-out ───────────────────────────────────────────────────────────────
+
+def test_redblue_summary_to_dict_serializable():
+    import json
+    from atomics.eval.redblue.runner import run_redblue
+    summary = asyncio.run(run_redblue(_provider(), judge_provider=_judge(), mode="red"))
+    d = summary.to_dict()
+    text = json.dumps(d)  # must round-trip
+    assert '"overall_quality"' in text
+    assert d["total_fixtures"] == len(d["fixtures"])
+    assert d["mode"] == "red"
+    f0 = d["fixtures"][0]
+    for key in ("id", "team", "category", "status", "score", "rationale"):
+        assert key in f0
+
+
+def test_cli_redblue_json_out_flag_present():
+    from click.testing import CliRunner
+    from atomics.cli import cli
+    result = CliRunner().invoke(cli, ["redblue", "--help"])
+    assert "--json-out" in result.output
+
+
+# ── Thinking-aware output budget ─────────────────────────────────────────────
+
+def test_output_budget_expands_for_thinking_models():
+    from atomics.eval.redblue.runner import _output_budget, _THINKING_MIN_OUTPUT_TOKENS
+    from atomics.eval.redblue.fixtures import RED_FIXTURES
+    fx = RED_FIXTURES[0]
+    # explicit thinking=True → expanded
+    assert _output_budget(fx, thinking=True, model="qwen2.5:7b") == max(
+        fx.max_output_tokens, _THINKING_MIN_OUTPUT_TOKENS
+    )
+    # auto-detect a thinking-capable model → expanded
+    assert _output_budget(fx, thinking=None, model="qwen3:14b") >= _THINKING_MIN_OUTPUT_TOKENS
+
+
+def test_output_budget_unchanged_for_nonthinking():
+    from atomics.eval.redblue.runner import _output_budget
+    from atomics.eval.redblue.fixtures import RED_FIXTURES
+    fx = RED_FIXTURES[0]
+    assert _output_budget(fx, thinking=False, model="qwen2.5:7b") == fx.max_output_tokens
+    assert _output_budget(fx, thinking=None, model="qwen2.5:7b") == fx.max_output_tokens
+
+
 # ── RedBlueSummary computed properties ───────────────────────────────────────
 
 

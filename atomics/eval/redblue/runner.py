@@ -20,10 +20,28 @@ from atomics.eval.judge import (
     score_response,
 )
 from atomics.eval.redblue.fixtures import ALL_FIXTURES, BLUE_FIXTURES, RED_FIXTURES, RedBlueFixture
+from atomics.model_classes import supports_thinking
 from atomics.models import TaskCategory, TaskResult, TaskStatus
 from atomics.providers.base import BaseProvider
 
 logger = logging.getLogger("atomics.eval.redblue.runner")
+
+# When thinking is enabled, reasoning models spend most of their output budget on
+# hidden reasoning before the visible answer. The fixture's max_output_tokens
+# (1024) is sized for the visible answer; without headroom the answer is truncated
+# and scored as a capability gap rather than reflecting the model's real ability.
+_THINKING_MIN_OUTPUT_TOKENS = 4096
+
+
+def _output_budget(fixture: RedBlueFixture, *, thinking: bool | None, model: str | None) -> int:
+    """Resolve the output-token budget, giving thinking models room to reason."""
+    base = fixture.max_output_tokens
+    use_thinking = thinking if thinking is not None else (
+        supports_thinking(model) if model else False
+    )
+    if use_thinking:
+        return max(base, _THINKING_MIN_OUTPUT_TOKENS)
+    return base
 
 
 @dataclass
@@ -85,6 +103,46 @@ class RedBlueSummary:
     @property
     def total_cost_usd(self) -> float:
         return sum(r.task_result.estimated_cost_usd for r in self.results)
+
+    def to_dict(self) -> dict:
+        """Machine-readable view of the run for --json-out / dashboards / CI."""
+        return {
+            "run_id": self.run_id,
+            "provider": self.provider,
+            "model": self.model,
+            "mode": self.mode,
+            "runs": self.runs,
+            "started_at": self.started_at.isoformat(),
+            "completed_at": self.completed_at.isoformat(),
+            "overall_quality": self.overall_quality,
+            "quality_stddev": self.quality_stddev,
+            "total_fixtures": self.total_fixtures,
+            "category_scores": self.category_scores,
+            "avg_latency_ms": self.avg_latency_ms,
+            "total_cost_usd": round(self.total_cost_usd, 6),
+            "fixtures": [
+                {
+                    "id": r.fixture.id,
+                    "team": r.fixture.team,
+                    "category": r.fixture.category,
+                    "complexity": getattr(r.fixture, "complexity", None),
+                    "status": r.task_result.status.value,
+                    "score": r.judge.score if r.judge else None,
+                    "parse_failed": r.judge.parse_failed if r.judge else True,
+                    "run_scores": r.run_scores,
+                    "rationale": r.judge.rationale if r.judge else "",
+                    "criteria_coverage": (
+                        r.judge.criteria_coverage if r.judge else None
+                    ),
+                    "latency_ms": round(r.task_result.latency_ms, 1),
+                    "output_tokens": r.task_result.output_tokens,
+                    "thinking_tokens": r.task_result.thinking_tokens,
+                    "estimated_cost_usd": round(r.task_result.estimated_cost_usd, 6),
+                    "error": r.task_result.error_message or None,
+                }
+                for r in self.results
+            ],
+        }
 
 
 async def run_redblue(
@@ -157,7 +215,7 @@ async def run_redblue(
                     fixture.prompt,
                     system="You are a highly knowledgeable security engineering assistant.",
                     model=model,
-                    max_tokens=fixture.max_output_tokens,
+                    max_tokens=_output_budget(fixture, thinking=thinking, model=model),
                     thinking=thinking,
                     thinking_budget=thinking_budget,
                 )

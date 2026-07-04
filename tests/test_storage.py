@@ -154,6 +154,41 @@ def test_create_and_complete_run():
     repo.close()
 
 
+def test_query_task_results_suite_filter():
+    """query_task_results isolates a suite (exact) and a prefix (redblue-*)."""
+    repo = _tmp_repo()
+    repo.create_run("run-suite")
+
+    def _mk(name, suite):
+        r = TaskResult(
+            run_id="run-suite", category=TaskCategory.GENERAL_QA, task_name=name,
+            provider="ollama", model="m", status=TaskStatus.SUCCESS,
+            started_at=datetime.now(UTC), completed_at=datetime.now(UTC),
+        )
+        repo.save_task_result(r, suite=suite)
+
+    _mk("ev-1", "eval")
+    _mk("rb-red-1", "redblue-red")
+    _mk("rb-blue-1", "redblue-blue")
+
+    all_rows = repo.query_task_results()
+    assert len(all_rows) == 3
+    eval_rows = repo.query_task_results(suite="eval")
+    assert len(eval_rows) == 1 and eval_rows[0]["task_name"] == "ev-1"
+    redblue_rows = repo.query_task_results(suite_prefix="redblue-")
+    assert len(redblue_rows) == 2
+    assert {r["suite"] for r in redblue_rows} == {"redblue-red", "redblue-blue"}
+
+
+def test_cli_export_suite_choices_include_eval_redblue():
+    from click.testing import CliRunner
+    from atomics.cli import cli
+    result = CliRunner().invoke(cli, ["export", "--help"])
+    assert result.exit_code == 0
+    assert "redblue" in result.output
+    assert "eval" in result.output
+
+
 def test_save_and_query_task_result():
     repo = _tmp_repo()
     repo.create_run("run-002")
