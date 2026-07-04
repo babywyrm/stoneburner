@@ -2,23 +2,20 @@
 
 from __future__ import annotations
 
-import asyncio
 import tempfile
-from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from atomics.qa_runner import (
+    QAError,
     QAFixture,
     QAResult,
     QASuiteResult,
-    QAError,
     evaluate_fixture,
     load_qa_suite,
     run_qa_suite,
 )
-
 
 # ── Fixtures / helpers ────────────────────────────────────────────────────────
 
@@ -336,7 +333,7 @@ class TestQARunnerProfileMode:
     @pytest.mark.asyncio
     async def test_profile_mode_uses_profile_transport(self):
         """When profile= is given, _query_profile is used instead of _query_ollama."""
-        from unittest.mock import MagicMock, patch, AsyncMock as _AM
+        from unittest.mock import MagicMock, patch
 
         fixture = QAFixture(id="t", prompt="q", must_match="any")
         fake_profile = MagicMock()
@@ -418,6 +415,7 @@ class TestQARunnerProfileMode:
 class TestQACLI:
     def test_qa_command_exists(self):
         from click.testing import CliRunner
+
         from atomics.cli import cli
         runner = CliRunner()
         result = runner.invoke(cli, ["qa", "--help"])
@@ -426,16 +424,17 @@ class TestQACLI:
 
     def test_qa_profile_flag_in_help(self):
         from click.testing import CliRunner
+
         from atomics.cli import cli
         result = CliRunner().invoke(cli, ["qa", "--help"])
         assert "--profile" in result.output or "-p" in result.output
 
     def test_qa_profile_flag_routes_to_profile_mode(self):
+
         from click.testing import CliRunner
+
         from atomics.cli import cli
-        from atomics.qa_runner import QASuiteResult, QAFixture, QAResult
-        from atomics.profiles import TargetProfile
-        import tempfile
+        from atomics.qa_runner import QAFixture, QAResult, QASuiteResult
 
         yaml_content = (
             "model: test\nhost: http://fake:11434\n"
@@ -466,8 +465,9 @@ class TestQACLI:
 
     def test_qa_runs_suite(self):
         from click.testing import CliRunner
+
         from atomics.cli import cli
-        from atomics.qa_runner import QASuiteResult, QAFixture, QAResult
+        from atomics.qa_runner import QAFixture, QAResult, QASuiteResult
 
         yaml_content = (
             "model: test\nhost: http://fake:11434\n"

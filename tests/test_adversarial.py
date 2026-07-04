@@ -33,7 +33,7 @@ def test_adversarial_fixtures_all_have_required_fields():
         "instruction_override", "social_engineering", "data_exfil_attempt",
     }
     for f in ADVERSARIAL_FIXTURES:
-        assert f.id, f"fixture missing id"
+        assert f.id, "fixture missing id"
         assert f.severity in valid_severities, f"{f.id}: bad severity {f.severity}"
         assert f.category in valid_categories, f"{f.id}: bad category {f.category}"
         assert f.prompt, f"{f.id}: empty prompt"
@@ -80,7 +80,6 @@ def test_resistance_label_from_score():
 
 def test_resist_re_parses_clean():
     """Baseline: standard \n separator works."""
-    import re
     from atomics.eval.adversarial.scorer import _RESIST_RE
     raw = "RESISTANCE: 8\nLABEL: resisted\nRATIONALE: Refused clearly."
     m = _RESIST_RE.search(raw)
@@ -110,8 +109,8 @@ def test_resist_re_parses_crlf():
 
 
 import asyncio
-from unittest.mock import AsyncMock
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 
 def _make_provider(text="I cannot comply with that request."):
@@ -138,7 +137,7 @@ def _make_judge(score=8, label="resisted", rationale="The model resisted the adv
 
 
 def test_run_adversarial_returns_summary():
-    from atomics.eval.adversarial.runner import run_adversarial, AdversarialSummary
+    from atomics.eval.adversarial.runner import AdversarialSummary, run_adversarial
     summary = asyncio.run(run_adversarial(
         _make_provider(),
         judge_provider=_make_judge(),
@@ -168,10 +167,10 @@ def test_run_adversarial_critical_compliance_flagged():
 
 
 def test_save_adversarial_result(tmp_path):
-    from atomics.storage.repository import MetricsRepository
-    from atomics.eval.adversarial.runner import AdversarialFixtureResult
     from atomics.eval.adversarial.fixtures import AdversarialFixture
+    from atomics.eval.adversarial.runner import AdversarialFixtureResult
     from atomics.eval.adversarial.scorer import ResistanceResult
+    from atomics.storage.repository import MetricsRepository
 
     repo = MetricsRepository(tmp_path / "test.db")
     fixture = AdversarialFixture(
@@ -197,6 +196,7 @@ def test_save_adversarial_result(tmp_path):
 
 def test_cli_adversarial_help():
     from click.testing import CliRunner
+
     from atomics.cli import cli
     runner = CliRunner()
     result = runner.invoke(cli, ["adversarial", "--help"])
@@ -312,6 +312,7 @@ def test_run_adversarial_multi_judge_judge_scores_tracked():
 
 def test_cli_adversarial_runs_option():
     from click.testing import CliRunner
+
     from atomics.cli import cli
     runner = CliRunner()
     result = runner.invoke(cli, ["adversarial", "--help"])
@@ -320,6 +321,7 @@ def test_cli_adversarial_runs_option():
 
 def test_cli_adversarial_extra_judges_option():
     from click.testing import CliRunner
+
     from atomics.cli import cli
     runner = CliRunner()
     result = runner.invoke(cli, ["adversarial", "--help"])
@@ -360,7 +362,9 @@ def test_fixture_count_includes_new():
 
 def test_new_suites_registered_in_all_fixtures():
     from atomics.eval.adversarial import (
-        ALL_FIXTURES, MULTITURN_FIXTURES, RAG_POISONING_FIXTURES,
+        ALL_FIXTURES,
+        MULTITURN_FIXTURES,
+        RAG_POISONING_FIXTURES,
         TOOL_DESC_INJECTION_FIXTURES,
     )
     assert len(MULTITURN_FIXTURES) >= 5
@@ -422,8 +426,8 @@ def test_prior_turns_field_defaults_empty():
 
 
 def test_render_prompt_single_turn_unchanged():
-    from atomics.eval.adversarial.runner import _render_prompt
     from atomics.eval.adversarial.fixtures import AdversarialFixture
+    from atomics.eval.adversarial.runner import _render_prompt
     f = AdversarialFixture(
         id="x-1", category="prompt_injection", severity="LOW",
         prompt="just this", attack_goal="g", resistance_criteria=["r"],
@@ -432,8 +436,8 @@ def test_render_prompt_single_turn_unchanged():
 
 
 def test_render_prompt_multiturn_builds_transcript():
-    from atomics.eval.adversarial.runner import _render_prompt
     from atomics.eval.adversarial.fixtures import AdversarialFixture
+    from atomics.eval.adversarial.runner import _render_prompt
     f = AdversarialFixture(
         id="x-2", category="escalation_gradual", severity="HIGH",
         prompt="final ask", attack_goal="g", resistance_criteria=["r"],
@@ -459,6 +463,7 @@ def test_multiturn_fixtures_have_prior_turns():
 
 def test_summary_to_dict_serializable():
     import json
+
     from atomics.eval.adversarial.runner import run_adversarial
     summary = asyncio.run(run_adversarial(
         _make_provider(),
@@ -479,10 +484,10 @@ def test_summary_to_dict_serializable():
 # ── Adversarial persistence lifecycle ───────────────────────────────────────
 
 def test_complete_adversarial_run_and_query(tmp_path):
-    from atomics.storage.repository import MetricsRepository
-    from atomics.eval.adversarial.runner import AdversarialFixtureResult
     from atomics.eval.adversarial.fixtures import AdversarialFixture
+    from atomics.eval.adversarial.runner import AdversarialFixtureResult
     from atomics.eval.adversarial.scorer import ResistanceResult
+    from atomics.storage.repository import MetricsRepository
 
     repo = MetricsRepository(tmp_path / "adv.db")
     repo.create_run("run-xyz", tier="adversarial", provider="ollama", model="m")
@@ -510,10 +515,10 @@ def test_complete_adversarial_run_and_query(tmp_path):
 
 
 def test_get_adversarial_results_limit(tmp_path):
-    from atomics.storage.repository import MetricsRepository
-    from atomics.eval.adversarial.runner import AdversarialFixtureResult
     from atomics.eval.adversarial.fixtures import AdversarialFixture
+    from atomics.eval.adversarial.runner import AdversarialFixtureResult
     from atomics.eval.adversarial.scorer import ResistanceResult
+    from atomics.storage.repository import MetricsRepository
 
     repo = MetricsRepository(tmp_path / "adv2.db")
     repo.create_run("r1", tier="adversarial", provider="ollama", model="m")
@@ -536,6 +541,7 @@ def test_get_adversarial_results_limit(tmp_path):
 
 def test_cli_adversarial_new_flags_present():
     from click.testing import CliRunner
+
     from atomics.cli import cli
     result = CliRunner().invoke(cli, ["adversarial", "--help"])
     assert result.exit_code == 0
@@ -545,6 +551,7 @@ def test_cli_adversarial_new_flags_present():
 
 def test_cli_export_suite_includes_adversarial():
     from click.testing import CliRunner
+
     from atomics.cli import cli
     result = CliRunner().invoke(cli, ["export", "--help"])
     assert result.exit_code == 0
@@ -553,6 +560,7 @@ def test_cli_export_suite_includes_adversarial():
 
 def test_cli_redblue_has_runs_flag():
     from click.testing import CliRunner
+
     from atomics.cli import cli
     result = CliRunner().invoke(cli, ["redblue", "--help"])
     assert result.exit_code == 0
@@ -562,8 +570,9 @@ def test_cli_redblue_has_runs_flag():
 # ── Summary edge cases (empty / parse-failed) ───────────────────────────────
 
 def _empty_summary(fixture_results):
-    from atomics.eval.adversarial.runner import AdversarialSummary
     from datetime import UTC, datetime
+
+    from atomics.eval.adversarial.runner import AdversarialSummary
     return AdversarialSummary(
         run_id="r", provider="ollama", model="m", judge_provider="ollama",
         judge_model="j", judges=["j"], runs=1,
@@ -608,8 +617,8 @@ def test_run_adversarial_verbose_smoke(capsys):
 
 def test_to_dict_handles_failed_fixture():
     """A fixture whose generation failed (resistance=None) serializes cleanly."""
-    from atomics.eval.adversarial.runner import AdversarialFixtureResult
     from atomics.eval.adversarial.fixtures import AdversarialFixture
+    from atomics.eval.adversarial.runner import AdversarialFixtureResult
     fx = AdversarialFixture(
         id="adv-01", category="prompt_injection", severity="CRITICAL",
         prompt="p", attack_goal="g", resistance_criteria=["r"],

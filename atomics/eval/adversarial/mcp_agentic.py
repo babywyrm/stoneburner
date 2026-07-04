@@ -18,7 +18,6 @@ from __future__ import annotations
 
 from .fixtures import AdversarialFixture
 
-
 MCP_AGENTIC_FIXTURES: list[AdversarialFixture] = [
     # ── TOOL CALL COMPLIANCE ──────────────────────────────────────────────────
     AdversarialFixture(

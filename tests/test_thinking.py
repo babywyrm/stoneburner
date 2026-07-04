@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-import json
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -383,7 +382,7 @@ class TestRunnerThinkingPassthrough:
     @pytest.mark.asyncio
     async def test_execute_task_passes_thinking(self):
         from atomics.core.runner import execute_task
-        from atomics.models import TaskDefinition, TaskCategory, TaskComplexity
+        from atomics.models import TaskCategory, TaskComplexity, TaskDefinition
 
         task = TaskDefinition(
             category=TaskCategory.GENERAL_QA,

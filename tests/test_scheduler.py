@@ -124,7 +124,6 @@ def test_all_formats_include_trigger_scheduled():
 
 
 def _fake_run(returncode=0, stdout="", stderr=""):
-    import subprocess
     import types
 
     def _run(cmd, **kwargs):

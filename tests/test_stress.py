@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import subprocess
-import shutil
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -62,7 +60,6 @@ def test_stress_prompts_are_populated():
 @pytest.mark.asyncio
 async def test_run_stress_with_mock():
     """Verify the ramp logic works end-to-end with a mocked HTTP client."""
-    import httpx
     from atomics.stress import _run_phase
 
     call_count = 0
@@ -188,6 +185,7 @@ async def test_run_phase_handles_failures():
 def test_cli_stress_command_with_save(monkeypatch, tmp_path):
     """atomics stress --save should persist results to database."""
     from click.testing import CliRunner
+
     from atomics.cli import cli
 
     async def fake_run_stress(**kwargs):
@@ -223,6 +221,7 @@ def test_cli_stress_command_with_save(monkeypatch, tmp_path):
 def test_cli_stress_command_no_save(monkeypatch, tmp_path):
     """atomics stress --no-save should skip database persistence."""
     from click.testing import CliRunner
+
     from atomics.cli import cli
 
     async def fake_run_stress(**kwargs):
@@ -257,6 +256,7 @@ def test_cli_stress_command_no_save(monkeypatch, tmp_path):
 def test_cli_stress_throttling_detected(monkeypatch, tmp_path):
     """Stress CLI should detect throttling when final phase TPS drops."""
     from click.testing import CliRunner
+
     from atomics.cli import cli
 
     async def fake_run_stress(**kwargs):
@@ -449,6 +449,7 @@ def test_cli_stress_with_provider(monkeypatch, tmp_path):
     """atomics stress --provider openai routes to run_stress_provider."""
     pytest.importorskip("openai", reason="optional 'openai' extra not installed")
     from click.testing import CliRunner
+
     from atomics.cli import cli
 
     captured_kwargs: dict = {}
@@ -489,6 +490,7 @@ def test_cli_stress_with_provider(monkeypatch, tmp_path):
 def test_cli_stress_provider_claude(monkeypatch, tmp_path):
     """atomics stress --provider claude uses Claude provider."""
     from click.testing import CliRunner
+
     from atomics.cli import cli
 
     async def fake_run_stress_provider(**kwargs):
@@ -526,6 +528,7 @@ def test_cli_stress_provider_save_cost(monkeypatch, tmp_path):
     """Stress with --provider --save should persist cost data."""
     pytest.importorskip("openai", reason="optional 'openai' extra not installed")
     from click.testing import CliRunner
+
     from atomics.cli import cli
 
     async def fake_run_stress_provider(**kwargs):
@@ -692,7 +695,7 @@ class TestRunStressProfile:
 
     @pytest.mark.asyncio
     async def test_run_stress_profile_on_phase_callback(self):
-        from atomics.stress import run_stress_profile, ConcurrencyResult
+        from atomics.stress import run_stress_profile
         phases_received: list[ConcurrencyResult] = []
 
         def on_phase(p: ConcurrencyResult) -> None:

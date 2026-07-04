@@ -1,4 +1,4 @@
-from atomics.archreview.taxonomy import Category, normalize_category, ALL_CATEGORIES
+from atomics.archreview.taxonomy import ALL_CATEGORIES, Category, normalize_category
 
 
 def test_all_categories_are_enum_values():

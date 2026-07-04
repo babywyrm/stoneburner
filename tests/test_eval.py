@@ -7,11 +7,10 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from atomics.eval.fixtures import EVAL_FIXTURES, EvalFixture
-from atomics.eval.judge import JudgeResult, _SCORE_RE, score_response
+from atomics.eval.fixtures import EVAL_FIXTURES
+from atomics.eval.judge import _SCORE_RE, score_response
 from atomics.eval.runner import EvalRunSummary, run_eval
 from atomics.models import TaskComplexity
-
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 

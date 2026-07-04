@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -13,7 +13,6 @@ from atomics.contention import (
     _percentile,
     run_contention,
 )
-
 
 # ── ContentionModelResult ─────────────────────────────────────────────────────
 
@@ -195,6 +194,7 @@ class TestRunContention:
 class TestContentionCLI:
     def test_stress_models_flag_in_help(self):
         from click.testing import CliRunner
+
         from atomics.cli import cli
         runner = CliRunner()
         result = runner.invoke(cli, ["stress", "--help"])
@@ -202,6 +202,7 @@ class TestContentionCLI:
 
     def test_models_flag_triggers_contention_path(self):
         from click.testing import CliRunner
+
         from atomics.cli import cli
         from atomics.contention import ContentionResult
 
@@ -238,7 +239,7 @@ def test_contention_model_result_avg_latency_empty():
 
 
 def test_contention_factor_mixed_none():
-    from atomics.contention import ContentionResult, ContentionModelResult
+    from atomics.contention import ContentionModelResult, ContentionResult
     cr = ContentionResult(host="h", models=["a", "b"], phase_seconds=5.0)
     cr.solo_tps = {"a": 10.0, "b": 5.0}
     # "a" not in contention_results → mixed avg_tps = 0 (no per_request_tps),
@@ -251,7 +252,7 @@ def test_contention_factor_mixed_none():
 
 
 def test_contention_factor_solo_zero():
-    from atomics.contention import ContentionResult, ContentionModelResult
+    from atomics.contention import ContentionModelResult, ContentionResult
     cr = ContentionResult(host="h", models=["a"], phase_seconds=5.0)
     cr.solo_tps = {"a": 0.0}  # solo == 0 → factor is None
     r = ContentionModelResult(model="a", requests=5, failed=0, latencies=[80.0])

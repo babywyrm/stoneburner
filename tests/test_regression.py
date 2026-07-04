@@ -10,14 +10,12 @@ import pytest
 
 from atomics.regression import (
     BaselineRecord,
-    RegressionReport,
     _pct_delta,
     compute_regression,
     list_baselines,
     load_baseline,
     save_baseline,
 )
-
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 

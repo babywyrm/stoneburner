@@ -154,7 +154,8 @@ def test_providers_init_bedrock_lazy():
 
 
 def test_providers_init_unknown_attr():
-    import atomics.providers as p
     import pytest
+
+    import atomics.providers as p
     with pytest.raises(AttributeError, match="no attribute"):
         _ = p.NonExistentProvider

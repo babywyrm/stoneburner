@@ -1,5 +1,4 @@
 import textwrap
-from pathlib import Path
 
 from atomics.archreview.keygen import answer_key_from_challenges, load_repo_spec
 

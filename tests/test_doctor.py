@@ -53,15 +53,13 @@ def test_doctor_checks_boto3_creds(capsys, monkeypatch, tmp_path):
 
 # ── Doctor missing branch coverage ───────────────────────────────────────────
 
-import platform
-import sqlite3
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 
 def test_doctor_db_oserror(monkeypatch, tmp_path):
     """Lines 42-44: OSError path when DB parent isn't creatable."""
-    from atomics.doctor import run_doctor
     from atomics.config import AtomicsSettings
+    from atomics.doctor import run_doctor
     settings = AtomicsSettings(db_path=tmp_path / "doc.db")
     with patch("sqlite3.connect", side_effect=OSError("permission denied")):
         rc = run_doctor(settings=settings)
@@ -70,9 +68,8 @@ def test_doctor_db_oserror(monkeypatch, tmp_path):
 
 def test_doctor_openai_sdk_missing(capsys, tmp_path):
     """Line 61: openai SDK not installed path."""
-    import importlib.util
-    from atomics.doctor import run_doctor
     from atomics.config import AtomicsSettings
+    from atomics.doctor import run_doctor
     settings = AtomicsSettings(db_path=tmp_path / "doc.db")
     with patch("importlib.util.find_spec", return_value=None):
         run_doctor(settings=settings)
@@ -83,8 +80,8 @@ def test_doctor_openai_sdk_missing(capsys, tmp_path):
 def test_doctor_boto3_aws_creds_valid(capsys, tmp_path):
     """Lines 75-79: boto3 installed + valid creds branch."""
     pytest.importorskip("boto3", reason="optional 'bedrock' extra not installed")
-    from atomics.doctor import run_doctor
     from atomics.config import AtomicsSettings
+    from atomics.doctor import run_doctor
     settings = AtomicsSettings(db_path=tmp_path / "doc.db")
 
     mock_sts = MagicMock()
@@ -111,8 +108,8 @@ def test_doctor_boto3_aws_creds_valid(capsys, tmp_path):
 def test_doctor_boto3_aws_creds_invalid(capsys, tmp_path):
     """Lines 75-79: boto3 installed but creds invalid (exception)."""
     pytest.importorskip("boto3", reason="optional 'bedrock' extra not installed")
-    from atomics.doctor import run_doctor
     from atomics.config import AtomicsSettings
+    from atomics.doctor import run_doctor
     settings = AtomicsSettings(db_path=tmp_path / "doc.db")
 
     import importlib.util as _ilu
@@ -133,8 +130,8 @@ def test_doctor_boto3_aws_creds_invalid(capsys, tmp_path):
 
 def test_doctor_scheduler_crontab_missing(capsys, tmp_path):
     """Lines 101-102: crontab scheduler detected but binary missing."""
-    from atomics.doctor import run_doctor
     from atomics.config import AtomicsSettings
+    from atomics.doctor import run_doctor
     settings = AtomicsSettings(db_path=tmp_path / "doc.db")
     with patch("atomics.doctor.detect_best_scheduler", return_value="crontab"), \
          patch("shutil.which", return_value=None):
@@ -145,8 +142,8 @@ def test_doctor_scheduler_crontab_missing(capsys, tmp_path):
 
 def test_doctor_linux_paths(capsys, tmp_path):
     """Lines 108-111: Linux-specific data dir lines."""
-    from atomics.doctor import run_doctor
     from atomics.config import AtomicsSettings
+    from atomics.doctor import run_doctor
     settings = AtomicsSettings(db_path=tmp_path / "doc.db")
     with patch("platform.system", return_value="Linux"):
         run_doctor(settings=settings)
@@ -156,8 +153,8 @@ def test_doctor_linux_paths(capsys, tmp_path):
 
 def test_doctor_scheduler_systemd_missing_systemctl(capsys, tmp_path):
     """Line 104: systemd scheduler detected but systemctl binary missing."""
-    from atomics.doctor import run_doctor
     from atomics.config import AtomicsSettings
+    from atomics.doctor import run_doctor
     settings = AtomicsSettings(db_path=tmp_path / "doc.db")
     with patch("atomics.doctor.detect_best_scheduler", return_value="systemd"), \
          patch("shutil.which", return_value=None):
