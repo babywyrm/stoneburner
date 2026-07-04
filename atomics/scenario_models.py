@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from atomics.stats import percentile as _percentile
+
 WORKLOAD_TYPES: frozenset[str] = frozenset({"gate", "eval"})
 
 DEFAULT_NUM_PREDICT: dict[str, int] = {
@@ -82,16 +84,6 @@ class ScenarioResult:
     total_failed: int = 0
 
 
-def _percentile(values: list[float], pct: float) -> float:
-    if not values:
-        return 0.0
-    s = sorted(values)
-    k = (len(s) - 1) * (pct / 100)
-    f = int(k)
-    c = f + 1
-    if c >= len(s):
-        return s[f]
-    return s[f] + (k - f) * (s[c] - s[f])
 
 
 def parse_workload_flag(flag: str) -> WorkloadSpec:

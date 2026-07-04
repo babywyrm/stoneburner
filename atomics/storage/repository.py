@@ -7,19 +7,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from atomics.models import RunSummary, TaskResult, TaskStatus
+from atomics.stats import percentile as _percentile
 from atomics.storage.schema import init_db
-
-
-def _percentile(sorted_values: list[float], pct: float) -> float:
-    """Compute a percentile from a pre-sorted list."""
-    if not sorted_values:
-        return 0.0
-    k = (len(sorted_values) - 1) * (pct / 100)
-    f = int(k)
-    c = f + 1
-    if c >= len(sorted_values):
-        return sorted_values[f]
-    return sorted_values[f] + (k - f) * (sorted_values[c] - sorted_values[f])
 
 
 class MetricsRepository:

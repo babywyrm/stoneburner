@@ -15,6 +15,8 @@ from dataclasses import dataclass, field
 
 import httpx
 
+from atomics.stats import percentile as _percentile
+
 
 @dataclass
 class ContentionModelResult:
@@ -67,15 +69,6 @@ class ContentionResult:
         return round(mixed / solo, 3)
 
 
-def _percentile(sorted_values: list[float], pct: float) -> float:
-    if not sorted_values:
-        return 0.0
-    k = (len(sorted_values) - 1) * (pct / 100)
-    f = int(k)
-    c = f + 1
-    if c >= len(sorted_values):
-        return sorted_values[f]
-    return sorted_values[f] + (k - f) * (sorted_values[c] - sorted_values[f])
 
 
 async def _run_model_phase(

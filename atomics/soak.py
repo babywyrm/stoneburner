@@ -8,6 +8,8 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
+from atomics.stats import percentile as _percentile
+
 
 def parse_duration(s: str) -> float:
     """Parse a human-friendly duration string into seconds.
@@ -128,16 +130,6 @@ class SoakResult:
     total_cost_usd: float = 0.0
 
 
-def _percentile(values: list[float], pct: float) -> float:
-    if not values:
-        return 0.0
-    s = sorted(values)
-    k = (len(s) - 1) * (pct / 100)
-    f = int(k)
-    c = f + 1
-    if c >= len(s):
-        return s[f]
-    return s[f] + (k - f) * (s[c] - s[f])
 
 
 async def run_soak(
