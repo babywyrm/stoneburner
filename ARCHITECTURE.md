@@ -19,7 +19,7 @@ never imports eval; providers never import storage.
 
 ```
 CLI / entry          cli.py, __main__.py
-Orchestration        sweep, scenario, qa_runner
+Orchestration        sweep, scenario, qa_runner, labcompare
 Burn loop            core/, tasks/, tiers, hooks
 Eval / security      eval/, probe/, archreview/
 Load testing         stress, soak, contention, capacity, profiles, regression
@@ -34,7 +34,7 @@ Support / infra      config, paths, secrets, doctor, reporting, exporters,
 | Layer | Owns | Key modules |
 |-------|------|-------------|
 | CLI | Argument parsing, wiring, Rich output. No business logic that can't be reached another way. | `cli.py` |
-| Orchestration | Multi-run/multi-model coordination over the lower layers. | `sweep.py`, `scenario.py`, `qa_runner.py` |
+| Orchestration | Multi-run/multi-model coordination over the lower layers. | `sweep.py`, `scenario.py`, `qa_runner.py`, `labcompare.py` |
 | Burn loop | The continuous token-burn benchmark. | `core/engine.py`, `core/runner.py`, `core/guard.py`, `tasks/` |
 | Eval / security | LLM quality and security evaluation suites. | `eval/`, `probe/`, `archreview/` |
 | Load testing | Throughput/latency/stability under concurrency. | `stress.py`, `soak.py`, `contention.py`, `capacity.py` |
