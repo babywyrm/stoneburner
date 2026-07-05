@@ -9,7 +9,7 @@ from pathlib import Path
 
 logger = logging.getLogger("atomics.schema")
 
-SCHEMA_VERSION = 15
+SCHEMA_VERSION = 16
 
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -258,6 +258,26 @@ CREATE TABLE IF NOT EXISTS archreview_results (
 CREATE INDEX IF NOT EXISTS idx_archreview_results_run_id ON archreview_results(run_id);
 CREATE INDEX IF NOT EXISTS idx_archreview_results_repo ON archreview_results(repo);
 CREATE INDEX IF NOT EXISTS idx_archreview_results_model ON archreview_results(model);
+
+CREATE TABLE IF NOT EXISTS labcompare_results (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    comparison_run_id   TEXT NOT NULL,
+    created_at          TEXT NOT NULL,
+    host_name           TEXT NOT NULL,
+    host_url            TEXT NOT NULL,
+    model               TEXT NOT NULL,
+    tokens_per_second   REAL,
+    latency_ms          REAL,
+    prompt_eval_rate    REAL,
+    vram_fit_pct        REAL,
+    gpu_name            TEXT,
+    quality_score       REAL,
+    quality_suite       TEXT,
+    judge_model         TEXT,
+    dimensions          TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_labcompare_run ON labcompare_results(comparison_run_id);
 """
 
 
@@ -324,6 +344,7 @@ def init_db(db_path: Path) -> sqlite3.Connection:
             "DROP TABLE IF EXISTS soak_results;"
             "DROP TABLE IF EXISTS baselines;"
             "DROP TABLE IF EXISTS archreview_results;"
+            "DROP TABLE IF EXISTS labcompare_results;"
             "DROP TABLE IF EXISTS runs;"
             "DROP TABLE IF EXISTS schedules;"
             "DROP TABLE IF EXISTS schema_version;"
