@@ -214,6 +214,47 @@ class MetricsRepository:
         )
         self._conn.commit()
 
+    def complete_probe_run(self, run_id: str) -> None:
+        """Finalize a run whose results live in probe_results.
+
+        Mirrors complete_adversarial_run but reads probe_results (which has no
+        cost/latency columns), so it just records completion + row count.
+        """
+        now = datetime.now(UTC).isoformat()
+        row = self._conn.execute(
+            "SELECT COUNT(*) FROM probe_results WHERE run_id = ?", (run_id,)
+        ).fetchone()
+        self._conn.execute(
+            """
+            UPDATE runs SET
+                completed_at = ?, total_tasks = ?, successful_tasks = ?
+            WHERE run_id = ?
+            """,
+            (now, row[0], row[0], run_id),
+        )
+        self._conn.commit()
+
+    def complete_archreview_run(self, run_id: str) -> None:
+        """Finalize a run whose results live in archreview_results."""
+        now = datetime.now(UTC).isoformat()
+        row = self._conn.execute(
+            """
+            SELECT COUNT(*) AS total,
+                   COALESCE(SUM(cost_usd), 0.0) AS cost
+            FROM archreview_results WHERE run_id = ?
+            """,
+            (run_id,),
+        ).fetchone()
+        self._conn.execute(
+            """
+            UPDATE runs SET completed_at = ?, total_tasks = ?, successful_tasks = ?,
+                total_cost_usd = ?
+            WHERE run_id = ?
+            """,
+            (now, row[0], row[0], row[1], run_id),
+        )
+        self._conn.commit()
+
     def get_adversarial_results(
         self, *, limit: int | None = None, run_id: str | None = None
     ) -> list[dict]:
