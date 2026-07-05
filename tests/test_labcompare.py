@@ -143,3 +143,67 @@ async def test_probe_throughput_handles_ps_failure():
     res = await probe_throughput(prov, "m", ps_fetcher=ps, prompts=["a"])
     assert res.tokens_per_second == 80.0
     assert res.vram_fit_pct is None
+
+
+# ── Orchestrator ──────────────────────────────────────────
+
+from atomics.labcompare import CellResult, run_labcompare
+
+
+@pytest.mark.asyncio
+async def test_run_labcompare_two_hosts_throughput_and_quality():
+    hosts = [HostSpec("laptop", "http://a:11434"), HostSpec("brainbox", "http://b:11434")]
+
+    def provider_factory(url):
+        return _FakeProvider()
+
+    def ps_fetcher_factory(url):
+        async def _ps():
+            return {"models": [{"name": "m", "size": 100, "size_vram": 100}]}
+        return _ps
+
+    async def quality_fn(provider, judge_provider, judge_model, model):
+        return 0.9
+
+    cells = await run_labcompare(
+        hosts=hosts, models=["m"], dimensions=["throughput", "quality"],
+        quality_suite="eval", judge_host=None, judge_model="judge",
+        prompts=2, provider_factory=provider_factory, quality_fn=quality_fn,
+        ps_fetcher_factory=ps_fetcher_factory,
+    )
+    assert len(cells) == 2
+    assert {c.host_name for c in cells} == {"laptop", "brainbox"}
+    assert all(c.tokens_per_second == 80.0 for c in cells)
+    assert all(c.quality_score == 0.9 for c in cells)
+
+
+@pytest.mark.asyncio
+async def test_run_labcompare_unreachable_host_skipped():
+    hosts = [HostSpec("up", "http://a:11434"), HostSpec("down", "http://b:11434")]
+
+    class _DeadProvider:
+        async def generate(self, *a, **k):
+            raise ConnectionError("host down")
+
+    def provider_factory(url):
+        return _DeadProvider() if "b:" in url else _FakeProvider()
+
+    def ps_fetcher_factory(url):
+        async def _ps():
+            return {"models": []}
+        return _ps
+
+    async def quality_fn(provider, judge_provider, judge_model, model):
+        return 0.9
+
+    cells = await run_labcompare(
+        hosts=hosts, models=["m"], dimensions=["throughput"],
+        quality_suite="eval", judge_host=None, judge_model=None,
+        prompts=1, provider_factory=provider_factory, quality_fn=quality_fn,
+        ps_fetcher_factory=ps_fetcher_factory,
+    )
+    up = [c for c in cells if c.host_name == "up"][0]
+    down = [c for c in cells if c.host_name == "down"][0]
+    assert up.tokens_per_second == 80.0
+    assert down.tokens_per_second is None
+    assert down.error is not None
