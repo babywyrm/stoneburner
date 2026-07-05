@@ -293,6 +293,28 @@ uv run atomics sweep --provider claude --models claude-sonnet-4-6 --verbose
 uv run atomics sweep --all-local --fixtures ev-01,ev-02,ev-03
 ```
 
+### `atomics labcompare` — Two-Host Bench-off + Quality Parity
+
+Compare two lab boxes (e.g. an RTX 5090 laptop vs an RTX 5070 box) on the same
+models — throughput and quality side by side.
+
+```bash
+uv run atomics labcompare \
+  --host laptop=http://192.168.1.205:11434 \
+  --host brainbox=http://192.168.1.239:11434 \
+  --models qwen2.5:7b,qwen3:14b,qwen3.6:27b \
+  --judge-host http://192.168.1.239:11434 --judge-model qwen3.6:35b-a3b
+```
+
+- **Throughput:** single-stream tok/s, latency, prompt-eval rate, and VRAM fit
+  (100% = fully in GPU; lower = CPU offload) read from each host's `/api/ps`.
+- **Quality parity:** the same fixtures run on both boxes, scored by one fixed
+  judge, so identical weights should produce identical scores (a gap flags a
+  problem). Pick the suite with `--quality-suite eval|redblue` (default `eval`).
+- Run one dimension alone with `--dimensions throughput` or `--dimensions quality`.
+- Results persist to the `labcompare_results` table; add `-o out.json` for a
+  structured dump.
+
 ### `atomics capacity` — User Load Simulator
 
 Projects how many users your setup can handle using queueing theory and real stress test data. No live requests needed -- pure math from measured data points.
