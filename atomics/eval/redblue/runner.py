@@ -66,6 +66,15 @@ class RedBlueSummary:
     results: list[RedBlueFixtureResult] = field(default_factory=list)
 
     @property
+    def fixture_results(self) -> list[RedBlueFixtureResult]:
+        """Alias for `results` — the convergent name used across eval suites.
+
+        See ARCHITECTURE.md "known divergences". New code should prefer
+        `fixture_results`; `results` remains for back-compat.
+        """
+        return self.results
+
+    @property
     def total_fixtures(self) -> int:
         return len(self.results)
 

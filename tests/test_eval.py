@@ -243,6 +243,32 @@ def test_run_eval_value_score_free_provider():
     assert summary.value_score > 0
 
 
+def test_eval_summary_to_dict_serializable():
+    import json
+
+    provider = _make_test_provider()
+    judge = _make_good_judge()
+    judge.name = "judge"  # real providers expose a str name; mock needs it set
+    summary = asyncio.run(run_eval(provider, judge_provider=judge))
+    d = summary.to_dict()
+    json.dumps(d)  # must round-trip
+    assert d["total_fixtures"] == len(d["fixtures"])
+    assert "overall_accuracy" in d and "parse_failure_rate" in d
+    f0 = d["fixtures"][0]
+    for key in ("id", "status", "score", "rationale", "latency_ms"):
+        assert key in f0
+
+
+def test_cli_eval_has_json_out_flag():
+    from click.testing import CliRunner
+
+    from atomics.cli import cli
+
+    result = CliRunner().invoke(cli, ["eval", "--help"])
+    assert result.exit_code == 0
+    assert "--json-out" in result.output
+
+
 def test_run_eval_on_fixture_done_called():
     provider = _make_test_provider()
     judge = _make_good_judge()

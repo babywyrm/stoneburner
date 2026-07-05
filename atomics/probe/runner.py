@@ -34,6 +34,15 @@ class ProbeSummary:
     results: list[ProbeResult] = field(default_factory=list)
 
     @property
+    def fixture_results(self) -> list[ProbeResult]:
+        """Alias for `results` — the convergent name used across eval suites.
+
+        See ARCHITECTURE.md "known divergences". New code should prefer
+        `fixture_results`; `results` remains for back-compat.
+        """
+        return self.results
+
+    @property
     def overall_score(self) -> float | None:
         scored = [r.score for r in self.results if r.score is not None]
         return round(sum(scored) / len(scored), 3) if scored else None

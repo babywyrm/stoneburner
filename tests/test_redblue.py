@@ -185,6 +185,14 @@ def test_cli_redblue_json_out_flag_present():
     assert "--json-out" in result.output
 
 
+def test_redblue_summary_fixture_results_alias():
+    """fixture_results is the convergent alias for results (same object)."""
+    from atomics.eval.redblue.runner import run_redblue
+    summary = asyncio.run(run_redblue(_provider(), judge_provider=_judge(), mode="red"))
+    assert summary.fixture_results is summary.results
+    assert len(summary.fixture_results) == summary.total_fixtures
+
+
 # ── Thinking-aware output budget ─────────────────────────────────────────────
 
 def test_output_budget_expands_for_thinking_models():

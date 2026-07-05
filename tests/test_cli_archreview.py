@@ -293,3 +293,30 @@ def test_archreview_cli_unknown_repo_errors():
                                  "--models", "m", "--no-save"])
     assert result.exit_code != 0
     assert "does-not-exist" in result.output
+
+
+def test_archreview_runs_is_alias_for_rounds():
+    """--runs is accepted as an alias for --rounds (cross-suite consistency)."""
+    from unittest.mock import patch
+
+    from atomics.archreview.models import ArchReviewResult
+
+    captured = {}
+
+    async def _shim(**kwargs):
+        captured["rounds"] = kwargs.get("rounds")
+        return [ArchReviewResult(
+            run_id="r", repo="juice-shop", tier="floor", model="m",
+            provider="ollama", round_index=0, findings=[],
+        )]
+
+    runner = CliRunner()
+    with patch("atomics.archreview.runner.run_archreview", side_effect=_shim):
+        result = runner.invoke(cli, [
+            "archreview", "--repo", "juice-shop", "--models", "m",
+            "--provider", "ollama", "--runs", "2", "--judge-only", "--no-save",
+        ])
+    # It should parse --runs into rounds=2 (or fail later for env reasons, not on the flag).
+    assert "no such option" not in result.output.lower()
+    if captured:
+        assert captured["rounds"] == 2

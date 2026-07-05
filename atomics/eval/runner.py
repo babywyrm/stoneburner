@@ -78,6 +78,41 @@ class EvalRunSummary:
         eps = 0.001
         return round(acc / max(cost_per_1k, eps), 1)
 
+    def to_dict(self) -> dict:
+        """Machine-readable view of the run for --json-out / dashboards / CI."""
+        return {
+            "run_id": self.run_id,
+            "provider": self.provider,
+            "model": self.model,
+            "judge_provider": self.judge_provider,
+            "judge_model": self.judge_model,
+            "started_at": self.started_at.isoformat(),
+            "completed_at": self.completed_at.isoformat(),
+            "overall_accuracy": self.overall_accuracy,
+            "parse_failure_rate": self.parse_failure_rate,
+            "value_score": self.value_score,
+            "total_fixtures": len(self.fixture_results),
+            "total_cost_usd": round(self.total_cost_usd, 6),
+            "total_tokens": self.total_tokens,
+            "avg_latency_ms": self.avg_latency_ms,
+            "fixtures": [
+                {
+                    "id": r.fixture.id,
+                    "status": r.task_result.status.value,
+                    "score": r.judge.score if r.judge else None,
+                    "parse_failed": r.judge.parse_failed if r.judge else True,
+                    "rationale": r.judge.rationale if r.judge else "",
+                    "criteria_coverage": r.judge.criteria_coverage if r.judge else None,
+                    "latency_ms": round(r.task_result.latency_ms, 1),
+                    "output_tokens": r.task_result.output_tokens,
+                    "thinking_tokens": r.task_result.thinking_tokens,
+                    "estimated_cost_usd": round(r.task_result.estimated_cost_usd, 6),
+                    "error": r.task_result.error_message or None,
+                }
+                for r in self.fixture_results
+            ],
+        }
+
 
 async def run_eval(
     provider: BaseProvider,
