@@ -812,3 +812,49 @@ class MetricsRepository:
             ),
         )
         self._conn.commit()
+
+    # ── LabCompare ────────────────────────────────────────
+
+    def save_labcompare_result(
+        self,
+        *,
+        comparison_run_id: str,
+        host_name: str,
+        host_url: str,
+        model: str,
+        tokens_per_second: float | None,
+        latency_ms: float | None,
+        prompt_eval_rate: float | None,
+        vram_fit_pct: float | None,
+        gpu_name: str | None,
+        quality_score: float | None,
+        quality_suite: str | None,
+        judge_model: str | None,
+        dimensions: str,
+    ) -> None:
+        """Persist one host × model cell from a labcompare run."""
+        self._conn.execute(
+            """
+            INSERT INTO labcompare_results (
+                comparison_run_id, created_at, host_name, host_url, model,
+                tokens_per_second, latency_ms, prompt_eval_rate, vram_fit_pct,
+                gpu_name, quality_score, quality_suite, judge_model, dimensions
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                comparison_run_id, datetime.now(UTC).isoformat(), host_name,
+                host_url, model, tokens_per_second, latency_ms, prompt_eval_rate,
+                vram_fit_pct, gpu_name, quality_score, quality_suite, judge_model,
+                dimensions,
+            ),
+        )
+        self._conn.commit()
+
+    def get_labcompare_run(self, comparison_run_id: str) -> list[dict]:
+        """Return all rows for one labcompare invocation, ordered model/host."""
+        rows = self._conn.execute(
+            "SELECT * FROM labcompare_results WHERE comparison_run_id = ? "
+            "ORDER BY model, host_name",
+            (comparison_run_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
