@@ -3,6 +3,12 @@
 ## Unreleased — structure & hardening
 
 ### Added
+- **`atomics labcompare`** — compare two+ Ollama inference hosts side-by-side on
+  throughput (single-stream tok/s, latency, prompt-eval rate, VRAM fit read from
+  each host's `/api/ps`) and quality parity (same fixtures, one fixed judge, so
+  identical weights should score identically — a gap flags a problem). Additive:
+  reuses existing providers/runners/judge as libraries and persists to a new
+  `labcompare_results` table (schema v16). No existing command or table changed.
 - **ARCHITECTURE.md** — layer map, the load-bearing primitives, how to add an
   eval suite, and the security model. Linked from the README for contributors.
 - **`atomics/stats.py`** — single home for the percentile helper that was
