@@ -144,7 +144,7 @@ New code should follow the target column, not copy whichever suite you opened fi
 |---------|-------------------|--------|
 | Item list field | `fixture_results` | redblue/probe now expose it as an alias for `results` |
 | Multi-pass arg | `runs` | archreview accepts `--runs` as an alias for `--rounds` |
-| JSON export | `Summary.to_dict()` + `--json-out` | eval/adversarial/redblue done; archreview/probe still missing |
+| JSON export | `Summary.to_dict()` + `--json-out` | done — all five suites |
 | Parent run row | `create_run()` + `complete_*_run()` | done — all suites create + finalize a run row |
 | Stats helpers | one shared `stats` module | done — `atomics/stats.py` |
 | Provider build | `_make_provider()` | done — single factory |

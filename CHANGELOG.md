@@ -15,13 +15,14 @@
 - **Single provider factory** — `eval`/`archreview` no longer carry their own
   `_build_provider`; all commands use `_make_provider` (now takes optional
   `region`/`context_tokens`/`inference_timeout`).
-- **Eval-suite convergence** (additive, no breaking changes): `eval` gains
-  `EvalRunSummary.to_dict()` + `--json-out`; `RedBlueSummary`/`ProbeSummary`
-  expose `fixture_results` as an alias for `results`; `archreview` accepts
-  `--runs` as an alias for `--rounds`. `probe` and `archreview` now create and
-  finalize a parent `runs` row (via `complete_probe_run` /
-  `complete_archreview_run`) like the other suites, so every run is listable.
-  See ARCHITECTURE.md "known divergences".
+- **Eval-suite convergence** (additive, no breaking changes): every suite now
+  has `Summary.to_dict()` + `--json-out` (added `eval`, `probe`, `archreview`)
+  and creates + finalizes a parent `runs` row (`eval` now calls `complete_run`;
+  `probe`/`archreview` gained `complete_probe_run`/`complete_archreview_run`).
+  `RedBlueSummary`/`ProbeSummary` expose `fixture_results` as an alias for
+  `results`; `archreview` accepts `--runs` as an alias for `--rounds`. See
+  ARCHITECTURE.md "known divergences" (JSON-export and parent-run-row rows now
+  fully converged).
 
 ### Security
 - **`atomics secrets get` no longer prints the value by default.** It reports

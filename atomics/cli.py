@@ -1062,6 +1062,7 @@ def eval(
     console.print(summary_table)
 
     if repo:
+        repo.complete_run(eval_run_id)
         repo.close()
         console.print("\n[dim]Results saved to database. Run [bold]atomics compare --narrative[/bold] after evaluating multiple providers.[/dim]")
 
@@ -2462,6 +2463,8 @@ def redblue(
 @click.option("--alert-on-regression/--no-alert-on-regression", default=False,
               help="Warn if any check score drops >10% from last run.")
 @click.option("--save/--no-save", "save_results", default=True, show_default=True)
+@click.option("--json-out", "json_out", type=click.Path(dir_okay=False, writable=True), default=None,
+              help="Write the full run (per-target scores, rationales, regressions) as JSON to this file.")
 def probe(
     provider_name: str,
     model: str | None,
@@ -2477,6 +2480,7 @@ def probe(
     thinking_budget: int,
     alert_on_regression: bool,
     save_results: bool,
+    json_out: str | None,
 ) -> None:
     """Run LLM-evaluated live ecosystem health probes against configured artifact targets."""
     from pathlib import Path
@@ -2554,6 +2558,12 @@ def probe(
     if repo:
         repo.complete_probe_run(run_id)
         repo.close()
+
+    if json_out:
+        import json as _json
+        with open(json_out, "w", encoding="utf-8") as fh:
+            _json.dump(summary.to_dict(), fh, indent=2)
+        console.print(f"[dim]Wrote JSON results to {json_out}[/dim]")
 
     if alert_on_regression and summary.regressions:
         console.print(
@@ -3239,9 +3249,12 @@ def scenario(
 @click.option("--verbose", "-v", is_flag=True, default=False,
               help="Stream per-model/per-round progress: findings and scores as they complete")
 @click.option("--save/--no-save", "save_results", default=True)
+@click.option("--json-out", "json_out", type=click.Path(dir_okay=False, writable=True), default=None,
+              help="Write the full run (per-round findings, scores, cost) as JSON to this file.")
 def archreview(repo_name, models_csv, provider_name, ollama_host, vllm_host,
                region, judge_provider_name, judge_model, judge_host, tier, rounds,
-               max_output_tokens, inference_timeout, judge_only, verbose, save_results):
+               max_output_tokens, inference_timeout, judge_only, verbose, save_results,
+               json_out):
     """Benchmark models on a security-architecture review of a repo."""
     import asyncio
     import os
@@ -3333,6 +3346,8 @@ def archreview(repo_name, models_csv, provider_name, ollama_host, vllm_host,
     # and its async HTTP client binds to whatever loop first uses it; a per-model
     # asyncio.run() would close that loop after model 1 and break the judge on
     # later models ("Event loop is closed").
+    all_results = []
+
     async def _run_all() -> None:
         for mdl in models:
             test_provider = _build_provider(provider_name, mdl,
@@ -3355,6 +3370,7 @@ def archreview(repo_name, models_csv, provider_name, ollama_host, vllm_host,
                 max_output_tokens=max_output_tokens,
                 run_id=archreview_run_id,
             )
+            all_results.extend(results)
             if repo:
                 for r in results:
                     repo.save_archreview_result(r)
@@ -3393,6 +3409,15 @@ def archreview(repo_name, models_csv, provider_name, ollama_host, vllm_host,
     if repo:
         repo.complete_archreview_run(archreview_run_id)
         repo.close()
+
+    if json_out:
+        import json as _json
+
+        from atomics.archreview.models import ArchReviewSummary
+        summary = ArchReviewSummary(repo=spec.name, tier=tier, results=all_results)
+        with open(json_out, "w", encoding="utf-8") as fh:
+            _json.dump(summary.to_dict(), fh, indent=2)
+        console.print(f"[dim]Wrote JSON results to {json_out}[/dim]")
 
 
 # ── atomics secrets ───────────────────────────────────────────────────────────

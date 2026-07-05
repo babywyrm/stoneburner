@@ -79,3 +79,41 @@ class ArchReviewSummary:
     repo: str
     tier: str
     results: list[ArchReviewResult]
+
+    def to_dict(self) -> dict:
+        """Machine-readable view of the run for --json-out / dashboards / CI."""
+        return {
+            "repo": self.repo,
+            "tier": self.tier,
+            "total_rounds": len(self.results),
+            "results": [
+                {
+                    "run_id": r.run_id,
+                    "model": r.model,
+                    "provider": r.provider,
+                    "round": r.round,
+                    "objective_recall": r.objective_recall,
+                    "objective_precision": r.objective_precision,
+                    "objective_f": r.objective_f,
+                    "judge_score": r.judge_score,
+                    "matched_categories": r.matched_categories,
+                    "parse_failed": r.parse_failed,
+                    "findings": [
+                        {
+                            "category": f.category,
+                            "location": f.location,
+                            "severity": f.severity,
+                            "rationale": f.rationale,
+                        }
+                        for f in r.findings
+                    ],
+                    "tokens_in": r.tokens_in,
+                    "tokens_out": r.tokens_out,
+                    "cost_usd": r.cost_usd,
+                    "latency_ms": r.latency_ms,
+                    "judge_model": r.judge_model,
+                    "error": r.error_message,
+                }
+                for r in self.results
+            ],
+        }

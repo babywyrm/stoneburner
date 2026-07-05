@@ -47,6 +47,28 @@ class ProbeSummary:
         scored = [r.score for r in self.results if r.score is not None]
         return round(sum(scored) / len(scored), 3) if scored else None
 
+    def to_dict(self) -> dict:
+        """Machine-readable view of the run for --json-out / dashboards / CI."""
+        return {
+            "overall_score": self.overall_score,
+            "total_targets": len(self.results),
+            "regressions": [r.target_name for r in self.regressions],
+            "results": [
+                {
+                    "target_name": r.target_name,
+                    "artifact_type": r.artifact_type,
+                    "check_id": r.check_id,
+                    "score": r.score,
+                    "prev_score": r.prev_score,
+                    "regressed": r.regressed,
+                    "judge_model": r.judge_model,
+                    "judge_rationale": r.judge_rationale,
+                    "thinking_tokens": r.thinking_tokens,
+                }
+                for r in self.results
+            ],
+        }
+
     @property
     def regressions(self) -> list[ProbeResult]:
         return [r for r in self.results if r.regressed]
