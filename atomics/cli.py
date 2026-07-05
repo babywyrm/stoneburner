@@ -2495,11 +2495,15 @@ def probe(
     )
 
     repo = None
+    run_id = __import__("uuid").uuid4().hex[:12]
     if save_results:
         from atomics.storage.repository import MetricsRepository
         repo = MetricsRepository(settings.db_path)
-
-    run_id = __import__("uuid").uuid4().hex[:12]
+        # Parent run row so probe runs are listable/queryable like other suites.
+        repo.create_run(
+            run_id, tier="probe", provider=provider_name,
+            model=model or "default", trigger="manual",
+        )
 
     def on_result(r):
         color = "green" if (r.score or 0) >= 0.8 else ("yellow" if (r.score or 0) >= 0.6 else "red")
@@ -2532,6 +2536,10 @@ def probe(
     if summary.regressions:
         table.add_row("[red]Regressions[/red]", str(len(summary.regressions)))
     console.print(table)
+
+    if repo:
+        repo.complete_probe_run(run_id)
+        repo.close()
 
     if alert_on_regression and summary.regressions:
         console.print(
@@ -3288,6 +3296,12 @@ def archreview(repo_name, models_csv, provider_name, ollama_host, vllm_host,
     if save_results:
         from atomics.storage.repository import MetricsRepository
         repo = MetricsRepository(settings.db_path)
+        # Parent run row so archreview runs are listable/queryable like other
+        # suites; per-round rows land in archreview_results.
+        repo.create_run(
+            archreview_run_id, tier="archreview", provider=provider_name,
+            model=models_csv, trigger="manual",
+        )
 
     judge_label = f"{judge_provider_name}:{judge_model or judge_provider.default_model or 'default'}"
 
@@ -3363,6 +3377,7 @@ def archreview(repo_name, models_csv, provider_name, ollama_host, vllm_host,
 
     console.print(table)
     if repo:
+        repo.complete_archreview_run(archreview_run_id)
         repo.close()
 
 

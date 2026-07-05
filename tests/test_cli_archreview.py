@@ -307,7 +307,7 @@ def test_archreview_runs_is_alias_for_rounds():
         captured["rounds"] = kwargs.get("rounds")
         return [ArchReviewResult(
             run_id="r", repo="juice-shop", tier="floor", model="m",
-            provider="ollama", round_index=0, findings=[],
+            provider="ollama", round=0, findings=[],
         )]
 
     runner = CliRunner()

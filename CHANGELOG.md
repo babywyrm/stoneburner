@@ -18,7 +18,10 @@
 - **Eval-suite convergence** (additive, no breaking changes): `eval` gains
   `EvalRunSummary.to_dict()` + `--json-out`; `RedBlueSummary`/`ProbeSummary`
   expose `fixture_results` as an alias for `results`; `archreview` accepts
-  `--runs` as an alias for `--rounds`. See ARCHITECTURE.md "known divergences".
+  `--runs` as an alias for `--rounds`. `probe` and `archreview` now create and
+  finalize a parent `runs` row (via `complete_probe_run` /
+  `complete_archreview_run`) like the other suites, so every run is listable.
+  See ARCHITECTURE.md "known divergences".
 
 ### Security
 - **`atomics secrets get` no longer prints the value by default.** It reports

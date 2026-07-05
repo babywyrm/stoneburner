@@ -163,6 +163,54 @@ def test_schema_no_backup_on_fresh_db(tmp_path):
     assert list(tmp_path.glob("*.bak")) == []
 
 
+def test_complete_probe_run_finalizes_parent(tmp_path):
+    """probe runs get a parent row that completion finalizes with a count."""
+    repo = MetricsRepository(tmp_path / "probe.db")
+    repo.create_run("p1", tier="probe", provider="ollama", model="m")
+
+    class _R:
+        target_name = "t"
+        artifact_type = "log"
+        check_id = "c"
+        score = 0.9
+        prev_score = None
+        regressed = False
+        judge_model = "j"
+        judge_rationale = "ok"
+        thinking_enabled = False
+        thinking_tokens = 0
+
+    repo.save_probe_result("p1", _R())
+    repo.complete_probe_run("p1")
+
+    run = repo._conn.execute(
+        "SELECT completed_at, total_tasks, tier FROM runs WHERE run_id='p1'"
+    ).fetchone()
+    assert run["completed_at"] is not None
+    assert run["total_tasks"] == 1
+    assert run["tier"] == "probe"
+
+
+def test_complete_archreview_run_finalizes_parent(tmp_path):
+    """archreview runs get a parent row that completion finalizes."""
+    from atomics.archreview.models import ArchReviewResult
+
+    repo = MetricsRepository(tmp_path / "arch.db")
+    repo.create_run("a1", tier="archreview", provider="ollama", model="m")
+    repo.save_archreview_result(ArchReviewResult(
+        run_id="a1", repo="juice-shop", tier="floor", model="m",
+        provider="ollama", round=0, findings=[],
+    ))
+    repo.complete_archreview_run("a1")
+
+    run = repo._conn.execute(
+        "SELECT completed_at, total_tasks, tier FROM runs WHERE run_id='a1'"
+    ).fetchone()
+    assert run["completed_at"] is not None
+    assert run["total_tasks"] == 1
+    assert run["tier"] == "archreview"
+
+
 def test_schedules_table_exists(tmp_path):
     db_path = tmp_path / "sched.db"
     conn = init_db(db_path)
