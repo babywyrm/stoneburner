@@ -1754,6 +1754,27 @@ def show_tiers() -> None:
 
 # ── Shared provider builder for new suites ────────────────────────────────────
 
+_KNOWN_PROVIDERS = {"claude", "bedrock", "openai", "ollama", "vllm", "brain-gateway"}
+
+
+def _parse_model_spec(spec: str, default_provider: str) -> tuple[str, str, str | None]:
+    """Parse a `model`, `provider:model`, or `provider:model@host` spec.
+
+    Ollama model names contain colons (e.g. ``qwen2.5:7b``), so a leading
+    ``prefix:`` is only treated as a provider when the prefix is a known
+    provider name; otherwise the whole spec (minus any ``@host``) is the model.
+    Returns (provider_name, model, host_or_None).
+    """
+    host: str | None = None
+    spec = spec.strip()
+    if "@" in spec:
+        spec, host = spec.rsplit("@", 1)
+    if ":" in spec and spec.split(":", 1)[0].lower() in _KNOWN_PROVIDERS:
+        provider_name, model = spec.split(":", 1)
+        return provider_name, model, host
+    return default_provider, spec, host
+
+
 def _make_provider(
     name: str,
     mdl: str | None,
@@ -2200,14 +2221,7 @@ def adversarial(
     # ── --compare: run a second model on the same fixtures and diff ──────────
     compare_summary = None
     if compare_model:
-        cmp_host = None
-        spec = compare_model.strip()
-        if "@" in spec:
-            spec, cmp_host = spec.rsplit("@", 1)
-        if ":" in spec:
-            cmp_provider_name, cmp_model = spec.split(":", 1)
-        else:
-            cmp_provider_name, cmp_model = provider_name, spec
+        cmp_provider_name, cmp_model, cmp_host = _parse_model_spec(compare_model, provider_name)
         cmp_provider = _make_provider(
             cmp_provider_name, cmp_model, cmp_host or ollama_host, settings, vllm_host=vllm_host,
         )
