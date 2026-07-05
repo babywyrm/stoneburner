@@ -140,14 +140,14 @@ row in storage.
 
 New code should follow the target column, not copy whichever suite you opened first.
 
-| Concern | Target convention | Suites not yet aligned |
-|---------|-------------------|------------------------|
-| Item list field | `fixture_results` | redblue/probe use `results` |
-| Multi-pass arg | `runs` | archreview uses `rounds` |
-| JSON export | `Summary.to_dict()` + `--json-out` | eval/archreview/probe missing |
-| Parent run row | `create_run()` + `complete_run()` | archreview/probe skip it |
-| Stats helpers | one shared `stats` module | `_percentile` duplicated across load-test modules |
-| Provider build | `_make_provider()` | archreview had its own factory |
+| Concern | Target convention | Status |
+|---------|-------------------|--------|
+| Item list field | `fixture_results` | redblue/probe now expose it as an alias for `results` |
+| Multi-pass arg | `runs` | archreview accepts `--runs` as an alias for `--rounds` |
+| JSON export | `Summary.to_dict()` + `--json-out` | eval/adversarial/redblue done; archreview/probe still missing |
+| Parent run row | `create_run()` + `complete_run()` | archreview/probe still skip it (Phase B follow-up) |
+| Stats helpers | one shared `stats` module | done — `atomics/stats.py` |
+| Provider build | `_make_provider()` | done — single factory |
 
 ---
 

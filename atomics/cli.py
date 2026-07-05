@@ -867,6 +867,8 @@ def _print_narrative(console: Console, rows: list[dict], by: str) -> None:
               help="Comma-separated fixture IDs to run a subset (e.g. ev-19 or "
                    "ev-01,ev-02). Default: all 25 fixtures.")
 @click.option("--save/--no-save", "save_results", default=True, help="Persist results to the database")
+@click.option("--json-out", "json_out", type=click.Path(dir_okay=False, writable=True), default=None,
+              help="Write the full run (per-fixture scores, rationales, latency, cost) as JSON to this file.")
 @click.option("--thinking/--no-thinking", "thinking_flag", default=None, help="Enable/disable thinking for capable models")
 @click.option("--thinking-budget", type=int, default=None, help="Max thinking tokens")
 def eval(
@@ -881,6 +883,7 @@ def eval(
     extra_judges: str | None,
     fixtures_filter: str | None,
     save_results: bool,
+    json_out: str | None,
     thinking_flag: bool | None,
     thinking_budget: int | None,
 ) -> None:
@@ -1061,6 +1064,12 @@ def eval(
     if repo:
         repo.close()
         console.print("\n[dim]Results saved to database. Run [bold]atomics compare --narrative[/bold] after evaluating multiple providers.[/dim]")
+
+    if json_out:
+        import json as _json
+        with open(json_out, "w", encoding="utf-8") as fh:
+            _json.dump(summary.to_dict(), fh, indent=2)
+        console.print(f"[dim]Wrote JSON results to {json_out}[/dim]")
 
 
 @cli.command()
@@ -3198,7 +3207,8 @@ def scenario(
 @click.option("--judge-model", type=str, default=None)
 @click.option("--judge-host", type=str, default=None)
 @click.option("--tier", type=click.Choice(["floor", "local", "wide", "expanded"]), default="floor", show_default=True)
-@click.option("--rounds", type=int, default=1, show_default=True)
+@click.option("--rounds", "--runs", "rounds", type=int, default=1, show_default=True,
+              help="Number of analysis passes per model (--runs is an alias for cross-suite consistency).")
 @click.option("--max-output-tokens", type=click.IntRange(min=128), default=2048, show_default=True,
               help="Maximum generated tokens for each model-under-test analysis")
 @click.option("--inference-timeout", type=float, default=None,

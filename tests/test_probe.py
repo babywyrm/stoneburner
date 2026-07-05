@@ -365,6 +365,8 @@ def test_probe_summary_overall_score():
                     judge_rationale="ok"),
     ]
     assert summary.overall_score == 0.7
+    # fixture_results is the convergent alias for results
+    assert summary.fixture_results is summary.results
 
 
 def test_probe_summary_overall_score_empty():
