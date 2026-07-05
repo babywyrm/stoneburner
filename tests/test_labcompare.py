@@ -94,3 +94,52 @@ def test_parity_verdict_missing_score_returns_none():
     ok, delta = parity_verdict(0.94, None)
     assert ok is None
     assert delta is None
+
+
+# ── Throughput probe ──────────────────────────────────────
+
+from atomics.labcompare import ThroughputResult, probe_throughput
+from atomics.providers.base import ProviderResponse
+
+
+class _FakeProvider:
+    def __init__(self):
+        self.calls = 0
+
+    async def generate(self, prompt, *, system=None, model=None, max_tokens=256,
+                        thinking=None, thinking_budget=None, temperature=None):
+        self.calls += 1
+        return ProviderResponse(
+            text="hello world",
+            input_tokens=10, output_tokens=20, total_tokens=30,
+            model=model or "m", latency_ms=250.0, estimated_cost_usd=0.0,
+            tokens_per_second=80.0, tps_basis="generation",
+            raw={"prompt_eval_count": 10, "prompt_eval_duration": 10_000_000},
+        )
+
+
+@pytest.mark.asyncio
+async def test_probe_throughput_averages_tps():
+    prov = _FakeProvider()
+
+    async def ps():
+        return {"models": [{"name": "m", "size": 100, "size_vram": 100}]}
+
+    res = await probe_throughput(prov, "m", ps_fetcher=ps, prompts=["a", "b", "c"])
+    assert isinstance(res, ThroughputResult)
+    assert prov.calls == 3
+    assert res.tokens_per_second == 80.0
+    assert res.latency_ms == 250.0
+    assert res.vram_fit_pct == 1.0
+
+
+@pytest.mark.asyncio
+async def test_probe_throughput_handles_ps_failure():
+    prov = _FakeProvider()
+
+    async def ps():
+        raise RuntimeError("ps unavailable")
+
+    res = await probe_throughput(prov, "m", ps_fetcher=ps, prompts=["a"])
+    assert res.tokens_per_second == 80.0
+    assert res.vram_fit_pct is None
