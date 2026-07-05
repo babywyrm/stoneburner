@@ -369,6 +369,34 @@ def test_probe_summary_overall_score():
     assert summary.fixture_results is summary.results
 
 
+def test_probe_summary_to_dict_serializable():
+    import json
+
+    from atomics.probe.runner import ProbeResult, ProbeSummary
+
+    summary = ProbeSummary()
+    summary.results = [
+        ProbeResult(target_name="a", artifact_type="access-log", check_id="c",
+                    score=0.8, prev_score=0.9, regressed=True, judge_model="m",
+                    judge_rationale="down"),
+    ]
+    d = summary.to_dict()
+    json.dumps(d)  # must round-trip
+    assert d["total_targets"] == 1
+    assert d["regressions"] == ["a"]
+    assert d["results"][0]["score"] == 0.8
+
+
+def test_cli_probe_has_json_out_flag():
+    from click.testing import CliRunner
+
+    from atomics.cli import cli
+
+    result = CliRunner().invoke(cli, ["probe", "--help"])
+    assert result.exit_code == 0
+    assert "--json-out" in result.output
+
+
 def test_probe_summary_overall_score_empty():
     from atomics.probe.runner import ProbeSummary
     summary = ProbeSummary()
