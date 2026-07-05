@@ -80,3 +80,58 @@ def parity_verdict(
         return None, None
     delta = round(abs(a - b), 4)
     return (delta <= tolerance), delta
+
+
+@dataclass
+class ThroughputResult:
+    tokens_per_second: float | None
+    latency_ms: float | None
+    prompt_eval_rate: float | None
+    vram_fit_pct: float | None
+    gpu_name: str | None
+
+
+async def probe_throughput(
+    provider,
+    model: str,
+    *,
+    ps_fetcher,
+    prompts: list[str],
+) -> ThroughputResult:
+    """Run fixed prompts through provider.generate and average the metrics.
+
+    `ps_fetcher` is an async callable returning an Ollama /api/ps payload; on
+    failure VRAM fit is reported as None (throughput still returned).
+    """
+    tps_vals: list[float] = []
+    lat_vals: list[float] = []
+    peval_vals: list[float] = []
+    for prompt in prompts:
+        resp = await provider.generate(prompt, model=model, max_tokens=256)
+        if resp.tokens_per_second:
+            tps_vals.append(resp.tokens_per_second)
+        if resp.latency_ms:
+            lat_vals.append(resp.latency_ms)
+        raw = resp.raw or {}
+        pe_count = raw.get("prompt_eval_count", 0)
+        pe_dur = raw.get("prompt_eval_duration", 0)
+        if pe_count and pe_dur:
+            peval_vals.append(pe_count / (pe_dur / 1e9))
+
+    vram_fit, gpu = None, None
+    try:
+        ps_payload = await ps_fetcher()
+        vram_fit, gpu = vram_fit_from_ps(ps_payload, model)
+    except Exception as exc:
+        logger.info("labcompare: /api/ps unavailable for %s: %s", model, exc)
+
+    def _avg(xs: list[float]) -> float | None:
+        return round(sum(xs) / len(xs), 2) if xs else None
+
+    return ThroughputResult(
+        tokens_per_second=_avg(tps_vals),
+        latency_ms=_avg(lat_vals),
+        prompt_eval_rate=_avg(peval_vals),
+        vram_fit_pct=vram_fit,
+        gpu_name=gpu,
+    )
