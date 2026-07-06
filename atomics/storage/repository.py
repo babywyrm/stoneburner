@@ -5,10 +5,20 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from atomics.models import RunSummary, TaskResult, TaskStatus
 from atomics.stats import percentile as _percentile
 from atomics.storage.schema import init_db
+
+if TYPE_CHECKING:
+    from atomics.archreview.models import ArchReviewResult
+    from atomics.eval.adversarial.runner import AdversarialFixtureResult
+    from atomics.probe.runner import ProbeResult
+    from atomics.scenario_models import ScenarioResult
+    from atomics.soak import SoakResult
+    from atomics.stress import StressResult
+    from atomics.sweep import ModelSweepResult
 
 
 class MetricsRepository:
@@ -145,12 +155,12 @@ class MetricsRepository:
     def save_adversarial_result(
         self,
         run_id: str,
-        result: object,
+        result: AdversarialFixtureResult,
         *,
         thinking_enabled: bool = False,
     ) -> None:
         r = result
-        res = r.resistance  # type: ignore[attr-defined]
+        res = r.resistance
         self._conn.execute(
             """
             INSERT OR REPLACE INTO adversarial_results (
@@ -164,22 +174,22 @@ class MetricsRepository:
             (
                 uuid.uuid4().hex,
                 run_id,
-                r.fixture.id,  # type: ignore[attr-defined]
-                r.fixture.category,  # type: ignore[attr-defined]
-                r.fixture.severity,  # type: ignore[attr-defined]
+                r.fixture.id,
+                r.fixture.category,
+                r.fixture.severity,
                 "",
                 "",
-                r.fixture.prompt,  # type: ignore[attr-defined]
-                r.response,  # type: ignore[attr-defined]
-                r.fixture.attack_goal,  # type: ignore[attr-defined]
+                r.fixture.prompt,
+                r.response,
+                r.fixture.attack_goal,
                 res.score if res else None,
                 res.label if res else None,
                 res.judge_model if res else None,
                 res.rationale if res else None,
                 int(thinking_enabled),
-                r.thinking_tokens,  # type: ignore[attr-defined]
-                r.latency_ms,  # type: ignore[attr-defined]
-                r.estimated_cost_usd,  # type: ignore[attr-defined]
+                r.thinking_tokens,
+                r.latency_ms,
+                r.estimated_cost_usd,
                 datetime.now(UTC).isoformat(),
             ),
         )
@@ -272,7 +282,7 @@ class MetricsRepository:
         rows = self._conn.execute(sql, params).fetchall()
         return [dict(r) for r in rows]
 
-    def save_probe_result(self, run_id: str, result: object) -> None:
+    def save_probe_result(self, run_id: str, result: ProbeResult) -> None:
         r = result
         self._conn.execute(
             """
@@ -286,18 +296,18 @@ class MetricsRepository:
             (
                 uuid.uuid4().hex,
                 run_id,
-                r.target_name,  # type: ignore[attr-defined]
-                r.artifact_type,  # type: ignore[attr-defined]
-                r.check_id,  # type: ignore[attr-defined]
-                r.score,  # type: ignore[attr-defined]
-                r.prev_score,  # type: ignore[attr-defined]
-                int(r.regressed),  # type: ignore[attr-defined]
+                r.target_name,
+                r.artifact_type,
+                r.check_id,
+                r.score,
+                r.prev_score,
+                int(r.regressed),
                 "",
                 "",
-                r.judge_model,  # type: ignore[attr-defined]
-                r.judge_rationale,  # type: ignore[attr-defined]
-                int(r.thinking_enabled),  # type: ignore[attr-defined]
-                r.thinking_tokens,  # type: ignore[attr-defined]
+                r.judge_model,
+                r.judge_rationale,
+                int(r.thinking_enabled),
+                r.thinking_tokens,
                 datetime.now(UTC).isoformat(),
             ),
         )
@@ -567,7 +577,7 @@ class MetricsRepository:
 
     # ── Stress results ─────────────────────────────────────
 
-    def save_stress_result(self, sr: object) -> None:
+    def save_stress_result(self, sr: StressResult) -> None:
         """Persist a StressResult from atomics.stress."""
         import json as _json
 
@@ -622,7 +632,7 @@ class MetricsRepository:
             ).fetchall()
         return [dict(r) for r in rows]
 
-    def save_sweep_result(self, sr: object) -> None:
+    def save_sweep_result(self, sr: ModelSweepResult) -> None:
         """Persist a ModelSweepResult to the sweep_results table."""
         import uuid
         now = datetime.now(UTC).isoformat()
@@ -663,7 +673,7 @@ class MetricsRepository:
 
     # ── Soak results ──────────────────────────────────────
 
-    def save_soak_result(self, sr: object) -> None:
+    def save_soak_result(self, sr: SoakResult) -> None:
         """Persist a SoakResult from atomics.soak."""
         import json as _json
 
@@ -726,7 +736,7 @@ class MetricsRepository:
 
     # ── Scenario results ──────────────────────────────────
 
-    def save_scenario_result(self, sr: object) -> None:
+    def save_scenario_result(self, sr: ScenarioResult) -> None:
         """Persist a ScenarioResult from atomics.scenario."""
         import json as _json
 
@@ -775,7 +785,7 @@ class MetricsRepository:
         )
         self._conn.commit()
 
-    def save_archreview_result(self, r: object) -> None:
+    def save_archreview_result(self, r: ArchReviewResult) -> None:
         """Persist an ArchReviewResult from atomics.archreview."""
         import json as _json
 
