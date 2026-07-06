@@ -65,10 +65,6 @@ module = [
     "atomics.providers.vllm",
     "atomics.providers.claude",
     "atomics.providers.bedrock",
-    # Load-test modules share duck-typed private request primitives
-    # (profile: object) — Phase-C target for TargetProfile Protocol typing.
-    "atomics.scenario",
-    "atomics.qa_runner",
 ]
 ignore_errors = true
 

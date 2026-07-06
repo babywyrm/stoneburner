@@ -24,6 +24,11 @@ QA fixture YAML format::
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from atomics.profiles import TargetProfile
+
 import re
 import time
 from dataclasses import dataclass, field
@@ -169,7 +174,7 @@ async def _query_ollama(
 
 async def _query_profile(
     client: httpx.AsyncClient,
-    profile: object,
+    profile: TargetProfile,
     prompt: str,
 ) -> tuple[str, float]:
     """Fire a single prompt via a TargetProfile. Returns (response_text, latency_ms)."""
@@ -184,7 +189,7 @@ async def run_qa_suite(
     fixtures: list[QAFixture],
     num_predict: int = 1024,
     on_result: object = None,
-    profile: object = None,
+    profile: TargetProfile | None = None,
 ) -> QASuiteResult:
     """Run all fixtures sequentially and evaluate each response.
 
