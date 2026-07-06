@@ -147,7 +147,7 @@ async def test_probe_throughput_handles_ps_failure():
 
 # ── Orchestrator ──────────────────────────────────────────
 
-from atomics.labcompare import CellResult, run_labcompare
+from atomics.labcompare import run_labcompare
 
 
 @pytest.mark.asyncio
