@@ -7,12 +7,14 @@ Auth: OPENAI_API_KEY, OAuth/OIDC, or Codex CLI tokens.
 from __future__ import annotations
 
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from atomics.providers import pricing
 from atomics.providers.base import BaseProvider, ProviderResponse, compute_tps
 
 if TYPE_CHECKING:
+    from openai import AsyncOpenAI
+
     from atomics.auth import AuthStrategy
 
 # Pricing per 1M tokens (input / output). Sourced from the central pricing
@@ -46,7 +48,7 @@ class OpenAIProvider(BaseProvider):
         api_key: str = "",
         default_model: str = "gpt-4o",
         *,
-        client: object | None = None,
+        client: AsyncOpenAI | None = None,
         auth: AuthStrategy | None = None,
     ) -> None:
         self._auth = auth
@@ -96,17 +98,17 @@ class OpenAIProvider(BaseProvider):
             if token:
                 self._client.api_key = token
 
-        kwargs = {
-            "system": system,
-            "model": model,
-            "max_tokens": max_tokens,
-            "thinking": thinking,
-            "thinking_budget": thinking_budget,
-            "temperature": temperature,
-        }
         if self._use_responses_api:
-            return await self._generate_responses(prompt, **kwargs)
-        return await self._generate_completions(prompt, **kwargs)
+            return await self._generate_responses(
+                prompt, system=system, model=model, max_tokens=max_tokens,
+                thinking=thinking, thinking_budget=thinking_budget,
+                temperature=temperature,
+            )
+        return await self._generate_completions(
+            prompt, system=system, model=model, max_tokens=max_tokens,
+            thinking=thinking, thinking_budget=thinking_budget,
+            temperature=temperature,
+        )
 
     async def _generate_completions(
         self, prompt: str, *, system: str, model: str, max_tokens: int,
@@ -122,6 +124,7 @@ class OpenAIProvider(BaseProvider):
         messages.append({"role": "user", "content": prompt})
 
         is_reasoning = model in _MAX_COMPLETION_TOKENS_MODELS
+        token_param: dict[str, Any]
         if is_reasoning:
             multiplier = _REASONING_TOKEN_MULTIPLIER if thinking is not False else 2
             token_param = {"max_completion_tokens": max_tokens * multiplier}

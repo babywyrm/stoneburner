@@ -45,7 +45,7 @@ class VllmProvider(BaseProvider):
         api_key: str = "dummy",
         *,
         timeout: float = 300.0,
-        client: object | None = None,
+        client: httpx.AsyncClient | None = None,
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._default_model = default_model

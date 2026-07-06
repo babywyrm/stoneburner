@@ -35,7 +35,7 @@ class OllamaProvider(BaseProvider):
         *,
         timeout: float = 300.0,
         context_tokens: int | None = None,
-        client: object | None = None,
+        client: httpx.AsyncClient | None = None,
     ) -> None:
         self._host = host.rstrip("/")
         self._default_model = default_model

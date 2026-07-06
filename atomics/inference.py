@@ -14,6 +14,7 @@ from __future__ import annotations
 import datetime
 import os
 from dataclasses import dataclass, field
+from typing import Any
 
 # Canonical backend names == atomics provider names.
 CANONICAL_BACKENDS: frozenset[str] = frozenset(
@@ -222,11 +223,13 @@ def resolve(machine: dict, profile: dict, difficulty: str, pool: str,
 
 # ── provider auto-load integration point ──────────────────────────────────────
 
-def provider_from_target(target: InferenceTarget, *, client: object | None = None):
+def provider_from_target(target: InferenceTarget, *, client: Any | None = None):
     """Build the matching ``atomics`` provider for a resolved target.
 
     Lazy-imports providers so importing this module stays cheap and free of
-    optional deps (e.g. the ``openai`` package).
+    optional deps (e.g. the ``openai`` package). ``client`` is backend-specific
+    (httpx.AsyncClient for ollama/vllm, AsyncOpenAI for openai), so it is typed
+    ``Any`` at this generic dispatch boundary.
     """
     backend = target.backend
     if backend == "ollama":
