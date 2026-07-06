@@ -14,8 +14,12 @@
 - **`atomics/stats.py`** — single home for the percentile helper that was
   copy-pasted across 5 modules.
 - **Type checking in CI** — ship a `py.typed` marker (PEP 561) and add a mypy
-  gate. Config type-checks the package with a documented override list for the
-  duck-typed boundaries still on the Phase-C cleanup list.
+  gate. Phase-C typing pass: `scenario`, `qa_runner`, all five provider adapters,
+  and `storage.repository` now type-clean with their real types (profiles,
+  provider clients, and the result dataclasses via `TYPE_CHECKING`), and all
+  `# type: ignore` shims in the repository are gone. Only `atomics.cli` (the
+  Click wiring layer) remains under the mypy override. Gate is green across the
+  package.
 
 ### Changed
 - **Single provider factory** — `eval`/`archreview` no longer carry their own
