@@ -110,7 +110,7 @@ async def run_scenario(
     3. Run all workloads concurrently
     4. Compute interference factors
     """
-    loaded_profiles: dict[str, object] = {}
+    loaded_profiles: dict[str, TargetProfile] = {}
     for spec in specs:
         if spec.profile:
             from atomics.profiles import load_profile
