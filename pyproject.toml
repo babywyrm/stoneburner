@@ -52,14 +52,12 @@ select = ["E", "F", "I", "N", "W", "UP"]
 [tool.mypy]
 python_version = "3.11"
 ignore_missing_imports = true
-# Pragmatic baseline: type-check the core primitives and eval layer, and ratchet
-# stricter over time. The two modules below still use deliberate duck typing
-# (repository takes `result: object` for suite-agnostic persistence; cli wires
-# everything) and are the last Phase-C targets — see ARCHITECTURE.md.
+# Pragmatic baseline: type-check the whole package. `atomics.cli` remains the
+# last override — it's the wiring layer where Click's dynamic decorators and the
+# breadth of command plumbing make full typing low-value; see ARCHITECTURE.md.
 [[tool.mypy.overrides]]
 module = [
     "atomics.cli",
-    "atomics.storage.repository",
 ]
 ignore_errors = true
 
