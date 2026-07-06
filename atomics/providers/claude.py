@@ -42,7 +42,7 @@ class ClaudeProvider(BaseProvider):
         api_key: str,
         default_model: str = "claude-sonnet-4-6",
         *,
-        client: object | None = None,
+        client: anthropic.AsyncAnthropic | None = None,
     ) -> None:
         self._client = client or anthropic.AsyncAnthropic(api_key=api_key)
         self._default_model = default_model

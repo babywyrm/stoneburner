@@ -53,18 +53,13 @@ select = ["E", "F", "I", "N", "W", "UP"]
 python_version = "3.11"
 ignore_missing_imports = true
 # Pragmatic baseline: type-check the core primitives and eval layer, and ratchet
-# stricter over time. Modules listed below use deliberate duck typing (repository
-# takes `result: object`; provider adapters hold `client: object` for test DI) and
-# are Phase-C targets for proper Protocol typing — see ARCHITECTURE.md.
+# stricter over time. The two modules below still use deliberate duck typing
+# (repository takes `result: object` for suite-agnostic persistence; cli wires
+# everything) and are the last Phase-C targets — see ARCHITECTURE.md.
 [[tool.mypy.overrides]]
 module = [
     "atomics.cli",
     "atomics.storage.repository",
-    "atomics.providers.openai",
-    "atomics.providers.ollama",
-    "atomics.providers.vllm",
-    "atomics.providers.claude",
-    "atomics.providers.bedrock",
 ]
 ignore_errors = true
 

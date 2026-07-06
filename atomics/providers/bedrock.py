@@ -7,9 +7,16 @@ Auth: uses standard AWS credential chain (env vars, ~/.aws/credentials, IAM role
 from __future__ import annotations
 
 import time
+from typing import Any, Protocol
 
 from atomics.providers import pricing
 from atomics.providers.base import BaseProvider, ProviderResponse, compute_tps
+
+
+class _BedrockRuntimeClient(Protocol):
+    """Structural type for the boto3 bedrock-runtime client (no stubs ship)."""
+
+    def converse(self, **kwargs: Any) -> dict: ...
 
 # Pricing per 1M tokens (input / output). Sourced from the central pricing
 # module; re-exported here for backward compatibility.
@@ -31,7 +38,7 @@ class BedrockProvider(BaseProvider):
         region: str = "us-east-1",
         model_id: str = "us.anthropic.claude-sonnet-4-6",
         *,
-        client: object | None = None,
+        client: _BedrockRuntimeClient | None = None,
     ) -> None:
         if client is not None:
             self._client = client
