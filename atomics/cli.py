@@ -6,21 +6,26 @@ import asyncio
 import logging
 import sys
 import time
+from typing import TYPE_CHECKING
 
 import click
 from rich.console import Console
 from rich.logging import RichHandler
+from rich.status import Status
 from rich.table import Table
 
 from atomics.config import load_settings
 from atomics.labcompare import (
-    CellResult,
-    parse_host_specs,
     parity_verdict,
+    parse_host_specs,
     run_labcompare,
     speedup_ratio,
 )
 from atomics.models import BurnTier
+from atomics.providers.base import BaseProvider
+
+if TYPE_CHECKING:
+    from atomics.labcompare import CellResult
 
 
 def _setup_logging(level: str) -> None:
@@ -49,7 +54,7 @@ class FixtureProgress:
         self._start = time.monotonic()
         self._fixture_times: list[float] = []
         self._current_start: float | None = None
-        self._status = None
+        self._status: Status | None = None
 
     def on_start(self, index: int, fixture_id: str, category: str) -> None:
         self._current_start = time.monotonic()
@@ -197,6 +202,7 @@ def run(
 
     profile = get_tier_profile(burn_tier)
 
+    provider: BaseProvider
     if provider_name == "claude":
         if not settings.anthropic_api_key:
             console.print("[red]ANTHROPIC_API_KEY not set. Export it or add to .env[/red]")
@@ -337,6 +343,7 @@ def provider_test(provider_name: str, model: str | None, region: str, ollama_hos
     _setup_logging(settings.log_level)
     console = Console()
 
+    prov: BaseProvider
     if provider_name == "claude":
         if not settings.anthropic_api_key:
             console.print("[red]ANTHROPIC_API_KEY not set.[/red]")
@@ -1137,7 +1144,7 @@ def stress(
             f"Models: {', '.join(model_list)}\n"
             f"Phase: {phase_seconds}s solo + {phase_seconds}s mixed\n"
         )
-        result = asyncio.run(run_contention(
+        contention = asyncio.run(run_contention(
             host=host,
             models=model_list,
             concurrency=1,
@@ -1151,9 +1158,9 @@ def stress(
         ctable.add_column("Factor", justify="right")
         ctable.add_column("Mixed P95", justify="right")
         ctable.add_column("Errors", justify="right")
-        for mr in result.contention_results:
-            solo = result.solo_tps.get(mr.model, 0.0)
-            factor = result.contention_factor(mr.model)
+        for mr in contention.contention_results:
+            solo = contention.solo_tps.get(mr.model, 0.0)
+            factor = contention.contention_factor(mr.model)
             factor_str = f"{factor:.2f}x" if factor is not None else "n/a"
             factor_color = "green" if (factor or 1.0) >= 0.9 else ("yellow" if (factor or 1.0) >= 0.7 else "red")
             ctable.add_row(
@@ -1165,7 +1172,7 @@ def stress(
                 str(mr.failed),
             )
         console.print(ctable)
-        console.print(f"\n[dim]Total duration: {result.duration_seconds:.1f}s[/dim]")
+        console.print(f"\n[dim]Total duration: {contention.duration_seconds:.1f}s[/dim]")
         return
 
     if profile_path:
@@ -1544,6 +1551,10 @@ def completion(shell: str) -> None:
     from click.shell_completion import get_completion_class
 
     cls = get_completion_class(shell)
+    if cls is None:
+        console = Console()
+        console.print(f"[red]No completion support for shell: {shell}[/red]")
+        sys.exit(1)
     comp = cls(cli, {}, "atomics", "_ATOMICS_COMPLETE")
     click.echo(comp.source())
 
@@ -1684,6 +1695,7 @@ def models(provider_name: str, host: str | None, vllm_host: str | None) -> None:
     settings = load_settings()
     console = Console()
 
+    provider: BaseProvider
     if provider_name == "vllm":
         from atomics.providers.vllm import VllmProvider
         base_url = vllm_host or settings.vllm_host
@@ -1793,7 +1805,7 @@ def _make_provider(
     region: str = "us-east-1",
     context_tokens: int | None = None,
     inference_timeout: int | None = None,
-):
+) -> BaseProvider:
     """Build a provider instance. Single factory for every command.
 
     Optional params cover the variations different commands need:
@@ -1914,7 +1926,7 @@ def sweep(
         except ConnectionError as exc:
             click.echo(str(exc), err=True)
             raise SystemExit(1)
-        model_list = [m["name"] for m in available]
+        model_list = [str(m["name"]) for m in available]
         if not model_list:
             console.print("[red]No models found on Ollama host.[/red]")
             raise SystemExit(1)
@@ -1998,7 +2010,7 @@ def sweep(
         best = ranked[0]
         console.print(
             f"\n[bold green]Best local model:[/bold green] {best.model} "
-            f"({best.overall_quality * 100:.0f}% quality, "
+            f"({(best.overall_quality or 0) * 100:.0f}% quality, "
             f"{best.avg_latency_ms:.0f}ms avg latency, "
             f"${best.total_cost_usd:.2f} total cost)"
         )
