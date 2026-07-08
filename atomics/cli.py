@@ -3487,20 +3487,30 @@ def secrets_group():
 
 @secrets_group.command("set")
 @click.argument("key")
-def secrets_set(key: str):
+@click.option("--force", is_flag=True, default=False,
+              help="Allow storing keys not in the standard set.")
+def secrets_set(key: str, force: bool):
     """Store a secret in the OS keychain.
 
     The value is prompted interactively (hidden input — not echoed to terminal).
 
     Example: atomics secrets set ANTHROPIC_API_KEY
     """
-    from atomics.secrets import keychain_available, set_secret
+    from atomics.secrets import KNOWN_KEYS, keychain_available, set_secret
 
     if not keychain_available():
         click.echo("Error: no OS keychain backend available.", err=True)
         raise SystemExit(1)
 
     key = key.upper()
+    if key not in KNOWN_KEYS and not force:
+        click.echo(
+            f"Error: unknown key {key!r}. Valid keys: {', '.join(sorted(KNOWN_KEYS))}\n"
+            f"Use --force to store a custom key.",
+            err=True,
+        )
+        raise SystemExit(1)
+
     value = click.prompt(f"Enter value for {key}", hide_input=True, confirmation_prompt=True)
     if not value.strip():
         click.echo("Error: empty value — not stored.", err=True)
