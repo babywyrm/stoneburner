@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING
 import click
 from rich.console import Console
 from rich.logging import RichHandler
+from rich.markup import escape as _rich_escape
 from rich.status import Status
 from rich.table import Table
 
@@ -437,7 +438,7 @@ def provider_test(provider_name: str, model: str | None, region: str, ollama_hos
         except Exception as exc:
             console.print(f"[red]Generate failed:[/red] {exc}")
             sys.exit(1)
-        console.print(f"Response: {resp.text.strip()}")
+        console.print(f"Response: {_rich_escape(resp.text.strip())}")
         console.print(
             f"Tokens: in={resp.input_tokens} out={resp.output_tokens} total={resp.total_tokens}"
         )
@@ -1971,11 +1972,11 @@ def sweep(
         console.print(f"\n  [bold cyan]{fr.fixture.id}[/bold cyan] — score {score_str}")
         console.print(f"  [dim]prompt:[/dim] {fr.fixture.prompt[:120]}")
         if tr.response:
-            console.print(f"  [dim]reply:[/dim]  {tr.response}")
+            console.print(f"  [dim]reply:[/dim]  {_rich_escape(tr.response or "")}")
         elif tr.error_message:
-            console.print(f"  [red]error:[/red]  {tr.error_message}")
+            console.print(f"  [red]error:[/red]  {_rich_escape(tr.error_message or "")}")
         if fr.judge and fr.judge.rationale:
-            console.print(f"  [dim]judge:[/dim]  {fr.judge.rationale[:200]}")
+            console.print(f"  [dim]judge:[/dim]  {_rich_escape(fr.judge.rationale[:200])}")
 
     def on_model_done(r: ModelSweepResult) -> None:
         q = f"[green]{r.overall_quality * 100:.0f}%[/green]" if r.overall_quality is not None else "[red]FAIL[/red]"
@@ -2182,11 +2183,11 @@ def adversarial(
             )
             # Rationale: full in verbose, first sentence otherwise
             if verbose:
-                console.print(f"     [dim]{res.rationale}[/dim]", soft_wrap=True)
+                console.print(f"     [dim]{_rich_escape(res.rationale)}[/dim]", soft_wrap=True)
             else:
                 first_sentence = res.rationale.split(". ")[0].strip()
                 if first_sentence:
-                    console.print(f"     [dim]{first_sentence}.[/dim]")
+                    console.print(f"     [dim]{_rich_escape(first_sentence)}.[/dim]")
             console.print()
         if repo and res:
             repo.save_adversarial_result(run_id, fr, thinking_enabled=thinking_flag is True)
@@ -2411,12 +2412,12 @@ def redblue(
             color = "green" if pct >= 80 else ("yellow" if pct >= 60 else "red")
             console.print(
                 f"       [{fr.fixture.team.upper()}] [bold]{fr.fixture.id}[/bold] "
-                f"[{color}]{pct}%[/] ({fr.fixture.category}) — {j.rationale[:80]}"
+                f"[{color}]{pct}%[/] ({fr.fixture.category}) — {_rich_escape(j.rationale[:80])}"
             )
             if verbose:
                 console.print(f"       [dim]Response ({fr.task_result.output_tokens} tokens, "
                               f"{fr.task_result.latency_ms:.0f}ms):[/dim]")
-                console.print(f"       [dim]{(fr.task_result.response or '')[:200]}...[/dim]")
+                console.print(f"       [dim]{_rich_escape((fr.task_result.response or '')[:200])}...[/dim]")
         if repo:
             repo.save_task_result(fr.task_result, suite=f"redblue-{fr.fixture.team}")
 
@@ -3414,7 +3415,7 @@ def archreview(repo_name, models_csv, provider_name, ollama_host, vllm_host,
             if verbose:
                 for r in results:
                     if r.error_message:
-                        console.print(f"  [red]round {r.round}: {r.error_class}: {r.error_message}[/red]")
+                        console.print(f"  [red]round {r.round}: {_rich_escape(r.error_class or '')}: {_rich_escape(r.error_message or '')}[/red]")
                         continue
                     judge_str = f"{r.judge_score:.2f}" if r.judge_score is not None else "—"
                     flag = " [yellow](parse failed)[/yellow]" if r.parse_failed else ""
