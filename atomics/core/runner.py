@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from atomics.validation import sanitize_error
+
 import logging
 from datetime import UTC, datetime
 
@@ -63,7 +65,7 @@ async def execute_task(
     except Exception as exc:
         result.status = TaskStatus.FAILED
         result.error_class = type(exc).__name__
-        result.error_message = str(exc)[:500]
+        result.error_message = sanitize_error(exc)
         logger.warning(
             "Task %s failed: %s — %s",
             task.name,

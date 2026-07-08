@@ -8,6 +8,8 @@ against a single cloud run.
 
 from __future__ import annotations
 
+from atomics.validation import sanitize_error
+
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -113,7 +115,7 @@ async def run_model_sweep(
                 error=_representative_error(summary) if summary.overall_accuracy is None else None,
             )
         except Exception as exc:
-            err = (str(exc) or repr(exc))[:200]
+            err = sanitize_error(exc)[:200]
             logger.warning("[sweep] Model %s failed: %s", model, err)
             result = ModelSweepResult(
                 model=model,

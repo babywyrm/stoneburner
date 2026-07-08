@@ -6,6 +6,8 @@ but run against security-domain fixtures tagged as red or blue team.
 
 from __future__ import annotations
 
+from atomics.validation import sanitize_error
+
 import inspect
 import logging
 import math
@@ -242,7 +244,7 @@ async def run_redblue(
                 task_result.completed_at = datetime.now(UTC)
             except Exception as exc:
                 # Fall back to repr for exceptions with an empty str (e.g. ReadTimeout).
-                err = (str(exc) or repr(exc))[:500]
+                err = sanitize_error(exc)
                 logger.warning(
                     "[redblue] %s run %d generate failed: %s",
                     fixture.id, run_num + 1, err,

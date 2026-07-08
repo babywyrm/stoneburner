@@ -211,7 +211,7 @@ async def run_labcompare(
                         provider, judge_host, judge_model, model
                     )
             except Exception as exc:
-                cell.error = (str(exc) or repr(exc))[:200]
+                cell.error = sanitize_error(exc)[:200]
                 logger.warning(
                     "labcompare: cell %s/%s failed: %s", host.name, model, cell.error
                 )

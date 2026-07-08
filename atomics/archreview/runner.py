@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from atomics.validation import sanitize_error
+
 import logging
 
 from atomics.archreview.models import ArchReviewResult, RepoSpec
@@ -49,7 +51,7 @@ async def run_archreview(
             )
         except Exception as exc:  # noqa: BLE001 — record, never abort the batch
             result.error_class = type(exc).__name__
-            result.error_message = str(exc) or repr(exc)
+            result.error_message = sanitize_error(exc)
             results.append(result)
             continue
 
