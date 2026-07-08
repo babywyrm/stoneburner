@@ -3301,16 +3301,28 @@ def archreview(repo_name, models_csv, provider_name, ollama_host, vllm_host,
             context_tokens=context_tokens, inference_timeout=inference_timeout,
         )
 
-    spec_path = Path(__file__).parent / "archreview" / "repos" / f"{repo_name}.yaml"
+    repos_dir = Path(__file__).parent / "archreview" / "repos"
+    if "/" in repo_name or "\\" in repo_name or ".." in repo_name:
+        raise click.ClickException(
+            f"Invalid repo name: {repo_name!r}. Must be a simple name (no path separators)."
+        )
+    spec_path = repos_dir / f"{repo_name}.yaml"
+    if not spec_path.resolve().is_relative_to(repos_dir.resolve()):
+        raise click.ClickException(
+            f"Invalid repo name: {repo_name!r}. Path escapes the repos directory."
+        )
     if not spec_path.exists():
-        console.print(f"[red]Unknown repo spec: {repo_name}[/red] (looked in {spec_path})")
-        sys.exit(1)
+        available = [p.stem for p in repos_dir.glob("*.yaml")]
+        raise click.ClickException(
+            f"Unknown repo spec: {repo_name!r}. Available: {', '.join(sorted(available))}"
+        )
     spec = load_repo_spec(spec_path)
 
     repo_dir = os.environ.get(spec.path_env)
     if not repo_dir or not Path(repo_dir).is_dir():
-        console.print(f"[red]Set {spec.path_env} to the local {spec.name} checkout.[/red]")
-        sys.exit(1)
+        raise click.ClickException(
+            f"Set {spec.path_env} to the local {spec.name} checkout."
+        )
 
     tier_config = spec.tier(tier)
     archreview_max_output_tokens = max_output_tokens
