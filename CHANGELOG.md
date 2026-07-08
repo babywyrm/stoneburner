@@ -13,13 +13,18 @@
   eval suite, and the security model. Linked from the README for contributors.
 - **`atomics/stats.py`** — single home for the percentile helper that was
   copy-pasted across 5 modules.
+- **`atomics/validation.py`** — central URL validator (`validate_endpoint_url`)
+  and error sanitizer (`sanitize_error`) used by CLI, labcompare, and all eval
+  runners to strip leaked credentials from persisted exception strings.
+- **`SECURITY.md`** — documents operational security considerations (post-run
+  hooks, custom OIDC issuer, secrets storage, sanitization).
 - **Type checking in CI** — ship a `py.typed` marker (PEP 561) and add a mypy
   gate. **Phase-C typing pass is complete**: `scenario`, `qa_runner`, all five
   provider adapters, `storage.repository`, and `atomics.cli` are now type-clean
   with their real types (profiles, provider clients, result dataclasses via
   `TYPE_CHECKING`, and a `BaseProvider`-typed factory). All `# type: ignore`
   shims are gone and **no per-module mypy overrides remain** — `mypy atomics` is
-  green across all 88 files.
+  green across all 89 files.
 
 ### Changed
 - **Single provider factory** — `eval`/`archreview` no longer carry their own
@@ -38,6 +43,22 @@
 - **`atomics secrets get` no longer prints the value by default.** It reports
   presence + a masked preview; use `--show` to print the raw value for piping.
   Removes accidental secret exposure via terminal scrollback / shell history.
+- **Path traversal in `--repo`** — `atomics archreview --repo ../../x` is now
+  rejected; only simple names matching files in `atomics/archreview/repos/` are
+  accepted.
+- **Unknown provider names error instead of silent Ollama fallback** — a typo in
+  `--provider` or `--extra-judges` now raises a clear error instead of quietly
+  using the wrong backend.
+- **Rich markup injection** — LLM responses, judge rationale, and error messages
+  are escaped before terminal rendering so a model cannot inject fake Rich markup.
+- **URL validation** — all `--ollama-host`, `--vllm-host`, `--judge-host`, and
+  `--host` flags reject `file://`, embedded credentials, and path traversal.
+- **Error message sanitization** — exception strings stored in the DB are scrubbed
+  of Bearer tokens, API keys, and AWS credentials before persistence.
+- **Secrets key allowlist** — `atomics secrets set` validates key names against
+  `KNOWN_KEYS`; use `--force` for custom keys.
+- **Rich tracebacks disabled in normal mode** — only shown with `-v`/`--verbose`
+  to prevent accidental exposure of frame locals containing secrets.
 
 ## 0.8.0 (2026-07-04) — New adversarial suites, export/compare/CI plumbing, redblue variance
 
