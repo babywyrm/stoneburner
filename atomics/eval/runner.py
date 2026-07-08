@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from atomics.validation import sanitize_error
+
 import inspect
 import logging
 import uuid
@@ -200,7 +202,7 @@ async def run_eval(
             task_result.error_class = type(exc).__name__
             # Some exceptions (e.g. httpx.ReadTimeout) have an empty str(), which
             # produced blank, useless error rows/logs — fall back to repr.
-            task_result.error_message = (str(exc) or repr(exc))[:500]
+            task_result.error_message = sanitize_error(exc)
             task_result.completed_at = datetime.now(UTC)
             fr = FixtureResult(fixture=fixture, task_result=task_result, judge=None)
             fixture_results.append(fr)
