@@ -1837,12 +1837,17 @@ def _make_provider(
     if name == "brain-gateway":
         from atomics.providers.brain_gateway import BrainGatewayProvider
         return BrainGatewayProvider(url=host or settings.brain_gateway_url, default_model=mdl)
-    from atomics.providers.ollama import OllamaProvider
-    return OllamaProvider(
-        host=host or settings.ollama_host,
-        default_model=mdl or settings.ollama_model,
-        timeout=inference_timeout or settings.ollama_timeout,
-        context_tokens=context_tokens,
+    if name == "ollama":
+        from atomics.providers.ollama import OllamaProvider
+        return OllamaProvider(
+            host=host or settings.ollama_host,
+            default_model=mdl or settings.ollama_model,
+            timeout=inference_timeout or settings.ollama_timeout,
+            context_tokens=context_tokens,
+        )
+    raise click.ClickException(
+        f"Unknown provider: {name!r}. "
+        f"Valid: claude, bedrock, openai, ollama, vllm, brain-gateway"
     )
 
 
