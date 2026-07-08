@@ -29,13 +29,13 @@ if TYPE_CHECKING:
     from atomics.labcompare import CellResult
 
 
-def _setup_logging(level: str) -> None:
+def _setup_logging(level: str, *, rich_tracebacks: bool = False) -> None:
     numeric = getattr(logging, level.upper(), logging.INFO)
     logging.basicConfig(
         level=logging.WARNING,
         format="%(message)s",
         datefmt="[%X]",
-        handlers=[RichHandler(rich_tracebacks=True, markup=True)],
+        handlers=[RichHandler(rich_tracebacks=rich_tracebacks, markup=True)],
         force=True,
     )
     # Only our own loggers get the requested level; third-party stays quiet.
@@ -104,7 +104,7 @@ def cli(ctx: click.Context, verbose: bool, progress: bool) -> None:
     ctx.obj["verbose"] = verbose
     ctx.obj["progress"] = progress
     if verbose:
-        _setup_logging("DEBUG")
+        _setup_logging("DEBUG", rich_tracebacks=True)
     else:
         _setup_logging("WARNING")
 
@@ -1828,8 +1828,7 @@ def _make_provider(
 
     if name == "claude":
         if not settings.anthropic_api_key:
-            click.echo("Error: ANTHROPIC_API_KEY not set.", err=True)
-            sys.exit(1)
+            raise click.ClickException("ANTHROPIC_API_KEY not set. Export it or add to .env")
         from atomics.providers.claude import ClaudeProvider
         return ClaudeProvider(api_key=settings.anthropic_api_key, default_model=mdl or settings.default_model)
     if name == "bedrock":
@@ -1837,8 +1836,7 @@ def _make_provider(
         return BedrockProvider(region=region, model_id=mdl or "us.anthropic.claude-sonnet-4-6")
     if name == "openai":
         if not settings.openai_api_key:
-            click.echo("Error: OPENAI_API_KEY not set.", err=True)
-            sys.exit(1)
+            raise click.ClickException("OPENAI_API_KEY not set. Export it or install with: uv sync --extra openai")
         from atomics.providers.openai import OpenAIProvider
         return OpenAIProvider(api_key=settings.openai_api_key, default_model=mdl or "gpt-4o")
     if name == "vllm":
