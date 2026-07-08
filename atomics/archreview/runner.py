@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from atomics.validation import sanitize_error
-
 import logging
 
 from atomics.archreview.models import ArchReviewResult, RepoSpec
@@ -11,6 +9,7 @@ from atomics.archreview.pack import EvidencePack
 from atomics.archreview.prompt import build_analysis_prompt, parse_findings
 from atomics.archreview.scorer import score_objective, score_reasoning
 from atomics.providers.base import BaseProvider
+from atomics.validation import sanitize_error
 
 logger = logging.getLogger("atomics.archreview.runner")
 

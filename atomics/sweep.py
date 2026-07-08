@@ -8,8 +8,6 @@ against a single cloud run.
 
 from __future__ import annotations
 
-from atomics.validation import sanitize_error
-
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -17,6 +15,7 @@ from dataclasses import dataclass
 from atomics.eval.fixtures import EVAL_FIXTURES, EvalFixture
 from atomics.eval.runner import EvalRunSummary, run_eval
 from atomics.providers.base import BaseProvider
+from atomics.validation import sanitize_error
 
 logger = logging.getLogger("atomics.sweep")
 

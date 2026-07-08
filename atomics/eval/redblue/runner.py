@@ -6,8 +6,6 @@ but run against security-domain fixtures tagged as red or blue team.
 
 from __future__ import annotations
 
-from atomics.validation import sanitize_error
-
 import inspect
 import logging
 import math
@@ -26,6 +24,7 @@ from atomics.eval.redblue.fixtures import ALL_FIXTURES, BLUE_FIXTURES, RED_FIXTU
 from atomics.model_classes import supports_thinking
 from atomics.models import TaskCategory, TaskResult, TaskStatus
 from atomics.providers.base import BaseProvider
+from atomics.validation import sanitize_error
 
 logger = logging.getLogger("atomics.eval.redblue.runner")
 
