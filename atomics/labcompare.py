@@ -23,6 +23,8 @@ def parse_host_specs(raw: list[str]) -> list[HostSpec]:
 
     Raises ValueError on malformed input so the CLI can surface a clear error.
     """
+    from atomics.validation import validate_endpoint_url
+
     specs: list[HostSpec] = []
     for item in raw:
         if "=" not in item:
@@ -34,6 +36,7 @@ def parse_host_specs(raw: list[str]) -> list[HostSpec]:
             raise ValueError(f"bad --host '{item}': empty host name")
         if not url:
             raise ValueError(f"bad --host '{item}': empty url")
+        url = validate_endpoint_url(url, label=f"--host {name}")
         specs.append(HostSpec(name=name, url=url))
     return specs
 

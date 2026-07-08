@@ -1813,6 +1813,19 @@ def _make_provider(
     `region` (bedrock), `context_tokens` (ollama long-context), and
     `inference_timeout` (override the configured per-backend request timeout).
     """
+    from atomics.validation import validate_endpoint_url
+
+    if host:
+        try:
+            host = validate_endpoint_url(host, label="--ollama-host/--judge-host")
+        except ValueError as exc:
+            raise click.ClickException(str(exc)) from exc
+    if vllm_host:
+        try:
+            vllm_host = validate_endpoint_url(vllm_host, label="--vllm-host")
+        except ValueError as exc:
+            raise click.ClickException(str(exc)) from exc
+
     if name == "claude":
         if not settings.anthropic_api_key:
             click.echo("Error: ANTHROPIC_API_KEY not set.", err=True)
