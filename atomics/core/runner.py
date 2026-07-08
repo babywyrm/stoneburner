@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-from atomics.validation import sanitize_error
-
 import logging
 from datetime import UTC, datetime
 
 from atomics.models import TaskDefinition, TaskResult, TaskStatus
 from atomics.providers.base import BaseProvider
+from atomics.validation import sanitize_error
 
 logger = logging.getLogger("atomics.runner")
 

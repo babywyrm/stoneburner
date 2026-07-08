@@ -1983,9 +1983,9 @@ def sweep(
         console.print(f"\n  [bold cyan]{fr.fixture.id}[/bold cyan] — score {score_str}")
         console.print(f"  [dim]prompt:[/dim] {fr.fixture.prompt[:120]}")
         if tr.response:
-            console.print(f"  [dim]reply:[/dim]  {_rich_escape(tr.response or "")}")
+            console.print(f"  [dim]reply:[/dim]  {_rich_escape(tr.response or '')}")
         elif tr.error_message:
-            console.print(f"  [red]error:[/red]  {_rich_escape(tr.error_message or "")}")
+            console.print(f"  [red]error:[/red]  {_rich_escape(tr.error_message or '')}")
         if fr.judge and fr.judge.rationale:
             console.print(f"  [dim]judge:[/dim]  {_rich_escape(fr.judge.rationale[:200])}")
 

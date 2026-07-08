@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from atomics.validation import sanitize_error
-
 import inspect
 import logging
 import uuid
@@ -21,6 +19,7 @@ from atomics.eval.judge import (
 )
 from atomics.models import TaskCategory, TaskResult, TaskStatus
 from atomics.providers.base import BaseProvider
+from atomics.validation import sanitize_error
 
 logger = logging.getLogger("atomics.eval.runner")
 
