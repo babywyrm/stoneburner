@@ -295,6 +295,16 @@ def test_archreview_cli_unknown_repo_errors():
     assert "does-not-exist" in result.output
 
 
+def test_archreview_cli_rejects_path_traversal():
+    """Repo names with path separators or '..' are rejected."""
+    runner = CliRunner()
+    for bad_name in ["../../etc/passwd", "../cli", "foo/bar", "a\\b"]:
+        result = runner.invoke(cli, ["archreview", "--repo", bad_name,
+                                     "--models", "m", "--no-save"])
+        assert result.exit_code != 0, f"expected failure for {bad_name!r}"
+        assert "Invalid repo name" in result.output, f"bad message for {bad_name!r}"
+
+
 def test_archreview_runs_is_alias_for_rounds():
     """--runs is accepted as an alias for --rounds (cross-suite consistency)."""
     from unittest.mock import patch
