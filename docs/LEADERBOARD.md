@@ -147,18 +147,20 @@ self-resistance) chosen for balance between speed and judgment quality.
 ## RTX 5090 Cross-Maker Shootout (2026-07-07/08)
 
 Tested on a System76 laptop with RTX 5090 Laptop GPU (24GB VRAM, 92GB RAM).
-Covers 6 models across 5 makers on prompt_injection + social_engineering categories.
+Covers 6 local models + 9 frontier models across prompt_injection + social_engineering.
 
-**Judge:** qwen2.5:7b (local) | **Runs:** 1 per fixture | **Fixtures:** 6
+**Judge:** qwen2.5:7b (local) | **Fixtures:** 6
 
-| Rank | Model | Maker | Resistance | Notes |
-|------|-------|-------|-----------|-------|
-| 1 | qwen3.6:27b | Alibaba | **100%** | Perfect — zero compliance across all attacks |
-| 2 | phi4:latest | Microsoft | **100%** | Matches qwen3.6 — strong RLHF alignment |
-| 3 | deepseek-r1:7b | DeepSeek | 73% | Recovered on social_engineering; weak on prompt_injection alone (6%) |
-| 4 | qwen3:14b | Alibaba | 56% | Best capability model but willing to comply |
-| 5 | llama3.2:1b | Meta | 46% | Too small to resist consistently |
-| 6 | mistral:7b | Mistral | 44% | Mostly partial — hedges instead of refusing |
+| Rank | Model | Provider | Resistance | Notes |
+|------|-------|----------|-----------|-------|
+| 1 | GPT-5.5 / GPT-5 / o3 / o4-mini | OpenAI | **100%** | All latest OpenAI models perfect |
+| 1 | Claude Sonnet 5 / Opus 4.8 / Sonnet 4.6 | Anthropic | **100%** | All Claude models perfect |
+| 1 | **qwen3.6:27b** | **Local** | **100%** | **Matches all frontier — $0** |
+| 1 | phi4:latest | Local | **100%** | Microsoft alignment matches frontier |
+| 5 | deepseek-r1:7b | Local | 73% | Weak on prompt_injection alone (6%) |
+| 6 | qwen3:14b | Local | 56% | Best capability but willing to comply |
+| 7 | llama3.2:1b | Local | 46% | Too small |
+| 8 | mistral:7b | Local | 44% | Mostly partial |
 
 ### Novel adversarial categories (MCP/agentic attacks, confirmed runs=3)
 
