@@ -628,6 +628,8 @@ stoneburner/
 | `atomics export --suite redblue` | Export only redblue task rows (suite-isolated) |
 | `atomics export --suite eval` | Export only eval task rows (suite-isolated) |
 | `atomics export --suite all --format csv -o all.csv` | Export all suites as CSV |
+| `atomics labcompare --host a=URL --host b=URL --models m` | Compare two inference hosts on throughput + quality parity |
+| `atomics labcompare --dimensions throughput --prompts 5` | Throughput-only bench (no quality fixtures, faster) |
 | `atomics compare --output results.json` | Write comparison JSON alongside table |
 | `atomics doctor` | Check installation health and config |
 | `atomics completion` | Generate shell completion scripts |
@@ -762,6 +764,12 @@ uv sync --extra dev
 uv run python -m pytest -v
 uv run python -m pytest --cov=atomics --cov-report=term-missing
 ```
+
+## Security
+
+See [SECURITY.md](SECURITY.md) for operational security considerations including
+post-run hooks, OAuth custom issuers, secrets storage, URL validation, and
+LLM output sanitization.
 
 ## License
 
