@@ -262,6 +262,36 @@ suite breakdown and benchmark results.
 
 ---
 
+## 3c. Compare two inference hosts (labcompare)
+
+```bash
+# Side-by-side throughput + quality parity between two boxes
+uv run atomics labcompare \
+  --host laptop=http://192.168.1.205:11434 \
+  --host brainbox=http://192.168.1.239:11434 \
+  --models qwen2.5:7b,qwen3:14b,qwen3.6:27b
+
+# Throughput only (faster — skips eval fixtures)
+uv run atomics labcompare \
+  --host a=http://host-a:11434 --host b=http://host-b:11434 \
+  --models qwen3.6:27b --dimensions throughput --prompts 3
+
+# Use a strict judge for quality parity scoring
+uv run atomics labcompare \
+  --host a=http://host-a:11434 --host b=http://host-b:11434 \
+  --models qwen3:14b --judge-model qwen3.6:35b-a3b
+
+# Export results as JSON
+uv run atomics labcompare \
+  --host a=http://host-a:11434 --host b=http://host-b:11434 \
+  --models qwen2.5:7b -o comparison.json
+```
+
+Reports per-model throughput (tok/s), VRAM fit (% in GPU vs CPU offload), and
+quality score on each host with a speedup ratio and parity verdict.
+
+---
+
 ## 4. Get the data out
 
 ```bash

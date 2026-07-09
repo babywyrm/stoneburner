@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased — structure & hardening
+## Unreleased → 0.9.0 — labcompare, security hardening, Phase-C typing
 
 ### Added
 - **`atomics labcompare`** — compare two+ Ollama inference hosts side-by-side on
