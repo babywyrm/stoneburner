@@ -138,16 +138,34 @@ Format: model(resistance%/capability%)
 
 | Quadrant | Models | Use case |
 |----------|--------|----------|
-| **Ideal** (high resist + high capable) | gemma4:12b, gemma4:e4b, phi4, qwen2.5:14b | Production security tooling |
+| **Ideal** (high resist + high capable) | **qwen3.6:27b**, **phi4**, gemma4:12b, gemma4:e4b, qwen2.5:14b | Production security tooling |
 | **Capable but risky** (low resist + high capable) | qwen3:14b, qwen3:4b, ministral-3, gemma3:4b | Supervised red-team work only |
 | **Safe but limited** (high resist + low capable) | qwen3.5:4b/2b/0.8b, phi4-mini | User-facing safety filtering |
-| **Avoid** (low resist + low capable) | dolphin3, deepseek-r1:7b, llama3.2:1b | Not recommended |
+| **Avoid** (low resist + low capable) | dolphin3, deepseek-r1:7b, llama3.2:1b, mistral:7b | Not recommended |
+
+---
+
+## RTX 5090 Capability Results (2026-07-07/08)
+
+Tested on RTX 5090 Laptop GPU (24GB VRAM). Same eval fixtures, 6 models across
+5 makers. Judge: qwen2.5:7b.
+
+| Rank | Model | Maker | Quality | Latency | Notes |
+|------|-------|-------|---------|---------|-------|
+| 1 | qwen3:14b | Alibaba | **96%** | 38.1s | Best capability, but 56% resistance |
+| 2 | qwen3.6:27b | Alibaba | **95%** | ~90s | Near-perfect + 100% resistance = ideal |
+| 3 | phi4:latest | Microsoft | **93%** | ~30s | Strong + 100% resistance = ideal |
+| 4 | mistral:7b | Mistral | 73% | ~15s | Moderate |
+| 5 | deepseek-r1:7b | DeepSeek | 52% | ~20s | Weak — thinking overhead doesn't help |
+| 6 | llama3.2:1b | Meta | 43% | ~4s | Too small for security tasks |
 
 ---
 
 ## Infrastructure notes
 
-- All models run via Ollama on brainbox (RTX 5070, 12GB VRAM, 48GB RAM)
-- Models >12GB offload layers to CPU RAM (slower but functional)
+- **Brainbox results (June 2026):** RTX 5070, 12GB VRAM, 48GB RAM, 20 models
+- **5090 results (July 2026):** RTX 5090 Laptop, 24GB VRAM, 92GB RAM, 6 models
+- Models >12GB offload layers to CPU RAM on brainbox (slower but functional)
+- Models up to 17GB fit in VRAM on the 5090 (qwen3.6:27b at 88% fit)
 - Judge (qwen2.5:7b) runs on same host — model-under-test unloaded before judge loads
 - Results stored in SQLite (`data/atomics.db`, table: `task_results`, suite: `redblue-*`)

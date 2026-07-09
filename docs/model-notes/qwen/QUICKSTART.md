@@ -43,6 +43,22 @@ Other MoE examples in the wild:
 - DeepSeek V3 = 671B total, 37B active
 - Qwen 3.6 35B-A3B = 35B total, 3B active (extremely efficient)
 
+### Important: MoE speed depends on available VRAM
+
+The MoE's speed advantage only works when it fits in VRAM. The Q4 weights are
+23.9GB on disk but expand at runtime (KV cache grows with context window):
+
+| VRAM | Default context | Speed | What happens |
+|------|----------------|-------|-------------|
+| 32GB+ | Any | 60+ tok/s | Everything fits |
+| 24GB (RTX 5090) | 16K+ | 7 tok/s | KV cache overflows to CPU — negates MoE advantage |
+| 24GB (RTX 5090) | 4096 | **54 tok/s** | Fits! Small context = fast |
+| 12GB (RTX 5070) | 4096 | 61 tok/s | Ollama auto-selects small context |
+
+**Practical rule:** If your card has <32GB VRAM, pass `num_ctx=4096` (or use
+stoneburner's `--context-tokens 4096`) when using the MoE for judge calls or
+short-context work. For long-form generation, use the dense 27B instead.
+
 ---
 
 ## Getting started on brainbox

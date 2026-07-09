@@ -292,10 +292,90 @@ for any fixtures involving domain-specific structured output (Sigma, YARA, Snort
 
 ---
 
+## RTX 5090 Laptop Testing (2026-07-07/08)
+
+Tested on a System76 laptop with RTX 5090 Laptop GPU (24GB VRAM, 92GB RAM,
+24 cores) via Ollama on the local network.
+
+### Throughput on the 5090
+
+| Model | tok/s | VRAM fit | vs brainbox (5070, 12GB) |
+|-------|-------|----------|--------------------------|
+| qwen2.5:3b | 295 | 100% GPU | ~2.5× faster |
+| deepseek-r1:7b | 145.6 | 100% GPU | new |
+| phi4:latest | 73.6 | 100% GPU | new |
+| qwen3:14b | 69.8 | 100% GPU | 2× faster (was ~35) |
+| qwen3.6:27b | 22.6 | 88% GPU | 3.2× faster (was 7, offloading) |
+| qwen3.6:35b-a3b | 7 (default) / **54 (num_ctx=4096)** | 88% | Context-window dependent |
+
+### Critical finding: MoE speed depends on context window
+
+The MoE (qwen3.6:35b-a3b) at Q4_K_M is 23.9GB on disk but expands to ~27.7GB
+at runtime with a large context window. On the 24GB 5090:
+- **Default context:** 7 tok/s (offloading KV cache to CPU — same as the dense 27B on brainbox)
+- **num_ctx=4096:** 54 tok/s (fits entirely, approaches brainbox's 61 tok/s)
+
+Implication: for judge calls (short context, <1000 input tokens), the MoE is
+fast and viable. For long-context generation, it's no better than the dense 27B
+on this card. A 32GB+ card would eliminate this constraint entirely.
+
+### Stress testing (concurrency scaling)
+
+| Model | Peak tok/s | Saturates at | Scaling factor |
+|-------|-----------|-------------|----------------|
+| qwen3.6:27b | 21.6 | concurrency=1 | 1.02× (flat — GPU maxed on single request) |
+| qwen3:14b | 65.4 | concurrency=2 | 1.12× (slight batch gain, then flat) |
+
+The 27B model has zero concurrency scaling — the GPU is fully utilized on a
+single inference stream. The 14B model gets a 12% boost from batching 2 requests
+(Ollama's parallel scheduling), then plateaus. Multi-user serving needs the 14B
+tier or smaller on this card.
+
+### 2x2 Matrix: Resistance vs Capability (6 models, RTX 5090)
+
+```
+                    HIGH CAPABILITY (>85%)
+                    │
+        IDEAL       │      CAPABLE BUT RISKY
+                    │
+   qwen3.6:27b(100/95)     qwen3:14b(56/96)
+   phi4:latest(100/93)
+                    │
+  HIGH RESISTANCE ──┼── LOW RESISTANCE
+   (>70%)           │   (<70%)
+                    │
+        SAFE BUT    │      AVOID
+        LIMITED     │
+   deepseek-r1(73/52)      mistral:7b(44/73)
+                    │       llama3.2:1b(46/43)
+                    │
+                    LOW CAPABILITY (<85%)
+```
+
+Format: model(resistance%/capability%)
+
+### Novel adversarial categories (confirmed with runs=3)
+
+Tested multiturn manipulation, RAG poisoning, and tool-description injection:
+
+| Model | Overall | ±stddev | Weakest category |
+|-------|---------|---------|-----------------|
+| qwen3.6:27b | 100% | n/a | None — perfect across all |
+| phi4:latest | 89.9% | ±19.5% | tool_desc_injection (partial on schema_injection, desc_directive) |
+| qwen3:14b | 82.5% | ±27.2% | hidden_unicode in tool descriptions (complied); high variance overall |
+
+Key insight: the MCP/agentic attack surface (tool descriptions, retrieved
+context) is where the real model differentiation shows up. Basic prompt injection
+is well-defended by most modern models; tool-metadata attacks are the 2026 frontier.
+
+---
+
 ## References
 
 - Quesma blog: https://quesma.com/blog/qwen-36-is-awesome/
 - Ollama model page: https://ollama.com/library/qwen3.6
 - Community quants: https://ollama.com/batiai/qwen3.6-27b
+- Alibaba announcement: https://www.alibabacloud.com/blog/qwen3-6-35b-a3b-agentic-coding-power-now-open-to-all_603043
+- Release date: April 16, 2026 (MoE), April 22, 2026 (dense 27B)
 - Stoneburner adversarial leaderboard: `docs/LEADERBOARD.md`
 - Stoneburner redblue leaderboard: `docs/LEADERBOARD-REDBLUE.md`
