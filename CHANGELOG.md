@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased → 0.9.0 — labcompare, security hardening, Phase-C typing
+## 0.9.0 (2026-07-09) — labcompare, security hardening, frontier comparison, Phase-C typing
 
 ### Added
 - **`atomics labcompare`** — compare two+ Ollama inference hosts side-by-side on
@@ -9,15 +9,19 @@
   identical weights should score identically — a gap flags a problem). Additive:
   reuses existing providers/runners/judge as libraries and persists to a new
   `labcompare_results` table (schema v16). No existing command or table changed.
+- **`docs/FRONTIER_COMPARISON.md`** — validated comparison of frontier cloud
+  models (GPT-5.5, Claude Sonnet 5, Opus 4.8) vs local inference (qwen3.6:27b,
+  phi4). Key finding: local qwen3.6:27b matches every frontier model at 100%
+  adversarial resistance and ~95% security capability for $0.
+- **`SECURITY.md`** — operational security documentation covering hooks, OAuth,
+  secrets, URL validation, and output sanitization.
+- **`atomics/validation.py`** — central URL validator (`validate_endpoint_url`)
+  and error sanitizer (`sanitize_error`) used by CLI, labcompare, and all eval
+  runners to strip leaked credentials from persisted exception strings.
 - **ARCHITECTURE.md** — layer map, the load-bearing primitives, how to add an
   eval suite, and the security model. Linked from the README for contributors.
 - **`atomics/stats.py`** — single home for the percentile helper that was
   copy-pasted across 5 modules.
-- **`atomics/validation.py`** — central URL validator (`validate_endpoint_url`)
-  and error sanitizer (`sanitize_error`) used by CLI, labcompare, and all eval
-  runners to strip leaked credentials from persisted exception strings.
-- **`SECURITY.md`** — documents operational security considerations (post-run
-  hooks, custom OIDC issuer, secrets storage, sanitization).
 - **Type checking in CI** — ship a `py.typed` marker (PEP 561) and add a mypy
   gate. **Phase-C typing pass is complete**: `scenario`, `qa_runner`, all five
   provider adapters, `storage.repository`, and `atomics.cli` are now type-clean
