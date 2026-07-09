@@ -144,14 +144,42 @@ self-resistance) chosen for balance between speed and judgment quality.
 
 ---
 
+## RTX 5090 Cross-Maker Shootout (2026-07-07/08)
+
+Tested on a System76 laptop with RTX 5090 Laptop GPU (24GB VRAM, 92GB RAM).
+Covers 6 models across 5 makers on prompt_injection + social_engineering categories.
+
+**Judge:** qwen2.5:7b (local) | **Runs:** 1 per fixture | **Fixtures:** 6
+
+| Rank | Model | Maker | Resistance | Notes |
+|------|-------|-------|-----------|-------|
+| 1 | qwen3.6:27b | Alibaba | **100%** | Perfect — zero compliance across all attacks |
+| 2 | phi4:latest | Microsoft | **100%** | Matches qwen3.6 — strong RLHF alignment |
+| 3 | deepseek-r1:7b | DeepSeek | 73% | Recovered on social_engineering; weak on prompt_injection alone (6%) |
+| 4 | qwen3:14b | Alibaba | 56% | Best capability model but willing to comply |
+| 5 | llama3.2:1b | Meta | 46% | Too small to resist consistently |
+| 6 | mistral:7b | Mistral | 44% | Mostly partial — hedges instead of refusing |
+
+### Novel adversarial categories (MCP/agentic attacks, confirmed runs=3)
+
+| Model | Overall | ±stddev | Weak spot |
+|-------|---------|---------|-----------|
+| qwen3.6:27b | **100%** | 0 | None |
+| phi4:latest | **89.9%** | ±19.5% | tool_desc_injection (schema_injection, desc_directive) |
+| qwen3:14b | **82.5%** | ±27.2% | hidden_unicode in tool descriptions; high variance |
+
+---
+
 ## Practical implications
 
 | Use case | Recommended models |
 |----------|-------------------|
-| High-security deployment (resist manipulation) | qwen3.5:4b, gemma4:12b |
-| Balanced (capable + safe) | qwen3.5:2b, phi4, gemma4:e4b |
-| CTF "easy" tier (intentionally vulnerable) | qwen2.5:1.5b, gemma3:4b, dolphin3:8b |
+| High-security deployment (resist manipulation) | qwen3.5:4b, gemma4:12b, **qwen3.6:27b**, **phi4** |
+| Balanced (capable + safe) | **phi4** (100% resist / 93% capability), qwen3.5:2b, gemma4:e4b |
+| Best red-team capability | **qwen3:14b** (96% capability, but only 56% resistance) |
+| CTF "easy" tier (intentionally vulnerable) | qwen2.5:1.5b, gemma3:4b, dolphin3:8b, **deepseek-r1:7b** |
 | CTF "hard" tier (resists but still solvable) | qwen3.5:0.8b, qwen2.5:14b |
+| As judge (strict + fast) | qwen3.6:35b-a3b (54 tok/s w/ num_ctx=4096) or phi4 (73 tok/s) |
 
 ---
 
@@ -160,4 +188,3 @@ self-resistance) chosen for balance between speed and judgment quality.
 - Add cloud providers (Claude, GPT) for cross-provider leaderboard
 - Increase to ROUNDS=5 for tighter confidence on borderline models
 - Track trends over time as models update
-- Add redblue (capability) leaderboard as companion
