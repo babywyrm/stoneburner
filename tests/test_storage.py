@@ -17,7 +17,7 @@ def _tmp_repo() -> MetricsRepository:
 
 
 def test_schema_version_is_current():
-    assert SCHEMA_VERSION == 16
+    assert SCHEMA_VERSION == 19
 
 
 def test_archreview_results_table_exists(tmp_path):
@@ -64,12 +64,16 @@ def test_save_archreview_result_roundtrip(tmp_path):
 def test_adversarial_results_table_exists(tmp_path):
     conn = init_db(tmp_path / "test.db")
     conn.execute(
+        "INSERT INTO runs (run_id, started_at) VALUES ('run1', '2026-01-01')"
+    )
+    conn.execute(
         "INSERT INTO adversarial_results "
         "(result_id, run_id, fixture_id, category, severity, provider, model, timestamp) "
         "VALUES ('r1','run1','f1','prompt_injection','HIGH','ollama','qwen3:14b','2026-01-01')"
     )
     row = conn.execute("SELECT fixture_id FROM adversarial_results WHERE result_id='r1'").fetchone()
     assert row[0] == "f1"
+    conn.close()
 
 
 def test_probe_results_table_exists(tmp_path):
@@ -77,7 +81,8 @@ def test_probe_results_table_exists(tmp_path):
     conn.execute(
         "INSERT INTO probe_results "
         "(result_id, run_id, target_name, artifact_type, check_id, provider, model, timestamp) "
-        "VALUES ('p1','run1','my-target','access-log','ioc_analysis','ollama','qwen3:14b','2026-01-01')"
+        "VALUES ('p1','run1','my-target','access-log','ioc_analysis','ollama',"
+        "'qwen3:14b','2026-01-01')"
     )
     row = conn.execute("SELECT target_name FROM probe_results WHERE result_id='p1'").fetchone()
     assert row[0] == "my-target"
@@ -92,7 +97,8 @@ def test_task_results_has_suite_column(tmp_path):
     conn.execute(
         "INSERT INTO task_results "
         "(task_id, run_id, category, task_name, provider, model, status, started_at, suite) "
-        "VALUES ('t1','run1','general_qa','ev-01','ollama','qwen3:14b','success','2026-01-01','redblue-red')"
+        "VALUES ('t1','run1','general_qa','ev-01','ollama','qwen3:14b','success',"
+        "'2026-01-01','redblue-red')"
     )
     conn.commit()
     row = conn.execute("SELECT suite FROM task_results WHERE task_id='t1'").fetchone()
@@ -153,6 +159,175 @@ def test_schema_migration_backs_up_before_wipe(tmp_path):
     old = bconn.execute("SELECT run_id FROM runs").fetchall()
     bconn.close()
     assert old == [("keepme",)]
+
+
+def test_schema_migration_aborts_and_closes_when_backup_fails(
+    tmp_path, monkeypatch
+):
+    import sqlite3
+
+    from atomics.storage import schema
+
+    db_path = tmp_path / "backup-failure.db"
+    setup = sqlite3.connect(db_path)
+    setup.executescript("""
+        CREATE TABLE schema_version (version INTEGER PRIMARY KEY);
+        INSERT INTO schema_version (version) VALUES (17);
+        CREATE TABLE runs (run_id TEXT PRIMARY KEY, started_at TEXT NOT NULL);
+        INSERT INTO runs (run_id, started_at) VALUES ('sentinel', '2026-01-01');
+    """)
+    setup.close()
+
+    opened = []
+    real_connect = schema.sqlite3.connect
+
+    def capture_connect(*args, **kwargs):
+        conn = real_connect(*args, **kwargs)
+        opened.append(conn)
+        return conn
+
+    monkeypatch.setattr(schema.sqlite3, "connect", capture_connect)
+    monkeypatch.setattr(
+        schema,
+        "_backup_before_wipe",
+        lambda *_args: (_ for _ in ()).throw(sqlite3.OperationalError("disk full")),
+    )
+
+    with pytest.raises(sqlite3.OperationalError, match="disk full"):
+        init_db(db_path)
+
+    with pytest.raises(sqlite3.ProgrammingError):
+        opened[0].execute("SELECT 1")
+    verify = real_connect(db_path)
+    try:
+        assert verify.execute(
+            "SELECT version FROM schema_version"
+        ).fetchone()[0] == 17
+        assert verify.execute("SELECT run_id FROM runs").fetchone()[0] == "sentinel"
+        verify.execute(
+            "INSERT INTO runs (run_id, started_at) "
+            "VALUES ('after-failure', '2026-01-02')"
+        )
+        verify.commit()
+    finally:
+        verify.close()
+
+
+def test_schema_migration_rolls_back_mid_reset_failure(tmp_path, monkeypatch):
+    import sqlite3
+
+    from atomics.storage import schema
+
+    db_path = tmp_path / "reset-failure.db"
+    setup = sqlite3.connect(db_path)
+    setup.executescript("""
+        CREATE TABLE schema_version (version INTEGER PRIMARY KEY);
+        INSERT INTO schema_version (version) VALUES (17);
+        CREATE TABLE runs (run_id TEXT PRIMARY KEY, started_at TEXT NOT NULL);
+        INSERT INTO runs (run_id, started_at) VALUES ('sentinel', '2026-01-01');
+    """)
+    setup.close()
+    monkeypatch.setattr(
+        schema,
+        "SCHEMA_SQL",
+        "CREATE TABLE replacement (id INTEGER); INVALID SCHEMA STATEMENT;",
+    )
+
+    with pytest.raises(sqlite3.OperationalError):
+        init_db(db_path)
+
+    verify = sqlite3.connect(db_path)
+    try:
+        assert verify.execute(
+            "SELECT version FROM schema_version"
+        ).fetchone()[0] == 17
+        assert verify.execute("SELECT run_id FROM runs").fetchone()[0] == "sentinel"
+        assert verify.execute(
+            "SELECT COUNT(*) FROM sqlite_master "
+            "WHERE type='table' AND name='replacement'"
+        ).fetchone()[0] == 0
+    finally:
+        verify.close()
+
+
+def test_schema_migration_lock_prevents_post_backup_write_loss(
+    tmp_path, monkeypatch
+):
+    import sqlite3
+    import threading
+
+    from atomics.storage import schema
+
+    db_path = tmp_path / "migration-race.db"
+    setup = sqlite3.connect(db_path)
+    setup.executescript("""
+        CREATE TABLE schema_version (version INTEGER PRIMARY KEY);
+        INSERT INTO schema_version (version) VALUES (17);
+        CREATE TABLE runs (
+            run_id TEXT PRIMARY KEY,
+            started_at TEXT NOT NULL,
+            legacy_only TEXT
+        );
+        INSERT INTO runs (run_id, started_at, legacy_only)
+        VALUES ('sentinel', '2026-01-01', 'before-backup');
+    """)
+    setup.close()
+
+    backup_finished = threading.Event()
+    writer_attempting = threading.Event()
+    writer_finished = threading.Event()
+    writer_result = {}
+    real_backup = schema._backup_before_wipe
+
+    def synchronized_backup(conn, path, current):
+        backup_path = real_backup(conn, path, current)
+        backup_finished.set()
+        assert writer_attempting.wait(timeout=2)
+        writer_finished.wait(timeout=0.25)
+        return backup_path
+
+    def concurrent_writer():
+        conn = sqlite3.connect(db_path, timeout=5)
+        try:
+            assert backup_finished.wait(timeout=2)
+            writer_attempting.set()
+            conn.execute(
+                "INSERT INTO runs (run_id, started_at, legacy_only) "
+                "VALUES ('racing-writer', '2026-01-02', 'after-backup')"
+            )
+            conn.commit()
+            writer_result["committed"] = True
+        except sqlite3.Error as exc:
+            writer_result["error"] = exc
+        finally:
+            conn.close()
+            writer_finished.set()
+
+    monkeypatch.setattr(schema, "_backup_before_wipe", synchronized_backup)
+    writer = threading.Thread(target=concurrent_writer)
+    writer.start()
+    migrated = init_db(db_path)
+    migrated.close()
+    writer.join(timeout=6)
+    assert not writer.is_alive()
+
+    backup_path = next(tmp_path.glob("migration-race.db.v17.*.bak"))
+    backup = sqlite3.connect(backup_path)
+    live = sqlite3.connect(db_path)
+    try:
+        in_backup = backup.execute(
+            "SELECT COUNT(*) FROM runs WHERE run_id='racing-writer'"
+        ).fetchone()[0]
+        in_live = live.execute(
+            "SELECT COUNT(*) FROM runs WHERE run_id='racing-writer'"
+        ).fetchone()[0]
+    finally:
+        backup.close()
+        live.close()
+
+    assert not writer_result.get("committed") or in_backup or in_live
+    assert writer_result.get("committed") is not True
+    assert isinstance(writer_result.get("error"), sqlite3.Error)
 
 
 def test_schema_no_backup_on_fresh_db(tmp_path):
