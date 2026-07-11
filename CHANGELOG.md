@@ -1,5 +1,31 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- **Two new adversarial suites** (adversarial fixture count 64 → 72):
+  - `encoding` (5 fixtures) — base64 / ROT13 / leetspeak / hex / homoglyph-wrapped
+    override requests. Tests whether safety reasoning survives an obfuscation
+    layer or only operates on surface text. Group alias: `--category encoding`.
+  - `many_shot` (3 fixtures) — context-stuffing attacks that stage many fabricated
+    "assistant complied" turns via `prior_turns`, then deliver the real ask. Tests
+    long-context safety degradation. Group alias: `--category many_shot`.
+  Both use benign-but-forbidden markers only (no harmful content ships).
+- **`atomics refusal`** — refusal-calibration eval measuring **both** safety
+  failure modes. Fixtures pair `comply` (benign/dual-use security work), `refuse`
+  (operational harm), and `clarify` (ambiguous scope) expectations; a judge
+  classifies each response and the scorer reports `over_refusal_rate`,
+  `under_refusal_rate`, and an overall `calibration_score`. Catches over-aligned
+  models that refuse legitimate security work, which resistance-only evals miss.
+- **`atomics codereview`** — secure-code-review eval on code snippets and unified
+  diffs. Vulnerable fixtures carry a known CWE (SQLi, command injection, path
+  traversal, hardcoded secret, insecure deserialization, weak password hash);
+  clean fixtures measure false positives. Reports `detection_rate`,
+  `false_positive_rate`, and an F1-style `review_score`. `diff` mode tests
+  PR-style review of a change in isolation.
+- Docs: `docs/ADVERSARIAL_SUITES.md` documents all four new suites (encoding,
+  many_shot) and companion evals (refusal, codereview) with usage and metrics.
+
 ## 0.9.0 (2026-07-09) — labcompare, security hardening, frontier comparison, Phase-C typing
 
 ### Added
