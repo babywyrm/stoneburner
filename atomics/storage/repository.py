@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
@@ -10,6 +11,7 @@ from typing import TYPE_CHECKING
 from atomics.models import RunSummary, TaskResult, TaskStatus
 from atomics.stats import percentile as _percentile
 from atomics.storage.schema import init_db
+from atomics.validation import sanitize_error
 
 if TYPE_CHECKING:
     from atomics.archreview.models import ArchReviewResult
@@ -158,18 +160,75 @@ class MetricsRepository:
         result: AdversarialFixtureResult,
         *,
         thinking_enabled: bool = False,
+        provider: str = "",
+        model: str = "",
     ) -> None:
         r = result
         res = r.resistance
+        serialized = r.to_dict()
+        # Parent task token semantics track only the model under test. Judge-call
+        # tokens remain in attempts_json as cost/evidence and are not rolled up.
+        input_tokens = sum(attempt.input_tokens for attempt in r.attempts)
+        output_tokens = sum(attempt.output_tokens for attempt in r.attempts)
+        total_tokens = input_tokens + output_tokens
+        representative_error = str(serialized["error_message"])
+        sanitized_error = (
+            (
+                representative_error
+                if "[REDACTED]" in representative_error
+                else sanitize_error(Exception(representative_error))
+            )
+            if representative_error
+            else ""
+        )
         self._conn.execute(
             """
-            INSERT OR REPLACE INTO adversarial_results (
+            INSERT INTO adversarial_results (
                 result_id, run_id, fixture_id, category, severity,
                 provider, model, prompt, response, attack_goal,
                 resistance_score, resistance_label, judge_model, judge_rationale,
                 thinking_enabled, thinking_tokens, latency_ms, estimated_cost_usd,
-                timestamp
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                timestamp, status, generation_status, judge_status, attempt_count,
+                input_tokens, output_tokens, total_tokens, attempts_json,
+                run_scores_json, generation_failures,
+                infrastructure_failures, judge_failures, parse_failed,
+                error_class, error_message
+            ) VALUES (
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+            )
+            ON CONFLICT(run_id, fixture_id) DO UPDATE SET
+                category = excluded.category,
+                severity = excluded.severity,
+                provider = excluded.provider,
+                model = excluded.model,
+                prompt = excluded.prompt,
+                response = excluded.response,
+                attack_goal = excluded.attack_goal,
+                resistance_score = excluded.resistance_score,
+                resistance_label = excluded.resistance_label,
+                judge_model = excluded.judge_model,
+                judge_rationale = excluded.judge_rationale,
+                thinking_enabled = excluded.thinking_enabled,
+                thinking_tokens = excluded.thinking_tokens,
+                latency_ms = excluded.latency_ms,
+                estimated_cost_usd = excluded.estimated_cost_usd,
+                timestamp = excluded.timestamp,
+                status = excluded.status,
+                generation_status = excluded.generation_status,
+                judge_status = excluded.judge_status,
+                attempt_count = excluded.attempt_count,
+                input_tokens = excluded.input_tokens,
+                output_tokens = excluded.output_tokens,
+                total_tokens = excluded.total_tokens,
+                attempts_json = excluded.attempts_json,
+                run_scores_json = excluded.run_scores_json,
+                generation_failures = excluded.generation_failures,
+                infrastructure_failures = excluded.infrastructure_failures,
+                judge_failures = excluded.judge_failures,
+                parse_failed = excluded.parse_failed,
+                error_class = excluded.error_class,
+                error_message = excluded.error_message
             """,
             (
                 uuid.uuid4().hex,
@@ -177,20 +236,35 @@ class MetricsRepository:
                 r.fixture.id,
                 r.fixture.category,
                 r.fixture.severity,
-                "",
-                "",
+                provider,
+                model,
                 r.fixture.prompt,
                 r.response,
                 r.fixture.attack_goal,
                 res.score if res else None,
-                res.label if res else None,
-                res.judge_model if res else None,
-                res.rationale if res else None,
+                res.label if res else "",
+                res.judge_model if res else "",
+                res.rationale if res else "",
                 int(thinking_enabled),
                 r.thinking_tokens,
                 r.latency_ms,
                 r.estimated_cost_usd,
                 datetime.now(UTC).isoformat(),
+                serialized["status"],
+                serialized["generation_status"],
+                serialized["judge_status"],
+                serialized["attempt_count"],
+                input_tokens,
+                output_tokens,
+                total_tokens,
+                json.dumps(serialized["attempts"]),
+                json.dumps(serialized["run_scores"]),
+                serialized["generation_failures"],
+                serialized["infrastructure_failures"],
+                serialized["judge_failures"],
+                int(bool(serialized["parse_failed"])),
+                serialized["error_class"],
+                sanitized_error,
             ),
         )
         self._conn.commit()
@@ -200,13 +274,21 @@ class MetricsRepository:
 
         The generic `complete_run` aggregates `task_results`, so adversarial runs
         need their own completion that reads the right table. Sets completed_at
-        and rolls up count/cost/latency for `atomics report`-style listing.
+        and rolls up counts, provider-attempt tokens, cost, and latency for
+        `atomics report`-style listing.
         """
         now = datetime.now(UTC).isoformat()
         row = self._conn.execute(
             """
             SELECT
                 COUNT(*) AS total,
+                COALESCE(SUM(CASE WHEN status = 'complete' THEN 1 ELSE 0 END), 0)
+                    AS success,
+                COALESCE(SUM(CASE WHEN status <> 'complete' THEN 1 ELSE 0 END), 0)
+                    AS failed,
+                COALESCE(SUM(input_tokens), 0) AS input_tokens,
+                COALESCE(SUM(output_tokens), 0) AS output_tokens,
+                COALESCE(SUM(total_tokens), 0) AS total_tokens,
                 COALESCE(SUM(estimated_cost_usd), 0.0) AS cost,
                 COALESCE(AVG(latency_ms), 0.0) AS avg_lat
             FROM adversarial_results WHERE run_id = ?
@@ -217,10 +299,23 @@ class MetricsRepository:
             """
             UPDATE runs SET
                 completed_at = ?, total_tasks = ?, successful_tasks = ?,
+                failed_tasks = ?, total_input_tokens = ?,
+                total_output_tokens = ?, total_tokens = ?,
                 total_cost_usd = ?, avg_latency_ms = ?
             WHERE run_id = ?
             """,
-            (now, row[0], row[0], row[1], row[2], run_id),
+            (
+                now,
+                row[0],
+                row[1],
+                row[2],
+                row[3],
+                row[4],
+                row[5],
+                row[6],
+                row[7],
+                run_id,
+            ),
         )
         self._conn.commit()
 

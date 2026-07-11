@@ -327,8 +327,18 @@ class TestSoakStorage:
             error_rate=0.004,
             verdict="STABLE",
             samples=[
-                SoakSample(elapsed_seconds=30, requests=25, aggregate_tps=42.0, p95_latency_ms=2800),
-                SoakSample(elapsed_seconds=60, requests=24, aggregate_tps=41.5, p95_latency_ms=2900),
+                SoakSample(
+                    elapsed_seconds=30,
+                    requests=25,
+                    aggregate_tps=42.0,
+                    p95_latency_ms=2800,
+                ),
+                SoakSample(
+                    elapsed_seconds=60,
+                    requests=24,
+                    aggregate_tps=41.5,
+                    p95_latency_ms=2900,
+                ),
             ],
         )
         repo.save_soak_result(sr)
@@ -413,7 +423,8 @@ class TestSchemaVersion:
             "sample_interval, total_requests, total_failed, total_tokens, avg_tps, peak_tps, "
             "min_tps, throughput_drift_pct, latency_drift_pct, avg_p95_ms, error_rate, "
             "verdict, samples_json, timestamp) "
-            "VALUES ('r1','m','h',4,60,59,30,100,0,10000,42,44,40,-1.0,2.0,2800,0.0,'STABLE','[]','2026-06-01')"
+            "VALUES ('r1','m','h',4,60,59,30,100,0,10000,42,44,40,-1.0,2.0,"
+            "2800,0.0,'STABLE','[]','2026-06-01')"
         )
         row = conn.execute("SELECT verdict FROM soak_results WHERE result_id='r1'").fetchone()
         assert row[0] == "STABLE"
@@ -421,7 +432,7 @@ class TestSchemaVersion:
 
     def test_schema_version_bumped(self):
         from atomics.storage.schema import SCHEMA_VERSION
-        assert SCHEMA_VERSION == 16
+        assert SCHEMA_VERSION == 19
 
 
 # ── Think-time / user arrival simulation ─────────────────────────────────────
