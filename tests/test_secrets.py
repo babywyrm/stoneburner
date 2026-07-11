@@ -132,7 +132,10 @@ def test_secrets_list_cli():
 
     from atomics.cli import cli
 
-    with patch("keyring.get_password", return_value=None):
+    with (
+        patch("atomics.secrets.keychain_available", return_value=True),
+        patch("keyring.get_password", return_value=None),
+    ):
         runner = CliRunner()
         result = runner.invoke(cli, ["secrets", "list"])
         assert result.exit_code == 0

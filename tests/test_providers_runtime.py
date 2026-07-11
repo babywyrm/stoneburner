@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from atomics.eval import ProviderOutcomeKind
 from atomics.providers.base import ProviderResponse
 
 
@@ -208,6 +209,7 @@ async def test_openai_health_passes_on_empty_reasoning_response():
     class _EmptyChoice:
         def __init__(self):
             self.message = type("Msg", (), {"content": ""})()
+            self.finish_reason = "length"
 
     class _Resp:
         def __init__(self):
@@ -232,4 +234,7 @@ async def test_openai_health_passes_on_empty_reasoning_response():
     resp = await provider.generate("hi", model="o4-mini", max_tokens=8)
     assert resp.text == ""
     assert resp.total_tokens == 72
+    assert resp.outcome is not None
+    assert resp.outcome.kind is ProviderOutcomeKind.TRUNCATED
+    assert resp.finish_reason == "length"
     assert await provider.health_check() is True
