@@ -5,6 +5,8 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
+from atomics.eval.outcomes import ProviderOutcome
+
 
 @dataclass
 class ProviderResponse:
@@ -30,6 +32,27 @@ class ProviderResponse:
     cache_read_tokens: int = 0
     cache_write_tokens: int = 0
     raw: dict | None = field(default=None, repr=False)
+    outcome: ProviderOutcome | None = None
+    finish_reason: str | None = None
+
+    def __setattr__(self, name: str, value: object) -> None:
+        if name == "finish_reason" and "finish_reason" in self.__dict__:
+            outcome = self.__dict__.get("outcome")
+            if isinstance(outcome, ProviderOutcome) and value != outcome.finish_reason:
+                raise ValueError("finish_reason conflicts with outcome.finish_reason")
+        elif name == "outcome" and "outcome" in self.__dict__:
+            finish_reason = self.__dict__.get("finish_reason")
+            if isinstance(value, ProviderOutcome) and value.finish_reason != finish_reason:
+                raise ValueError("finish_reason conflicts with outcome.finish_reason")
+        object.__setattr__(self, name, value)
+
+    def __post_init__(self) -> None:
+        if self.outcome is None or self.outcome.finish_reason is None:
+            return
+        if self.finish_reason is None:
+            self.finish_reason = self.outcome.finish_reason
+        elif self.finish_reason != self.outcome.finish_reason:
+            raise ValueError("finish_reason conflicts with outcome.finish_reason")
 
 
 def compute_tps(output_tokens: int, seconds: float) -> float | None:
