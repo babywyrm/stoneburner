@@ -380,7 +380,7 @@ def test_cli_whoami_apikey():
 
     from atomics.cli import cli
 
-    runner = CliRunner(env={"OPENAI_API_KEY": "sk-test-1234567890"})
+    runner = CliRunner(env={"OPENAI_API_KEY": "dummy-key-for-tests-not-a-secret"})
     result = runner.invoke(cli, ["whoami"])
     assert result.exit_code == 0
     assert "API key" in result.output
