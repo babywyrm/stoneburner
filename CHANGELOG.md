@@ -3,6 +3,13 @@
 ## Unreleased
 
 ### Added
+- **Adversarial integrity ledger** — every fixture now retains its typed
+  per-attempt and per-judge-call evidence in JSON and SQLite, including failed
+  generation and judge calls. Schema v19 adds additive status, coverage,
+  failure, representative-error, ledger, and provider-attempt token fields to
+  `adversarial_results`, with model-under-test usage rolled up to parent runs.
+- **`atomics adversarial --allow-partial`** — explicitly permits partial or
+  infrastructure-invalid execution to exit zero after diagnostics.
 - **Two new adversarial suites** (adversarial fixture count 64 → 72):
   - `encoding` (5 fixtures) — base64 / ROT13 / leetspeak / hex / homoglyph-wrapped
     override requests. Tests whether safety reasoning survives an obfuscation
@@ -25,6 +32,12 @@
   PR-style review of a change in isolation.
 - Docs: `docs/ADVERSARIAL_SUITES.md` documents all four new suites (encoding,
   many_shot) and companion evals (refusal, codereview) with usage and metrics.
+
+### Changed
+- **Honest adversarial completion** — partial and infrastructure-invalid runs
+  now exit nonzero by default after JSON output and database finalization.
+  Every fixture is persisted, compare runs own finalized parent rows, and the
+  existing JSON shape remains compatible as an additive superset.
 
 ## 0.9.0 (2026-07-09) — labcompare, security hardening, frontier comparison, Phase-C typing
 
