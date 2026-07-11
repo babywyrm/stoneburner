@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-RUNS=25
-FIXTURES="ev-01,ev-06,ev-08,ev-11,ev-17,ev-22"
-HOST="http://gpu-host:11434"
+RUNS="${RUNS:-25}"
+FIXTURES="${FIXTURES:-ev-01,ev-06,ev-08,ev-11,ev-17,ev-22}"
+HOST="${HOST:-http://gpu-host:11434}"
 MODELS=("qwen2.5:7b" "qwen3:14b" "deepseek-r1:14b")
-OUTDIR="/Users/tms/stoneburner/data/variance_sweep_$(date +%Y%m%d_%H%M%S)"
+REPO_ROOT="$(git -C "$(dirname "$0")" rev-parse --show-toplevel)"
+OUTDIR="${OUTDIR:-$REPO_ROOT/data/variance_sweep_$(date +%Y%m%d_%H%M%S)}"
 mkdir -p "$OUTDIR"
 
 CSV="$OUTDIR/results.csv"
