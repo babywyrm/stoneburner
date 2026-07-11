@@ -267,8 +267,8 @@ suite breakdown and benchmark results.
 ```bash
 # Side-by-side throughput + quality parity between two boxes
 uv run atomics labcompare \
-  --host laptop=http://192.168.1.205:11434 \
-  --host brainbox=http://192.168.1.239:11434 \
+  --host host-a=http://gpu-a:11434 \
+  --host host-b=http://gpu-b:11434 \
   --models qwen2.5:7b,qwen3:14b,qwen3.6:27b
 
 # Throughput only (faster — skips eval fixtures)
@@ -334,7 +334,7 @@ Set via env vars (prefix `ATOMICS_`) or a `.env` file in the repo root:
 `.env` example:
 
 ```ini
-ATOMICS_OLLAMA_HOST=http://192.168.1.239:11434
+ATOMICS_OLLAMA_HOST=http://gpu-host:11434
 ATOMICS_OLLAMA_MODEL=qwen2.5:7b
 ATOMICS_OLLAMA_TIMEOUT=600   # big reasoning models on hard prompts
 ```

@@ -197,7 +197,7 @@ for calibrated low-cost judging.
 Tests whether a model resists adversarial manipulation: prompt injection, role confusion, jailbreaks, social engineering, and data exfiltration attempts. Uses an inverted scoring model — higher scores mean better resistance.
 
 ```bash
-# Run all 15 adversarial fixtures, judge with local Ollama
+# Run all 72 adversarial fixtures, judge with local Ollama
 uv run atomics adversarial --provider ollama -m qwen3:14b --judge-model qwen2.5:14b
 
 # Target specific attack categories
@@ -300,10 +300,10 @@ models — throughput and quality side by side.
 
 ```bash
 uv run atomics labcompare \
-  --host laptop=http://192.168.1.205:11434 \
-  --host brainbox=http://192.168.1.239:11434 \
+  --host host-a=http://gpu-a:11434 \
+  --host host-b=http://gpu-b:11434 \
   --models qwen2.5:7b,qwen3:14b,qwen3.6:27b \
-  --judge-host http://192.168.1.239:11434 --judge-model qwen3.6:35b-a3b
+  --judge-host http://gpu-b:11434 --judge-model qwen3.6:35b-a3b
 ```
 
 - **Throughput:** single-stream tok/s, latency, prompt-eval rate, and VRAM fit
@@ -589,12 +589,14 @@ stoneburner/
 | `atomics eval` | Run evaluation suite against a provider |
 | `atomics eval --fixtures ev-19` | Run a fixture subset for a fast spot-check |
 | `atomics eval --extra-judges ollama:mistral:7b` | Multi-judge consensus scoring |
-| `atomics adversarial` | Adversarial resilience eval — resistance to manipulation (64 fixtures) |
-| `atomics adversarial --category tool_desc_injection` | Run one suite/group (also: multiturn, rag_poisoning, mcp, zerotrust, agentic) |
+| `atomics adversarial` | Adversarial resilience eval — resistance to manipulation (72 fixtures) |
+| `atomics adversarial --category tool_desc_injection` | Run one suite/group (also: multiturn, rag_poisoning, encoding, many_shot, mcp, zerotrust, agentic) |
 | `atomics adversarial --runs 3` | Variance-aware scoring (mean ± stddev) |
 | `atomics adversarial --compare mistral-small:24b` | Run a second model on the same fixtures, print a per-fixture diff |
 | `atomics adversarial --json-out run.json` | Write full per-fixture results as JSON |
 | `atomics adversarial --fail-on-resilience 60` | CI gate — non-zero exit if resilience < 60% |
+| `atomics refusal` | Refusal-calibration eval — over- vs under-refusal (comply/refuse/clarify) |
+| `atomics codereview` | Secure-code-review eval — planted-vuln detection + false positives (snippet/diff) |
 | `atomics redblue --mode all` | Red/blue security capability eval (offensive + defensive) |
 | `atomics redblue --runs 3 --json-out rb.json` | Variance-aware capability scoring + JSON export |
 | `atomics probe --probes-file probes.yaml` | Live ecosystem probe against real artifacts |

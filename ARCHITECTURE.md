@@ -104,12 +104,14 @@ scoring (`eval/adversarial/scorer.py`) is a parallel judge with an inverted rubr
 
 ## The evaluation suites
 
-Five suites share the "fixtures → provider → judge → summary → storage" shape:
+These suites share the "fixtures → provider → judge → summary → storage" shape:
 
 | Suite | Fixtures | Runner | Judge | Measures |
 |-------|----------|--------|-------|----------|
 | `eval` | `EvalFixture` | `eval/runner.py` | quality (`judge.py`) | general answer quality |
 | `adversarial` | `AdversarialFixture` | `eval/adversarial/runner.py` | resistance (`scorer.py`) | resistance to manipulation |
+| `refusal` | `RefusalFixture` | `eval/refusal/runner.py` | classifier | over- vs under-refusal calibration |
+| `codereview` | `SecureCodeFixture` | `eval/codereview/runner.py` | ground-truth verdict | planted-vuln detection + false positives |
 | `redblue` | `RedBlueFixture` | `eval/redblue/runner.py` | quality (`judge.py`) | offensive/defensive capability |
 | `archreview` | `RepoSpec` + evidence pack | `archreview/runner.py` | objective + reasoning | security-architecture review |
 | `probe` | `ProbeTarget` | `probe/runner.py` | quality (`judge.py`) | live-artifact regression |
