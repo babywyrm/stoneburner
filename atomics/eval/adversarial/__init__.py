@@ -10,7 +10,9 @@ from __future__ import annotations
 from collections.abc import Iterable
 
 from .agentic_reasoning import AGENTIC_REASONING_FIXTURES  # noqa: F401
+from .encoding_obfuscation import ENCODING_OBFUSCATION_FIXTURES  # noqa: F401
 from .fixtures import ADVERSARIAL_FIXTURES, AdversarialFixture  # noqa: F401
+from .many_shot import MANYSHOT_FIXTURES  # noqa: F401
 from .mcp_agentic import MCP_AGENTIC_FIXTURES, TOOL_SAFETY_FIXTURES  # noqa: F401
 from .multiturn import MULTITURN_FIXTURES  # noqa: F401
 from .rag_poisoning import RAG_POISONING_FIXTURES  # noqa: F401
@@ -27,6 +29,8 @@ ALL_FIXTURES: list[AdversarialFixture] = (
     + MULTITURN_FIXTURES
     + RAG_POISONING_FIXTURES
     + TOOL_DESC_INJECTION_FIXTURES
+    + ENCODING_OBFUSCATION_FIXTURES
+    + MANYSHOT_FIXTURES
 )
 
 # Group aliases expand to the set of categories in each suite, so `--category
@@ -39,6 +43,8 @@ GROUP_ALIASES: dict[str, set[str]] = {
     "multiturn": {f.category for f in MULTITURN_FIXTURES},
     "rag_poisoning": {f.category for f in RAG_POISONING_FIXTURES},
     "tool_desc_injection": {f.category for f in TOOL_DESC_INJECTION_FIXTURES},
+    "encoding": {f.category for f in ENCODING_OBFUSCATION_FIXTURES},
+    "many_shot": {f.category for f in MANYSHOT_FIXTURES},
 }
 
 
@@ -73,6 +79,8 @@ __all__ = [
     "MULTITURN_FIXTURES",
     "RAG_POISONING_FIXTURES",
     "TOOL_DESC_INJECTION_FIXTURES",
+    "ENCODING_OBFUSCATION_FIXTURES",
+    "MANYSHOT_FIXTURES",
     "ALL_FIXTURES",
     "GROUP_ALIASES",
     "expand_categories",
