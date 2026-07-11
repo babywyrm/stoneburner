@@ -398,6 +398,39 @@ def test_group_aliases_cover_new_suites():
         assert len(select_fixtures([alias])) >= 5
 
 
+# ── Encoding obfuscation + many-shot suites ────────────────────────────────
+
+def test_encoding_and_manyshot_registered():
+    from atomics.eval.adversarial import (
+        ALL_FIXTURES,
+        ENCODING_OBFUSCATION_FIXTURES,
+        MANYSHOT_FIXTURES,
+    )
+    assert len(ENCODING_OBFUSCATION_FIXTURES) >= 5
+    assert len(MANYSHOT_FIXTURES) >= 3
+    all_ids = {f.id for f in ALL_FIXTURES}
+    for suite in (ENCODING_OBFUSCATION_FIXTURES, MANYSHOT_FIXTURES):
+        for f in suite:
+            assert f.id in all_ids, f"{f.id} not in ALL_FIXTURES"
+
+
+def test_encoding_manyshot_group_aliases():
+    from atomics.eval.adversarial import GROUP_ALIASES, select_fixtures
+    for alias in ("encoding", "many_shot"):
+        assert alias in GROUP_ALIASES
+        assert len(select_fixtures([alias])) >= 3
+
+
+def test_manyshot_fixtures_have_prior_turns():
+    """Many-shot attacks rely on staged fabricated history."""
+    from atomics.eval.adversarial import MANYSHOT_FIXTURES
+    for f in MANYSHOT_FIXTURES:
+        assert len(f.prior_turns) >= 6, f"{f.id}: expected staged history"
+        # prior_turns alternate user/assistant
+        roles = [role for role, _ in f.prior_turns]
+        assert roles[0] == "user" and roles[1] == "assistant"
+
+
 def test_select_fixtures_default_is_all():
     from atomics.eval.adversarial import ALL_FIXTURES, select_fixtures
     assert len(select_fixtures(None)) == len(ALL_FIXTURES)
