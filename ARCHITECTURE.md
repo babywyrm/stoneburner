@@ -92,6 +92,16 @@ All new persistence goes through `MetricsRepository`, never raw `sqlite3`.
 Queries return `list[dict]`; prefer adding a typed accessor over ad-hoc SQL in
 callers.
 
+Schema v19 stores the complete adversarial attempt ledger in
+`adversarial_results`, including provider/judge statuses, every judge call,
+failure counts, and representative sanitized errors. Fixture serialization has
+one implementation shared by summary JSON and repository persistence, so the
+SQLite ledger round-trips the same evidence. Existing exports remain compatible;
+the new fields are an additive JSON superset. Adversarial parent token totals
+sum every model-under-test provider attempt, including failed attempts with known
+usage; judge-call tokens remain ledger evidence and cost data rather than parent
+task token usage.
+
 ### `eval/judge.py` — LLM-as-judge
 
 `score_response()` / `score_consensus()` produce a `JudgeResult`
@@ -115,6 +125,12 @@ These suites share the "fixtures → provider → judge → summary → storage"
 | `redblue` | `RedBlueFixture` | `eval/redblue/runner.py` | quality (`judge.py`) | offensive/defensive capability |
 | `archreview` | `RepoSpec` + evidence pack | `archreview/runner.py` | objective + reasoning | security-architecture review |
 | `probe` | `ProbeTarget` | `probe/runner.py` | quality (`judge.py`) | live-artifact regression |
+
+Adversarial runs classify integrity as `complete`, `partial`, or
+`infrastructure_invalid`. The CLI reports fixture and attempt coverage and exits
+nonzero for the latter two only after saving fixtures, finalizing parent rows,
+and writing requested JSON. `--allow-partial` overrides this integrity exit, but
+does not override an independent `--fail-on-resilience` gate.
 
 ### How to add a new adversarial fixture suite
 

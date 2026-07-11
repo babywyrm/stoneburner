@@ -7,7 +7,10 @@ single cost function so cache accounting and rounding stay consistent.
 
 from __future__ import annotations
 
+import re
+
 Price = tuple[float, float]
+_DATE_SNAPSHOT_SUFFIX = re.compile(r"-\d{4}-\d{2}-\d{2}$")
 
 # Anthropic prompt-caching multipliers, relative to the base input rate: cache
 # writes bill at 1.25x and cache reads at 0.10x. Cached tokens are reported
@@ -24,6 +27,7 @@ CLAUDE_PRICING: dict[str, Price] = {
     "claude-sonnet-4-5-20250929": (3.0, 15.0),
     "claude-haiku-4-5": (1.0, 5.0),
     "claude-haiku-4-5-20251001": (1.0, 5.0),
+    "claude-fable-5": (10.0, 50.0),
     # Deprecated (kept for historical cost lookups on stored results)
     "claude-sonnet-4-20250514": (3.0, 15.0),
     "claude-opus-4-20250514": (15.0, 75.0),
@@ -42,6 +46,7 @@ OPENAI_PRICING: dict[str, Price] = {
     "gpt-5-turbo": (5.00, 20.0),
     "gpt-5.3": (10.0, 40.0),
     "gpt-5.5": (15.0, 60.0),
+    "gpt-5.6": (5.0, 30.0),
     "o3": (2.00, 8.00),
     "o3-mini": (1.10, 4.40),
     "o3-pro": (20.0, 80.0),
@@ -79,7 +84,11 @@ def estimate_cost(
     multipliers; providers without prompt caching pass 0 for both and the cache
     terms vanish.
     """
-    inp_price, out_price = table.get(model, default)
+    price = table.get(model)
+    if price is None:
+        base_model = _DATE_SNAPSHOT_SUFFIX.sub("", model)
+        price = table.get(base_model, default)
+    inp_price, out_price = price
     cost = (
         input_tokens * inp_price
         + cache_write_tokens * inp_price * CACHE_WRITE_MULTIPLIER

@@ -135,6 +135,63 @@ async def test_openai_omits_temperature_for_reasoning_model():
 
 
 @pytest.mark.asyncio
+async def test_openai_gpt_5_6_uses_reasoning_model_parameters():
+    provider, comps = _openai_provider()
+    await provider.generate("hi", model="gpt-5.6", max_tokens=32, temperature=0.0)
+    assert comps.kwargs["max_completion_tokens"] == 256
+    assert "max_tokens" not in comps.kwargs
+    assert "temperature" not in comps.kwargs
+
+
+@pytest.mark.asyncio
+async def test_openai_responses_gpt_5_6_dated_alias_uses_reasoning_parameters():
+    from atomics.providers.openai import OpenAIProvider
+
+    class Auth:
+        async def get_headers(self):
+            return {"Authorization": "Bearer test"}
+
+    class Responses:
+        def __init__(self):
+            self.kwargs = None
+
+        async def create(self, **kwargs):
+            self.kwargs = kwargs
+            return type(
+                "Response",
+                (),
+                {
+                    "status": "completed",
+                    "output_text": "ok",
+                    "output": [],
+                    "usage": type(
+                        "Usage",
+                        (),
+                        {
+                            "input_tokens": 10,
+                            "output_tokens": 5,
+                            "output_tokens_details": None,
+                        },
+                    )(),
+                },
+            )()
+
+    responses = Responses()
+    client = type("C", (), {"responses": responses, "api_key": "oauth-managed"})()
+    provider = OpenAIProvider(client=client, auth=Auth())
+
+    await provider.generate(
+        "hi",
+        model="gpt-5.6-2026-06-01",
+        max_tokens=32,
+        temperature=0.0,
+    )
+
+    assert responses.kwargs["max_output_tokens"] == 256
+    assert "temperature" not in responses.kwargs
+
+
+@pytest.mark.asyncio
 async def test_openai_omits_temperature_when_none():
     provider, comps = _openai_provider()
     await provider.generate("hi", model="gpt-4o")

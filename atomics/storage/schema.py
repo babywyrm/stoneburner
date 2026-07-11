@@ -9,7 +9,7 @@ from pathlib import Path
 
 logger = logging.getLogger("atomics.schema")
 
-SCHEMA_VERSION = 16
+SCHEMA_VERSION = 19
 
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -87,7 +87,24 @@ CREATE TABLE IF NOT EXISTS adversarial_results (
     thinking_tokens     INTEGER DEFAULT 0,
     latency_ms          REAL DEFAULT 0.0,
     estimated_cost_usd  REAL DEFAULT 0.0,
-    timestamp           TEXT NOT NULL
+    timestamp           TEXT NOT NULL,
+    status              TEXT NOT NULL DEFAULT '',
+    generation_status   TEXT NOT NULL DEFAULT '',
+    judge_status        TEXT NOT NULL DEFAULT '',
+    attempt_count       INTEGER NOT NULL DEFAULT 0,
+    input_tokens        INTEGER NOT NULL DEFAULT 0,
+    output_tokens       INTEGER NOT NULL DEFAULT 0,
+    total_tokens        INTEGER NOT NULL DEFAULT 0,
+    attempts_json       TEXT NOT NULL DEFAULT '[]',
+    run_scores_json     TEXT NOT NULL DEFAULT '[]',
+    generation_failures INTEGER NOT NULL DEFAULT 0,
+    infrastructure_failures INTEGER NOT NULL DEFAULT 0,
+    judge_failures      INTEGER NOT NULL DEFAULT 0,
+    parse_failed        INTEGER NOT NULL DEFAULT 0,
+    error_class         TEXT NOT NULL DEFAULT '',
+    error_message       TEXT NOT NULL DEFAULT '',
+    UNIQUE (run_id, fixture_id),
+    FOREIGN KEY (run_id) REFERENCES runs(run_id)
 );
 
 CREATE TABLE IF NOT EXISTS probe_results (
@@ -280,6 +297,22 @@ CREATE TABLE IF NOT EXISTS labcompare_results (
 CREATE INDEX IF NOT EXISTS idx_labcompare_run ON labcompare_results(comparison_run_id);
 """
 
+RESET_SQL = """
+DROP TABLE IF EXISTS task_results;
+DROP TABLE IF EXISTS adversarial_results;
+DROP TABLE IF EXISTS probe_results;
+DROP TABLE IF EXISTS stress_results;
+DROP TABLE IF EXISTS sweep_results;
+DROP TABLE IF EXISTS scenario_results;
+DROP TABLE IF EXISTS soak_results;
+DROP TABLE IF EXISTS baselines;
+DROP TABLE IF EXISTS archreview_results;
+DROP TABLE IF EXISTS labcompare_results;
+DROP TABLE IF EXISTS runs;
+DROP TABLE IF EXISTS schedules;
+DROP TABLE IF EXISTS schema_version;
+"""
+
 
 def _get_schema_version(conn: sqlite3.Connection) -> int:
     try:
@@ -292,18 +325,38 @@ def _get_schema_version(conn: sqlite3.Connection) -> int:
 def _backup_before_wipe(conn: sqlite3.Connection, db_path: Path, current: int) -> Path:
     """WAL-safe snapshot of the DB before a destructive schema reset.
 
-    Uses SQLite's online backup API (not a file copy) so in-flight WAL data is
-    captured. Returns the backup path so callers/logs can point users to it.
+    The caller holds a write lock on ``conn``. A separate read connection avoids
+    the online backup API deadlocking on that connection while the lock prevents
+    concurrent commits from racing the snapshot.
     """
+    if not conn.in_transaction:
+        raise sqlite3.ProgrammingError("migration backup requires an active lock")
     stamp = datetime.now(UTC).strftime("%Y%m%d%H%M%S")
     backup_path = db_path.with_name(f"{db_path.name}.v{current}.{stamp}.bak")
-    backup_conn = sqlite3.connect(str(backup_path))
+    source_conn = sqlite3.connect(str(db_path))
     try:
-        with backup_conn:
-            conn.backup(backup_conn)
+        backup_conn = sqlite3.connect(str(backup_path))
+        try:
+            with backup_conn:
+                source_conn.backup(backup_conn)
+        finally:
+            backup_conn.close()
     finally:
-        backup_conn.close()
+        source_conn.close()
     return backup_path
+
+
+def _execute_sql_statements(conn: sqlite3.Connection, script: str) -> None:
+    """Execute a SQL script without sqlite3's implicit transaction commits."""
+    statement = ""
+    for char in script:
+        statement += char
+        if char == ";" and sqlite3.complete_statement(statement):
+            if statement.strip():
+                conn.execute(statement)
+            statement = ""
+    if statement.strip():
+        raise sqlite3.OperationalError("incomplete SQL statement")
 
 
 def init_db(db_path: Path) -> sqlite3.Connection:
@@ -316,44 +369,34 @@ def init_db(db_path: Path) -> sqlite3.Connection:
     """
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(db_path), check_same_thread=False)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA foreign_keys=ON")
+    try:
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA foreign_keys=ON")
 
-    current = _get_schema_version(conn)
-    if current != 0 and current < SCHEMA_VERSION:
-        try:
+        current = _get_schema_version(conn)
+        migration_candidate = current != 0 and current < SCHEMA_VERSION
+        conn.execute("BEGIN IMMEDIATE")
+        if migration_candidate:
+            current = _get_schema_version(conn)
+        if current != 0 and current < SCHEMA_VERSION:
             backup_path = _backup_before_wipe(conn, db_path, current)
             logger.warning(
                 "Schema version %d → %d: backed up existing DB to %s, then "
                 "resetting tables.",
                 current, SCHEMA_VERSION, backup_path,
             )
-        except sqlite3.Error as exc:
-            logger.warning(
-                "Schema version %d → %d: backup failed (%s); resetting tables.",
-                current, SCHEMA_VERSION, exc,
-            )
-        conn.executescript(
-            "DROP TABLE IF EXISTS task_results;"
-            "DROP TABLE IF EXISTS adversarial_results;"
-            "DROP TABLE IF EXISTS probe_results;"
-            "DROP TABLE IF EXISTS stress_results;"
-            "DROP TABLE IF EXISTS sweep_results;"
-            "DROP TABLE IF EXISTS scenario_results;"
-            "DROP TABLE IF EXISTS soak_results;"
-            "DROP TABLE IF EXISTS baselines;"
-            "DROP TABLE IF EXISTS archreview_results;"
-            "DROP TABLE IF EXISTS labcompare_results;"
-            "DROP TABLE IF EXISTS runs;"
-            "DROP TABLE IF EXISTS schedules;"
-            "DROP TABLE IF EXISTS schema_version;"
-        )
 
-    conn.executescript(SCHEMA_SQL)
-    conn.execute(
-        "INSERT OR REPLACE INTO schema_version (version) VALUES (?)",
-        (SCHEMA_VERSION,),
-    )
-    conn.commit()
-    return conn
+        if current != 0 and current < SCHEMA_VERSION:
+            _execute_sql_statements(conn, RESET_SQL)
+        _execute_sql_statements(conn, SCHEMA_SQL)
+        conn.execute(
+            "INSERT OR REPLACE INTO schema_version (version) VALUES (?)",
+            (SCHEMA_VERSION,),
+        )
+        conn.commit()
+        return conn
+    except Exception:
+        conn.rollback()
+        conn.close()
+        raise
