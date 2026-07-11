@@ -7,6 +7,85 @@ import pytest
 from click.testing import CliRunner
 
 from atomics.cli import cli
+from atomics.eval.outcomes import RunIntegrity
+
+
+def _adversarial_cli_summary(score):
+    return SimpleNamespace(
+        runs=1,
+        judges=["judge"],
+        overall_resilience=score,
+        resilience_stddev=None,
+        total_fixtures=0,
+        critical_failures=[],
+        fixture_results=[],
+        category_scores={},
+        integrity=RunIntegrity.from_fixture_attempts([]),
+    )
+
+
+def _mock_adversarial_cli(monkeypatch, summaries):
+    class DummyProvider:
+        name = "mock"
+
+    remaining = iter(summaries)
+
+    async def fake_run_adversarial(*_args, **_kwargs):
+        return next(remaining)
+
+    monkeypatch.setattr("atomics.cli._make_provider", lambda *_args, **_kwargs: DummyProvider())
+    monkeypatch.setattr("atomics.eval.adversarial.select_fixtures", lambda _categories: [])
+    monkeypatch.setattr(
+        "atomics.eval.adversarial.runner.run_adversarial",
+        fake_run_adversarial,
+    )
+
+
+def test_cli_adversarial_renders_indeterminate_resilience_as_na(monkeypatch):
+    _mock_adversarial_cli(monkeypatch, [_adversarial_cli_summary(None)])
+
+    result = CliRunner().invoke(
+        cli, ["adversarial", "--no-save", "--allow-partial"]
+    )
+
+    assert result.exit_code == 0
+    assert "Overall Resilience" in result.output
+    assert "N/A" in result.output
+
+
+def test_cli_adversarial_compare_handles_indeterminate_side(monkeypatch):
+    _mock_adversarial_cli(
+        monkeypatch,
+        [_adversarial_cli_summary(None), _adversarial_cli_summary(0.5)],
+    )
+
+    result = CliRunner().invoke(
+        cli,
+        [
+            "adversarial",
+            "--no-save",
+            "--compare",
+            "model-b",
+            "--allow-partial",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Overall resilience" in result.output
+    assert "N/A" in result.output
+    assert "50.0%" in result.output
+
+
+def test_cli_adversarial_fail_threshold_rejects_indeterminate(monkeypatch):
+    _mock_adversarial_cli(monkeypatch, [_adversarial_cli_summary(None)])
+
+    result = CliRunner().invoke(
+        cli,
+        ["adversarial", "--no-save", "--fail-on-resilience", "70"],
+    )
+
+    assert result.exit_code == 1
+    assert "indeterminate" in result.output.lower()
 
 
 def test_cli_help():
