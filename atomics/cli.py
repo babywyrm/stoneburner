@@ -1796,6 +1796,15 @@ def _parse_model_spec(spec: str, default_provider: str) -> tuple[str, str, str |
     return default_provider, spec, host
 
 
+def _attribution_model(provider: BaseProvider, requested_model: str | None) -> str:
+    if requested_model:
+        return requested_model
+    provider_default = getattr(provider, "default_model", None)
+    if isinstance(provider_default, str) and provider_default:
+        return provider_default
+    return "default"
+
+
 def _make_provider(
     name: str,
     mdl: str | None,
@@ -2062,7 +2071,7 @@ def sweep(
               help="Comma-separated extra judges for consensus scoring. "
                    "Format: provider:model or provider:model@host. "
                    "Example: ollama:deepseek-r1:14b,claude:claude-sonnet-4-6")
-@click.option("--runs", type=int, default=1, show_default=True,
+@click.option("--runs", type=click.IntRange(min=1), default=1, show_default=True,
               help="Run each fixture N times and report mean ± stddev (use 3+ for variance analysis).")
 @click.option("--category", type=str, default=None,
               help="Comma-separated categories or group aliases to run (default: all). "
@@ -2081,6 +2090,8 @@ def sweep(
                    "Format: model, provider:model, or provider:model@host.")
 @click.option("--fail-on-resilience", "fail_on_resilience", type=float, default=None,
               help="Exit non-zero if overall severity-weighted resilience %% is below this threshold (CI gate).")
+@click.option("--allow-partial", is_flag=True,
+              help="Allow partial/invalid execution to exit zero after diagnostics.")
 @click.option("--verbose", "-v", is_flag=True, help="Show full prompt, model response, and judge reasoning for each fixture.")
 def adversarial(
     provider_name: str,
@@ -2099,6 +2110,7 @@ def adversarial(
     json_out: str | None,
     compare_model: str | None,
     fail_on_resilience: float | None,
+    allow_partial: bool,
     verbose: bool,
 ) -> None:
     """Run adversarial LLM resilience eval — measures resistance to manipulation.
@@ -2118,6 +2130,10 @@ def adversarial(
     settings = load_settings()
     provider = _make_provider(provider_name, model, ollama_host, settings, vllm_host=vllm_host)
     judge = _make_provider(judge_provider_name, judge_model, judge_host or ollama_host, settings, vllm_host=vllm_host)
+    actual_provider_name = provider.name
+    effective_model = _attribution_model(provider, model)
+    actual_judge_name = judge.name
+    effective_judge_model = _attribution_model(judge, judge_model)
     categories = [c.strip() for c in category.split(",")] if category else None
     selected_count = len(select_fixtures(categories))
 
@@ -2135,23 +2151,58 @@ def adversarial(
             ej_provider = _make_provider(ej_provider_name, ej_model, host_override or judge_host or ollama_host, settings, vllm_host=vllm_host)
             extra_judge_pairs.append((ej_provider, ej_model))
 
-    judge_label = judge_model or "default"
+    judge_label = effective_judge_model
     if extra_judge_pairs:
         judge_label += f" + {len(extra_judge_pairs)} extra"
 
     console.print(
-        f"\n[bold]Adversarial eval[/bold] — model under test: [cyan]{provider_name}[/cyan] "
-        f"({model or 'default'})\n"
-        f"Judge: [cyan]{judge_provider_name}[/cyan] ({judge_label}) | "
+        f"\n[bold]Adversarial eval[/bold] — model under test: [cyan]{actual_provider_name}[/cyan] "
+        f"({effective_model})\n"
+        f"Judge: [cyan]{actual_judge_name}[/cyan] ({judge_label}) | "
         f"Runs per fixture: [bold]{runs}[/bold]\n"
         f"Fixtures: [bold]{selected_count}[/bold] | "
         f"Categories: [bold]{category or 'all'}[/bold]\n"
     )
 
+    ctx = click.get_current_context()
+    created_run_ids: list[str] = []
     repo = None
     if save_results:
         from atomics.storage.repository import MetricsRepository
-        repo = MetricsRepository(settings.db_path)
+        from atomics.validation import sanitize_error
+
+        repository = MetricsRepository(settings.db_path)
+        repo = repository
+        repository_cleaned = False
+
+        def finalize_repository(*, fail_closed: bool = False) -> None:
+            nonlocal repository_cleaned
+            if repository_cleaned:
+                return
+            repository_cleaned = True
+            failures: list[str] = []
+            for created_run_id in created_run_ids:
+                try:
+                    repository.complete_adversarial_run(created_run_id)
+                except Exception as exc:
+                    failures.append(
+                        f"Failed to finalize adversarial run {created_run_id}: "
+                        f"{sanitize_error(exc)}"
+                    )
+            try:
+                repository.close()
+            except Exception as exc:
+                failures.append(
+                    "Failed to close adversarial repository: "
+                    f"{sanitize_error(exc)}"
+                )
+            if failures:
+                message = "; ".join(failures)
+                if fail_closed:
+                    raise click.ClickException(message)
+                logging.getLogger("atomics.cli").error(message)
+
+        ctx.call_on_close(finalize_repository)
 
     run_id = __import__("uuid").uuid4().hex[:12]
     if repo:
@@ -2160,17 +2211,17 @@ def adversarial(
         repo.create_run(
             run_id,
             tier="adversarial",
-            provider=provider_name,
-            model=model or "default",
+            provider=actual_provider_name,
+            model=effective_model,
             trigger="manual",
         )
+        created_run_ids.append(run_id)
 
     # Actual fixture count (may be filtered by --category) via the single source
     # of truth so header/progress/run all agree.
     from atomics.eval.adversarial import select_fixtures
     adv_fixture_count = len(select_fixtures(categories))
 
-    ctx = click.get_current_context()
     show_progress = ctx.obj.get("progress", True) if ctx.obj else True
     progress = FixtureProgress(adv_fixture_count, console, label="adversarial") if show_progress else None
 
@@ -2200,8 +2251,14 @@ def adversarial(
                 if first_sentence:
                     console.print(f"     [dim]{_rich_escape(first_sentence)}.[/dim]")
             console.print()
-        if repo and res:
-            repo.save_adversarial_result(run_id, fr, thinking_enabled=thinking_flag is True)
+        if repo:
+            repo.save_adversarial_result(
+                run_id,
+                fr,
+                thinking_enabled=thinking_flag is True,
+                provider=actual_provider_name,
+                model=effective_model,
+            )
 
     summary = asyncio.run(run_adversarial(
         provider,
@@ -2223,16 +2280,39 @@ def adversarial(
     table = Table(title=title)
     table.add_column("Metric")
     table.add_column("Value")
-    table.add_row("Provider", provider_name)
-    table.add_row("Model", model or "default")
-    table.add_row("Judge", f"{judge_provider_name} / {judge_model or 'default'}")
-    resilience_str = f"{summary.overall_resilience * 100:.1f}%"
-    if summary.resilience_stddev is not None:
+    table.add_row("Provider", actual_provider_name)
+    table.add_row("Model", effective_model)
+    table.add_row("Judge", f"{actual_judge_name} / {effective_judge_model}")
+    resilience_str = (
+        f"{summary.overall_resilience * 100:.1f}%"
+        if summary.overall_resilience is not None
+        else "N/A"
+    )
+    if summary.overall_resilience is not None and summary.resilience_stddev is not None:
         resilience_str += f"  ±{summary.resilience_stddev * 100:.1f}%"
     table.add_row("Overall Resilience", resilience_str)
     table.add_row("Runs per fixture", str(summary.runs))
     table.add_row("Judges", ", ".join(summary.judges))
     table.add_row("Fixtures Run", str(summary.total_fixtures))
+    integrity = summary.integrity
+    table.add_row("Integrity Status", integrity.status.value)
+    table.add_row(
+        "Fixture Coverage",
+        f"{integrity.fixtures_scored}/{integrity.fixtures_total} "
+        f"({integrity.fixture_coverage * 100:.1f}%)",
+    )
+    table.add_row(
+        "Attempt Coverage",
+        f"{integrity.attempts_scored}/{integrity.attempts_total} "
+        f"({integrity.attempt_coverage * 100:.1f}%)",
+    )
+    table.add_row("Generation Failures", str(integrity.generation_failures))
+    table.add_row("Infrastructure Failures", str(integrity.infrastructure_failures))
+    table.add_row("Judge Failures", str(integrity.judge_failures))
+    table.add_row(
+        "Total / Scored Attempts",
+        f"{integrity.attempts_total} / {integrity.attempts_scored}",
+    )
     table.add_row("Critical Failures", str(len(summary.critical_failures)))
     # Cost + token summary
     total_cost = sum(fr.estimated_cost_usd for fr in summary.fixture_results)
@@ -2252,24 +2332,49 @@ def adversarial(
         for fr in summary.critical_failures:
             console.print(f"  • {fr.fixture.id} [{fr.fixture.severity}] {fr.fixture.category}")
 
-    if repo:
-        repo.complete_adversarial_run(run_id)
-
     # ── --compare: run a second model on the same fixtures and diff ──────────
     compare_summary = None
     if compare_model:
-        cmp_provider_name, cmp_model, cmp_host = _parse_model_spec(compare_model, provider_name)
-        cmp_provider = _make_provider(
-            cmp_provider_name, cmp_model, cmp_host or ollama_host, settings, vllm_host=vllm_host,
+        cmp_provider_name, cmp_requested_model, cmp_host = _parse_model_spec(
+            compare_model, provider_name
         )
+        cmp_provider = _make_provider(
+            cmp_provider_name,
+            cmp_requested_model,
+            cmp_host or ollama_host,
+            settings,
+            vllm_host=vllm_host,
+        )
+        actual_cmp_provider_name = cmp_provider.name
+        effective_cmp_model = _attribution_model(cmp_provider, cmp_requested_model)
         console.print(
-            f"\n[bold]Compare run[/bold] — model B: [cyan]{cmp_provider_name}[/cyan] ({cmp_model})\n"
+            f"\n[bold]Compare run[/bold] — model B: "
+            f"[cyan]{actual_cmp_provider_name}[/cyan] ({effective_cmp_model})\n"
         )
         cmp_run_id = __import__("uuid").uuid4().hex[:12]
+        if repo:
+            repo.create_run(
+                cmp_run_id,
+                tier="adversarial",
+                provider=actual_cmp_provider_name,
+                model=effective_cmp_model,
+                trigger="manual",
+            )
+            created_run_ids.append(cmp_run_id)
+        def on_compare_done(fr):
+            if repo:
+                repo.save_adversarial_result(
+                    cmp_run_id,
+                    fr,
+                    thinking_enabled=thinking_flag is True,
+                    provider=actual_cmp_provider_name,
+                    model=effective_cmp_model,
+                )
+
         compare_summary = asyncio.run(run_adversarial(
             cmp_provider,
             judge_provider=judge,
-            model=cmp_model,
+            model=cmp_requested_model,
             judge_model=judge_model,
             extra_judges=extra_judge_pairs,
             categories=categories,
@@ -2277,14 +2382,11 @@ def adversarial(
             run_id=cmp_run_id,
             thinking=thinking_flag,
             thinking_budget=thinking_budget,
+            on_fixture_done=on_compare_done,
         ))
-        if repo:
-            for fr in compare_summary.fixture_results:
-                if fr.resistance:
-                    repo.save_adversarial_result(cmp_run_id, fr, thinking_enabled=thinking_flag is True)
 
-        a_label = f"{model or 'default'}"
-        b_label = f"{cmp_model or 'default'}"
+        a_label = effective_model
+        b_label = effective_cmp_model
         diff = Table(title=f"Per-fixture comparison: A={a_label}  vs  B={b_label}")
         diff.add_column("Fixture")
         diff.add_column("Sev")
@@ -2306,10 +2408,19 @@ def adversarial(
                 d_txt = "—"
             diff.add_row(fr.fixture.id, fr.fixture.severity, a_txt, b_txt, d_txt)
         console.print(diff)
+        a_overall = summary.overall_resilience
+        b_overall = compare_summary.overall_resilience
+        a_overall_text = f"{a_overall * 100:.1f}%" if a_overall is not None else "N/A"
+        b_overall_text = f"{b_overall * 100:.1f}%" if b_overall is not None else "N/A"
+        delta_text = (
+            f"{(b_overall - a_overall) * 100:+.1f}%"
+            if a_overall is not None and b_overall is not None
+            else "N/A"
+        )
         console.print(
-            f"\nOverall resilience — A: [bold]{summary.overall_resilience * 100:.1f}%[/bold]  "
-            f"B: [bold]{compare_summary.overall_resilience * 100:.1f}%[/bold]  "
-            f"Δ: [bold]{(compare_summary.overall_resilience - summary.overall_resilience) * 100:+.1f}%[/bold]"
+            f"\nOverall resilience — A: [bold]{a_overall_text}[/bold]  "
+            f"B: [bold]{b_overall_text}[/bold]  "
+            f"Δ: [bold]{delta_text}[/bold]"
         )
 
     # ── --json-out: machine-readable export ─────────────────────────────────
@@ -2322,19 +2433,49 @@ def adversarial(
             _json.dump(payload, fh, indent=2)
         console.print(f"\n[dim]Wrote JSON results to {json_out}[/dim]")
 
+    exit_code = 0
+
     # ── --fail-on-resilience: CI gate ───────────────────────────────────────
     if fail_on_resilience is not None:
-        actual = summary.overall_resilience * 100
-        if actual < fail_on_resilience:
+        if summary.overall_resilience is None:
             console.print(
-                f"\n[bold red]FAIL[/bold red] — resilience {actual:.1f}% is below "
-                f"threshold {fail_on_resilience:.1f}%"
+                "\n[bold red]FAIL[/bold red] — resilience is indeterminate; "
+                f"cannot evaluate threshold {fail_on_resilience:.1f}%"
             )
-            raise SystemExit(1)
-        console.print(
-            f"\n[bold green]PASS[/bold green] — resilience {actual:.1f}% meets "
-            f"threshold {fail_on_resilience:.1f}%"
-        )
+            exit_code = 1
+        else:
+            actual = summary.overall_resilience * 100
+            if actual < fail_on_resilience:
+                console.print(
+                    f"\n[bold red]FAIL[/bold red] — resilience {actual:.1f}% is below "
+                    f"threshold {fail_on_resilience:.1f}%"
+                )
+                exit_code = 1
+            else:
+                console.print(
+                    f"\n[bold green]PASS[/bold green] — resilience {actual:.1f}% meets "
+                    f"threshold {fail_on_resilience:.1f}%"
+                )
+
+    integrity_summaries = [("Model A", summary)]
+    if compare_summary is not None:
+        integrity_summaries.append(("Model B", compare_summary))
+    for label, model_summary in integrity_summaries:
+        model_integrity = model_summary.integrity
+        if model_integrity.should_exit_nonzero:
+            override = " (--allow-partial override)" if allow_partial else ""
+            console.print(
+                f"\n[bold yellow]WARNING[/bold yellow] — {label} integrity status: "
+                f"[bold]{model_integrity.status.value}[/bold]{override}"
+            )
+            if not allow_partial:
+                exit_code = 1
+
+    if repo:
+        finalize_repository(fail_closed=True)
+
+    if exit_code:
+        ctx.exit(exit_code)
 
 
 # ── atomics redblue ───────────────────────────────────────────────────────────
