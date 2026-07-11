@@ -2476,6 +2476,159 @@ def redblue(
         console.print(f"\n[dim]Wrote JSON results to {json_out}[/dim]")
 
 
+# ── atomics refusal ───────────────────────────────────────────────────────────
+
+@cli.command("refusal")
+@click.option("--provider", "-p", "provider_name", type=PROVIDER_CHOICES,
+              default="ollama", show_default=True)
+@click.option("--model", "-m", type=str, default=None)
+@click.option("--ollama-host", type=str, default=None)
+@click.option("--vllm-host", "vllm_host", type=str, default=None)
+@click.option("--judge-provider", "judge_provider_name", type=PROVIDER_CHOICES,
+              default="ollama", show_default=True)
+@click.option("--judge-model", type=str, default=None)
+@click.option("--judge-host", type=str, default=None)
+@click.option("-o", "--json-out", "json_out", type=click.Path(), default=None)
+def refusal(provider_name, model, ollama_host, vllm_host, judge_provider_name,
+            judge_model, judge_host, json_out):
+    """Refusal-calibration eval — measures over- vs under-refusal.
+
+    Pairs benign (should-comply), harmful (should-refuse), and ambiguous
+    (should-clarify) requests, then reports an over-refusal rate (refusing
+    legitimate work), an under-refusal rate (complying with harmful asks), and
+    an overall calibration score. A well-calibrated model scores high on both.
+    """
+    from atomics.eval.refusal import run_refusal
+
+    console = Console()
+    settings = load_settings()
+    provider = _make_provider(provider_name, model, ollama_host, settings, vllm_host=vllm_host)
+    judge = _make_provider(judge_provider_name, judge_model, judge_host or ollama_host,
+                           settings, vllm_host=vllm_host)
+
+    console.print(
+        f"\n[bold]Refusal calibration[/bold] — model: [cyan]{provider_name}[/cyan] "
+        f"({model or 'default'})\n"
+        f"Judge: [cyan]{judge_provider_name}[/cyan] ({judge_model or 'default'})\n"
+    )
+
+    def on_done(r):
+        exp = r.fixture.expected
+        cls = r.classification
+        mark = "[green]OK[/green]" if r.correct else "[red]MISS[/red]"
+        flag = ""
+        if r.over_refusal:
+            flag = " [yellow](over-refusal)[/yellow]"
+        elif r.under_refusal:
+            flag = " [red](under-refusal)[/red]"
+        console.print(
+            f"  {mark} [bold]{r.fixture.id}[/bold] expected={exp} got={cls}{flag}"
+        )
+
+    summary = asyncio.run(run_refusal(
+        provider, judge_provider=judge, model=model, judge_model=judge_model,
+        on_fixture_done=on_done,
+    ))
+
+    table = Table(title="Refusal Calibration Summary")
+    table.add_column("Metric")
+    table.add_column("Value")
+    table.add_row("Provider", provider_name)
+    table.add_row("Model", model or "default")
+    table.add_row("Judge", f"{judge_provider_name} / {judge_model or 'default'}")
+    cal = summary.calibration_score
+    over = summary.over_refusal_rate
+    under = summary.under_refusal_rate
+    table.add_row("Calibration score", f"{cal * 100:.1f}%" if cal is not None else "n/a")
+    table.add_row("Over-refusal rate", f"{over * 100:.1f}%" if over is not None else "n/a")
+    table.add_row("Under-refusal rate", f"{under * 100:.1f}%" if under is not None else "n/a")
+    table.add_row("Fixtures", str(len(summary.results)))
+    console.print(table)
+
+    if json_out:
+        import json as _json
+        with open(json_out, "w", encoding="utf-8") as fh:
+            _json.dump(summary.to_dict(), fh, indent=2)
+        console.print(f"\n[dim]Wrote JSON results to {json_out}[/dim]")
+
+
+# ── atomics codereview ────────────────────────────────────────────────────────
+
+@cli.command("codereview")
+@click.option("--provider", "-p", "provider_name", type=PROVIDER_CHOICES,
+              default="ollama", show_default=True)
+@click.option("--model", "-m", type=str, default=None)
+@click.option("--ollama-host", type=str, default=None)
+@click.option("--vllm-host", "vllm_host", type=str, default=None)
+@click.option("--judge-provider", "judge_provider_name", type=PROVIDER_CHOICES,
+              default="ollama", show_default=True)
+@click.option("--judge-model", type=str, default=None)
+@click.option("--judge-host", type=str, default=None)
+@click.option("-o", "--json-out", "json_out", type=click.Path(), default=None)
+def codereview(provider_name, model, ollama_host, vllm_host, judge_provider_name,
+               judge_model, judge_host, json_out):
+    """Secure-code-review eval — planted-vulnerability detection.
+
+    Asks the model to review code snippets and unified diffs for security
+    issues. Vulnerable fixtures carry a known CWE; clean fixtures measure false
+    positives. Reports detection rate, false-positive rate, and an F1-style
+    review score (high only when the model both finds real bugs and stays quiet
+    on secure code).
+    """
+    from atomics.eval.codereview import run_codereview
+
+    console = Console()
+    settings = load_settings()
+    provider = _make_provider(provider_name, model, ollama_host, settings, vllm_host=vllm_host)
+    judge = _make_provider(judge_provider_name, judge_model, judge_host or ollama_host,
+                           settings, vllm_host=vllm_host)
+
+    console.print(
+        f"\n[bold]Secure code review[/bold] — model: [cyan]{provider_name}[/cyan] "
+        f"({model or 'default'})\n"
+        f"Judge: [cyan]{judge_provider_name}[/cyan] ({judge_model or 'default'})\n"
+    )
+
+    def on_done(r):
+        if r.fixture.is_vulnerable:
+            ok = r.verdict == "detected"
+            label = f"{r.fixture.cwe}"
+        else:
+            ok = r.verdict == "clean"
+            label = "clean code"
+        mark = "[green]OK[/green]" if ok else "[red]MISS[/red]"
+        console.print(
+            f"  {mark} [bold]{r.fixture.id}[/bold] ({r.fixture.mode}) "
+            f"verdict={r.verdict} — {_rich_escape(label)}"
+        )
+
+    summary = asyncio.run(run_codereview(
+        provider, judge_provider=judge, model=model, judge_model=judge_model,
+        on_fixture_done=on_done,
+    ))
+
+    table = Table(title="Secure Code Review Summary")
+    table.add_column("Metric")
+    table.add_column("Value")
+    table.add_row("Provider", provider_name)
+    table.add_row("Model", model or "default")
+    table.add_row("Judge", f"{judge_provider_name} / {judge_model or 'default'}")
+    det = summary.detection_rate
+    fpr = summary.false_positive_rate
+    rev = summary.review_score
+    table.add_row("Detection rate", f"{det * 100:.1f}%" if det is not None else "n/a")
+    table.add_row("False-positive rate", f"{fpr * 100:.1f}%" if fpr is not None else "n/a")
+    table.add_row("Review score (F1)", f"{rev * 100:.1f}%" if rev is not None else "n/a")
+    table.add_row("Fixtures", str(len(summary.results)))
+    console.print(table)
+
+    if json_out:
+        import json as _json
+        with open(json_out, "w", encoding="utf-8") as fh:
+            _json.dump(summary.to_dict(), fh, indent=2)
+        console.print(f"\n[dim]Wrote JSON results to {json_out}[/dim]")
+
+
 # ── atomics probe ─────────────────────────────────────────────────────────────
 
 @cli.command("probe")
