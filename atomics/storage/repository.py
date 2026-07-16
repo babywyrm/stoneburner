@@ -173,15 +173,21 @@ class MetricsRepository:
     def get_evaluation_results(
         self,
         *,
-        run_id: str,
+        run_id: str | None = None,
         suite: str | None = None,
     ) -> list[dict[str, object]]:
         """Return decoded generic evaluation rows in timestamp order."""
-        query = "SELECT * FROM evaluation_results WHERE run_id = ?"
-        params: list[object] = [run_id]
+        query = "SELECT * FROM evaluation_results"
+        clauses: list[str] = []
+        params: list[object] = []
+        if run_id is not None:
+            clauses.append("run_id = ?")
+            params.append(run_id)
         if suite is not None:
-            query += " AND suite = ?"
+            clauses.append("suite = ?")
             params.append(suite)
+        if clauses:
+            query += " WHERE " + " AND ".join(clauses)
         query += " ORDER BY timestamp, fixture_id"
         rows = self._conn.execute(query, params).fetchall()
         results: list[dict[str, object]] = []
