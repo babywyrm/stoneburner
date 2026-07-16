@@ -5,16 +5,20 @@ from __future__ import annotations
 import asyncio
 import logging
 import sys
-import time
 from typing import TYPE_CHECKING
 
 import click
 from rich.console import Console
 from rich.logging import RichHandler
 from rich.markup import escape as _rich_escape
-from rich.status import Status
 from rich.table import Table
 
+from atomics.commands.common import (
+    PROVIDER_CHOICES,
+    FixtureProgress,
+    _attribution_model,
+    _make_provider,
+)
 from atomics.config import load_settings
 from atomics.labcompare import (
     parity_verdict,
@@ -45,53 +49,6 @@ def _setup_logging(level: str, *, rich_tracebacks: bool = False) -> None:
 TIER_CHOICES = click.Choice([t.value for t in BurnTier], case_sensitive=False)
 
 
-class FixtureProgress:
-    """Real-time progress tracker for long-running fixture-based evals."""
-
-    def __init__(self, total: int, console: Console, label: str = "fixture"):
-        self.total = total
-        self.console = console
-        self.label = label
-        self._start = time.monotonic()
-        self._fixture_times: list[float] = []
-        self._current_start: float | None = None
-        self._status: Status | None = None
-
-    def on_start(self, index: int, fixture_id: str, category: str) -> None:
-        self._current_start = time.monotonic()
-        eta = self._estimate_remaining(index)
-        eta_str = f" | ETA remaining: {self._fmt_duration(eta)}" if eta is not None else ""
-        # Start a live spinner that shows elapsed time updating in real-time
-        status_msg = (
-            f"[{index + 1}/{self.total}] {fixture_id} ({category}) "
-            f"— generating...{eta_str}"
-        )
-        self._status = self.console.status(status_msg, spinner="dots")
-        self._status.start()
-
-    def on_done(self, index: int) -> None:
-        if self._status:
-            self._status.stop()
-            self._status = None
-        if self._current_start is not None:
-            self._fixture_times.append(time.monotonic() - self._current_start)
-            self._current_start = None
-
-    def _estimate_remaining(self, current_index: int) -> float | None:
-        if not self._fixture_times:
-            return None
-        avg = sum(self._fixture_times) / len(self._fixture_times)
-        remaining = self.total - current_index
-        return avg * remaining
-
-    @staticmethod
-    def _fmt_duration(seconds: float) -> str:
-        if seconds < 60:
-            return f"{seconds:.0f}s"
-        m, s = divmod(int(seconds), 60)
-        return f"{m}m{s:02d}s"
-
-
 @click.group()
 @click.version_option(package_name="atomics")
 @click.option("-v", "--verbose", is_flag=True, default=False, help="Enable verbose/debug output.")
@@ -107,10 +64,6 @@ def cli(ctx: click.Context, verbose: bool, progress: bool) -> None:
         _setup_logging("DEBUG", rich_tracebacks=True)
     else:
         _setup_logging("WARNING")
-
-
-PROVIDER_CHOICES = click.Choice(["claude", "bedrock", "openai", "ollama", "vllm", "brain-gateway"], case_sensitive=False)
-
 
 @cli.command()
 @click.option(
@@ -1794,82 +1747,6 @@ def _parse_model_spec(spec: str, default_provider: str) -> tuple[str, str, str |
         provider_name, model = spec.split(":", 1)
         return provider_name, model, host
     return default_provider, spec, host
-
-
-def _attribution_model(provider: BaseProvider, requested_model: str | None) -> str:
-    if requested_model:
-        return requested_model
-    provider_default = getattr(provider, "default_model", None)
-    if isinstance(provider_default, str) and provider_default:
-        return provider_default
-    return "default"
-
-
-def _make_provider(
-    name: str,
-    mdl: str | None,
-    host: str | None,
-    settings,
-    *,
-    vllm_host: str | None = None,
-    region: str = "us-east-1",
-    context_tokens: int | None = None,
-    inference_timeout: int | None = None,
-) -> BaseProvider:
-    """Build a provider instance. Single factory for every command.
-
-    Optional params cover the variations different commands need:
-    `region` (bedrock), `context_tokens` (ollama long-context), and
-    `inference_timeout` (override the configured per-backend request timeout).
-    """
-    from atomics.validation import validate_endpoint_url
-
-    if host:
-        try:
-            host = validate_endpoint_url(host, label="--ollama-host/--judge-host")
-        except ValueError as exc:
-            raise click.ClickException(str(exc)) from exc
-    if vllm_host:
-        try:
-            vllm_host = validate_endpoint_url(vllm_host, label="--vllm-host")
-        except ValueError as exc:
-            raise click.ClickException(str(exc)) from exc
-
-    if name == "claude":
-        if not settings.anthropic_api_key:
-            raise click.ClickException("ANTHROPIC_API_KEY not set. Export it or add to .env")
-        from atomics.providers.claude import ClaudeProvider
-        return ClaudeProvider(api_key=settings.anthropic_api_key, default_model=mdl or settings.default_model)
-    if name == "bedrock":
-        from atomics.providers.bedrock import BedrockProvider
-        return BedrockProvider(region=region, model_id=mdl or "us.anthropic.claude-sonnet-4-6")
-    if name == "openai":
-        if not settings.openai_api_key:
-            raise click.ClickException("OPENAI_API_KEY not set. Export it or install with: uv sync --extra openai")
-        from atomics.providers.openai import OpenAIProvider
-        return OpenAIProvider(api_key=settings.openai_api_key, default_model=mdl or "gpt-4o")
-    if name == "vllm":
-        from atomics.providers.vllm import VllmProvider
-        return VllmProvider(
-            base_url=vllm_host or settings.vllm_host,
-            default_model=mdl or settings.vllm_model,
-            timeout=inference_timeout or settings.vllm_timeout,
-        )
-    if name == "brain-gateway":
-        from atomics.providers.brain_gateway import BrainGatewayProvider
-        return BrainGatewayProvider(url=host or settings.brain_gateway_url, default_model=mdl)
-    if name == "ollama":
-        from atomics.providers.ollama import OllamaProvider
-        return OllamaProvider(
-            host=host or settings.ollama_host,
-            default_model=mdl or settings.ollama_model,
-            timeout=inference_timeout or settings.ollama_timeout,
-            context_tokens=context_tokens,
-        )
-    raise click.ClickException(
-        f"Unknown provider: {name!r}. "
-        f"Valid: claude, bedrock, openai, ollama, vllm, brain-gateway"
-    )
 
 
 # ── atomics sweep ─────────────────────────────────────────────────────────────
