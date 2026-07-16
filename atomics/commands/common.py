@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import time
 from pathlib import Path
-from typing import Protocol
+from typing import Protocol, cast
 
 import click
 from rich.console import Console
@@ -14,6 +14,7 @@ from rich.status import Status
 from atomics.config import AtomicsSettings
 from atomics.eval.outcomes import RunIntegrity
 from atomics.providers.base import BaseProvider
+from atomics.storage.records import EvaluationResultRecord
 from atomics.validation import sanitize_error, validate_endpoint_url
 
 PROVIDER_CHOICES = click.Choice(
@@ -110,6 +111,67 @@ def integrity_exit_code(
 ) -> int:
     """Return the command exit code for one run-integrity result."""
     return int(integrity.should_exit_nonzero and not allow_partial)
+
+
+def evaluation_record_from_fixture(
+    *,
+    run_id: str,
+    suite: str,
+    provider: str,
+    model: str,
+    payload: dict[str, object],
+) -> EvaluationResultRecord:
+    """Convert canonical fixture JSON into a storage-owned record."""
+    attempts_value = payload.get("attempts")
+    if not isinstance(attempts_value, list):
+        raise ValueError("fixture payload attempts must be a list")
+    attempts = cast(list[dict[str, object]], attempts_value)
+    input_tokens = sum(_as_int(attempt["input_tokens"]) for attempt in attempts)
+    output_tokens = sum(_as_int(attempt["output_tokens"]) for attempt in attempts)
+    thinking_tokens = sum(
+        _as_int(attempt["thinking_tokens"]) for attempt in attempts
+    )
+    score_value = payload.get("score")
+    score = None if score_value is None else _as_float(score_value)
+    return EvaluationResultRecord(
+        run_id=run_id,
+        suite=suite,
+        fixture_id=str(payload["id"]),
+        status=str(payload["status"]),
+        score=score,
+        generation_status=str(payload["generation_status"]),
+        judge_status=str(payload["judge_status"]),
+        latency_ms=_as_float(payload["latency_ms"]),
+        estimated_cost_usd=_as_float(payload["estimated_cost_usd"]),
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        total_tokens=input_tokens + output_tokens,
+        thinking_tokens=thinking_tokens,
+        attempt_count=_as_int(payload["attempt_count"]),
+        generation_failures=_as_int(payload["generation_failures"]),
+        infrastructure_failures=_as_int(payload["infrastructure_failures"]),
+        judge_failures=_as_int(payload["judge_failures"]),
+        parse_failed=bool(payload["parse_failed"]),
+        provider=provider,
+        model=model,
+        error_class=str(payload.get("error_class") or ""),
+        error_message=str(payload.get("error_message") or ""),
+        result_json=payload,
+    )
+
+
+def _as_int(value: object) -> int:
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, (int, float, str)):
+        return int(value)
+    raise ValueError(f"expected integer-compatible value, got {type(value).__name__}")
+
+
+def _as_float(value: object) -> float:
+    if isinstance(value, (int, float, str)):
+        return float(value)
+    raise ValueError(f"expected numeric value, got {type(value).__name__}")
 
 
 def _make_provider(

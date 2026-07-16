@@ -13,6 +13,7 @@ from atomics.commands.common import (
     FixtureProgress,
     _make_provider,
     effective_model,
+    evaluation_record_from_fixture,
     integrity_exit_code,
     write_summary_json,
 )
@@ -102,3 +103,41 @@ def test_make_provider_rejects_unknown_provider() -> None:
     settings = SimpleNamespace()
     with pytest.raises(click.ClickException, match="Unknown provider"):
         _make_provider("invalid", None, None, settings)
+
+
+def test_evaluation_record_from_fixture_rolls_up_attempt_usage() -> None:
+    payload: dict[str, object] = {
+        "id": "fixture-1",
+        "status": "complete",
+        "score": 1.0,
+        "generation_status": "completed",
+        "judge_status": "scored",
+        "latency_ms": 20.0,
+        "estimated_cost_usd": 0.03,
+        "attempt_count": 1,
+        "generation_failures": 0,
+        "infrastructure_failures": 0,
+        "judge_failures": 0,
+        "parse_failed": False,
+        "error_class": "",
+        "error_message": "",
+        "attempts": [
+            {
+                "input_tokens": 8,
+                "output_tokens": 4,
+                "thinking_tokens": 2,
+            }
+        ],
+    }
+
+    record = evaluation_record_from_fixture(
+        run_id="run-1",
+        suite="refusal",
+        provider="ollama",
+        model="qwen",
+        payload=payload,
+    )
+
+    assert record.total_tokens == 12
+    assert record.thinking_tokens == 2
+    assert record.result_json is payload

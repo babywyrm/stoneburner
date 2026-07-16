@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import uuid
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -16,10 +17,13 @@ from atomics.commands.common import (
     FixtureProgress,
     _make_provider,
     effective_model,
+    evaluation_record_from_fixture,
     integrity_exit_code,
     write_summary_json,
 )
 from atomics.config import load_settings
+from atomics.storage import MetricsRepository
+from atomics.validation import sanitize_error
 
 if TYPE_CHECKING:
     from atomics.eval.codereview.fixtures import SecureCodeFixture
@@ -109,6 +113,9 @@ def codereview(
         else None
     )
     current_index = -1
+    run_id = uuid.uuid4().hex[:12]
+    repository: MetricsRepository | None = None
+    parent_created = False
 
     def on_start(fixture: SecureCodeFixture) -> None:
         nonlocal current_index
@@ -131,33 +138,68 @@ def codereview(
             f"({escape(fixture.mode)}) verdict={escape(result.verdict)} — "
             f"{escape(expected_label)}"
         )
+        if repository is not None:
+            repository.save_evaluation_result(
+                evaluation_record_from_fixture(
+                    run_id=run_id,
+                    suite="codereview",
+                    provider=provider_name,
+                    model=attributed_model,
+                    payload=result.to_dict(),
+                )
+            )
 
-    summary = asyncio.run(
-        run_codereview(
-            provider,
-            judge_provider=judge,
-            model=model,
-            judge_model=judge_model,
-            on_fixture_start=on_start,
-            on_fixture_done=on_done,
+    try:
+        if save:
+            repository = MetricsRepository(settings.db_path)
+            repository.create_run(
+                run_id,
+                tier="codereview",
+                provider=provider_name,
+                model=attributed_model,
+            )
+            parent_created = True
+        summary = asyncio.run(
+            run_codereview(
+                provider,
+                judge_provider=judge,
+                model=model,
+                judge_model=judge_model,
+                run_id=run_id,
+                on_fixture_start=on_start,
+                on_fixture_done=on_done,
+            )
         )
-    )
-    _render_summary(
-        console,
-        summary,
-        provider_name=provider_name,
-        model=attributed_model,
-        judge_provider=judge_provider_name,
-        judge_model=attributed_judge,
-    )
+        _render_summary(
+            console,
+            summary,
+            provider_name=provider_name,
+            model=attributed_model,
+            judge_provider=judge_provider_name,
+            judge_model=attributed_judge,
+        )
 
-    if json_out is not None:
-        write_summary_json(summary, json_out)
-        console.print(f"\n[dim]Wrote JSON results to {escape(str(json_out))}[/dim]")
+        if json_out is not None:
+            write_summary_json(summary, json_out)
+            console.print(
+                f"\n[dim]Wrote JSON results to {escape(str(json_out))}[/dim]"
+            )
 
-    _ = save
-    if integrity_exit_code(summary.integrity, allow_partial=allow_partial):
-        raise click.exceptions.Exit(1)
+        if integrity_exit_code(summary.integrity, allow_partial=allow_partial):
+            raise click.exceptions.Exit(1)
+    except (click.ClickException, click.exceptions.Exit):
+        raise
+    except Exception as exc:
+        raise click.ClickException(
+            f"Code review evaluation failed: {sanitize_error(exc)}"
+        ) from exc
+    finally:
+        if repository is not None:
+            try:
+                if parent_created:
+                    repository.complete_evaluation_run(run_id)
+            finally:
+                repository.close()
 
 
 def _render_summary(

@@ -1123,6 +1123,18 @@ def test_get_evaluation_results_filters_suite_and_orders_timestamp(tmp_path):
     repo.close()
 
 
+def test_get_evaluation_results_can_filter_without_run_id(tmp_path):
+    repo = MetricsRepository(tmp_path / "metrics.db")
+    for run_id in ("run-a", "run-b"):
+        repo.create_run(run_id, tier="refusal", provider="ollama", model="qwen")
+        repo.save_evaluation_result(_evaluation_record(run_id=run_id))
+
+    rows = repo.get_evaluation_results(suite="refusal")
+
+    assert {row["run_id"] for row in rows} == {"run-a", "run-b"}
+    repo.close()
+
+
 def test_save_evaluation_result_sanitizes_error(tmp_path):
     repo = MetricsRepository(tmp_path / "metrics.db")
     repo.create_run("eval-run", tier="refusal", provider="ollama", model="qwen")
