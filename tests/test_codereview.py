@@ -101,6 +101,13 @@ class _EmptyProvider:
         )
 
 
+class _CleanFixtureFailingJudge(_FakeJudge):
+    async def generate(self, prompt, **kwargs):
+        if "contains this vulnerability" not in prompt:
+            raise httpx.ReadTimeout("clean-fixture judge timed out")
+        return await super().generate(prompt, **kwargs)
+
+
 @pytest.mark.asyncio
 async def test_perfect_reviewer_scores_high():
     summary = await run_codereview(
@@ -186,6 +193,23 @@ async def test_empty_review_is_indeterminate():
     assert summary.review_score is None
     assert summary.integrity.status is RunStatus.INFRASTRUCTURE_INVALID
     assert summary.results[0].verdict == "unknown"
+
+
+@pytest.mark.asyncio
+async def test_review_score_is_indeterminate_without_clean_fixture_coverage():
+    vulnerable = next(f for f in SECURE_CODE_FIXTURES if f.is_vulnerable)
+    clean = next(f for f in SECURE_CODE_FIXTURES if not f.is_vulnerable)
+
+    summary = await run_codereview(
+        _FakeProvider(),
+        judge_provider=_CleanFixtureFailingJudge(perfect=True),
+        fixtures=[vulnerable, clean],
+    )
+
+    assert summary.detection_rate == 1.0
+    assert summary.false_positive_rate is None
+    assert summary.review_score is None
+    assert summary.integrity.status is RunStatus.PARTIAL
 
 
 @pytest.mark.asyncio

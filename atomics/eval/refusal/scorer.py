@@ -150,9 +150,6 @@ async def classify_response(
                 status=JudgeOutcomeStatus.SCORED,
                 calls=tuple(calls),
             )
-        if raw:
-            break
-
     return ClassificationResult(
         classification="unknown",
         rationale="Judge output did not contain a classification.",

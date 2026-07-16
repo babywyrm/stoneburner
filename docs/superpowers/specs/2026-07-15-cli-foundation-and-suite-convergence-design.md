@@ -1,6 +1,6 @@
 # CLI Foundation and Suite Convergence Design
 
-**Date:** 2026-07-15  
+**Date:** 2026-07-15
 **Status:** Approved design, pending written-spec review
 
 ## Goal
@@ -219,4 +219,3 @@ separation and avoid mixing unrelated cleanup into these commits.
 - Splitting `MetricsRepository` into persistence components.
 - Unified cross-suite reporting, comparison, and export.
 - Wiring `inference.env` into CLI defaults and `doctor`.
-

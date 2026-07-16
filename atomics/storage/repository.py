@@ -175,8 +175,11 @@ class MetricsRepository:
         *,
         run_id: str | None = None,
         suite: str | None = None,
+        limit: int | None = None,
     ) -> list[dict[str, object]]:
         """Return decoded generic evaluation rows in timestamp order."""
+        if limit is not None and limit < 0:
+            raise ValueError("limit must be nonnegative")
         query = "SELECT * FROM evaluation_results"
         clauses: list[str] = []
         params: list[object] = []
@@ -189,6 +192,9 @@ class MetricsRepository:
         if clauses:
             query += " WHERE " + " AND ".join(clauses)
         query += " ORDER BY timestamp, fixture_id"
+        if limit is not None:
+            query += " LIMIT ?"
+            params.append(limit)
         rows = self._conn.execute(query, params).fetchall()
         results: list[dict[str, object]] = []
         for row in rows:
