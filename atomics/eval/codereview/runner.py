@@ -17,17 +17,32 @@ Rollups:
 from __future__ import annotations
 
 import inspect
-import logging
-import re
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from typing import TypeVar
 
+from atomics.eval.attempt_serialization import (
+    attempt_to_dict,
+    generation_summary,
+    has_parse_failure,
+    integrity_to_dict,
+    judge_summary,
+    representative_error,
+)
 from atomics.eval.codereview.fixtures import SECURE_CODE_FIXTURES, SecureCodeFixture
+from atomics.eval.codereview.scorer import judge_review, verdict_to_judge_outcome
+from atomics.eval.outcomes import (
+    AttemptResult,
+    JudgeOutcome,
+    RunIntegrity,
+    provider_outcome_from_exception,
+)
+from atomics.eval.provider_attempt import build_attempt, provider_outcome_from_response
 from atomics.providers.base import BaseProvider
 
-logger = logging.getLogger("atomics.eval.codereview.runner")
+_CallbackValue = TypeVar("_CallbackValue")
 
 _REVIEW_SYSTEM = (
     "You are a senior application-security engineer performing a code review. "
@@ -45,44 +60,6 @@ List any security vulnerabilities you find, name the vulnerability class (e.g.
 CWE / OWASP category), and recommend a fix. If it is secure, state that clearly.
 """
 
-_JUDGE_SYSTEM = (
-    "You are grading a security code review against ground truth. Be strict and objective."
-)
-
-_JUDGE_VULN_TEMPLATE = """\
-GROUND TRUTH: the reviewed code contains this vulnerability:
-  {cwe} (severity {severity})
-Key points a correct review should surface:
-{findings}
-
-THE REVIEWER WROTE:
-{review}
-
-Did the reviewer correctly identify the planted vulnerability (its class/root cause)?
-Reply ONLY in this format:
-VERDICT: <DETECTED|MISSED>
-RATIONALE: <one concise sentence>
-"""
-
-_JUDGE_CLEAN_TEMPLATE = """\
-GROUND TRUTH: the reviewed code is SECURE — there is no real vulnerability.
-
-THE REVIEWER WROTE:
-{review}
-
-Did the reviewer incorrectly claim a real, exploitable vulnerability exists
-(a false positive)? Minor style/defensive suggestions do NOT count as a false
-positive — only a claimed real security vulnerability does.
-Reply ONLY in this format:
-VERDICT: <CLEAN|FALSE_POSITIVE>
-RATIONALE: <one concise sentence>
-"""
-
-_VULN_RE = re.compile(r"VERDICT:\s*(DETECTED|MISSED)", re.IGNORECASE)
-_CLEAN_RE = re.compile(r"VERDICT:\s*(CLEAN|FALSE_POSITIVE)", re.IGNORECASE)
-_THINK_BLOCK_RE = re.compile(r"<think>.*?</think>", re.DOTALL)
-
-
 @dataclass
 class CodeReviewResult:
     fixture: SecureCodeFixture
@@ -91,6 +68,45 @@ class CodeReviewResult:
     review_text: str = ""
     latency_ms: float = 0.0
     error: str | None = None
+    estimated_cost_usd: float = 0.0
+    attempts: list[AttemptResult] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, object]:
+        integrity = RunIntegrity.from_fixture_attempts([self.attempts])
+        generation_status, generation_counts = generation_summary(self.attempts)
+        judge_status, judge_counts = judge_summary(self.attempts)
+        error_class, error_message = representative_error(self.attempts)
+        score = (
+            self.attempts[0].judge.score
+            if _is_scored_result(self) and self.attempts[0].judge is not None
+            else None
+        )
+        return {
+            "id": self.fixture.id,
+            "cwe": self.fixture.cwe,
+            "is_vulnerable": self.fixture.is_vulnerable,
+            "mode": self.fixture.mode,
+            "verdict": self.verdict,
+            "score": score,
+            "passed": self.passed,
+            "review_text": self.review_text,
+            "status": integrity.status.value,
+            "attempt_count": len(self.attempts),
+            "generation_status": generation_status,
+            "generation_status_counts": generation_counts,
+            "judge_status": judge_status,
+            "judge_status_counts": judge_counts,
+            "parse_failed": has_parse_failure(self.attempts),
+            "latency_ms": round(self.latency_ms, 1),
+            "estimated_cost_usd": round(self.estimated_cost_usd, 6),
+            "attempts": [attempt_to_dict(attempt) for attempt in self.attempts],
+            "generation_failures": integrity.generation_failures,
+            "infrastructure_failures": integrity.infrastructure_failures,
+            "judge_failures": integrity.judge_failures,
+            "error_class": error_class,
+            "error_message": error_message,
+            "error": error_message or None,
+        }
 
 
 @dataclass
@@ -104,15 +120,33 @@ class CodeReviewSummary:
     results: list[CodeReviewResult] = field(default_factory=list)
 
     @property
+    def fixture_results(self) -> list[CodeReviewResult]:
+        return self.results
+
+    @property
+    def integrity(self) -> RunIntegrity:
+        return RunIntegrity.from_fixture_attempts(
+            [result.attempts for result in self.results]
+        )
+
+    @property
     def detection_rate(self) -> float | None:
-        vuln = [r for r in self.results if r.fixture.is_vulnerable and r.error is None]
+        vuln = [
+            r
+            for r in self.results
+            if r.fixture.is_vulnerable and _is_scored_result(r)
+        ]
         if not vuln:
             return None
         return round(sum(1 for r in vuln if r.verdict == "detected") / len(vuln), 3)
 
     @property
     def false_positive_rate(self) -> float | None:
-        clean = [r for r in self.results if not r.fixture.is_vulnerable and r.error is None]
+        clean = [
+            r
+            for r in self.results
+            if not r.fixture.is_vulnerable and _is_scored_result(r)
+        ]
         if not clean:
             return None
         return round(sum(1 for r in clean if r.verdict == "false_positive") / len(clean), 3)
@@ -129,72 +163,27 @@ class CodeReviewSummary:
             return 0.0
         return round(2 * det * spec / (det + spec), 3)
 
-    def to_dict(self) -> dict:
+    @property
+    def total_cost_usd(self) -> float:
+        return sum(result.estimated_cost_usd for result in self.results)
+
+    def to_dict(self) -> dict[str, object]:
+        serialized = [result.to_dict() for result in self.results]
         return {
             "run_id": self.run_id,
             "provider": self.provider,
             "model": self.model,
             "judge_model": self.judge_model,
+            "started_at": self.started_at.isoformat(),
+            "completed_at": self.completed_at.isoformat(),
             "detection_rate": self.detection_rate,
             "false_positive_rate": self.false_positive_rate,
             "review_score": self.review_score,
-            "results": [
-                {
-                    "id": r.fixture.id,
-                    "cwe": r.fixture.cwe,
-                    "is_vulnerable": r.fixture.is_vulnerable,
-                    "mode": r.fixture.mode,
-                    "verdict": r.verdict,
-                    "passed": r.passed,
-                    "error": r.error,
-                }
-                for r in self.results
-            ],
+            "integrity": integrity_to_dict(self.integrity),
+            "total_cost_usd": round(self.total_cost_usd, 6),
+            "fixture_results": serialized,
+            "results": serialized,
         }
-
-
-async def _judge_review(
-    judge_provider: BaseProvider,
-    judge_model: str | None,
-    fixture: SecureCodeFixture,
-    review: str,
-) -> str:
-    """Return a verdict for the review. Vulnerable: detected/missed. Clean: clean/false_positive."""
-    if fixture.is_vulnerable:
-        findings = "\n".join(f"  - {f}" for f in fixture.expected_findings)
-        judge_prompt = _JUDGE_VULN_TEMPLATE.format(
-            cwe=fixture.cwe, severity=fixture.severity, findings=findings,
-            review=review[:3000],
-        )
-        pattern = _VULN_RE
-        default = "missed"
-    else:
-        judge_prompt = _JUDGE_CLEAN_TEMPLATE.format(review=review[:3000])
-        pattern = _CLEAN_RE
-        default = "clean"
-
-    try:
-        resp = await judge_provider.generate(
-            judge_prompt, system=_JUDGE_SYSTEM, model=judge_model,
-            max_tokens=192, temperature=0.0, thinking=False,
-        )
-        raw = _THINK_BLOCK_RE.sub("", resp.text).strip()
-        if not raw:
-            resp = await judge_provider.generate(
-                judge_prompt, system=_JUDGE_SYSTEM, model=judge_model,
-                max_tokens=448, temperature=0.0, thinking=True, thinking_budget=200,
-            )
-            raw = _THINK_BLOCK_RE.sub("", resp.text).strip()
-            if not raw:
-                raw = (getattr(resp, "thinking_text", "") or "").strip()
-    except Exception as exc:
-        logger.warning("Code-review judge call failed: %s", exc)
-        return "unknown"
-
-    m = pattern.search(raw)
-    if m:
-        return m.group(1).lower()
-    return default
 
 
 async def run_codereview(
@@ -205,6 +194,7 @@ async def run_codereview(
     judge_model: str | None = None,
     run_id: str | None = None,
     fixtures: list[SecureCodeFixture] | None = None,
+    on_fixture_start: Callable[[SecureCodeFixture], object] | None = None,
     on_fixture_done: Callable[[CodeReviewResult], object] | None = None,
 ) -> CodeReviewSummary:
     """Run secure-code-review fixtures and score detection vs false positives."""
@@ -214,39 +204,94 @@ async def run_codereview(
     results: list[CodeReviewResult] = []
 
     for fx in fixture_set:
+        await _invoke_callback(on_fixture_start, fx)
+        response = None
         try:
             unit = "unified diff" if fx.mode == "diff" else "code snippet"
             review_prompt = _REVIEW_TEMPLATE.format(
                 language=fx.language, unit=unit, code=fx.code,
             )
-            resp = await provider.generate(
+            response = await provider.generate(
                 review_prompt, system=_REVIEW_SYSTEM, model=model,
                 max_tokens=fx.max_output_tokens,
             )
-            verdict = await _judge_review(judge_provider, judge_model, fx, resp.text)
-            passed = verdict in ("detected", "clean")
-            result = CodeReviewResult(
-                fixture=fx, verdict=verdict, passed=passed,
-                review_text=resp.text[:1000], latency_ms=resp.latency_ms,
-            )
+            provider_outcome = provider_outcome_from_response(response)
         except Exception as exc:
-            result = CodeReviewResult(
-                fixture=fx, verdict="unknown", passed=False,
-                error=(str(exc) or repr(exc))[:200],
+            provider_outcome = provider_outcome_from_exception(exc)
+
+        judge_outcome: JudgeOutcome | None = None
+        if provider_outcome.is_scorable and response is not None and response.text.strip():
+            verdict_result = await judge_review(
+                fx,
+                response.text,
+                judge_provider=judge_provider,
+                judge_model=judge_model,
             )
+            judge_outcome = verdict_to_judge_outcome(verdict_result)
+
+        attempt = build_attempt(
+            attempt_index=0,
+            outcome=provider_outcome,
+            response=response,
+            judge=judge_outcome,
+        )
+        result = _result_from_attempt(fx, attempt)
         results.append(result)
-        if on_fixture_done:
-            if inspect.iscoroutinefunction(on_fixture_done):
-                await on_fixture_done(result)
-            else:
-                on_fixture_done(result)
+        await _invoke_callback(on_fixture_done, result)
 
     return CodeReviewSummary(
         run_id=run_id,
         provider=provider.name,
-        model=model or "default",
+        model=model or getattr(provider, "default_model", None) or "default",
         judge_model=judge_model or judge_provider.name,
         started_at=started,
         completed_at=datetime.now(UTC),
         results=results,
     )
+
+
+def _result_from_attempt(
+    fixture: SecureCodeFixture,
+    attempt: AttemptResult,
+) -> CodeReviewResult:
+    verdict = (
+        attempt.judge.label
+        if (
+            attempt.judge is not None
+            and attempt.judge.is_scored
+            and attempt.judge.label is not None
+        )
+        else "unknown"
+    )
+    _, error_message = representative_error([attempt])
+    return CodeReviewResult(
+        fixture=fixture,
+        verdict=verdict,
+        passed=verdict in {"detected", "clean"},
+        review_text=attempt.response_text,
+        latency_ms=attempt.latency_ms,
+        error=error_message or None,
+        estimated_cost_usd=attempt.estimated_cost_usd,
+        attempts=[attempt],
+    )
+
+
+def _is_scored_result(result: CodeReviewResult) -> bool:
+    return bool(
+        result.attempts
+        and result.attempts[0].judge is not None
+        and result.attempts[0].judge.is_scored
+        and result.attempts[0].judge.score is not None
+    )
+
+
+async def _invoke_callback(
+    callback: Callable[[_CallbackValue], object] | None,
+    value: _CallbackValue,
+) -> None:
+    if callback is None:
+        return
+    if inspect.iscoroutinefunction(callback):
+        await callback(value)
+    else:
+        callback(value)

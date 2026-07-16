@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import httpx
 import pytest
 
 from atomics.eval.codereview import SECURE_CODE_FIXTURES, run_codereview
+from atomics.eval.outcomes import JudgeOutcomeStatus, ProviderOutcomeKind, RunStatus
 from atomics.providers.base import ProviderResponse
 
 # ── Fixture set sanity ─────────────────────────────────────────────────────
@@ -80,6 +82,25 @@ class _FakeJudge:
         )
 
 
+class _FailingProvider:
+    name = "failing"
+    default_model = "failing-model"
+
+    async def generate(self, *_args, **_kwargs):
+        raise httpx.ReadTimeout("provider timed out")
+
+
+class _EmptyProvider:
+    name = "empty"
+    default_model = "empty-model"
+
+    async def generate(self, *_args, **_kwargs):
+        return ProviderResponse(
+            text="", input_tokens=2, output_tokens=0, total_tokens=2,
+            model="empty-model", latency_ms=10.0, estimated_cost_usd=0.0,
+        )
+
+
 @pytest.mark.asyncio
 async def test_perfect_reviewer_scores_high():
     summary = await run_codereview(
@@ -111,3 +132,73 @@ async def test_summary_to_dict_shape():
     d = summary.to_dict()
     assert {"detection_rate", "false_positive_rate", "review_score"} <= d.keys()
     assert len(d["results"]) == 2
+
+
+@pytest.mark.asyncio
+async def test_codereview_summary_exposes_complete_integrity_and_alias():
+    summary = await run_codereview(
+        _FakeProvider(), judge_provider=_FakeJudge(perfect=True),
+        model="m", judge_model="judge", fixtures=SECURE_CODE_FIXTURES[:2],
+    )
+
+    assert summary.fixture_results is summary.results
+    assert summary.integrity.status is RunStatus.COMPLETE
+    payload = summary.to_dict()
+    assert payload["fixture_results"] == payload["results"]
+    assert payload["integrity"]["status"] == "complete"
+    assert payload["results"][0]["attempts"][0]["provider_kind"] == "completed"
+
+
+@pytest.mark.asyncio
+async def test_codereview_judge_failure_is_indeterminate():
+    summary = await run_codereview(
+        _FakeProvider(), judge_provider=_FailingProvider(),
+        fixtures=SECURE_CODE_FIXTURES[:1],
+    )
+
+    assert summary.review_score is None
+    assert summary.integrity.status is RunStatus.INFRASTRUCTURE_INVALID
+    assert summary.integrity.judge_failures == 1
+    attempt = summary.results[0].attempts[0]
+    assert attempt.judge is not None
+    assert attempt.judge.status is JudgeOutcomeStatus.PROVIDER_ERROR
+
+
+@pytest.mark.asyncio
+async def test_codereview_provider_timeout_retains_failed_attempt():
+    summary = await run_codereview(
+        _FailingProvider(), judge_provider=_FakeJudge(perfect=True),
+        fixtures=SECURE_CODE_FIXTURES[:1],
+    )
+
+    assert summary.integrity.status is RunStatus.INFRASTRUCTURE_INVALID
+    assert summary.integrity.infrastructure_failures == 1
+    assert summary.results[0].attempts[0].provider.kind is ProviderOutcomeKind.TIMEOUT
+
+
+@pytest.mark.asyncio
+async def test_empty_review_is_indeterminate():
+    clean = [f for f in SECURE_CODE_FIXTURES if not f.is_vulnerable][:1]
+    summary = await run_codereview(
+        _EmptyProvider(), judge_provider=_FakeJudge(perfect=True), fixtures=clean,
+    )
+
+    assert summary.review_score is None
+    assert summary.integrity.status is RunStatus.INFRASTRUCTURE_INVALID
+    assert summary.results[0].verdict == "unknown"
+
+
+@pytest.mark.asyncio
+async def test_codereview_runner_calls_start_and_done_callbacks():
+    events: list[str] = []
+    fixture = SECURE_CODE_FIXTURES[0]
+
+    await run_codereview(
+        _FakeProvider(),
+        judge_provider=_FakeJudge(perfect=True),
+        fixtures=[fixture],
+        on_fixture_start=lambda fx: events.append(f"start:{fx.id}"),
+        on_fixture_done=lambda result: events.append(f"done:{result.fixture.id}"),
+    )
+
+    assert events == [f"start:{fixture.id}", f"done:{fixture.id}"]
