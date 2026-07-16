@@ -2,8 +2,15 @@
 
 from __future__ import annotations
 
+import httpx
 import pytest
 
+from atomics.eval.outcomes import (
+    JudgeOutcomeStatus,
+    ProviderOutcome,
+    ProviderOutcomeKind,
+    RunStatus,
+)
 from atomics.eval.refusal import REFUSAL_FIXTURES, run_refusal
 from atomics.eval.refusal.runner import _classification_to_score
 from atomics.providers.base import ProviderResponse
@@ -78,6 +85,31 @@ class _FakeJudge:
         )
 
 
+class _FailingProvider:
+    name = "failing"
+    default_model = "failing-model"
+
+    async def generate(self, *_args, **_kwargs):
+        raise httpx.ReadTimeout("provider timed out")
+
+
+class _SafetyBlockedProvider:
+    name = "blocked"
+    default_model = "blocked-model"
+
+    async def generate(self, *_args, **_kwargs):
+        outcome = ProviderOutcome(
+            ProviderOutcomeKind.SAFETY_BLOCKED,
+            finish_reason="content_filter",
+            safety_reason="content_filter",
+        )
+        return ProviderResponse(
+            text="", input_tokens=5, output_tokens=0, total_tokens=5,
+            model="blocked-model", latency_ms=10.0, estimated_cost_usd=0.0,
+            outcome=outcome, finish_reason="content_filter",
+        )
+
+
 @pytest.mark.asyncio
 async def test_perfect_calibration_when_judge_matches_expected():
     """A model that always does exactly what's expected scores 1.0 with 0 error rates."""
@@ -126,3 +158,79 @@ async def test_summary_to_dict_shape():
     assert "over_refusal_rate" in d
     assert "under_refusal_rate" in d
     assert len(d["results"]) == 2
+
+
+@pytest.mark.asyncio
+async def test_refusal_summary_exposes_complete_integrity_and_alias():
+    fixtures = [f for f in REFUSAL_FIXTURES if f.expected == "comply"][:1]
+    summary = await run_refusal(
+        _FakeProvider(), judge_provider=_FakeJudge("COMPLIED"),
+        model="m", judge_model="judge", fixtures=fixtures,
+    )
+
+    assert summary.fixture_results is summary.results
+    assert summary.integrity.status is RunStatus.COMPLETE
+    assert summary.integrity.fixtures_scored == 1
+    payload = summary.to_dict()
+    assert payload["fixture_results"] == payload["results"]
+    assert payload["integrity"]["status"] == "complete"
+    assert payload["results"][0]["attempts"][0]["provider_kind"] == "completed"
+
+
+@pytest.mark.asyncio
+async def test_refusal_judge_failure_is_indeterminate():
+    summary = await run_refusal(
+        _FakeProvider(), judge_provider=_FailingProvider(),
+        model="m", judge_model="judge", fixtures=REFUSAL_FIXTURES[:1],
+    )
+
+    assert summary.calibration_score is None
+    assert summary.integrity.status is RunStatus.INFRASTRUCTURE_INVALID
+    assert summary.integrity.judge_failures == 1
+    attempt = summary.results[0].attempts[0]
+    assert attempt.judge is not None
+    assert attempt.judge.status is JudgeOutcomeStatus.PROVIDER_ERROR
+
+
+@pytest.mark.asyncio
+async def test_refusal_provider_timeout_retains_failed_attempt():
+    summary = await run_refusal(
+        _FailingProvider(), judge_provider=_FakeJudge("COMPLIED"),
+        fixtures=REFUSAL_FIXTURES[:1],
+    )
+
+    assert summary.integrity.status is RunStatus.INFRASTRUCTURE_INVALID
+    assert summary.integrity.infrastructure_failures == 1
+    assert summary.results[0].attempts[0].provider.kind is ProviderOutcomeKind.TIMEOUT
+
+
+@pytest.mark.asyncio
+async def test_empty_safety_block_counts_as_refusal_without_judge_call():
+    harmful = [f for f in REFUSAL_FIXTURES if f.expected == "refuse"][:1]
+    summary = await run_refusal(
+        _SafetyBlockedProvider(),
+        judge_provider=_FailingProvider(),
+        fixtures=harmful,
+    )
+
+    assert summary.calibration_score == 1.0
+    assert summary.integrity.status is RunStatus.COMPLETE
+    assert summary.results[0].classification == "refuse"
+    assert summary.results[0].attempts[0].judge is not None
+    assert summary.results[0].attempts[0].judge.judge_model == "provider-outcome"
+
+
+@pytest.mark.asyncio
+async def test_refusal_runner_calls_start_and_done_callbacks():
+    events: list[str] = []
+    fixture = REFUSAL_FIXTURES[0]
+
+    await run_refusal(
+        _FakeProvider(),
+        judge_provider=_FakeJudge("COMPLIED"),
+        fixtures=[fixture],
+        on_fixture_start=lambda fx: events.append(f"start:{fx.id}"),
+        on_fixture_done=lambda result: events.append(f"done:{result.fixture.id}"),
+    )
+
+    assert events == [f"start:{fixture.id}", f"done:{fixture.id}"]
