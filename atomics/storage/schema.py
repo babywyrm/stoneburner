@@ -9,7 +9,7 @@ from pathlib import Path
 
 logger = logging.getLogger("atomics.schema")
 
-SCHEMA_VERSION = 19
+SCHEMA_VERSION = 20
 
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -32,6 +32,36 @@ CREATE TABLE IF NOT EXISTS runs (
     total_tokens    INTEGER DEFAULT 0,
     total_cost_usd  REAL DEFAULT 0.0,
     avg_latency_ms  REAL DEFAULT 0.0
+);
+
+CREATE TABLE IF NOT EXISTS evaluation_results (
+    result_id               TEXT PRIMARY KEY,
+    run_id                  TEXT NOT NULL,
+    suite                   TEXT NOT NULL,
+    fixture_id              TEXT NOT NULL,
+    status                  TEXT NOT NULL DEFAULT '',
+    score                   REAL DEFAULT NULL,
+    generation_status       TEXT NOT NULL DEFAULT '',
+    judge_status            TEXT NOT NULL DEFAULT '',
+    latency_ms              REAL DEFAULT 0.0,
+    estimated_cost_usd      REAL DEFAULT 0.0,
+    input_tokens            INTEGER NOT NULL DEFAULT 0,
+    output_tokens           INTEGER NOT NULL DEFAULT 0,
+    total_tokens            INTEGER NOT NULL DEFAULT 0,
+    thinking_tokens         INTEGER NOT NULL DEFAULT 0,
+    attempt_count           INTEGER NOT NULL DEFAULT 0,
+    generation_failures     INTEGER NOT NULL DEFAULT 0,
+    infrastructure_failures INTEGER NOT NULL DEFAULT 0,
+    judge_failures          INTEGER NOT NULL DEFAULT 0,
+    parse_failed            INTEGER NOT NULL DEFAULT 0,
+    provider                TEXT NOT NULL DEFAULT '',
+    model                   TEXT NOT NULL DEFAULT '',
+    error_class             TEXT NOT NULL DEFAULT '',
+    error_message           TEXT NOT NULL DEFAULT '',
+    result_json             TEXT NOT NULL DEFAULT '{}',
+    timestamp               TEXT NOT NULL,
+    UNIQUE (run_id, suite, fixture_id),
+    FOREIGN KEY (run_id) REFERENCES runs(run_id)
 );
 
 CREATE TABLE IF NOT EXISTS task_results (
@@ -145,6 +175,12 @@ CREATE INDEX IF NOT EXISTS idx_task_results_started_at ON task_results(started_a
 CREATE INDEX IF NOT EXISTS idx_runs_provider ON runs(provider);
 CREATE INDEX IF NOT EXISTS idx_runs_tier ON runs(tier);
 CREATE INDEX IF NOT EXISTS idx_runs_trigger ON runs(trigger);
+CREATE INDEX IF NOT EXISTS idx_evaluation_results_run
+    ON evaluation_results(run_id);
+CREATE INDEX IF NOT EXISTS idx_evaluation_results_suite
+    ON evaluation_results(suite);
+CREATE INDEX IF NOT EXISTS idx_evaluation_results_timestamp
+    ON evaluation_results(timestamp);
 CREATE TABLE IF NOT EXISTS stress_results (
     result_id               TEXT PRIMARY KEY,
     model                   TEXT NOT NULL,
@@ -300,6 +336,7 @@ CREATE INDEX IF NOT EXISTS idx_labcompare_run ON labcompare_results(comparison_r
 RESET_SQL = """
 DROP TABLE IF EXISTS task_results;
 DROP TABLE IF EXISTS adversarial_results;
+DROP TABLE IF EXISTS evaluation_results;
 DROP TABLE IF EXISTS probe_results;
 DROP TABLE IF EXISTS stress_results;
 DROP TABLE IF EXISTS sweep_results;

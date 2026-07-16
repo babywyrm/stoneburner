@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from atomics.models import TaskCategory, TaskResult, TaskStatus
+from atomics.storage import EvaluationResultRecord
 from atomics.storage.repository import MetricsRepository, _percentile
 from atomics.storage.schema import SCHEMA_VERSION, init_db
 
@@ -17,7 +18,7 @@ def _tmp_repo() -> MetricsRepository:
 
 
 def test_schema_version_is_current():
-    assert SCHEMA_VERSION == 19
+    assert SCHEMA_VERSION == 20
 
 
 def test_archreview_results_table_exists(tmp_path):
@@ -134,14 +135,14 @@ def test_schema_fresh_start_on_version_mismatch(tmp_path):
 
 
 def test_schema_migration_backs_up_before_wipe(tmp_path):
-    """The pre-wipe backup exists and still holds the old data."""
+    """The v19 pre-wipe backup exists and still holds the old data."""
     import sqlite3
 
     db_path = tmp_path / "migrate.db"
     conn = sqlite3.connect(str(db_path))
     conn.executescript("""
         CREATE TABLE schema_version (version INTEGER PRIMARY KEY);
-        INSERT INTO schema_version (version) VALUES (1);
+        INSERT INTO schema_version (version) VALUES (19);
         CREATE TABLE runs (run_id TEXT PRIMARY KEY, started_at TEXT NOT NULL);
         INSERT INTO runs (run_id, started_at) VALUES ('keepme', '2026-01-01');
     """)
@@ -151,7 +152,7 @@ def test_schema_migration_backs_up_before_wipe(tmp_path):
     conn2 = init_db(db_path)
     conn2.close()
 
-    backups = list(tmp_path.glob("migrate.db.v1.*.bak"))
+    backups = list(tmp_path.glob("migrate.db.v19.*.bak"))
     assert len(backups) == 1, f"expected one backup, found {backups}"
 
     # The backup still contains the pre-migration row.
@@ -1042,3 +1043,135 @@ def test_sweep_results_table_exists(tmp_path):
     row = conn.execute("SELECT model FROM sweep_results WHERE result_id='r1'").fetchone()
     assert row[0] == "test"
     conn.close()
+
+
+def _evaluation_record(
+    *,
+    run_id: str = "eval-run",
+    suite: str = "refusal",
+    fixture_id: str = "fixture-1",
+    status: str = "complete",
+    score: float | None = 1.0,
+    total_tokens: int = 15,
+    error_message: str = "",
+) -> EvaluationResultRecord:
+    return EvaluationResultRecord(
+        run_id=run_id,
+        suite=suite,
+        fixture_id=fixture_id,
+        status=status,
+        generation_status="completed",
+        judge_status="scored" if score is not None else "provider_error",
+        latency_ms=25.0,
+        input_tokens=10,
+        output_tokens=total_tokens - 10,
+        total_tokens=total_tokens,
+        result_json={"id": fixture_id, "status": status},
+        score=score,
+        estimated_cost_usd=0.02,
+        attempt_count=1,
+        judge_failures=0 if score is not None else 1,
+        provider="ollama",
+        model="qwen",
+        error_message=error_message,
+    )
+
+
+def test_evaluation_results_table_exists_with_foreign_key(tmp_path):
+    conn = init_db(tmp_path / "evaluation.db")
+    table = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' "
+        "AND name='evaluation_results'"
+    ).fetchone()
+    foreign_keys = conn.execute(
+        "PRAGMA foreign_key_list(evaluation_results)"
+    ).fetchall()
+
+    assert table is not None
+    assert any(row["table"] == "runs" for row in foreign_keys)
+    conn.close()
+
+
+def test_save_evaluation_result_upserts_logical_fixture(tmp_path):
+    repo = MetricsRepository(tmp_path / "metrics.db")
+    repo.create_run("eval-run", tier="refusal", provider="ollama", model="qwen")
+    repo.save_evaluation_result(
+        _evaluation_record(status="infrastructure_invalid", score=None)
+    )
+    repo.save_evaluation_result(_evaluation_record())
+
+    rows = repo.get_evaluation_results(run_id="eval-run", suite="refusal")
+
+    assert len(rows) == 1
+    assert rows[0]["status"] == "complete"
+    assert rows[0]["score"] == 1.0
+    assert rows[0]["result_json"] == {"id": "fixture-1", "status": "complete"}
+    repo.close()
+
+
+def test_get_evaluation_results_filters_suite_and_orders_timestamp(tmp_path):
+    repo = MetricsRepository(tmp_path / "metrics.db")
+    repo.create_run("eval-run", tier="eval", provider="ollama", model="qwen")
+    repo.save_evaluation_result(_evaluation_record(fixture_id="r1"))
+    repo.save_evaluation_result(
+        _evaluation_record(suite="codereview", fixture_id="c1")
+    )
+
+    rows = repo.get_evaluation_results(run_id="eval-run", suite="codereview")
+
+    assert [row["fixture_id"] for row in rows] == ["c1"]
+    repo.close()
+
+
+def test_save_evaluation_result_sanitizes_error(tmp_path):
+    repo = MetricsRepository(tmp_path / "metrics.db")
+    repo.create_run("eval-run", tier="refusal", provider="ollama", model="qwen")
+    repo.save_evaluation_result(
+        _evaluation_record(
+            status="infrastructure_invalid",
+            score=None,
+            error_message="x-api-key: secret-value",
+        )
+    )
+
+    row = repo.get_evaluation_results(run_id="eval-run")[0]
+
+    assert "secret-value" not in row["error_message"]
+    assert "[REDACTED]" in row["error_message"]
+    repo.close()
+
+
+def test_complete_evaluation_run_rolls_up_honest_counts(tmp_path):
+    repo = MetricsRepository(tmp_path / "metrics.db")
+    repo.create_run("eval-run", tier="refusal", provider="ollama", model="qwen")
+    repo.save_evaluation_result(
+        _evaluation_record(fixture_id="complete", total_tokens=15)
+    )
+    repo.save_evaluation_result(
+        _evaluation_record(
+            fixture_id="failed",
+            status="infrastructure_invalid",
+            score=None,
+            total_tokens=15,
+        )
+    )
+
+    summary = repo.complete_evaluation_run("eval-run")
+
+    assert summary.total_tasks == 2
+    assert summary.successful_tasks == 1
+    assert summary.failed_tasks == 1
+    assert summary.total_tokens == 30
+    repo.close()
+
+
+def test_complete_evaluation_run_handles_zero_rows(tmp_path):
+    repo = MetricsRepository(tmp_path / "metrics.db")
+    repo.create_run("eval-run", tier="refusal", provider="ollama", model="qwen")
+
+    summary = repo.complete_evaluation_run("eval-run")
+
+    assert summary.total_tasks == 0
+    assert summary.successful_tasks == 0
+    assert summary.failed_tasks == 0
+    repo.close()
