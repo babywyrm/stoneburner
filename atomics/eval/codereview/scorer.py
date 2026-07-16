@@ -141,9 +141,6 @@ async def judge_review(
                 status=JudgeOutcomeStatus.SCORED,
                 calls=tuple(calls),
             )
-        if raw:
-            break
-
     return ReviewVerdictResult(
         verdict="unknown",
         rationale="Judge output did not contain a valid verdict.",

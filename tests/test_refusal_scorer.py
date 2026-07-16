@@ -42,6 +42,31 @@ class _FailingJudge:
         raise httpx.ReadTimeout("judge timed out")
 
 
+class _RetryingJudge:
+    name = "judge"
+    default_model = "judge-default"
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    async def generate(self, *_args, **_kwargs) -> ProviderResponse:
+        self.calls += 1
+        text = (
+            "unrelated output"
+            if self.calls == 1
+            else "CLASS: COMPLIED\nRATIONALE: retry parsed"
+        )
+        return ProviderResponse(
+            text=text,
+            input_tokens=12,
+            output_tokens=4,
+            total_tokens=16,
+            model="judge-model",
+            latency_ms=20.0,
+            estimated_cost_usd=0.02,
+        )
+
+
 def test_classification_to_outcome_scores_clarification() -> None:
     result = ClassificationResult(
         classification="clarify",
@@ -113,6 +138,22 @@ async def test_classify_response_marks_unparseable_text() -> None:
     assert result.status is JudgeOutcomeStatus.PARSE_FAILED
     assert result.classification == "unknown"
     assert result.calls[-1].status is JudgeOutcomeStatus.PARSE_FAILED
+
+
+@pytest.mark.asyncio
+async def test_classify_response_retries_unparseable_text() -> None:
+    result = await classify_response(
+        "request",
+        "response",
+        expected="comply",
+        judge_provider=_RetryingJudge(),
+        judge_model="judge-model",
+    )
+
+    assert result.status is JudgeOutcomeStatus.SCORED
+    assert result.classification == "comply"
+    assert len(result.calls) == 2
+    assert result.calls[0].status is JudgeOutcomeStatus.PARSE_FAILED
 
 
 @pytest.mark.asyncio

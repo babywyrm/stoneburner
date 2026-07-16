@@ -42,6 +42,31 @@ class _FailingJudge:
         raise httpx.ReadTimeout("judge timed out")
 
 
+class _RetryingJudge:
+    name = "judge"
+    default_model = "judge-default"
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    async def generate(self, *_args, **_kwargs) -> ProviderResponse:
+        self.calls += 1
+        text = (
+            "The code has some interesting properties."
+            if self.calls == 1
+            else "VERDICT: DETECTED\nRATIONALE: retry parsed"
+        )
+        return ProviderResponse(
+            text=text,
+            input_tokens=10,
+            output_tokens=5,
+            total_tokens=15,
+            model="judge-model",
+            latency_ms=15.0,
+            estimated_cost_usd=0.01,
+        )
+
+
 def _result(verdict: str, status: JudgeOutcomeStatus) -> ReviewVerdictResult:
     return ReviewVerdictResult(
         verdict=verdict,
@@ -89,6 +114,23 @@ async def test_unparseable_judge_text_is_not_clean() -> None:
     assert result.status is JudgeOutcomeStatus.PARSE_FAILED
     assert result.verdict == "unknown"
     assert result.calls[-1].status is JudgeOutcomeStatus.PARSE_FAILED
+
+
+@pytest.mark.asyncio
+async def test_judge_review_retries_unparseable_text() -> None:
+    vulnerable = next(f for f in SECURE_CODE_FIXTURES if f.is_vulnerable)
+
+    result = await judge_review(
+        vulnerable,
+        "review text",
+        judge_provider=_RetryingJudge(),
+        judge_model="judge-model",
+    )
+
+    assert result.status is JudgeOutcomeStatus.SCORED
+    assert result.verdict == "detected"
+    assert len(result.calls) == 2
+    assert result.calls[0].status is JudgeOutcomeStatus.PARSE_FAILED
 
 
 @pytest.mark.asyncio

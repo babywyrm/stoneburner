@@ -155,10 +155,10 @@ class CodeReviewSummary:
     def review_score(self) -> float | None:
         det = self.detection_rate
         fpr = self.false_positive_rate
-        if det is None:
+        if det is None or fpr is None:
             return None
         # Treat detection as recall and (1 - FPR) as precision-ish; harmonic mean.
-        spec = 1.0 - fpr if fpr is not None else 1.0
+        spec = 1.0 - fpr
         if det + spec == 0:
             return 0.0
         return round(2 * det * spec / (det + spec), 3)

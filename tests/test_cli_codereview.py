@@ -82,8 +82,8 @@ class _Summary:
                 cwe="CWE-79",
                 mode="snippet",
             ),
-            verdict="detected",
-            passed=True,
+            verdict="unknown" if partial else "detected",
+            passed=not partial,
             to_dict=lambda: payload,
         )
         self.results = [fixture_result]
@@ -170,6 +170,7 @@ def test_codereview_invocation_preserves_output(monkeypatch) -> None:
     assert "Secure Code Review Summary" in result.output
     assert "cr-characterization" in result.output
     assert "100.0%" in result.output
+    assert "Run ID" in result.output
 
 
 def test_codereview_json_preserves_results_key(monkeypatch, tmp_path) -> None:
@@ -206,6 +207,9 @@ def test_codereview_partial_json_is_written_before_nonzero_exit(
     )
 
     assert result.exit_code == 1
+    assert "ERROR" in result.output
+    assert "MISS" not in result.output
+    assert "Judge failures" in result.output
     assert json.loads(output.read_text(encoding="utf-8"))["integrity"]["status"] == (
         "infrastructure_invalid"
     )
@@ -289,3 +293,76 @@ def test_codereview_failure_preserves_fixture_and_finalizes_parent(
     assert parent["total_tasks"] == 1
     assert parent["completed_at"] is not None
     repo.close()
+
+
+def test_codereview_finalizer_failure_is_sanitized(monkeypatch, tmp_path) -> None:
+    from atomics.storage import MetricsRepository
+
+    db_path = tmp_path / "metrics.db"
+    _patch_codereview(monkeypatch, db_path=db_path)
+
+    def fail_finalizer(*_args, **_kwargs) -> None:
+        raise RuntimeError("Bearer secret-finalizer-token")
+
+    monkeypatch.setattr(
+        MetricsRepository,
+        "complete_evaluation_run",
+        fail_finalizer,
+    )
+
+    result = CliRunner().invoke(cli, ["--no-progress", "codereview"])
+
+    assert result.exit_code == 1
+    assert "Code review evaluation failed" in result.output
+    assert "secret-finalizer-token" not in result.output
+
+
+def test_codereview_callback_save_failure_is_sanitized(monkeypatch, tmp_path) -> None:
+    from atomics.storage import MetricsRepository
+
+    db_path = tmp_path / "metrics.db"
+    _patch_codereview(monkeypatch, db_path=db_path)
+
+    def fail_save(*_args, **_kwargs) -> None:
+        raise RuntimeError("Bearer secret-save-token")
+
+    monkeypatch.setattr(
+        MetricsRepository,
+        "save_evaluation_result",
+        fail_save,
+    )
+
+    result = CliRunner().invoke(cli, ["--no-progress", "codereview"])
+
+    assert result.exit_code == 1
+    assert "Code review evaluation failed" in result.output
+    assert "secret-save-token" not in result.output
+
+
+def test_codereview_progress_respects_root_toggle(monkeypatch) -> None:
+    events: list[str] = []
+
+    class _Progress:
+        def __init__(self, *_args, **_kwargs) -> None:
+            events.append("init")
+
+        def on_start(self, *_args, **_kwargs) -> None:
+            events.append("start")
+
+        def on_done(self, *_args, **_kwargs) -> None:
+            events.append("done")
+
+    _patch_codereview(monkeypatch)
+    monkeypatch.setattr("atomics.commands.codereview.FixtureProgress", _Progress)
+
+    enabled = CliRunner().invoke(cli, ["codereview", "--no-save"])
+    assert enabled.exit_code == 0
+    assert events == ["init", "start", "done"]
+
+    events.clear()
+    disabled = CliRunner().invoke(
+        cli,
+        ["--no-progress", "codereview", "--no-save"],
+    )
+    assert disabled.exit_code == 0
+    assert events == []

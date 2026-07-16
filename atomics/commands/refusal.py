@@ -82,23 +82,30 @@ def refusal(
     from atomics.eval.refusal import REFUSAL_FIXTURES, run_refusal
 
     console = Console()
-    settings = load_settings()
-    provider = _make_provider(
-        provider_name,
-        model,
-        ollama_host,
-        settings,
-        vllm_host=vllm_host,
-    )
-    judge = _make_provider(
-        judge_provider_name,
-        judge_model,
-        judge_host or ollama_host,
-        settings,
-        vllm_host=vllm_host,
-    )
-    attributed_model = effective_model(model, provider)
-    attributed_judge = effective_model(judge_model, judge)
+    try:
+        settings = load_settings()
+        provider = _make_provider(
+            provider_name,
+            model,
+            ollama_host,
+            settings,
+            vllm_host=vllm_host,
+        )
+        judge = _make_provider(
+            judge_provider_name,
+            judge_model,
+            judge_host or ollama_host,
+            settings,
+            vllm_host=vllm_host,
+        )
+        attributed_model = effective_model(model, provider)
+        attributed_judge = effective_model(judge_model, judge)
+    except click.ClickException:
+        raise
+    except Exception as exc:
+        raise click.ClickException(
+            f"Refusal evaluation setup failed: {sanitize_error(exc)}"
+        ) from exc
     console.print(
         f"\n[bold]Refusal calibration[/bold] — model: [cyan]"
         f"{escape(provider_name)}[/cyan] ({escape(attributed_model)})\n"
@@ -130,7 +137,11 @@ def refusal(
     def on_done(result: RefusalResult) -> None:
         if progress is not None:
             progress.on_done(max(current_index, 0))
-        mark = "[green]OK[/green]" if result.correct else "[red]MISS[/red]"
+        payload = result.to_dict()
+        if payload["score"] is None:
+            mark = "[yellow]ERROR[/yellow]"
+        else:
+            mark = "[green]OK[/green]" if result.correct else "[red]MISS[/red]"
         flag = ""
         if result.over_refusal:
             flag = " [yellow](over-refusal)[/yellow]"
@@ -148,10 +159,11 @@ def refusal(
                     suite="refusal",
                     provider=provider_name,
                     model=attributed_model,
-                    payload=result.to_dict(),
+                    payload=payload,
                 )
             )
 
+    failure: Exception | None = None
     try:
         if save:
             repository = MetricsRepository(settings.db_path)
@@ -190,19 +202,28 @@ def refusal(
 
         if integrity_exit_code(summary.integrity, allow_partial=allow_partial):
             raise click.exceptions.Exit(1)
-    except (click.ClickException, click.exceptions.Exit):
-        raise
     except Exception as exc:
-        raise click.ClickException(
-            f"Refusal evaluation failed: {sanitize_error(exc)}"
-        ) from exc
+        failure = exc
     finally:
         if repository is not None:
-            try:
-                if parent_created:
+            if parent_created:
+                try:
                     repository.complete_evaluation_run(run_id)
-            finally:
+                except Exception as exc:
+                    if failure is None:
+                        failure = exc
+            try:
                 repository.close()
+            except Exception as exc:
+                if failure is None:
+                    failure = exc
+
+    if failure is not None:
+        if isinstance(failure, (click.ClickException, click.exceptions.Exit)):
+            raise failure
+        raise click.ClickException(
+            f"Refusal evaluation failed: {sanitize_error(failure)}"
+        ) from failure
 
 
 def _render_summary(
@@ -220,6 +241,7 @@ def _render_summary(
     table.add_row("Provider", provider_name)
     table.add_row("Model", model)
     table.add_row("Judge", f"{judge_provider} / {judge_model}")
+    table.add_row("Run ID", summary.run_id)
     calibration = summary.calibration_score
     over_refusal = summary.over_refusal_rate
     under_refusal = summary.under_refusal_rate
@@ -237,6 +259,11 @@ def _render_summary(
     )
     table.add_row("Fixtures", str(len(summary.results)))
     table.add_row("Integrity", summary.integrity.status.value)
+    table.add_row(
+        "Generation failures",
+        str(summary.integrity.generation_failures),
+    )
+    table.add_row("Judge failures", str(summary.integrity.judge_failures))
     table.add_row(
         "Fixture coverage",
         f"{summary.integrity.fixture_coverage * 100:.1f}%",

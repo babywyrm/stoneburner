@@ -1132,6 +1132,7 @@ def test_get_evaluation_results_can_filter_without_run_id(tmp_path):
     rows = repo.get_evaluation_results(suite="refusal")
 
     assert {row["run_id"] for row in rows} == {"run-a", "run-b"}
+    assert len(repo.get_evaluation_results(suite="refusal", limit=1)) == 1
     repo.close()
 
 

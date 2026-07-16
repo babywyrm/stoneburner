@@ -81,8 +81,8 @@ class _Summary:
                 category="benign",
                 expected="comply",
             ),
-            classification="comply",
-            correct=True,
+            classification="unknown" if partial else "comply",
+            correct=not partial,
             over_refusal=False,
             under_refusal=False,
             to_dict=lambda: payload,
@@ -171,6 +171,7 @@ def test_refusal_invocation_preserves_output(monkeypatch) -> None:
     assert "Refusal Calibration Summary" in result.output
     assert "ref-characterization" in result.output
     assert "100.0%" in result.output
+    assert "Run ID" in result.output
 
 
 def test_refusal_json_preserves_results_key(monkeypatch, tmp_path) -> None:
@@ -198,6 +199,9 @@ def test_refusal_partial_run_exits_nonzero(monkeypatch) -> None:
 
     assert result.exit_code == 1
     assert "infrastructure_invalid" in result.output
+    assert "ERROR" in result.output
+    assert "MISS" not in result.output
+    assert "Judge failures" in result.output
 
 
 def test_refusal_allow_partial_writes_json(monkeypatch, tmp_path) -> None:
@@ -286,3 +290,111 @@ def test_refusal_failure_preserves_fixture_and_finalizes_parent(
     assert parent["total_tasks"] == 1
     assert parent["completed_at"] is not None
     repo.close()
+
+
+def test_refusal_finalizer_failure_is_sanitized(monkeypatch, tmp_path) -> None:
+    from atomics.storage import MetricsRepository
+
+    db_path = tmp_path / "metrics.db"
+    _patch_refusal(monkeypatch, db_path=db_path)
+
+    def fail_finalizer(*_args, **_kwargs) -> None:
+        raise RuntimeError("Bearer secret-finalizer-token")
+
+    monkeypatch.setattr(
+        MetricsRepository,
+        "complete_evaluation_run",
+        fail_finalizer,
+    )
+
+    result = CliRunner().invoke(cli, ["--no-progress", "refusal"])
+
+    assert result.exit_code == 1
+    assert "Refusal evaluation failed" in result.output
+    assert "secret-finalizer-token" not in result.output
+
+
+def test_refusal_json_failure_keeps_persisted_fixture(monkeypatch, tmp_path) -> None:
+    from atomics.storage import MetricsRepository
+
+    db_path = tmp_path / "metrics.db"
+    _patch_refusal(monkeypatch, db_path=db_path)
+
+    def fail_json(*_args, **_kwargs) -> None:
+        raise OSError("Bearer secret-json-token")
+
+    monkeypatch.setattr(
+        "atomics.commands.refusal.write_summary_json",
+        fail_json,
+    )
+
+    result = CliRunner().invoke(
+        cli,
+        ["--no-progress", "refusal", "--json-out", str(tmp_path / "out.json")],
+    )
+
+    assert result.exit_code == 1
+    assert "secret-json-token" not in result.output
+    repo = MetricsRepository(db_path)
+    rows = repo.get_evaluation_results(suite="refusal")
+    assert len(rows) == 1
+    parent = next(
+        run
+        for run in repo.get_recent_runs()
+        if run["run_id"] == rows[0]["run_id"]
+    )
+    assert parent["completed_at"] is not None
+    repo.close()
+
+
+def test_refusal_primary_failure_survives_close_failure(monkeypatch, tmp_path) -> None:
+    from atomics.storage import MetricsRepository
+
+    db_path = tmp_path / "metrics.db"
+    _patch_refusal(
+        monkeypatch,
+        db_path=db_path,
+        fail_after_callback=True,
+    )
+    original_close = MetricsRepository.close
+
+    def fail_close(repository, *_args, **_kwargs) -> None:
+        original_close(repository)
+        raise RuntimeError("close failure")
+
+    monkeypatch.setattr(MetricsRepository, "close", fail_close)
+
+    result = CliRunner().invoke(cli, ["--no-progress", "refusal"])
+
+    assert result.exit_code == 1
+    assert "fixture batch failed" in result.output
+    assert "close failure" not in result.output
+
+
+def test_refusal_progress_respects_root_toggle(monkeypatch) -> None:
+    events: list[str] = []
+
+    class _Progress:
+        def __init__(self, *_args, **_kwargs) -> None:
+            events.append("init")
+
+        def on_start(self, *_args, **_kwargs) -> None:
+            events.append("start")
+
+        def on_done(self, *_args, **_kwargs) -> None:
+            events.append("done")
+
+    _patch_refusal(monkeypatch)
+    monkeypatch.setattr("atomics.commands.refusal.FixtureProgress", _Progress)
+
+    enabled = CliRunner().invoke(cli, ["refusal", "--no-save"])
+    assert enabled.exit_code == 0
+    assert events == ["init", "start", "done"]
+
+    events.clear()
+    disabled = CliRunner().invoke(
+        cli,
+        ["--no-progress", "refusal", "--no-save"],
+    )
+    assert disabled.exit_code == 0
+    assert events == []

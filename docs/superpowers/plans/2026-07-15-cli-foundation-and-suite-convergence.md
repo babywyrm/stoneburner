@@ -1159,4 +1159,3 @@ git status --short --branch
 
 Expected: changed-file Ruff, full-package mypy, and full pytest pass; `main` is
 clean and ahead of `origin/main` only by the intentional milestone commits.
-
