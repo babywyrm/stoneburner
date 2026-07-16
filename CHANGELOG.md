@@ -10,6 +10,10 @@
   `adversarial_results`, with model-under-test usage rolled up to parent runs.
 - **`atomics adversarial --allow-partial`** — explicitly permits partial or
   infrastructure-invalid execution to exit zero after diagnostics.
+- **Generic evaluation ledger** — schema v20 adds `evaluation_results` for
+  refusal and secure-code-review fixtures. Results are saved incrementally,
+  preserve typed status, usage, cost, sanitized errors, and raw model/judge
+  evidence, and finalize their parent run even when later execution fails.
 - **Two new adversarial suites** (adversarial fixture count 64 → 72):
   - `encoding` (5 fixtures) — base64 / ROT13 / leetspeak / hex / homoglyph-wrapped
     override requests. Tests whether safety reasoning survives an obfuscation
@@ -38,6 +42,23 @@
   now exit nonzero by default after JSON output and database finalization.
   Every fixture is persisted, compare runs own finalized parent rows, and the
   existing JSON shape remains compatible as an additive superset.
+- **Converged refusal and code-review execution** — both runners now retain
+  immutable provider attempts and judge-call evidence, expose
+  `fixture_results`, typed integrity, and total cost, and follow the same
+  nonzero-on-incomplete policy. Their commands support `--allow-partial`,
+  `--save/--no-save`, progress callbacks, and canonical JSON output.
+- **Modular CLI foundation** — refusal and code-review commands now live under
+  `atomics.commands`; shared provider construction, model attribution,
+  progress, JSON writing, persistence conversion, and integrity exit policy
+  are centralized in `commands.common`.
+- **Pre-1.0 schema upgrades** — opening a pre-v20 database creates a
+  timestamped WAL-safe backup before the existing reset migration policy runs.
+
+### Security
+- Refusal and code-review JSON exports and
+  `evaluation_results.result_json` contain raw model and judge evidence.
+  Documentation now calls out their sensitive-data handling requirements;
+  persisted exception summaries continue to be sanitized.
 
 ## 0.9.0 (2026-07-09) — labcompare, security hardening, frontier comparison, Phase-C typing
 

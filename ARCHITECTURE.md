@@ -18,7 +18,7 @@ Dependencies point downward only. Nothing below the CLI imports the CLI; storage
 never imports eval; providers never import storage.
 
 ```
-CLI / entry          cli.py, __main__.py
+CLI / entry          cli.py, commands/, __main__.py
 Orchestration        sweep, scenario, qa_runner, labcompare
 Burn loop            core/, tasks/, tiers, hooks
 Eval / security      eval/, probe/, archreview/
@@ -33,7 +33,7 @@ Support / infra      config, paths, secrets, doctor, reporting, exporters,
 
 | Layer | Owns | Key modules |
 |-------|------|-------------|
-| CLI | Argument parsing, wiring, Rich output. No business logic that can't be reached another way. | `cli.py` |
+| CLI | Argument parsing, wiring, Rich output. No business logic that can't be reached another way. | `cli.py`, `commands/` |
 | Orchestration | Multi-run/multi-model coordination over the lower layers. | `sweep.py`, `scenario.py`, `qa_runner.py`, `labcompare.py` |
 | Burn loop | The continuous token-burn benchmark. | `core/engine.py`, `core/runner.py`, `core/guard.py`, `tasks/` |
 | Eval / security | LLM quality and security evaluation suites. | `eval/`, `probe/`, `archreview/` |
@@ -70,8 +70,16 @@ class BaseProvider(ABC):
 cost, and `tps_basis`. Adapters live in `providers/{claude,openai,bedrock,ollama,
 vllm,brain_gateway}.py`. Pricing is centralized in `providers/pricing.py`.
 
-Build providers through the single CLI factory `_make_provider()` — do not write a
-new provider-name switch.
+Build providers through the single CLI factory
+`commands.common._make_provider()` — do not write a new provider-name switch.
+
+### `commands/` — command boundary
+
+`cli.py` remains the Click root and registers command objects imported from
+`atomics.commands`. New or substantially revised commands belong in a dedicated
+`commands/<name>.py` module; reusable command-layer policy belongs in
+`commands/common.py`. Keep runners independent of Click and Rich so they remain
+directly testable and reusable.
 
 ### `models.py` — shared domain vocabulary
 
@@ -85,7 +93,7 @@ Pydantic models for the burn/eval domain: `TaskResult`, `RunSummary`,
 ```
 create_run(run_id, tier=..., provider=..., model=...)   # once, before saving items
 save_*(...)                                              # per item
-complete_run(run_id)  (or complete_adversarial_run)     # once, at the end
+complete_run(run_id)  (or a suite-specific finalizer)   # once, at the end
 ```
 
 All new persistence goes through `MetricsRepository`, never raw `sqlite3`.
@@ -101,6 +109,16 @@ the new fields are an additive JSON superset. Adversarial parent token totals
 sum every model-under-test provider attempt, including failed attempts with known
 usage; judge-call tokens remain ledger evidence and cost data rather than parent
 task token usage.
+
+Schema v20 adds `evaluation_results`, the generic fixture ledger used by
+`refusal` and `codereview`. Commands create one parent run, upsert each canonical
+`fixture_result.to_dict()` as soon as the fixture completes, and finalize the
+parent even when a later fixture fails. `result_json` preserves raw
+model-under-test and judge evidence; typed columns support filtering and honest
+rollups without reparsing that evidence.
+
+Stoneburner is pre-1.0: opening an older schema creates a timestamped, WAL-safe
+`.bak` beside the database before resetting tables to the current schema.
 
 ### `eval/judge.py` — LLM-as-judge
 
@@ -126,11 +144,14 @@ These suites share the "fixtures → provider → judge → summary → storage"
 | `archreview` | `RepoSpec` + evidence pack | `archreview/runner.py` | objective + reasoning | security-architecture review |
 | `probe` | `ProbeTarget` | `probe/runner.py` | quality (`judge.py`) | live-artifact regression |
 
-Adversarial runs classify integrity as `complete`, `partial`, or
-`infrastructure_invalid`. The CLI reports fixture and attempt coverage and exits
-nonzero for the latter two only after saving fixtures, finalizing parent rows,
-and writing requested JSON. `--allow-partial` overrides this integrity exit, but
-does not override an independent `--fail-on-resilience` gate.
+Adversarial, refusal, and codereview runs classify integrity as `complete`,
+`partial`, or `infrastructure_invalid`. Their summaries expose
+`fixture_results`, typed integrity, full attempt evidence, and aggregate cost.
+The CLI reports coverage and exits nonzero for incomplete integrity only after
+saving fixtures, finalizing parent rows, and writing requested JSON.
+`--allow-partial` overrides this integrity exit; it does not alter stored
+integrity or override adversarial's independent `--fail-on-resilience` gate.
+`--save/--no-save` controls SQLite persistence.
 
 ### How to add a new adversarial fixture suite
 
@@ -160,12 +181,14 @@ New code should follow the target column, not copy whichever suite you opened fi
 
 | Concern | Target convention | Status |
 |---------|-------------------|--------|
-| Item list field | `fixture_results` | redblue/probe now expose it as an alias for `results` |
+| Item list field | `fixture_results` | adversarial/refusal/codereview use it; redblue/probe expose it as an alias for `results` |
 | Multi-pass arg | `runs` | archreview accepts `--runs` as an alias for `--rounds` |
 | JSON export | `Summary.to_dict()` + `--json-out` | done — all five suites |
 | Parent run row | `create_run()` + `complete_*_run()` | done — all suites create + finalize a run row |
 | Stats helpers | one shared `stats` module | done — `atomics/stats.py` |
 | Provider build | `_make_provider()` | done — single factory |
+| CLI modules | one module per command under `commands/` | refusal/codereview extracted; remaining commands still live in `cli.py` |
+| Repository modules | persistence grouped by domain | generic records extracted; `storage/repository.py` remains a split candidate |
 
 ---
 

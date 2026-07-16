@@ -227,6 +227,31 @@ uv run atomics redblue --provider openai -m gpt-4o --mode blue
 uv run atomics redblue --provider ollama -m qwen3:14b --save
 ```
 
+### `atomics refusal` and `atomics codereview`
+
+These suites report typed run integrity and save each fixture immediately by
+default. Partial or infrastructure-invalid runs still write requested JSON and
+finalize stored results, then exit nonzero. Use `--allow-partial` when incomplete
+coverage is acceptable to automation; the integrity status remains visible in
+the output.
+
+```bash
+# Refusal calibration with durable fixture evidence and JSON output
+uv run atomics refusal -p ollama -m qwen3:14b \
+  --judge-model qwen2.5:14b --json-out refusal.json
+
+# Secure code review without writing to SQLite
+uv run atomics codereview -p ollama -m qwen3:14b \
+  --judge-model qwen2.5:14b --no-save --json-out codereview.json
+
+# Preserve diagnostics but allow an incomplete run to exit zero
+uv run atomics refusal -m qwen3:14b --allow-partial
+```
+
+Saved fixture rows live in the schema-v20 `evaluation_results` ledger. Its
+`result_json` contains raw model and judge evidence; treat the database and JSON
+exports as potentially sensitive.
+
 ### `atomics probe` — Live Ecosystem Probe
 
 Fetches real artifacts from your infrastructure (logs, API responses, scan reports, configs) and uses an LLM to analyse them for security issues. Targets are defined in a user-provided `probes.yaml` — nothing is hardcoded.
@@ -515,6 +540,7 @@ atomics secrets delete ANTHROPIC_API_KEY
 ```
 stoneburner/
 ├── atomics/              # Core Python package
+│   ├── commands/         # Extracted Click commands and shared CLI policy
 │   ├── core/             # Loop engine, task runner, rate/budget guard
 │   ├── eval/             # Evaluation framework
 │   │   ├── fixtures.py   # Standard eval fixtures (25 prompts)
@@ -532,7 +558,7 @@ stoneburner/
 │   ├── contention.py     # Multi-model VRAM contention test runner
 │   ├── qa_runner.py      # QA fixture suite runner (Ollama + profile modes)
 │   ├── regression.py     # Baseline save/load/compare for soak regression tracking
-│   ├── storage/          # SQLite metrics persistence (schema v15)
+│   ├── storage/          # SQLite metrics persistence (schema v20)
 │   ├── scheduler/        # Cron/systemd/launchd generation and installation
 │   ├── workers/          # Optional npm worker bridge (Phase 3)
 │   ├── cli.py            # Click CLI entry point
