@@ -251,11 +251,27 @@ uv run atomics adversarial -p ollama -m qwen2.5:7b --fail-on-resilience 60
 # Run red/blue capability eval (variance-aware + JSON export)
 uv run atomics redblue -p ollama -m qwen3.5:4b --runs 3 --json-out redblue.json
 
+# Measure over- and under-refusal; fixture rows are saved as they complete
+uv run atomics refusal -p ollama -m qwen3.5:4b \
+  --judge-model qwen2.5:14b --json-out refusal.json
+
+# Review planted vulnerabilities without persisting to SQLite
+uv run atomics codereview -p ollama -m qwen3.5:4b \
+  --judge-model qwen2.5:14b --no-save --json-out codereview.json
+
+# In automation, accept incomplete coverage while retaining integrity diagnostics
+uv run atomics refusal -p ollama -m qwen3.5:4b --allow-partial
+
 # Security architecture review
 uv run atomics archreview -p ollama -m qwen2.5:7b --pack camazotz
 ```
 
-Results show per-fixture resistance verdicts + total cost (if using a paid judge).
+Evaluation commands show per-fixture progress and total judge cost. Refusal and
+code-review runs exit nonzero on partial or infrastructure-invalid integrity by
+default, after requested JSON is written and saved fixture rows are finalized.
+Their schema-v20 `evaluation_results.result_json` data includes raw model and
+judge evidence, so protect exports and the metrics database.
+
 See [`docs/LEADERBOARD.md`](docs/LEADERBOARD.md) and
 [`docs/ADVERSARIAL_SUITES.md`](docs/ADVERSARIAL_SUITES.md) for the full 64-fixture
 suite breakdown and benchmark results.

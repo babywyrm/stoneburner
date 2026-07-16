@@ -63,13 +63,17 @@ Exception strings stored in the database (`error_message` columns) are
 sanitized to strip common credential patterns (Bearer tokens, API keys,
 AWS access keys) before persistence and export.
 
-## Adversarial evaluation exports
+## Evaluation evidence and exports
 
-Adversarial JSON exports contain raw model responses and complete judge-call
-evidence, including visible response text, thinking text, the effective text
-that was parsed, and sanitized error diagnostics. These fields can still
-contain prompts, generated secrets, personal data, or other sensitive content.
+Adversarial, refusal, and code-review JSON exports contain raw model responses
+and judge-call evidence, including visible response text, thinking text, the
+effective text that was parsed, and sanitized error diagnostics. Refusal and
+code-review persist the same canonical evidence in
+`evaluation_results.result_json`. These fields can still contain prompts,
+generated secrets, personal data, source code, or other sensitive content.
 
-Treat adversarial exports as sensitive. Store them with restrictive file
-permissions, limit access to trusted operators, and avoid committing or
-uploading them to public systems.
+Treat evaluation exports and the Stoneburner metrics database as sensitive.
+Store them with restrictive file permissions, limit access to trusted
+operators, and avoid committing or uploading them to public systems. Use
+`--no-save` when durable local evidence is unnecessary; this does not redact
+explicit `--json-out` output.
