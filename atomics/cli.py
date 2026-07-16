@@ -19,6 +19,7 @@ from atomics.commands.common import (
     _attribution_model,
     _make_provider,
 )
+from atomics.commands.refusal import refusal
 from atomics.config import load_settings
 from atomics.labcompare import (
     parity_verdict,
@@ -64,6 +65,10 @@ def cli(ctx: click.Context, verbose: bool, progress: bool) -> None:
         _setup_logging("DEBUG", rich_tracebacks=True)
     else:
         _setup_logging("WARNING")
+
+
+cli.add_command(refusal)
+
 
 @cli.command()
 @click.option(
@@ -2486,82 +2491,6 @@ def redblue(
     if repo:
         repo.complete_run(run_id)
         repo.close()
-
-    if json_out:
-        import json as _json
-        with open(json_out, "w", encoding="utf-8") as fh:
-            _json.dump(summary.to_dict(), fh, indent=2)
-        console.print(f"\n[dim]Wrote JSON results to {json_out}[/dim]")
-
-
-# ── atomics refusal ───────────────────────────────────────────────────────────
-
-@cli.command("refusal")
-@click.option("--provider", "-p", "provider_name", type=PROVIDER_CHOICES,
-              default="ollama", show_default=True)
-@click.option("--model", "-m", type=str, default=None)
-@click.option("--ollama-host", type=str, default=None)
-@click.option("--vllm-host", "vllm_host", type=str, default=None)
-@click.option("--judge-provider", "judge_provider_name", type=PROVIDER_CHOICES,
-              default="ollama", show_default=True)
-@click.option("--judge-model", type=str, default=None)
-@click.option("--judge-host", type=str, default=None)
-@click.option("-o", "--json-out", "json_out", type=click.Path(), default=None)
-def refusal(provider_name, model, ollama_host, vllm_host, judge_provider_name,
-            judge_model, judge_host, json_out):
-    """Refusal-calibration eval — measures over- vs under-refusal.
-
-    Pairs benign (should-comply), harmful (should-refuse), and ambiguous
-    (should-clarify) requests, then reports an over-refusal rate (refusing
-    legitimate work), an under-refusal rate (complying with harmful asks), and
-    an overall calibration score. A well-calibrated model scores high on both.
-    """
-    from atomics.eval.refusal import run_refusal
-
-    console = Console()
-    settings = load_settings()
-    provider = _make_provider(provider_name, model, ollama_host, settings, vllm_host=vllm_host)
-    judge = _make_provider(judge_provider_name, judge_model, judge_host or ollama_host,
-                           settings, vllm_host=vllm_host)
-
-    console.print(
-        f"\n[bold]Refusal calibration[/bold] — model: [cyan]{provider_name}[/cyan] "
-        f"({model or 'default'})\n"
-        f"Judge: [cyan]{judge_provider_name}[/cyan] ({judge_model or 'default'})\n"
-    )
-
-    def on_done(r):
-        exp = r.fixture.expected
-        cls = r.classification
-        mark = "[green]OK[/green]" if r.correct else "[red]MISS[/red]"
-        flag = ""
-        if r.over_refusal:
-            flag = " [yellow](over-refusal)[/yellow]"
-        elif r.under_refusal:
-            flag = " [red](under-refusal)[/red]"
-        console.print(
-            f"  {mark} [bold]{r.fixture.id}[/bold] expected={exp} got={cls}{flag}"
-        )
-
-    summary = asyncio.run(run_refusal(
-        provider, judge_provider=judge, model=model, judge_model=judge_model,
-        on_fixture_done=on_done,
-    ))
-
-    table = Table(title="Refusal Calibration Summary")
-    table.add_column("Metric")
-    table.add_column("Value")
-    table.add_row("Provider", provider_name)
-    table.add_row("Model", model or "default")
-    table.add_row("Judge", f"{judge_provider_name} / {judge_model or 'default'}")
-    cal = summary.calibration_score
-    over = summary.over_refusal_rate
-    under = summary.under_refusal_rate
-    table.add_row("Calibration score", f"{cal * 100:.1f}%" if cal is not None else "n/a")
-    table.add_row("Over-refusal rate", f"{over * 100:.1f}%" if over is not None else "n/a")
-    table.add_row("Under-refusal rate", f"{under * 100:.1f}%" if under is not None else "n/a")
-    table.add_row("Fixtures", str(len(summary.results)))
-    console.print(table)
 
     if json_out:
         import json as _json
