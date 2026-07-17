@@ -1941,6 +1941,196 @@ def sweep(
         console.print("\n[dim]Sweep results saved to database.[/dim]")
 
 
+# ── atomics rag ───────────────────────────────────────────────────────────────
+
+@cli.command("rag")
+@click.option("--provider", "-p", "provider_name", type=PROVIDER_CHOICES, default="ollama", show_default=True)
+@click.option("--model", "-m", type=str, default=None, help="Model override for the provider under test.")
+@click.option("--ollama-host", type=str, default=None, help="Ollama base URL.")
+@click.option("--vllm-host", "vllm_host", type=str, default=None, help="vLLM/OpenAI-compatible base URL.")
+@click.option("--region", type=str, default="us-east-1", help="AWS region for Bedrock.")
+@click.option("--judge-provider", "judge_provider_name", type=PROVIDER_CHOICES, default="ollama",
+              show_default=True, help="Provider for the RAG judge.")
+@click.option("--judge-model", type=str, default=None, help="Model for the RAG judge.")
+@click.option("--judge-host", type=str, default=None, help="Ollama host for the judge model.")
+@click.option("--fixtures", "fixtures_filter", type=str, default=None,
+              help="Comma-separated fixture IDs (e.g. rag-05 or rag-01,rag-10).")
+@click.option("--save/--no-save", "save_results", default=True, help="Persist results to the database.")
+@click.option("--json-out", "json_out", type=click.Path(dir_okay=False, writable=True), default=None,
+              help="Write the full run as JSON to this file.")
+@click.option("--thinking/--no-thinking", "thinking_flag", default=None, help="Enable/disable thinking.")
+@click.option("--thinking-budget", type=int, default=None, help="Max thinking tokens.")
+def rag(
+    provider_name: str,
+    model: str | None,
+    ollama_host: str | None,
+    vllm_host: str | None,
+    region: str,
+    judge_provider_name: str,
+    judge_model: str | None,
+    judge_host: str | None,
+    fixtures_filter: str | None,
+    save_results: bool,
+    json_out: str | None,
+    thinking_flag: bool | None,
+    thinking_budget: int | None,
+) -> None:
+    """RAG pipeline evaluation — grounding, faithfulness, and abstention scoring."""
+    settings = load_settings()
+    _setup_logging(settings.log_level)
+    console = Console()
+
+    from atomics.eval.rag.fixtures import ALL_RAG_FIXTURES
+    from atomics.eval.rag.runner import RAGFixtureResult, run_rag
+
+    test_provider = _make_provider(
+        provider_name, model, settings,
+        ollama_host=ollama_host, vllm_host=vllm_host, region=region,
+    )
+    judge_provider = _make_provider(
+        judge_provider_name, judge_model, settings,
+        ollama_host=judge_host or ollama_host, vllm_host=vllm_host, region=region,
+    )
+
+    selected_fixtures = ALL_RAG_FIXTURES
+    if fixtures_filter:
+        ids = [f.strip() for f in fixtures_filter.split(",")]
+        fixture_map = {f.id: f for f in ALL_RAG_FIXTURES}
+        missing = [i for i in ids if i not in fixture_map]
+        if missing:
+            console.print(f"[red]Unknown fixture IDs: {', '.join(missing)}[/red]")
+            sys.exit(1)
+        selected_fixtures = [fixture_map[i] for i in ids]
+
+    fixture_count = len(selected_fixtures)
+    console.print(
+        f"\n[bold]RAG Evaluation[/bold] — provider: [cyan]{provider_name}[/cyan] | "
+        f"model: [cyan]{model or 'default'}[/cyan] | "
+        f"judge: [cyan]{judge_provider_name}:{judge_model or 'default'}[/cyan]\n"
+        f"Fixtures: [bold]{fixture_count}[/bold] | "
+        f"Results saved: [bold]{'yes' if save_results else 'no'}[/bold]\n"
+    )
+
+    repo = None
+    if save_results:
+        from atomics.storage.repository import MetricsRepository
+        repo = MetricsRepository(settings.db_path)
+
+    import uuid as _uuid
+    rag_run_id = _uuid.uuid4().hex[:12]
+    if provider_name == "ollama":
+        effective_model = model or settings.ollama_model
+    elif provider_name == "vllm":
+        effective_model = model or settings.vllm_model
+    else:
+        effective_model = model or settings.default_model
+    if repo:
+        repo.create_run(
+            rag_run_id, tier="rag", provider=provider_name,
+            model=effective_model, trigger="eval",
+        )
+
+    result_table = Table(title="RAG Eval Results", show_lines=True)
+    result_table.add_column("ID", style="dim")
+    result_table.add_column("Type", style="cyan")
+    result_table.add_column("Ground", justify="right")
+    result_table.add_column("Faith", justify="right")
+    result_table.add_column("Abst", justify="right")
+    result_table.add_column("Score", justify="right", style="green bold")
+    result_table.add_column("Latency", justify="right")
+    result_table.add_column("Tokens", justify="right")
+    result_table.add_column("Cost", justify="right", style="yellow")
+    result_table.add_column("Rationale", no_wrap=False, max_width=35, style="dim")
+
+    def on_done(fr: RAGFixtureResult) -> None:
+        tr = fr.task_result
+        j = fr.judge
+        if tr.status.value == "failed":
+            score_str = "[red]FAIL[/red]"
+            rationale = tr.error_message[:60]
+            g_str = f_str = a_str = "—"
+        elif j and not j.parse_failed:
+            score_str = f"{j.score * 100:.0f}%"
+            rationale = j.rationale[:60]
+            g_str = str(j.grounding)
+            f_str = str(j.faithfulness)
+            a_str = str(j.abstention)
+        else:
+            score_str = "[yellow]?[/yellow]"
+            rationale = "judge parse failed"
+            g_str = f_str = a_str = "?"
+
+        ctx_type = "answer" if fr.fixture.context_contains_answer else "abstain"
+        result_table.add_row(
+            fr.fixture.id, ctx_type, g_str, f_str, a_str, score_str,
+            f"{tr.latency_ms:.0f}ms", str(tr.total_tokens),
+            f"${tr.estimated_cost_usd:.6f}", rationale,
+        )
+        if repo:
+            repo.save_task_result(tr, suite="rag")
+
+    eff_thinking = thinking_flag
+    if eff_thinking is None and model:
+        from atomics.model_classes import supports_thinking
+        if supports_thinking(model):
+            eff_thinking = True
+
+    summary = asyncio.run(run_rag(
+        test_provider,
+        judge_provider=judge_provider,
+        model=model,
+        judge_model=judge_model,
+        run_id=rag_run_id,
+        on_fixture_done=on_done,
+        thinking=eff_thinking,
+        thinking_budget=thinking_budget,
+        fixtures=selected_fixtures,
+    ))
+
+    console.print(result_table)
+
+    summary_table = Table(title="RAG Eval Summary", show_lines=True)
+    summary_table.add_column("Metric", style="dim")
+    summary_table.add_column("Value", style="bold")
+    summary_table.add_row("Provider", provider_name)
+    summary_table.add_row("Model", model or "default")
+
+    rag_score = summary.overall_rag_score
+    summary_table.add_row("Overall RAG Score",
+                          f"[green]{rag_score * 100:.1f}%[/green]" if rag_score is not None else "—")
+    gs = summary.grounding_score
+    summary_table.add_row("Grounding",
+                          f"{gs * 100:.1f}%" if gs is not None else "—")
+    fs = summary.faithfulness_score
+    summary_table.add_row("Faithfulness",
+                          f"{fs * 100:.1f}%" if fs is not None else "—")
+    aa = summary.abstention_accuracy
+    summary_table.add_row("Abstention Accuracy",
+                          f"{aa * 100:.1f}%" if aa is not None else "—")
+    hr = summary.hallucination_rate
+    hr_style = "green" if hr is not None and hr < 0.1 else "yellow" if hr is not None and hr < 0.3 else "red"
+    summary_table.add_row("Hallucination Rate",
+                          f"[{hr_style}]{hr * 100:.1f}%[/{hr_style}]" if hr is not None else "—")
+    summary_table.add_row("Avg Latency", f"{summary.avg_latency_ms:.0f}ms")
+    summary_table.add_row("Total Tokens", f"{summary.total_tokens:,}")
+    summary_table.add_row("Total Cost", f"${summary.total_cost_usd:.6f}")
+    summary_table.add_row("Fixtures Run", str(len(summary.fixture_results)))
+    pf = summary.parse_failure_rate
+    pf_style = "green" if pf == 0 else "yellow" if pf < 0.1 else "red"
+    summary_table.add_row("Judge Parse Failures", f"[{pf_style}]{pf * 100:.1f}%[/{pf_style}]")
+    console.print(summary_table)
+
+    if repo:
+        repo.complete_run(rag_run_id)
+        repo.close()
+
+    if json_out:
+        import json as _json
+        with open(json_out, "w", encoding="utf-8") as fh:
+            _json.dump(summary.to_dict(), fh, indent=2)
+        console.print(f"[dim]Wrote JSON results to {json_out}[/dim]")
+
+
 # ── atomics adversarial ───────────────────────────────────────────────────────
 
 @cli.command("adversarial")
