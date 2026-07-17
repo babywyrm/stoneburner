@@ -77,6 +77,7 @@ uv run atomics tiers                   # show all tier profiles
 | `atomics redblue` | Red/blue security capability eval |
 | `atomics stress` | GPU saturation testing |
 | `atomics soak` | Long-duration stability test |
+| `atomics rag` | RAG pipeline evaluation (grounding, faithfulness, abstention) |
 | `atomics sweep` | Multi-model eval sweep |
 | `atomics doctor` | Installation health check |
 
@@ -190,6 +191,7 @@ uv run python -m pytest --cov=atomics --cov-report=term-missing
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Layer map, primitives, contributor guide |
 | [SECURITY.md](SECURITY.md) | Operational security considerations |
 | [CHANGELOG.md](CHANGELOG.md) | Version history |
+| [ROADMAP.md](ROADMAP.md) | Priorities and future directions |
 | [docs/CLI_REFERENCE.md](docs/CLI_REFERENCE.md) | Full CLI command reference |
 | [docs/SECURITY_SUITES.md](docs/SECURITY_SUITES.md) | Security evaluation suites |
 | [docs/LOAD_TESTING.md](docs/LOAD_TESTING.md) | Stress, soak, scenario, capacity testing |

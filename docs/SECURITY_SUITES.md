@@ -122,6 +122,21 @@ JUICE_SHOP_PATH=~/juice-shop atomics archreview --repo juice-shop \
 
 Answer keys are pluggable per repo (`atomics/archreview/repos/<name>.yaml`). See the README's archreview section for parser tolerance, taxonomy, and tier details.
 
+
+## `atomics rag` — RAG Pipeline Evaluation
+
+Tests how well models use retrieved context: grounding (does it reference the docs?), faithfulness (does it stay within what the docs say?), and abstention (does it correctly decline when the answer isn't in the context?).
+
+20 fixtures: 10 security (CVE retrieval, incident analysis, threat intel, SBOM, alert triage) + 10 general technical (API docs, ADRs, K8s runbooks, capacity planning).
+
+```bash
+uv run atomics rag --provider ollama -m qwen3:14b --judge-model qwen2.5:14b
+uv run atomics rag --fixtures rag-05,rag-12
+uv run atomics rag --json-out rag.json
+```
+
+Metrics: `grounding_score`, `faithfulness_score`, `abstention_accuracy`, `hallucination_rate`, `overall_rag_score`.
+
 ## `atomics sweep` — Multi-Model Comparison
 
 Sweep the eval fixture set across multiple models and produce a ranked comparison table.
