@@ -43,6 +43,7 @@ class AtomicsSettings(BaseSettings):
     # "vllm" refers to the wire-format dialect (POST /v1/chat/completions),
     # not the OpenAI company. Nothing leaves the LAN.
     vllm_host: str = Field(default="http://localhost:8000/v1", validation_alias="ATOMICS_VLLM_HOST")
+    llamacpp_host: str = Field(default="http://localhost:8080", validation_alias="ATOMICS_LLAMACPP_HOST")
     vllm_model: str = Field(default="qwen2.5:3b", validation_alias="ATOMICS_VLLM_MODEL")
     vllm_timeout: float = Field(default=300.0, validation_alias="ATOMICS_VLLM_TIMEOUT")
 

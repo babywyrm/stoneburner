@@ -213,6 +213,14 @@ def run(
         url = gateway_url or settings.brain_gateway_url
         effective_model = model or profile.preferred_model or settings.default_model
         provider = BrainGatewayProvider(url=url, default_model=effective_model)
+    elif provider_name == "llamacpp":
+        from atomics.providers.llamacpp import LlamaCppProvider
+
+        effective_model = model or "local"
+        provider = LlamaCppProvider(
+            base_url=ollama_host or settings.llamacpp_host,
+            default_model=effective_model,
+        )
     elif provider_name == "groq":
         if not settings.groq_api_key:
             console.print("[red]GROQ_API_KEY not set. Get one at https://console.groq.com/keys[/red]")
@@ -389,6 +397,15 @@ def provider_test(provider_name: str, model: str | None, region: str, ollama_hos
         url = gateway_url or settings.brain_gateway_url
         prov = BrainGatewayProvider(url=url, default_model=model)
         model_label = model or "(gateway default)"
+    elif provider_name == "llamacpp":
+        from atomics.providers.llamacpp import LlamaCppProvider
+
+        llamacpp_model = model or "local"
+        prov = LlamaCppProvider(
+            base_url=ollama_host or settings.llamacpp_host,
+            default_model=llamacpp_model,
+        )
+        model_label = llamacpp_model
     elif provider_name == "groq":
         if not settings.groq_api_key:
             console.print("[red]GROQ_API_KEY not set.[/red]")
