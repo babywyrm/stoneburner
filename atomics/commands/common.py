@@ -18,7 +18,7 @@ from atomics.storage.records import EvaluationResultRecord
 from atomics.validation import sanitize_error, validate_endpoint_url
 
 PROVIDER_CHOICES = click.Choice(
-    ["claude", "bedrock", "openai", "ollama", "vllm", "brain-gateway"],
+    ["claude", "bedrock", "openai", "ollama", "vllm", "brain-gateway", "groq", "together", "gemini"],
     case_sensitive=False,
 )
 
@@ -254,7 +254,40 @@ def _make_provider(
             timeout=inference_timeout or settings.ollama_timeout,
             context_tokens=context_tokens,
         )
+    if name == "groq":
+        if not settings.groq_api_key:
+            raise click.ClickException(
+                "GROQ_API_KEY not set. Get one at https://console.groq.com/keys"
+            )
+        from atomics.providers.groq import GroqProvider
+
+        return GroqProvider(
+            api_key=settings.groq_api_key,
+            default_model=mdl or "llama-3.3-70b-versatile",
+        )
+    if name == "together":
+        if not settings.together_api_key:
+            raise click.ClickException(
+                "TOGETHER_API_KEY not set. Get one at https://api.together.xyz/settings/api-keys"
+            )
+        from atomics.providers.together import TogetherProvider
+
+        return TogetherProvider(
+            api_key=settings.together_api_key,
+            default_model=mdl or "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+        )
+    if name == "gemini":
+        if not settings.gemini_api_key:
+            raise click.ClickException(
+                "GEMINI_API_KEY not set. Get one at https://aistudio.google.com/apikey"
+            )
+        from atomics.providers.gemini import GeminiProvider
+
+        return GeminiProvider(
+            api_key=settings.gemini_api_key,
+            default_model=mdl or "gemini-2.5-flash",
+        )
     raise click.ClickException(
         f"Unknown provider: {name!r}. "
-        "Valid: claude, bedrock, openai, ollama, vllm, brain-gateway"
+        "Valid: claude, bedrock, openai, ollama, vllm, brain-gateway, groq, together, gemini"
     )

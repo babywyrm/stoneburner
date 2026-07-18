@@ -213,6 +213,30 @@ def run(
         url = gateway_url or settings.brain_gateway_url
         effective_model = model or profile.preferred_model or settings.default_model
         provider = BrainGatewayProvider(url=url, default_model=effective_model)
+    elif provider_name == "groq":
+        if not settings.groq_api_key:
+            console.print("[red]GROQ_API_KEY not set. Get one at https://console.groq.com/keys[/red]")
+            sys.exit(1)
+        from atomics.providers.groq import GroqProvider
+
+        effective_model = model or "llama-3.3-70b-versatile"
+        provider = GroqProvider(api_key=settings.groq_api_key, default_model=effective_model)
+    elif provider_name == "together":
+        if not settings.together_api_key:
+            console.print("[red]TOGETHER_API_KEY not set.[/red]")
+            sys.exit(1)
+        from atomics.providers.together import TogetherProvider
+
+        effective_model = model or "meta-llama/Llama-3.3-70B-Instruct-Turbo"
+        provider = TogetherProvider(api_key=settings.together_api_key, default_model=effective_model)
+    elif provider_name == "gemini":
+        if not settings.gemini_api_key:
+            console.print("[red]GEMINI_API_KEY not set. Get one at https://aistudio.google.com/apikey[/red]")
+            sys.exit(1)
+        from atomics.providers.gemini import GeminiProvider
+
+        effective_model = model or "gemini-2.5-flash"
+        provider = GeminiProvider(api_key=settings.gemini_api_key, default_model=effective_model)
     else:
         console.print(f"[red]Unknown provider: {provider_name}[/red]")
         sys.exit(1)
@@ -359,6 +383,33 @@ def provider_test(provider_name: str, model: str | None, region: str, ollama_hos
         url = gateway_url or settings.brain_gateway_url
         prov = BrainGatewayProvider(url=url, default_model=model)
         model_label = model or "(gateway default)"
+    elif provider_name == "groq":
+        if not settings.groq_api_key:
+            console.print("[red]GROQ_API_KEY not set.[/red]")
+            sys.exit(1)
+        from atomics.providers.groq import GroqProvider
+
+        groq_model = model or "llama-3.3-70b-versatile"
+        prov = GroqProvider(api_key=settings.groq_api_key, default_model=groq_model)
+        model_label = groq_model
+    elif provider_name == "together":
+        if not settings.together_api_key:
+            console.print("[red]TOGETHER_API_KEY not set.[/red]")
+            sys.exit(1)
+        from atomics.providers.together import TogetherProvider
+
+        together_model = model or "meta-llama/Llama-3.3-70B-Instruct-Turbo"
+        prov = TogetherProvider(api_key=settings.together_api_key, default_model=together_model)
+        model_label = together_model
+    elif provider_name == "gemini":
+        if not settings.gemini_api_key:
+            console.print("[red]GEMINI_API_KEY not set.[/red]")
+            sys.exit(1)
+        from atomics.providers.gemini import GeminiProvider
+
+        gemini_model = model or "gemini-2.5-flash"
+        prov = GeminiProvider(api_key=settings.gemini_api_key, default_model=gemini_model)
+        model_label = gemini_model
     else:
         console.print(f"[red]Unknown provider: {provider_name}[/red]")
         sys.exit(1)
