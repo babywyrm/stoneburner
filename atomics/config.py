@@ -29,6 +29,9 @@ class AtomicsSettings(BaseSettings):
 
     anthropic_api_key: str = Field(default="", validation_alias="ANTHROPIC_API_KEY")
     openai_api_key: str = Field(default="", validation_alias="OPENAI_API_KEY")
+    groq_api_key: str = Field(default="", validation_alias="GROQ_API_KEY")
+    together_api_key: str = Field(default="", validation_alias="TOGETHER_API_KEY")
+    gemini_api_key: str = Field(default="", validation_alias="GEMINI_API_KEY")
 
     ollama_host: str = Field(default="http://localhost:11434", validation_alias="ATOMICS_OLLAMA_HOST")
     ollama_model: str = Field(default="qwen2.5:7b", validation_alias="ATOMICS_OLLAMA_MODEL")
