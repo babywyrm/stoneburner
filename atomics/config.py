@@ -53,6 +53,7 @@ class AtomicsSettings(BaseSettings):
     oidc_client_id: str = Field(default="")
     oidc_scopes: str = Field(default="")
 
+    webhook_url: str = Field(default="", validation_alias="ATOMICS_WEBHOOK_URL")
     post_run_hook: str = Field(default="")
     notify_on_finish: bool = Field(default=False)
 
