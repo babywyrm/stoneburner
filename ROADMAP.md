@@ -20,7 +20,7 @@ Current priorities and future directions for Stoneburner / Atomics.
 
 ### Infrastructure
 - [ ] Dashboard / web UI for results visualization
-- [ ] Webhook/Slack notifications on scheduled run regression
+- [x] Webhook/Slack notifications on scheduled run regression
 - [x] GitHub Actions workflow template for eval CI gates
 - [ ] Distributed runs across multiple hosts with results aggregation
 - [ ] API server mode (run atomics as a service, query via REST)
@@ -28,14 +28,14 @@ Current priorities and future directions for Stoneburner / Atomics.
 ### Eval Quality
 - [ ] RAG pipeline with real retrieval (vector DB integration, not just fixture chunks)
 - [ ] Multi-turn conversation eval fixtures (context retention, contradiction detection)
-- [ ] Code generation benchmarks (functional correctness, not just quality judging)
-- [ ] Multilingual evaluation fixtures
+- [x] Code generation benchmarks (functional correctness, not just quality judging)
+- [x] Multilingual evaluation fixtures
 
 ### Provider Coverage
 - [x] Google Gemini provider
 - [x] Groq provider (fast inference)
 - [x] Together AI provider
-- [ ] Local llama.cpp direct (without Ollama wrapper)
+- [x] Local llama.cpp direct (without Ollama wrapper)
 
 ### Phase 3 (npm workers)
 - [ ] `atomics/workers/bridge.py` — Node.js worker integration for browser-based benchmarks

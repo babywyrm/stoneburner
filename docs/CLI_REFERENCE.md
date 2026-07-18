@@ -34,6 +34,10 @@ Full command reference for `atomics`. See also [QUICKSTART.md](../QUICKSTART.md)
 | `atomics provider-test -p openai` | Health check OpenAI |
 | `atomics provider-test -p ollama` | Health check Ollama |
 | `atomics provider-test -p brain-gateway` | Health check brain-gateway |
+| `atomics provider-test -p groq` | Health check Groq |
+| `atomics provider-test -p together` | Health check Together AI |
+| `atomics provider-test -p gemini` | Health check Gemini |
+| `atomics provider-test -p llamacpp` | Health check llama.cpp |
 | `atomics models` | List available models on Ollama host with class/thinking annotations |
 | `atomics models --provider vllm` | List models on a vLLM-compatible endpoint |
 | `atomics doctor` | Check installation health and config |
@@ -62,9 +66,12 @@ Full command reference for `atomics`. See also [QUICKSTART.md](../QUICKSTART.md)
 | `atomics archreview --tier expanded --rounds 3` | Largest pack for large-context/cloud backends |
 | `atomics multiturn` | Multi-turn conversation eval (context retention, coherence) |
 | `atomics multiturn --fixtures mt-eval-01,mt-eval-05` | Run a fixture subset |
+| `atomics codegen` | Code generation eval (functional correctness) |
+| `atomics codegen --fixtures cg-01,cg-05` | Run a fixture subset |
 | `atomics advisor` | Cost optimization recommendations from benchmark history |
 | `atomics advisor --min-quality 0.9` | Higher quality threshold |
 | `atomics advisor --current-model claude-sonnet-4-6` | Optimize from a specific model |
+| `atomics eval --fixtures ml-01,ml-05` | Run multilingual fixtures (8 languages) |
 | `atomics rag` | RAG pipeline evaluation — grounding, faithfulness, abstention |
 | `atomics rag --fixtures rag-05,rag-12` | Run a fixture subset |
 | `atomics rag --json-out rag.json` | Write results as JSON |
