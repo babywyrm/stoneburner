@@ -141,6 +141,8 @@ These suites share the "fixtures → provider → judge → summary → storage"
 | `refusal` | `RefusalFixture` | `eval/refusal/runner.py` | classifier | over- vs under-refusal calibration |
 | `codereview` | `SecureCodeFixture` | `eval/codereview/runner.py` | ground-truth verdict | planted-vuln detection + false positives |
 | `redblue` | `RedBlueFixture` | `eval/redblue/runner.py` | quality (`judge.py`) | offensive/defensive capability |
+| `rag` | `RAGFixture` | `eval/rag/runner.py` | grounding/faithfulness/abstention (`eval/rag/judge.py`) | RAG pipeline quality |
+| `multiturn` | `ConversationFixture` | `eval/multiturn/runner.py` | turn + conversation level (`eval/multiturn/judge.py`) | multi-turn context retention |
 | `archreview` | `RepoSpec` + evidence pack | `archreview/runner.py` | objective + reasoning | security-architecture review |
 | `probe` | `ProbeTarget` | `probe/runner.py` | quality (`judge.py`) | live-artifact regression |
 

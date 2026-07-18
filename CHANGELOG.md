@@ -3,6 +3,20 @@
 ## Unreleased
 
 ### Added
+- **`atomics advisor`** — cost optimization advisor that analyzes historical
+  benchmark data grouped by category and model, identifies the cheapest model
+  meeting a `--min-quality` threshold (default 80%), and reports per-category
+  recommendations with savings percentages. `--current-model`, `--since-hours`,
+  `--json-out` flags.
+- **`atomics multiturn`** — multi-turn conversation evaluation with 15 fixtures
+  testing context retention (3), instruction following (3), coherence (2),
+  correction handling (2), multi-step reasoning (1), constraint accumulation (2),
+  and security-focused conversations (2). Real multi-turn: calls `generate()` per
+  turn, accumulates transcript, scores at both turn level (Accuracy/Context Use/
+  Coherence) and conversation level (Retention/Consistency/Instruction). 22 tests.
+- **GitHub Actions CI workflow** (`.github/workflows/eval-gate.yml`) — test,
+  doctor, and optional eval/adversarial gate jobs with manual dispatch for
+  provider and minimum resilience threshold. Uploads JSON artifacts.
 - **Adversarial integrity ledger** — every fixture now retains its typed
   per-attempt and per-judge-call evidence in JSON and SQLite, including failed
   generation and judge calls. Schema v19 adds additive status, coverage,

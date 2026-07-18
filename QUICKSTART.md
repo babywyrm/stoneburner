@@ -308,6 +308,25 @@ quality score on each host with a speedup ratio and parity verdict.
 
 ---
 
+## 3d. RAG, multi-turn, and cost optimization
+
+```bash
+# RAG pipeline eval — does the model ground answers in provided context?
+uv run atomics rag --provider ollama -m qwen3:14b --judge-model qwen2.5:14b
+uv run atomics rag --fixtures rag-05,rag-12          # subset
+
+# Multi-turn conversation eval — context retention, coherence, instruction following
+uv run atomics multiturn --provider ollama -m qwen3:14b --judge-model qwen2.5:14b
+uv run atomics multiturn --fixtures mt-eval-01       # subset
+
+# Cost advisor — find cheaper models that still meet quality thresholds
+uv run atomics advisor                               # default 80% quality floor
+uv run atomics advisor --min-quality 0.9             # higher bar
+uv run atomics advisor --current-model claude-sonnet-4-6 --json-out recs.json
+```
+
+---
+
 ## 4. Get the data out
 
 ```bash
