@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.10.0 (2026-07-17) — RAG eval, multi-turn conversations, cost advisor, CI gates, docs overhaul
 
 ### Added
 - **`atomics advisor`** — cost optimization advisor that analyzes historical
