@@ -279,6 +279,12 @@ def run(
                 rc = run_post_hook(eff_hook, env)
                 if rc != 0:
                     console.print(f"[yellow]Post-run hook exited with code {rc}[/yellow]")
+            if settings.webhook_url:
+                from atomics.webhooks import send_webhook
+                send_webhook(
+                    settings.webhook_url, summary,
+                    tier=burn_tier.value, provider=provider_name,
+                )
         repo.close()
 
 
