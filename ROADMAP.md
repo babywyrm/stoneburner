@@ -13,15 +13,15 @@ Current priorities and future directions for Stoneburner / Atomics.
 ## In Progress
 
 ### Eval Depth
-- [ ] **Multi-turn conversation benchmarks** — test context retention, coherence drift, and instruction following across multiple exchanges. Requires extending the `generate()` contract or building a turn-accumulating runner.
-- [ ] **Cost optimization advisor** — `atomics advisor` that analyzes historical runs and recommends cheaper models meeting a quality threshold. Pure SQL aggregation on existing data, no new API calls.
+- [x] **Multi-turn conversation benchmarks** — test context retention, coherence drift, and instruction following across multiple exchanges. Requires extending the `generate()` contract or building a turn-accumulating runner.
+- [x] **Cost optimization advisor** — `atomics advisor` that analyzes historical runs and recommends cheaper models meeting a quality threshold. Pure SQL aggregation on existing data, no new API calls.
 
 ## Planned
 
 ### Infrastructure
 - [ ] Dashboard / web UI for results visualization
 - [ ] Webhook/Slack notifications on scheduled run regression
-- [ ] GitHub Actions workflow template for eval CI gates
+- [x] GitHub Actions workflow template for eval CI gates
 - [ ] Distributed runs across multiple hosts with results aggregation
 - [ ] API server mode (run atomics as a service, query via REST)
 

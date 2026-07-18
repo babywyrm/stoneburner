@@ -60,6 +60,11 @@ Full command reference for `atomics`. See also [QUICKSTART.md](../QUICKSTART.md)
 | `atomics archreview --tier local --max-output-tokens 512` | Practical brainbox repo review |
 | `atomics archreview --tier wide --rounds 3` | Broader evidence pack with stability reporting |
 | `atomics archreview --tier expanded --rounds 3` | Largest pack for large-context/cloud backends |
+| `atomics multiturn` | Multi-turn conversation eval (context retention, coherence) |
+| `atomics multiturn --fixtures mt-eval-01,mt-eval-05` | Run a fixture subset |
+| `atomics advisor` | Cost optimization recommendations from benchmark history |
+| `atomics advisor --min-quality 0.9` | Higher quality threshold |
+| `atomics advisor --current-model claude-sonnet-4-6` | Optimize from a specific model |
 | `atomics rag` | RAG pipeline evaluation — grounding, faithfulness, abstention |
 | `atomics rag --fixtures rag-05,rag-12` | Run a fixture subset |
 | `atomics rag --json-out rag.json` | Write results as JSON |
