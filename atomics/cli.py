@@ -964,11 +964,13 @@ def eval(
             extra_judge_pairs.append((ej_provider, ej_model))
 
     from atomics.eval.fixtures import EVAL_FIXTURES
+    from atomics.eval.multilingual import ALL_MULTILINGUAL_FIXTURES
 
+    all_available = EVAL_FIXTURES + ALL_MULTILINGUAL_FIXTURES
     selected_fixtures = None
     if fixtures_filter:
         wanted = {fid.strip() for fid in fixtures_filter.split(",") if fid.strip()}
-        selected_fixtures = [f for f in EVAL_FIXTURES if f.id in wanted]
+        selected_fixtures = [f for f in all_available if f.id in wanted]
         missing = wanted - {f.id for f in selected_fixtures}
         if missing:
             click.echo(f"Error: unknown fixture id(s): {', '.join(sorted(missing))}", err=True)

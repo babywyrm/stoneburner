@@ -32,9 +32,9 @@ Current priorities and future directions for Stoneburner / Atomics.
 - [ ] Multilingual evaluation fixtures
 
 ### Provider Coverage
-- [ ] Google Gemini provider
-- [ ] Groq provider (fast inference)
-- [ ] Together AI provider
+- [x] Google Gemini provider
+- [x] Groq provider (fast inference)
+- [x] Together AI provider
 - [ ] Local llama.cpp direct (without Ollama wrapper)
 
 ### Phase 3 (npm workers)
