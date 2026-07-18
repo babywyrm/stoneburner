@@ -18,7 +18,7 @@ from atomics.storage.records import EvaluationResultRecord
 from atomics.validation import sanitize_error, validate_endpoint_url
 
 PROVIDER_CHOICES = click.Choice(
-    ["claude", "bedrock", "openai", "ollama", "vllm", "brain-gateway", "groq", "together", "gemini"],
+    ["claude", "bedrock", "openai", "ollama", "vllm", "brain-gateway", "groq", "together", "gemini", "llamacpp"],
     case_sensitive=False,
 )
 
@@ -254,6 +254,13 @@ def _make_provider(
             timeout=inference_timeout or settings.ollama_timeout,
             context_tokens=context_tokens,
         )
+    if name == "llamacpp":
+        from atomics.providers.llamacpp import LlamaCppProvider
+
+        return LlamaCppProvider(
+            base_url=host or settings.llamacpp_host,
+            default_model=mdl or "local",
+        )
     if name == "groq":
         if not settings.groq_api_key:
             raise click.ClickException(
@@ -289,5 +296,5 @@ def _make_provider(
         )
     raise click.ClickException(
         f"Unknown provider: {name!r}. "
-        "Valid: claude, bedrock, openai, ollama, vllm, brain-gateway, groq, together, gemini"
+        "Valid: claude, bedrock, openai, ollama, vllm, brain-gateway, groq, together, gemini, llamacpp"
     )
