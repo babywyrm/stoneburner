@@ -78,6 +78,8 @@ uv run atomics tiers                   # show all tier profiles
 | `atomics stress` | GPU saturation testing |
 | `atomics soak` | Long-duration stability test |
 | `atomics rag` | RAG pipeline evaluation (grounding, faithfulness, abstention) |
+| `atomics multiturn` | Multi-turn conversation eval (context retention, coherence) |
+| `atomics advisor` | Cost optimization recommendations from historical data |
 | `atomics sweep` | Multi-model eval sweep |
 | `atomics doctor` | Installation health check |
 

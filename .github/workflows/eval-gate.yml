@@ -1,0 +1,113 @@
+# Eval gate — CI workflow for quality and security regression checks.
+#
+# Runs the test suite, then optionally runs eval/adversarial suites against
+# a configured provider. Use --fail-on-resilience to gate on security
+# thresholds.
+#
+# Triggers: push to main, PRs, manual dispatch.
+#
+# Required secrets:
+#   ANTHROPIC_API_KEY — for Claude provider (optional, skip cloud evals if unset)
+#   OPENAI_API_KEY   — for OpenAI provider (optional)
+#
+# For local-only CI (Ollama), set up a self-hosted runner with Ollama installed.
+
+name: Eval Gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      provider:
+        description: "Provider for eval suites"
+        type: choice
+        options: [skip, claude, openai, ollama]
+        default: skip
+      min_resilience:
+        description: "Minimum adversarial resilience % (0 to skip)"
+        type: number
+        default: 0
+
+env:
+  UV_CACHE_DIR: /tmp/uv-cache
+
+jobs:
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --extra dev --extra openai --extra bedrock
+
+      - name: Run tests
+        run: uv run pytest -q --tb=short
+
+      - name: Type check
+        run: uv run mypy atomics
+
+  doctor:
+    name: Doctor
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+      - run: uv sync --extra dev
+      - run: uv run atomics doctor
+
+  eval-gate:
+    name: Eval Gate
+    runs-on: ubuntu-latest
+    needs: test
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.event.inputs.provider != 'skip'
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --extra dev --extra openai --extra bedrock
+
+      - name: Run eval suite
+        run: |
+          uv run atomics eval \
+            --provider ${{ github.event.inputs.provider }} \
+            --no-save \
+            --json-out eval-results.json
+
+      - name: Run adversarial suite
+        if: github.event.inputs.min_resilience != '0'
+        run: |
+          uv run atomics adversarial \
+            --provider ${{ github.event.inputs.provider }} \
+            --fail-on-resilience ${{ github.event.inputs.min_resilience }} \
+            --no-save \
+            --json-out adversarial-results.json
+
+      - name: Upload eval artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-results
+          path: |
+            eval-results.json
+            adversarial-results.json
+          retention-days: 30
