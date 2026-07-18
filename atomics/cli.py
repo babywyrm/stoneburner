@@ -1941,6 +1941,91 @@ def sweep(
         console.print("\n[dim]Sweep results saved to database.[/dim]")
 
 
+# ── atomics advisor ────────────────────────────────────────────────────────────
+
+@cli.command("advisor")
+@click.option("--min-quality", type=float, default=0.8, show_default=True,
+              help="Minimum acceptable quality score (0.0-1.0).")
+@click.option("--since-hours", type=float, default=None,
+              help="Only analyze data from the last N hours.")
+@click.option("--current-model", type=str, default=None,
+              help="Treat this model as the baseline to optimize from.")
+@click.option("--json-out", "json_out", type=click.Path(dir_okay=False, writable=True),
+              default=None, help="Write recommendations as JSON.")
+def advisor(
+    min_quality: float,
+    since_hours: float | None,
+    current_model: str | None,
+    json_out: str | None,
+) -> None:
+    """Analyze historical runs and recommend cheaper models meeting quality thresholds."""
+    settings = load_settings()
+    console = Console()
+
+    from atomics.advisor import analyze_cost_optimization
+    from atomics.storage.schema import init_db
+
+    conn = init_db(settings.db_path)
+    try:
+        summary = analyze_cost_optimization(
+            conn,
+            min_quality=min_quality,
+            since_hours=since_hours,
+            current_model=current_model,
+        )
+    finally:
+        conn.close()
+
+    if not summary.recommendations:
+        console.print(
+            "[dim]No optimization recommendations found. "
+            "Run benchmarks with multiple models first, or lower --min-quality.[/dim]"
+        )
+        return
+
+    table = Table(title=f"Cost Optimization (min quality: {min_quality:.0%})", show_lines=True)
+    table.add_column("Category", style="cyan")
+    table.add_column("Current Model", style="dim")
+    table.add_column("Quality", justify="right")
+    table.add_column("$/Task", justify="right", style="yellow")
+    table.add_column("\u2192", justify="center")
+    table.add_column("Recommended", style="green bold")
+    table.add_column("Quality", justify="right")
+    table.add_column("$/Task", justify="right", style="green")
+    table.add_column("Savings", justify="right", style="yellow bold")
+
+    for r in summary.recommendations:
+        table.add_row(
+            r.category,
+            r.current_model,
+            f"{r.current_quality:.0%}",
+            f"${r.current_cost_per_task:.6f}",
+            "\u2192",
+            r.recommended_model,
+            f"{r.recommended_quality:.0%}",
+            f"${r.recommended_cost_per_task:.6f}",
+            f"{r.cost_savings_pct:.0f}%",
+        )
+    console.print(table)
+
+    summary_table = Table(title="Savings Summary", show_lines=True)
+    summary_table.add_column("Metric", style="dim")
+    summary_table.add_column("Value", style="bold")
+    summary_table.add_row("Models Analyzed", str(summary.models_analyzed))
+    summary_table.add_row("Current Total Cost", f"${summary.total_current_cost:.4f}")
+    summary_table.add_row("Recommended Total Cost", f"${summary.total_recommended_cost:.4f}")
+    savings_style = "green" if summary.overall_savings_pct > 0 else "yellow"
+    summary_table.add_row("Overall Savings",
+                          f"[{savings_style}]{summary.overall_savings_pct:.1f}%[/{savings_style}]")
+    console.print(summary_table)
+
+    if json_out:
+        import json as _json
+        with open(json_out, "w", encoding="utf-8") as fh:
+            _json.dump(summary.to_dict(), fh, indent=2)
+        console.print(f"[dim]Wrote recommendations to {json_out}[/dim]")
+
+
 # ── atomics rag ───────────────────────────────────────────────────────────────
 
 @cli.command("rag")
