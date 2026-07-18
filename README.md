@@ -48,6 +48,10 @@ uv run atomics run --provider ollama -n 5
 | **OpenAI / Codex** | `--provider openai` | `uv sync --extra openai` |
 | **Ollama** (local) | `--provider ollama` | `uv sync` (uses httpx) |
 | **brain-gateway** | `--provider brain-gateway` | `uv sync` (uses httpx) |
+| **Groq** (cloud) | `--provider groq` | `uv sync` (uses httpx) |
+| **Together AI** (cloud) | `--provider together` | `uv sync` (uses httpx) |
+| **Google Gemini** | `--provider gemini` | `uv sync` (uses httpx) |
+| **llama.cpp** (local) | `--provider llamacpp` | `uv sync` (uses httpx) |
 | **vLLM** (OpenAI-compat) | `--provider vllm` | `uv sync` (uses httpx) |
 
 Compare providers after running benchmarks: `uv run atomics compare` — see [docs/COMPARING.md](docs/COMPARING.md) for model classes, metrics fidelity, and judge accuracy.
@@ -80,6 +84,7 @@ uv run atomics tiers                   # show all tier profiles
 | `atomics rag` | RAG pipeline evaluation (grounding, faithfulness, abstention) |
 | `atomics multiturn` | Multi-turn conversation eval (context retention, coherence) |
 | `atomics advisor` | Cost optimization recommendations from historical data |
+| `atomics codegen` | Code generation eval (functional correctness via test execution) |
 | `atomics sweep` | Multi-model eval sweep |
 | `atomics doctor` | Installation health check |
 
@@ -171,7 +176,7 @@ stoneburner/
 │   └── cli.py            # Click CLI entry point
 ├── profiles/             # Custom target profiles (local/ gitignored)
 ├── qa/                   # QA fixture suites (local/ gitignored)
-├── tests/                # 1445+ tests at 90% coverage
+├── tests/                # 1593+ tests at 85% coverage
 └── docs/                 # Detailed documentation
 ```
 

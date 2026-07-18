@@ -14,6 +14,23 @@
   and security-focused conversations (2). Real multi-turn: calls `generate()` per
   turn, accumulates transcript, scores at both turn level (Accuracy/Context Use/
   Coherence) and conversation level (Retention/Consistency/Instruction). 22 tests.
+- **`atomics codegen`** — code generation evaluation with 15 Python fixtures
+  (fizzbuzz through topological sort). Models generate functions, which are
+  executed against deterministic test cases — pass/fail is objective, no judge.
+  extract_function() handles code blocks and raw definitions. Custom comparison
+  for anagram grouping and topological sort validity. 23 tests.
+- **Multilingual eval fixtures** — 10 fixtures across 8 languages (Spanish,
+  French, German, Portuguese, Japanese, Chinese, Korean, Arabic). Selectable
+  via `atomics eval --fixtures ml-01,...`. 10 tests.
+- **Webhook notifications** — `atomics/webhooks.py` with Slack (Block Kit),
+  Discord (embeds), and generic HTTP POST. Auto-detects format by URL.
+  `check_regression()` detects latency/success-rate degradation. Config via
+  `ATOMICS_WEBHOOK_URL`. 18 tests.
+- **llama.cpp provider** (`--provider llamacpp`) — direct local inference
+  targeting llama-server's OpenAI-compatible endpoint. Zero cost, /health
+  check. Config via `ATOMICS_LLAMACPP_HOST`. 7 tests.
+- **Groq, Together AI, Google Gemini providers** — three new cloud providers
+  with pricing tables (10 providers total). 29 tests.
 - **GitHub Actions CI workflow** (`.github/workflows/eval-gate.yml`) — test,
   doctor, and optional eval/adversarial gate jobs with manual dispatch for
   provider and minimum resilience threshold. Uploads JSON artifacts.
