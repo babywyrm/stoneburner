@@ -48,7 +48,7 @@ def test_conversation_fixture_defaults():
 
 
 def test_all_fixtures_loaded():
-    assert len(ALL_MULTITURN_FIXTURES) == 15
+    assert len(ALL_MULTITURN_FIXTURES) == 35
 
 
 def test_fixture_ids_are_unique():
@@ -82,6 +82,53 @@ def test_turns_have_expected_behavior():
     for f in ALL_MULTITURN_FIXTURES:
         for i, t in enumerate(f.turns):
             assert t.expected_behavior, f"Fixture {f.id} turn {i} has no expected_behavior"
+
+
+def _ids_in_range(prefix: str, start: int, end: int) -> set[str]:
+    return {f"{prefix}-{i:02d}" for i in range(start, end + 1)}
+
+
+def test_contradiction_fixtures_present():
+    expected = _ids_in_range("mt-eval", 16, 20)
+    found = {f.id for f in ALL_MULTITURN_FIXTURES if f.id in expected}
+    assert found, "No contradiction detection fixtures found"
+    assert found == expected, f"Missing contradiction fixtures: {expected - found}"
+
+
+def test_persona_fixtures_present():
+    expected = _ids_in_range("mt-eval", 21, 24)
+    found = {f.id for f in ALL_MULTITURN_FIXTURES if f.id in expected}
+    assert found, "No persona drift fixtures found"
+    assert found == expected, f"Missing persona fixtures: {expected - found}"
+
+
+def test_long_context_fixtures_present():
+    expected = _ids_in_range("mt-eval", 25, 28)
+    found = {f.id for f in ALL_MULTITURN_FIXTURES if f.id in expected}
+    assert found, "No long-context retention fixtures found"
+    assert found == expected, f"Missing long-context fixtures: {expected - found}"
+
+
+def test_tool_use_fixtures_present():
+    expected = _ids_in_range("mt-eval", 29, 32)
+    found = {f.id for f in ALL_MULTITURN_FIXTURES if f.id in expected}
+    assert found, "No multi-turn tool-use fixtures found"
+    assert found == expected, f"Missing tool-use fixtures: {expected - found}"
+
+
+def test_security_multiturn_fixtures_present():
+    expected = _ids_in_range("mt-eval", 33, 35)
+    found = {f.id for f in ALL_MULTITURN_FIXTURES if f.id in expected}
+    assert found, "No security-focused multi-turn fixtures found"
+    assert found == expected, f"Missing security multi-turn fixtures: {expected - found}"
+
+
+def test_long_context_fixtures_have_min_turns():
+    long_context_ids = _ids_in_range("mt-eval", 25, 28)
+    long_fixtures = [f for f in ALL_MULTITURN_FIXTURES if f.id in long_context_ids]
+    assert any(len(f.turns) >= 8 for f in long_fixtures), (
+        "No long-context fixture has 8+ turns"
+    )
 
 
 # ── Turn judge parse tests ───────────────────────────────────────────────────

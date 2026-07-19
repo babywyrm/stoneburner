@@ -137,6 +137,18 @@ uv run atomics rag --json-out rag.json
 
 Metrics: `grounding_score`, `faithfulness_score`, `abstention_accuracy`, `hallucination_rate`, `overall_rag_score`.
 
+## `atomics multiturn` — Multi-Turn Conversation Evaluation
+
+Tests context retention, coherence, and instruction following across scripted multi-turn conversations. Now includes 35 fixtures covering context retention, instruction following, contradiction detection, persona drift/stability, long-context retention (8+ turns), simulated multi-turn tool-use chaining, and security-focused scenarios (social engineering refusal, least-privilege access control, and credential non-echo).
+
+```bash
+uv run atomics multiturn --provider ollama -m qwen3:14b --judge-model qwen2.5:14b
+uv run atomics multiturn --fixtures mt-eval-33,mt-eval-34,mt-eval-35
+uv run atomics multiturn --json-out multiturn.json
+```
+
+Metrics: per-turn accuracy/context-use/coherence, conversation-level retention/consistency/instruction, and overall score.
+
 ## `atomics sweep` — Multi-Model Comparison
 
 Sweep the eval fixture set across multiple models and produce a ranked comparison table.

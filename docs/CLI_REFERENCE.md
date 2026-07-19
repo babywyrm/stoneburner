@@ -64,7 +64,7 @@ Full command reference for `atomics`. See also [QUICKSTART.md](../QUICKSTART.md)
 | `atomics archreview --tier local --max-output-tokens 512` | Practical brainbox repo review |
 | `atomics archreview --tier wide --rounds 3` | Broader evidence pack with stability reporting |
 | `atomics archreview --tier expanded --rounds 3` | Largest pack for large-context/cloud backends |
-| `atomics multiturn` | Multi-turn conversation eval (context retention, coherence) |
+| `atomics multiturn` | Multi-turn conversation eval — context retention, coherence, contradiction detection, persona drift, long-context retention, tool-use chaining, and security scenarios |
 | `atomics multiturn --fixtures mt-eval-01,mt-eval-05` | Run a fixture subset |
 | `atomics codegen` | Code generation eval (functional correctness) |
 | `atomics codegen --fixtures cg-01,cg-05` | Run a fixture subset |

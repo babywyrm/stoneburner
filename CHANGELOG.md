@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- Added 20 new multi-turn conversation fixtures (`mt-eval-16` through `mt-eval-35`) covering contradiction detection, persona drift/stability, long-context retention, multi-turn tool-use, and security-focused scenarios. Long-context fixtures use `max_output_tokens=1024` to avoid truncating summary turns.
+
 ## 0.10.0 (2026-07-17) — RAG eval, multi-turn conversations, cost advisor, CI gates, docs overhaul
 
 ### Added
