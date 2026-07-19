@@ -220,7 +220,7 @@ async def run_multiturn(
                 turn_tokens = 0
                 turn_cost = 0.0
                 conversation_failed = True
-                logger.warning("Turn %d of %s failed: %s", i, fixture.id, sanitize_error(str(exc)))
+                logger.warning("Turn %d of %s failed: %s", i, fixture.id, sanitize_error(exc))
 
             completed_turns.append((turn.user_message, response_text))
             total_tokens += turn_tokens
@@ -308,7 +308,7 @@ async def run_multiturn(
     return MultiturnRunSummary(
         run_id=effective_run_id,
         provider=provider.name,
-        model=model or getattr(provider, "default_model", ""),
+        model=model or getattr(provider, "default_model", None) or "",
         judge_provider=effective_judge.name,
         judge_model=judge_model or "",
         started_at=started,

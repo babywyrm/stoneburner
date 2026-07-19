@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import sys
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import click
@@ -2052,8 +2053,8 @@ def codegen_cmd(
     from atomics.eval.codegen.runner import CodegenFixtureResult, run_codegen
 
     test_provider = _make_provider(
-        provider_name, model, settings,
-        ollama_host=ollama_host, vllm_host=vllm_host, region=region,
+        provider_name, model, ollama_host, settings,
+        vllm_host=vllm_host, region=region,
     )
 
     selected_fixtures = ALL_CODEGEN_FIXTURES
@@ -2286,12 +2287,12 @@ def multiturn(
     from atomics.eval.multiturn.runner import ConversationResult, run_multiturn
 
     test_provider = _make_provider(
-        provider_name, model, settings,
-        ollama_host=ollama_host, vllm_host=vllm_host, region=region,
+        provider_name, model, ollama_host, settings,
+        vllm_host=vllm_host, region=region,
     )
     judge_provider = _make_provider(
-        judge_provider_name, judge_model, settings,
-        ollama_host=judge_host or ollama_host, vllm_host=vllm_host, region=region,
+        judge_provider_name, judge_model, judge_host or ollama_host, settings,
+        vllm_host=vllm_host, region=region,
     )
 
     selected_fixtures = ALL_MULTITURN_FIXTURES
@@ -2427,6 +2428,10 @@ def multiturn(
 @click.option("--judge-host", type=str, default=None, help="Ollama host for the judge model.")
 @click.option("--fixtures", "fixtures_filter", type=str, default=None,
               help="Comma-separated fixture IDs (e.g. rag-05 or rag-01,rag-10).")
+@click.option("--index", "index_path", type=click.Path(exists=True, path_type=Path), default=None,
+              help="Path to a sqlite-vec RAG index built by rag-index.")
+@click.option("--top-k", type=int, default=5, show_default=True,
+              help="Number of chunks to retrieve when --index is provided.")
 @click.option("--save/--no-save", "save_results", default=True, help="Persist results to the database.")
 @click.option("--json-out", "json_out", type=click.Path(dir_okay=False, writable=True), default=None,
               help="Write the full run as JSON to this file.")
@@ -2446,6 +2451,8 @@ def rag(
     json_out: str | None,
     thinking_flag: bool | None,
     thinking_budget: int | None,
+    index_path: Path | None,
+    top_k: int,
 ) -> None:
     """RAG pipeline evaluation — grounding, faithfulness, and abstention scoring."""
     settings = load_settings()
@@ -2456,12 +2463,12 @@ def rag(
     from atomics.eval.rag.runner import RAGFixtureResult, run_rag
 
     test_provider = _make_provider(
-        provider_name, model, settings,
-        ollama_host=ollama_host, vllm_host=vllm_host, region=region,
+        provider_name, model, ollama_host, settings,
+        vllm_host=vllm_host, region=region,
     )
     judge_provider = _make_provider(
-        judge_provider_name, judge_model, settings,
-        ollama_host=judge_host or ollama_host, vllm_host=vllm_host, region=region,
+        judge_provider_name, judge_model, judge_host or ollama_host, settings,
+        vllm_host=vllm_host, region=region,
     )
 
     selected_fixtures = ALL_RAG_FIXTURES
@@ -2547,6 +2554,27 @@ def rag(
         if supports_thinking(model):
             eff_thinking = True
 
+    index = None
+    if index_path is not None:
+        try:
+            import sentence_transformers  # noqa: F401
+            import sqlite_vec  # noqa: F401
+        except ImportError as exc:
+            console.print(
+                "[red]RAG indexing requires the [rag] extra:[/red] "
+                'uv pip install "atomics[rag]"'
+            )
+            raise SystemExit(1) from exc
+        from atomics.eval.rag.retrieval import (
+            LocalSentenceTransformerEmbedder,
+            MockEmbedder,
+            RAGIndex,
+        )
+        index_meta = RAGIndex(index_path, embedder=MockEmbedder()).info()
+        embedding_model = index_meta.get("embedding_model") or "all-MiniLM-L6-v2"
+        embedder = LocalSentenceTransformerEmbedder(embedding_model)
+        index = RAGIndex(index_path, embedder=embedder)
+
     summary = asyncio.run(run_rag(
         test_provider,
         judge_provider=judge_provider,
@@ -2557,6 +2585,8 @@ def rag(
         thinking=eff_thinking,
         thinking_budget=thinking_budget,
         fixtures=selected_fixtures,
+        index=index,
+        top_k=top_k,
     ))
 
     console.print(result_table)
@@ -2601,6 +2631,180 @@ def rag(
         with open(json_out, "w", encoding="utf-8") as fh:
             _json.dump(summary.to_dict(), fh, indent=2)
         console.print(f"[dim]Wrote JSON results to {json_out}[/dim]")
+
+
+# ── atomics rag-index ─────────────────────────────────────────────────────────
+
+@cli.command("rag-index")
+@click.argument("path", type=click.Path(exists=True, path_type=Path))
+@click.option("--db", "db_path", type=click.Path(path_type=Path), default=None,
+              help="Output sqlite-vec database file.")
+@click.option("--chunk-size", type=int, default=512, show_default=True,
+              help="Target chunk size in characters.")
+@click.option("--overlap", type=int, default=50, show_default=True,
+              help="Overlap between chunks in characters.")
+@click.option("--embedding-model", type=str, default="all-MiniLM-L6-v2", show_default=True,
+              help="sentence-transformers model name.")
+@click.option("--force/--no-force", default=False, help="Rebuild the index from scratch.")
+def rag_index(
+    path: Path,
+    db_path: Path | None,
+    chunk_size: int,
+    overlap: int,
+    embedding_model: str,
+    force: bool,
+) -> None:
+    """Build a sqlite-vec RAG index from documents in PATH."""
+    settings = load_settings()
+    _setup_logging(settings.log_level)
+    console = Console()
+
+    try:
+        import sentence_transformers  # noqa: F401
+        import sqlite_vec  # noqa: F401
+    except ImportError as exc:
+        console.print(
+            "[red]RAG indexing requires the [rag] extra:[/red] "
+            'uv pip install "atomics[rag]"'
+        )
+        raise SystemExit(1) from exc
+
+    from atomics.eval.rag.retrieval import (
+        LocalSentenceTransformerEmbedder,
+        RAGIndex,
+        load_documents,
+    )
+
+    if db_path is None:
+        data_dir = Path.home() / ".local" / "share" / "atomics" / "rag"
+        data_dir.mkdir(parents=True, exist_ok=True)
+        db_path = data_dir / "default.vec"
+
+    if db_path.exists() and force:
+        db_path.unlink()
+
+    embedder = LocalSentenceTransformerEmbedder(embedding_model)
+    index = RAGIndex(db_path, embedder=embedder)
+    documents = load_documents(path)
+    chunk_count = index.build(documents, chunk_size=chunk_size, overlap=overlap)
+
+    console.print(
+        f"Loaded {len(documents)} files, created {chunk_count} chunks, stored in {db_path}"
+    )
+
+
+# ── atomics rag-retrieval ─────────────────────────────────────────────────────
+
+@cli.command("rag-retrieval")
+@click.option("--index", "index_path", type=click.Path(exists=True, path_type=Path),
+              required=True, help="Path to a sqlite-vec RAG index.")
+@click.option("--gold", "gold_path", type=click.Path(exists=True, path_type=Path),
+              required=True,
+              help="JSON file with query IDs mapped to relevant source IDs and scores.")
+@click.option("--queries", "queries_path",
+              type=click.Path(exists=True, path_type=Path), default=None,
+              help="JSON file with query ID to query text mapping.")
+@click.option("--top-k", type=int, default=5, show_default=True,
+              help="Number of chunks to retrieve per query.")
+@click.option("--json-out", type=click.Path(dir_okay=False, writable=True), default=None,
+              help="Write the retrieval report as JSON.")
+def rag_retrieval(
+    index_path: Path,
+    gold_path: Path,
+    queries_path: Path | None,
+    top_k: int,
+    json_out: str | None,
+) -> None:
+    """Evaluate retrieval quality from a RAG index against a gold relevance set."""
+    import json
+
+    settings = load_settings()
+    _setup_logging(settings.log_level)
+    console = Console()
+
+    try:
+        import sentence_transformers  # noqa: F401
+        import sqlite_vec  # noqa: F401
+    except ImportError as exc:
+        console.print(
+            "[red]RAG retrieval requires the [rag] extra:[/red] "
+            'uv pip install "atomics[rag]"'
+        )
+        raise SystemExit(1) from exc
+
+    from atomics.eval.rag.metrics import (
+        mean_reciprocal_rank,
+        ndcg_at_k,
+        precision_at_k,
+        recall_at_k,
+    )
+    from atomics.eval.rag.retrieval import (
+        LocalSentenceTransformerEmbedder,
+        MockEmbedder,
+        RAGIndex,
+    )
+
+    with open(gold_path, encoding="utf-8") as fh:
+        gold = json.load(fh)
+    queries: dict[str, str] = {}
+    if queries_path:
+        with open(queries_path, encoding="utf-8") as fh:
+            queries = json.load(fh)
+
+    index_meta = RAGIndex(index_path, embedder=MockEmbedder()).info()
+    embedding_model = index_meta.get("embedding_model") or "all-MiniLM-L6-v2"
+    embedder = LocalSentenceTransformerEmbedder(embedding_model)
+    index = RAGIndex(index_path, embedder=embedder)
+
+    per_query: list[dict] = []
+    relevant_sets: list[set[str]] = []
+    retrieved_lists: list[list[str]] = []
+    for query_id, entry in gold.items():
+        query_text = queries.get(query_id, query_id)
+        results = index.search(query_text, top_k=top_k)
+        retrieved_sources = [r.source for r in results]
+        relevant = set(entry.get("relevant", []))
+        scores = entry.get("scores", {})
+        per_query.append({
+            "query_id": query_id,
+            "recall@k": recall_at_k(relevant, retrieved_sources, top_k),
+            "precision@k": precision_at_k(relevant, retrieved_sources, top_k),
+            "ndcg@k": ndcg_at_k(scores, retrieved_sources, top_k),
+            "retrieved": retrieved_sources,
+        })
+        relevant_sets.append(relevant)
+        retrieved_lists.append(retrieved_sources)
+
+    avg_recall = sum(q["recall@k"] for q in per_query) / len(per_query) if per_query else 0.0
+    avg_precision = sum(q["precision@k"] for q in per_query) / len(per_query) if per_query else 0.0
+    avg_ndcg = sum(q["ndcg@k"] for q in per_query) / len(per_query) if per_query else 0.0
+    if not per_query:
+        console.print("[yellow]No queries in gold file; metrics are zero.[/yellow]")
+        mrr = 0.0
+    else:
+        mrr = mean_reciprocal_rank(relevant_sets, retrieved_lists)
+
+    report = {
+        "index": str(index_path),
+        "top_k": top_k,
+        "queries": len(per_query),
+        "avg_recall_at_k": avg_recall,
+        "avg_precision_at_k": avg_precision,
+        "avg_ndcg_at_k": avg_ndcg,
+        "mrr": mrr,
+        "per_query": per_query,
+    }
+
+    console.print(f"[bold]Retrieval metrics[/bold] (top_k={top_k})")
+    console.print(f"Recall@k: {avg_recall:.3f}")
+    console.print(f"Precision@k: {avg_precision:.3f}")
+    console.print(f"nDCG@k: {avg_ndcg:.3f}")
+    console.print(f"MRR: {mrr:.3f}")
+
+    if json_out:
+        with open(json_out, "w", encoding="utf-8") as fh:
+            json.dump(report, fh, indent=2)
+        console.print(f"[dim]Wrote report to {json_out}[/dim]")
 
 
 # ── atomics adversarial ───────────────────────────────────────────────────────

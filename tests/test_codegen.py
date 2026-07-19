@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from atomics.eval.codegen import CodegenFixture, CodeTestCase
 from atomics.eval.codegen.fixtures import ALL_CODEGEN_FIXTURES
 from atomics.eval.codegen.runner import (
@@ -13,7 +11,6 @@ from atomics.eval.codegen.runner import (
     run_test_case,
 )
 from atomics.models import TaskCategory, TaskComplexity, TaskResult, TaskStatus
-
 
 # ── Fixture collection tests ────────────────────────────────────────────────
 
@@ -250,6 +247,7 @@ def test_summary_to_dict():
 
 def test_cli_codegen_help():
     from click.testing import CliRunner
+
     from atomics.cli import cli
 
     runner = CliRunner()

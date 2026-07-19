@@ -4,6 +4,7 @@
 
 ### Added
 - Added 20 new multi-turn conversation fixtures (`mt-eval-16` through `mt-eval-35`) covering contradiction detection, persona drift/stability, long-context retention, multi-turn tool-use, and security-focused scenarios. Long-context fixtures use `max_output_tokens=1024` to avoid truncating summary turns.
+- RAG pipeline with real retrieval: `atomics rag-index` builds a sqlite-vec index from local documents, `atomics rag --index` runs existing fixtures against retrieved chunks, and `atomics rag-retrieval` reports recall@k, precision@k, MRR, and nDCG@k. Optional `[rag]` extra includes `sqlite-vec` and `sentence-transformers`.
 
 ## 0.10.0 (2026-07-17) — RAG eval, multi-turn conversations, cost advisor, CI gates, docs overhaul
 

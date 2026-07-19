@@ -2,13 +2,10 @@
 
 from __future__ import annotations
 
-import json
-
 import httpx
 import pytest
 
 from atomics.providers.base import BaseProvider
-
 
 # ── Fake HTTP response helper ────────────────────────────────────────────────
 
@@ -283,6 +280,7 @@ class TestGeminiProvider:
 
 def test_cli_provider_test_groq_missing_key():
     from click.testing import CliRunner
+
     from atomics.cli import cli
 
     runner = CliRunner(env={"GROQ_API_KEY": ""})
@@ -293,6 +291,7 @@ def test_cli_provider_test_groq_missing_key():
 
 def test_cli_provider_test_together_missing_key():
     from click.testing import CliRunner
+
     from atomics.cli import cli
 
     runner = CliRunner(env={"TOGETHER_API_KEY": ""})
@@ -303,6 +302,7 @@ def test_cli_provider_test_together_missing_key():
 
 def test_cli_provider_test_gemini_missing_key():
     from click.testing import CliRunner
+
     from atomics.cli import cli
 
     runner = CliRunner(env={"GEMINI_API_KEY": ""})

@@ -26,7 +26,7 @@ Current priorities and future directions for Stoneburner / Atomics.
 - [ ] API server mode (run atomics as a service, query via REST)
 
 ### Eval Quality
-- [ ] RAG pipeline with real retrieval (vector DB integration, not just fixture chunks)
+- [x] RAG pipeline with real retrieval (vector DB integration, not just fixture chunks)
 - [ ] Multi-turn conversation eval fixtures (context retention, contradiction detection)
 - [x] Code generation benchmarks (functional correctness, not just quality judging)
 - [x] Multilingual evaluation fixtures

@@ -137,6 +137,17 @@ uv run atomics rag --json-out rag.json
 
 Metrics: `grounding_score`, `faithfulness_score`, `abstention_accuracy`, `hallucination_rate`, `overall_rag_score`.
 
+### Real retrieval mode
+
+You can also evaluate RAG against your own indexed corpus. Real retrieval requires the optional extra:
+
+```bash
+uv pip install "atomics[rag]"
+uv run atomics rag-index ./docs --db ./my-index.vec
+uv run atomics rag --index ./my-index.vec --provider ollama -m qwen3:14b
+uv run atomics rag-retrieval --index ./my-index.vec --gold relevance.json
+```
+
 ## `atomics multiturn` — Multi-Turn Conversation Evaluation
 
 Tests context retention, coherence, and instruction following across scripted multi-turn conversations. Now includes 35 fixtures covering context retention, instruction following, contradiction detection, persona drift/stability, long-context retention (8+ turns), simulated multi-turn tool-use chaining, and security-focused scenarios (social engineering refusal, least-privilege access control, and credential non-echo).
