@@ -278,7 +278,7 @@ async def run_codegen(
                 status=TaskStatus.FAILED,
                 prompt=prompt,
                 error_class=type(exc).__name__,
-                error_message=sanitize_error(str(exc) or repr(exc)),
+                error_message=sanitize_error(exc),
                 started_at=task_started,
                 completed_at=datetime.now(UTC),
             )
@@ -320,7 +320,7 @@ async def run_codegen(
     return CodegenRunSummary(
         run_id=effective_run_id,
         provider=provider.name,
-        model=model or getattr(provider, "default_model", ""),
+        model=model or getattr(provider, "default_model", None) or "",
         started_at=started,
         completed_at=datetime.now(UTC),
         fixture_results=results,

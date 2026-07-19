@@ -21,6 +21,10 @@ dependencies = [
 [project.optional-dependencies]
 bedrock = ["boto3>=1.35.0"]
 openai = ["openai>=1.40.0"]
+rag = [
+    "sqlite-vec>=0.1.0",
+    "sentence-transformers>=3.0.0",
+]
 dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.24.0",
@@ -54,6 +58,21 @@ python_version = "3.11"
 ignore_missing_imports = true
 # The whole package is type-checked — no per-module error suppressions remain.
 # `ignore_missing_imports` stays on for optional/stub-less third-party deps.
+
+[[tool.mypy.overrides]]
+# Optional [rag] stack: installed numpy stubs use 3.12+ syntax that breaks under
+# python_version = "3.11". Skip following those imports when the extra is present.
+module = [
+    "numpy",
+    "numpy.*",
+    "sentence_transformers",
+    "sentence_transformers.*",
+    "sqlite_vec",
+    "sqlite_vec.*",
+    "torch",
+    "torch.*",
+]
+follow_imports = "skip"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

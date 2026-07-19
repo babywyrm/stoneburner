@@ -5,7 +5,6 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 import httpx
-import pytest
 
 from atomics.models import RunSummary
 from atomics.webhooks import (

@@ -56,6 +56,8 @@ uv run atomics run --provider ollama -n 5
 
 Compare providers after running benchmarks: `uv run atomics compare` — see [docs/COMPARING.md](docs/COMPARING.md) for model classes, metrics fidelity, and judge accuracy.
 
+> **Optional extras:** Real RAG retrieval (`atomics rag-index`, `atomics rag-retrieval`, `atomics rag --index`) requires `uv sync --extra rag` to install `sqlite-vec` and `sentence-transformers`. Bedrock and OpenAI providers need `--extra bedrock` and `--extra openai` respectively.
+
 ## Burn Tiers
 
 | Tier | Tasks | Model | Interval | Budget | Tokens/hr |
@@ -81,7 +83,9 @@ uv run atomics tiers                   # show all tier profiles
 | `atomics redblue` | Red/blue security capability eval |
 | `atomics stress` | GPU saturation testing |
 | `atomics soak` | Long-duration stability test |
-| `atomics rag` | RAG pipeline evaluation (grounding, faithfulness, abstention) |
+| `atomics rag` | RAG pipeline evaluation (grounding, faithfulness, abstention) — also supports real retrieval from an indexed corpus |
+| `atomics rag-index` | Build a sqlite-vec index from local documents for real RAG retrieval |
+| `atomics rag-retrieval` | Measure retrieval quality (recall@k, precision@k, MRR, nDCG@k) from an index |
 | `atomics multiturn` | Multi-turn conversation eval (context retention, coherence) |
 | `atomics advisor` | Cost optimization recommendations from historical data |
 | `atomics codegen` | Code generation eval (functional correctness via test execution) |

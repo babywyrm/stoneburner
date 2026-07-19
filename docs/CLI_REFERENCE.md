@@ -72,9 +72,14 @@ Full command reference for `atomics`. See also [QUICKSTART.md](../QUICKSTART.md)
 | `atomics advisor --min-quality 0.9` | Higher quality threshold |
 | `atomics advisor --current-model claude-sonnet-4-6` | Optimize from a specific model |
 | `atomics eval --fixtures ml-01,ml-05` | Run multilingual fixtures (8 languages) |
-| `atomics rag` | RAG pipeline evaluation — grounding, faithfulness, abstention |
+| `atomics rag` | RAG pipeline evaluation — grounding, faithfulness, abstention (uses hand-crafted or retrieved context) |
+| `atomics rag --index ./index.vec` | Run RAG fixtures against chunks retrieved from a sqlite-vec index |
+| `atomics rag-index ./docs --db ./index.vec` | Build a sqlite-vec index from a directory of documents |
+| `atomics rag-retrieval --index ./index.vec --gold gold.json` | Report recall@k, precision@k, MRR, and nDCG@k |
 | `atomics rag --fixtures rag-05,rag-12` | Run a fixture subset |
 | `atomics rag --json-out rag.json` | Write results as JSON |
+
+Real retrieval (`rag-index`, `rag --index`, `rag-retrieval`) requires the optional extra: `uv pip install "atomics[rag]"`.
 | `atomics sweep` | Multi-model eval sweep with ranked comparison |
 
 ## Load Testing

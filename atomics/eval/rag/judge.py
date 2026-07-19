@@ -13,8 +13,12 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from atomics.providers.base import BaseProvider
+
+if TYPE_CHECKING:
+    from atomics.eval.rag import RAGFixture
 
 logger = logging.getLogger("atomics.eval.rag.judge")
 
@@ -134,15 +138,13 @@ def _format_context(chunks: list) -> str:
 
 async def score_rag_response(
     response: str,
-    fixture: "RAGFixture",
+    fixture: RAGFixture,
     judge: BaseProvider,
     *,
     judge_model: str | None = None,
     max_response_chars: int = 4000,
 ) -> RAGJudgeResult:
     """Score a RAG response using the grounding/faithfulness/abstention rubric."""
-    from atomics.eval.rag import RAGFixture
-
     truncated = response[:max_response_chars]
     context_text = _format_context(fixture.context_chunks)
 
@@ -216,7 +218,7 @@ async def score_rag_response(
 
 def compute_hallucination(
     response: str,
-    fixture: "RAGFixture",
+    fixture: RAGFixture,
 ) -> bool:
     """Heuristic: did the response contain claims not grounded in any chunk?
 

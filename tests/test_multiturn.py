@@ -2,15 +2,13 @@
 
 from __future__ import annotations
 
-import pytest
-
 from atomics.eval.multiturn import ConversationFixture, ConversationTurn
 from atomics.eval.multiturn.fixtures import ALL_MULTITURN_FIXTURES
 from atomics.eval.multiturn.judge import (
-    TurnJudgeResult,
     ConversationJudgeResult,
-    _parse_turn_rubric,
+    TurnJudgeResult,
     _parse_conv_rubric,
+    _parse_turn_rubric,
 )
 from atomics.eval.multiturn.runner import (
     ConversationResult,
@@ -19,7 +17,6 @@ from atomics.eval.multiturn.runner import (
     _build_transcript,
 )
 from atomics.models import TaskCategory, TaskComplexity, TaskResult, TaskStatus
-
 
 # ── Model tests ──────────────────────────────────────────────────────────────
 
@@ -308,6 +305,7 @@ def test_summary_empty():
 
 def test_cli_multiturn_help():
     from click.testing import CliRunner
+
     from atomics.cli import cli
 
     runner = CliRunner()

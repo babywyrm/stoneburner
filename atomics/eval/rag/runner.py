@@ -7,10 +7,12 @@ import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from typing import Any
 
 from atomics.eval.rag import RAGFixture
 from atomics.eval.rag.fixtures import ALL_RAG_FIXTURES
 from atomics.eval.rag.judge import RAGJudgeResult, compute_hallucination, score_rag_response
+from atomics.eval.rag.retrieval import RAGIndex
 from atomics.models import TaskCategory, TaskResult, TaskStatus
 from atomics.providers.base import BaseProvider
 from atomics.validation import sanitize_error
@@ -35,15 +37,26 @@ class RAGRunSummary:
     started_at: datetime
     completed_at: datetime
     fixture_results: list[RAGFixtureResult] = field(default_factory=list)
+    avg_retrieved_chunks: float | None = None
+    unique_sources_retrieved: int | None = None
+    index_info: dict[str, Any] | None = None
 
     @property
     def grounding_score(self) -> float | None:
-        scored = [r.judge.grounding for r in self.fixture_results if r.judge and not r.judge.parse_failed]
+        scored = [
+            r.judge.grounding
+            for r in self.fixture_results
+            if r.judge and not r.judge.parse_failed
+        ]
         return round(sum(scored) / len(scored) / 4.0, 3) if scored else None
 
     @property
     def faithfulness_score(self) -> float | None:
-        scored = [r.judge.faithfulness for r in self.fixture_results if r.judge and not r.judge.parse_failed]
+        scored = [
+            r.judge.faithfulness
+            for r in self.fixture_results
+            if r.judge and not r.judge.parse_failed
+        ]
         return round(sum(scored) / len(scored) / 3.0, 3) if scored else None
 
     @property
@@ -75,7 +88,11 @@ class RAGRunSummary:
 
     @property
     def overall_rag_score(self) -> float | None:
-        scored = [r.judge.score for r in self.fixture_results if r.judge and not r.judge.parse_failed]
+        scored = [
+            r.judge.score
+            for r in self.fixture_results
+            if r.judge and not r.judge.parse_failed
+        ]
         return round(sum(scored) / len(scored), 3) if scored else None
 
     @property
@@ -118,6 +135,9 @@ class RAGRunSummary:
             "total_cost_usd": round(self.total_cost_usd, 6),
             "total_tokens": self.total_tokens,
             "avg_latency_ms": self.avg_latency_ms,
+            "avg_retrieved_chunks": self.avg_retrieved_chunks,
+            "unique_sources_retrieved": self.unique_sources_retrieved,
+            "index_info": self.index_info,
             "fixtures": [
                 {
                     "id": r.fixture.id,
@@ -164,6 +184,8 @@ async def run_rag(
     thinking: bool | None = None,
     thinking_budget: int | None = None,
     fixtures: list[RAGFixture] | None = None,
+    index: RAGIndex | None = None,
+    top_k: int = 5,
 ) -> RAGRunSummary:
     """Run the RAG evaluation suite."""
     effective_judge = judge_provider or provider
@@ -172,9 +194,26 @@ async def run_rag(
     started = datetime.now(UTC)
 
     results: list[RAGFixtureResult] = []
+    retrieved_chunk_counts: list[int] = []
+    retrieved_sources: set[str] = set()
 
     for fixture in selected:
-        prompt = _build_rag_prompt(fixture)
+        if index is not None:
+            retrieved_chunks = index.search(fixture.question, top_k=top_k)
+            retrieved_chunk_counts.append(len(retrieved_chunks))
+            retrieved_sources.update(c.source for c in retrieved_chunks)
+            effective_fixture = RAGFixture(
+                id=fixture.id,
+                complexity=fixture.complexity,
+                question=fixture.question,
+                context_chunks=retrieved_chunks,
+                gold_criteria=fixture.gold_criteria,
+                context_contains_answer=fixture.context_contains_answer,
+                max_output_tokens=fixture.max_output_tokens,
+            )
+        else:
+            effective_fixture = fixture
+        prompt = _build_rag_prompt(effective_fixture)
         task_id = uuid.uuid4().hex[:12]
         task_started = datetime.now(UTC)
 
@@ -218,7 +257,7 @@ async def run_rag(
                 status=TaskStatus.FAILED,
                 prompt=prompt,
                 error_class=type(exc).__name__,
-                error_message=sanitize_error(str(exc) or repr(exc)),
+                error_message=sanitize_error(exc),
                 started_at=task_started,
                 completed_at=datetime.now(UTC),
             )
@@ -230,7 +269,7 @@ async def run_rag(
 
         judge_result = await score_rag_response(
             response=resp.text,
-            fixture=fixture,
+            fixture=effective_fixture,
             judge=effective_judge,
             judge_model=judge_model,
         )
@@ -245,14 +284,29 @@ async def run_rag(
 
     completed = datetime.now(UTC)
 
+    avg_retrieved: float | None = None
+    unique_sources: int | None = None
+    index_meta: dict[str, Any] | None = None
+    if index is not None:
+        avg_retrieved = (
+            round(sum(retrieved_chunk_counts) / len(retrieved_chunk_counts), 3)
+            if retrieved_chunk_counts
+            else 0.0
+        )
+        unique_sources = len(retrieved_sources)
+        index_meta = index.info()
+
     judge_prov_name = effective_judge.name if effective_judge else "none"
     return RAGRunSummary(
         run_id=effective_run_id,
         provider=provider.name,
-        model=model or getattr(provider, "default_model", ""),
+        model=model or getattr(provider, "default_model", None) or "",
         judge_provider=judge_prov_name,
         judge_model=judge_model or "",
         started_at=started,
         completed_at=completed,
         fixture_results=results,
+        avg_retrieved_chunks=avg_retrieved,
+        unique_sources_retrieved=unique_sources,
+        index_info=index_meta,
     )

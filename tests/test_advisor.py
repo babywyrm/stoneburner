@@ -6,9 +6,7 @@ import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 
-import pytest
-
-from atomics.advisor import Recommendation, AdvisorSummary, analyze_cost_optimization
+from atomics.advisor import analyze_cost_optimization
 from atomics.models import TaskCategory, TaskResult, TaskStatus
 from atomics.storage.repository import MetricsRepository
 from atomics.storage.schema import init_db
@@ -165,6 +163,7 @@ def test_advisor_overall_savings():
 
 def test_cli_advisor_help():
     from click.testing import CliRunner
+
     from atomics.cli import cli
 
     runner = CliRunner()
@@ -176,6 +175,7 @@ def test_cli_advisor_help():
 
 def test_cli_advisor_empty_db(tmp_path):
     from click.testing import CliRunner
+
     from atomics.cli import cli
 
     runner = CliRunner(env={"ATOMICS_DB_PATH": str(tmp_path / "empty.db")})

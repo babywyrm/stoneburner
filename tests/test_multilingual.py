@@ -76,6 +76,7 @@ def test_no_id_collision_with_eval_fixtures():
 def test_cli_eval_accepts_multilingual_fixture_id():
     """The eval command should recognize ml-XX fixture IDs."""
     from click.testing import CliRunner
+
     from atomics.cli import cli
 
     runner = CliRunner(env={"ATOMICS_DB_PATH": "/tmp/test-ml.db"})

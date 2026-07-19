@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
+
 import pytest
 
 from atomics.eval.rag import RAGChunk, RAGFixture
@@ -11,9 +15,14 @@ from atomics.eval.rag.judge import (
     _parse_rag_rubric,
     compute_hallucination,
 )
-from atomics.eval.rag.runner import RAGFixtureResult, RAGRunSummary, _build_rag_prompt
+from atomics.eval.rag.runner import RAGFixtureResult, RAGRunSummary, _build_rag_prompt, run_rag
 from atomics.models import TaskCategory, TaskComplexity, TaskResult, TaskStatus
+from atomics.providers.base import ProviderResponse
 
+try:
+    import sqlite_vec
+except ImportError:
+    sqlite_vec = None  # type: ignore[assignment]
 
 # ── Fixture model tests ──────────────────────────────────────────────────────
 
@@ -174,14 +183,24 @@ def _answer_fixture() -> RAGFixture:
 
 
 def test_hallucination_correct_abstention():
-    assert compute_hallucination("I cannot answer this from the given context.", _abstention_fixture()) is False
+    assert (
+        compute_hallucination(
+            "I cannot answer this from the given context.",
+            _abstention_fixture(),
+        )
+        is False
+    )
 
 
 def test_hallucination_false_answer_on_abstention():
-    assert compute_hallucination(
-        "Based on the analysis, the vulnerability affects version 3.2 and requires immediate patching.",
-        _abstention_fixture(),
-    ) is True
+    assert (
+        compute_hallucination(
+            "Based on the analysis, the vulnerability affects "
+            "version 3.2 and requires immediate patching.",
+            _abstention_fixture(),
+        )
+        is True
+    )
 
 
 def test_hallucination_short_response_not_flagged():
@@ -213,6 +232,18 @@ def test_build_rag_prompt_includes_instructions():
     fixture = ALL_RAG_FIXTURES[0]
     prompt = _build_rag_prompt(fixture)
     assert "ONLY on the provided context" in prompt
+
+
+def test_build_rag_prompt_with_retrieved_context():
+    fixture = RAGFixture(
+        id="test-retrieval",
+        complexity=TaskComplexity.LIGHT,
+        question="what is the answer",
+        context_chunks=[RAGChunk(content="the answer is 42", label="retrieved", source="doc.txt")],
+    )
+    prompt = _build_rag_prompt(fixture)
+    assert "the answer is 42" in prompt
+    assert "[Document 1: doc.txt]" in prompt
 
 
 # ── Summary tests ────────────────────────────────────────────────────────────
@@ -336,6 +367,190 @@ def test_summary_empty():
     assert summary.grounding_score is None
     assert summary.hallucination_rate is None
     assert summary.parse_failure_rate == 0.0
+    assert summary.avg_retrieved_chunks is None
+    assert summary.unique_sources_retrieved is None
+    assert summary.index_info is None
+
+
+def test_summary_with_index_stats():
+    results = [_make_fixture_result()]
+    summary = RAGRunSummary(
+        run_id="test",
+        provider="mock",
+        model="mock",
+        judge_provider="mock",
+        judge_model="mock",
+        started_at=datetime.now(UTC),
+        completed_at=datetime.now(UTC),
+        fixture_results=results,
+        avg_retrieved_chunks=3.5,
+        unique_sources_retrieved=2,
+        index_info={"chunk_count": "10", "embedding_model": "mock"},
+    )
+    assert summary.avg_retrieved_chunks == 3.5
+    assert summary.unique_sources_retrieved == 2
+    assert summary.index_info == {"chunk_count": "10", "embedding_model": "mock"}
+    d = summary.to_dict()
+    assert d["avg_retrieved_chunks"] == 3.5
+    assert d["unique_sources_retrieved"] == 2
+    assert d["index_info"]["embedding_model"] == "mock"
+
+
+# ── run_rag with index ───────────────────────────────────────────────────────
+
+
+class _FakeIndex:
+    def __init__(self, chunks: list[RAGChunk]) -> None:
+        self._chunks = chunks
+        self.search_calls: list[tuple[str, int]] = []
+
+    def search(self, query: str, top_k: int = 5) -> list[RAGChunk]:
+        self.search_calls.append((query, top_k))
+        return self._chunks[:top_k]
+
+    def info(self) -> dict:
+        return {"chunk_count": str(len(self._chunks)), "embedding_model": "mock"}
+
+
+@pytest.mark.asyncio
+async def test_run_rag_judge_receives_retrieved_chunks():
+    retrieved = [
+        RAGChunk(content="retrieved advisory text", label="retrieved", source="CVE-2026-3891.md"),
+    ]
+    index = _FakeIndex(retrieved)
+    fixture = RAGFixture(
+        id="rag-test",
+        complexity=TaskComplexity.LIGHT,
+        question="What is the CVE?",
+        context_chunks=[RAGChunk(content="hand-crafted", label="relevant", source="hand.md")],
+        gold_criteria=["mentions CVE"],
+    )
+
+    provider = AsyncMock()
+    provider.name = "mock"
+    provider.generate = AsyncMock(
+        return_value=ProviderResponse(
+            text="The CVE is described in the advisory.",
+            input_tokens=10,
+            output_tokens=20,
+            total_tokens=30,
+            model="mock-model",
+            latency_ms=5.0,
+            estimated_cost_usd=0.0,
+        )
+    )
+
+    judge = AsyncMock()
+    judge.name = "mock-judge"
+    judge.generate = AsyncMock(
+        return_value=SimpleNamespace(
+            text="GROUNDING: 3\nFAITHFULNESS: 2\nABSTENTION: 3\nRATIONALE: Retrieved context used.",
+            model="judge-model",
+            input_tokens=5,
+            output_tokens=5,
+            total_tokens=10,
+            latency_ms=1.0,
+            estimated_cost_usd=0.0,
+        )
+    )
+
+    summary = await run_rag(
+        provider,
+        judge_provider=judge,
+        fixtures=[fixture],
+        index=index,  # type: ignore[arg-type]
+        top_k=3,
+    )
+
+    assert len(summary.fixture_results) == 1
+    assert summary.fixture_results[0].fixture is fixture
+    assert summary.fixture_results[0].judge is not None
+    assert not summary.fixture_results[0].judge.parse_failed
+    judge_prompt = judge.generate.call_args.args[0]
+    assert "retrieved advisory text" in judge_prompt
+    assert "CVE-2026-3891.md" in judge_prompt
+    assert "hand-crafted" not in judge_prompt
+    assert summary.avg_retrieved_chunks == 1.0
+    assert summary.unique_sources_retrieved == 1
+    assert summary.index_info is not None
+    assert summary.index_info["embedding_model"] == "mock"
+
+
+@pytest.mark.skipif(sqlite_vec is None, reason="sqlite-vec not installed")
+@pytest.mark.asyncio
+async def test_run_rag_with_real_index(tmp_path):
+    from atomics.eval.rag.retrieval import Document, MockEmbedder, RAGIndex
+
+    db_path = tmp_path / "index.vec"
+    index = RAGIndex(db_path, embedder=MockEmbedder(dim=8))
+    index.build(
+        [
+            Document(
+                content="The vulnerability CVE-2026-3891 affects the auth service.",
+                source="CVE-2026-3891.md",
+                metadata={"full_path": "/tmp/CVE-2026-3891.md"},
+            ),
+        ],
+        chunk_size=128,
+        overlap=0,
+    )
+
+    fixture = RAGFixture(
+        id="rag-test-index",
+        complexity=TaskComplexity.LIGHT,
+        question="What does CVE-2026-3891 affect?",
+        context_chunks=[RAGChunk(content="placeholder", label="relevant", source="hand.md")],
+        gold_criteria=["auth service"],
+    )
+
+    provider = AsyncMock()
+    provider.name = "mock"
+    provider.generate = AsyncMock(
+        return_value=ProviderResponse(
+            text="It affects the auth service.",
+            input_tokens=10,
+            output_tokens=20,
+            total_tokens=30,
+            model="mock-model",
+            latency_ms=5.0,
+            estimated_cost_usd=0.0,
+        )
+    )
+    judge = AsyncMock()
+    judge.name = "mock-judge"
+    judge.generate = AsyncMock(
+        return_value=SimpleNamespace(
+            text="GROUNDING: 4\nFAITHFULNESS: 3\nABSTENTION: 3\nRATIONALE: Grounded.",
+            model="judge-model",
+            input_tokens=5,
+            output_tokens=5,
+            total_tokens=10,
+            latency_ms=1.0,
+            estimated_cost_usd=0.0,
+        )
+    )
+
+    summary = await run_rag(
+        provider,
+        judge_provider=judge,
+        fixtures=[fixture],
+        index=index,
+        top_k=2,
+    )
+
+    assert len(summary.fixture_results) == 1
+    fr = summary.fixture_results[0]
+    assert fr.judge is not None
+    assert fr.judge.score > 0
+    assert not fr.judge.parse_failed
+    prompt = provider.generate.call_args.args[0]
+    assert "CVE-2026-3891" in prompt
+    assert "auth service" in prompt
+    assert summary.avg_retrieved_chunks is not None
+    assert summary.avg_retrieved_chunks >= 1
+    assert summary.unique_sources_retrieved == 1
+    assert summary.index_info is not None
+    assert summary.index_info["embedding_model"] == "mock"
 
 
 # ── CLI tests ────────────────────────────────────────────────────────────────
@@ -343,6 +558,7 @@ def test_summary_empty():
 
 def test_cli_rag_help():
     from click.testing import CliRunner
+
     from atomics.cli import cli
 
     runner = CliRunner()

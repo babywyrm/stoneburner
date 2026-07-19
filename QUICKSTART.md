@@ -315,6 +315,11 @@ quality score on each host with a speedup ratio and parity verdict.
 uv run atomics rag --provider ollama -m qwen3:14b --judge-model qwen2.5:14b
 uv run atomics rag --fixtures rag-05,rag-12          # subset
 
+# Real retrieval against your own indexed corpus (requires uv sync --extra rag)
+uv run atomics rag-index ./docs --db ./my-index.vec
+uv run atomics rag --index ./my-index.vec --provider ollama -m qwen3:14b --judge-model qwen2.5:14b
+uv run atomics rag-retrieval --index ./my-index.vec --gold ./relevance.json
+
 # Multi-turn conversation eval — context retention, coherence, instruction following
 uv run atomics multiturn --provider ollama -m qwen3:14b --judge-model qwen2.5:14b
 uv run atomics multiturn --fixtures mt-eval-01       # subset

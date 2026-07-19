@@ -6,7 +6,7 @@ generated code against deterministic test cases. Pass/fail is objective.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from atomics.models import TaskComplexity
 
