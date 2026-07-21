@@ -58,6 +58,8 @@ Compare providers after running benchmarks: `uv run atomics compare` — see [do
 
 > **Optional extras:** Real RAG retrieval (`atomics rag-index`, `atomics rag-retrieval`, `atomics rag --index`) requires `uv sync --extra rag` to install `sqlite-vec` and `sentence-transformers`. Bedrock and OpenAI providers need `--extra bedrock` and `--extra openai` respectively.
 
+The API server mode requires `uv sync --extra api` to install FastAPI and uvicorn.
+
 ## Burn Tiers
 
 | Tier | Tasks | Model | Interval | Budget | Tokens/hr |
@@ -91,6 +93,7 @@ uv run atomics tiers                   # show all tier profiles
 | `atomics codegen` | Code generation eval (functional correctness via test execution) |
 | `atomics sweep` | Multi-model eval sweep |
 | `atomics doctor` | Installation health check |
+| `atomics server` | Run atomics as an HTTP API server |
 
 Full reference: [docs/CLI_REFERENCE.md](docs/CLI_REFERENCE.md)
 

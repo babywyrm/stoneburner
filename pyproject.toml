@@ -1,6 +1,6 @@
 [project]
 name = "atomics"
-version = "0.10.0"
+version = "0.11.0"
 description = "Agentic token usage benchmarking platform"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -24,6 +24,10 @@ openai = ["openai>=1.40.0"]
 rag = [
     "sqlite-vec>=0.1.0",
     "sentence-transformers>=3.0.0",
+]
+api = [
+    "fastapi>=0.100.0",
+    "uvicorn>=0.23.0",
 ]
 dev = [
     "pytest>=8.0.0",

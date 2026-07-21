@@ -23,7 +23,7 @@ Current priorities and future directions for Stoneburner / Atomics.
 - [x] Webhook/Slack notifications on scheduled run regression
 - [x] GitHub Actions workflow template for eval CI gates
 - [ ] Distributed runs across multiple hosts with results aggregation
-- [ ] API server mode (run atomics as a service, query via REST)
+- [x] API server mode (run atomics as a service, query via REST)
 
 ### Eval Quality
 - [x] RAG pipeline with real retrieval (vector DB integration, not just fixture chunks)
