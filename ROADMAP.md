@@ -4,6 +4,7 @@ Current priorities and future directions for Stoneburner / Atomics.
 
 ## Recently Shipped
 
+- **Distributed runs (Phase 1 split mode)** — `atomics distributed run` / `atomics worker` with coordinator API for split-mode jobs across workers. Full-run and fleet modes are Phase 2.
 - **RAG Pipeline Evaluation** — `atomics rag` with 20 fixtures (security + general technical), grounding/faithfulness/abstention judge rubric, hallucination detection
 - **README refactor** — 805 → 205 lines with TOC, anchors, and 5 linked focused docs
 - **Compare improvements** — P50/P95 latency percentiles, $/1K tokens, model class taxonomy with mixed-class warnings
@@ -22,7 +23,7 @@ Current priorities and future directions for Stoneburner / Atomics.
 - [ ] Dashboard / web UI for results visualization
 - [x] Webhook/Slack notifications on scheduled run regression
 - [x] GitHub Actions workflow template for eval CI gates
-- [ ] Distributed runs across multiple hosts with results aggregation
+- [x] Distributed runs across multiple hosts with results aggregation (Phase 1 split mode shipped; full-run and fleet modes are Phase 2)
 - [x] API server mode (run atomics as a service, query via REST)
 
 ### Eval Quality

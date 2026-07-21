@@ -173,7 +173,14 @@ atomics secrets delete ANTHROPIC_API_KEY
 stoneburner/
 ├── atomics/              # Core Python package
 │   ├── api/              # HTTP API server (FastAPI) — runs, evals, reports, jobs
-│   ├── commands/         # Click command modules (auth, admin, benchmark, eval, security, load, api)
+│   ├── commands/         # Click command modules (auth, admin, benchmark, eval, security, load, api, worker, distributed)
+│   ├── distributed/      # Split-mode coordinator + worker (Phase 1)
+│   │   ├── coordinator.py
+│   │   ├── models.py
+│   │   ├── worker_client.py
+│   │   ├── worker_runner.py
+│   │   ├── routes.py
+│   │   └── auth.py
 │   ├── core/             # Loop engine, task runner, rate/budget guard
 │   ├── eval/             # Evaluation framework (eval, adversarial, redblue)
 │   ├── probe/            # Live ecosystem probe suite
@@ -184,7 +191,7 @@ stoneburner/
 │   └── cli.py            # Thin Click root — registers commands from commands/
 ├── profiles/             # Custom target profiles (local/ gitignored)
 ├── qa/                   # QA fixture suites (local/ gitignored)
-├── tests/                # 1683+ tests at 85% coverage
+├── tests/                # 1709+ tests at 85% coverage
 └── docs/                 # Detailed documentation
 ```
 

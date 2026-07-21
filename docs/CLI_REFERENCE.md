@@ -140,3 +140,55 @@ Real retrieval (`rag-index`, `rag --index`, `rag-retrieval`) requires the option
 | `atomics server --api-key KEY` | Allow one API key (repeatable) |
 | `atomics server --host 0.0.0.0 --port 8080` | Bind to all interfaces on port 8080 |
 | `atomics server --log-level debug` | Verbose uvicorn logging |
+| `atomics worker` | Start a distributed worker (polls coordinator for tasks) |
+| `atomics distributed run` | Submit a split-mode distributed run |
+| `atomics distributed status JOB_ID` | Poll distributed run status |
+
+## atomics worker
+
+Start a worker process that registers with the coordinator, heartbeats, polls for task assignments, executes them, and submits results.
+
+| Option | Description |
+|--------|-------------|
+| `--coordinator URL` | Coordinator base URL (default: `http://127.0.0.1:8000`) |
+| `--api-key KEY` | Worker API key (or `ATOMICS_WORKER_API_KEY`) |
+| `--label KEY=VALUE` | Worker label (repeatable) |
+| `--endpoint URL` | Optional push endpoint URL for this worker |
+| `--heartbeat-interval N` | Heartbeat interval in seconds (default: 30) |
+
+```bash
+ATOMICS_WORKER_API_KEY=sk-abc123 uv run atomics worker --label gpu=1
+```
+
+## atomics distributed
+
+Submit and inspect distributed benchmark runs. Phase 1 supports `split` mode only (tasks are divided across registered workers).
+
+### `atomics distributed run`
+
+| Option | Description |
+|--------|-------------|
+| `--coordinator URL` | Coordinator base URL (default: `http://127.0.0.1:8000`) |
+| `--api-key KEY` | Client API key (or `ATOMICS_API_KEY`) |
+| `--mode [split]` | Job mode (only `split` in Phase 1) |
+| `-p, --provider TEXT` | Provider (default: `claude`) |
+| `-t, --tier TEXT` | Burn tier (default: `baseline`) |
+| `-m, --model TEXT` | Model override |
+| `-n INTEGER` | Number of tasks (default: 1) |
+| `--label KEY=VALUE` | Worker selector (repeatable) |
+
+```bash
+ATOMICS_API_KEY=sk-abc123 uv run atomics distributed run -p ollama -t baseline -n 4 --label gpu=1
+```
+
+### `atomics distributed status`
+
+| Argument / Option | Description |
+|-------------------|-------------|
+| `JOB_ID` | Distributed job id (required) |
+| `--coordinator URL` | Coordinator base URL (default: `http://127.0.0.1:8000`) |
+| `--api-key KEY` | Client API key (or `ATOMICS_API_KEY`) |
+
+```bash
+ATOMICS_API_KEY=sk-abc123 uv run atomics distributed status <job_id>
+```
