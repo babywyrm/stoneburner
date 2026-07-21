@@ -1188,3 +1188,20 @@ def test_complete_evaluation_run_handles_zero_rows(tmp_path):
     assert summary.successful_tasks == 0
     assert summary.failed_tasks == 0
     repo.close()
+
+
+def test_distributed_tables_exist():
+    import pathlib
+    import tempfile
+
+    from atomics.storage.schema import init_db
+
+    with tempfile.TemporaryDirectory() as tmp:
+        db = pathlib.Path(tmp) / "test.db"
+        conn = init_db(db)
+        tables = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name IN (?, ?, ?)",
+            ("workers", "distributed_jobs", "distributed_assignments"),
+        ).fetchall()
+        names = {row[0] for row in tables}
+        assert names == {"workers", "distributed_jobs", "distributed_assignments"}

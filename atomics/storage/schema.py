@@ -331,6 +331,40 @@ CREATE TABLE IF NOT EXISTS labcompare_results (
 );
 
 CREATE INDEX IF NOT EXISTS idx_labcompare_run ON labcompare_results(comparison_run_id);
+
+CREATE TABLE IF NOT EXISTS workers (
+    worker_id TEXT PRIMARY KEY,
+    labels TEXT NOT NULL,
+    capabilities TEXT,
+    endpoint TEXT,
+    api_key_hint TEXT,
+    status TEXT NOT NULL DEFAULT 'online',
+    last_seen_at TEXT,
+    registered_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS distributed_jobs (
+    job_id TEXT PRIMARY KEY,
+    mode TEXT NOT NULL,
+    parent_run_id TEXT,
+    status TEXT NOT NULL DEFAULT 'pending',
+    request_json TEXT NOT NULL,
+    summary_json TEXT,
+    created_at TEXT NOT NULL,
+    completed_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS distributed_assignments (
+    assignment_id TEXT PRIMARY KEY,
+    job_id TEXT NOT NULL REFERENCES distributed_jobs(job_id),
+    worker_id TEXT REFERENCES workers(worker_id),
+    status TEXT NOT NULL DEFAULT 'pending',
+    task_spec TEXT NOT NULL,
+    result_json TEXT,
+    retry_count INTEGER DEFAULT 0,
+    started_at TEXT,
+    completed_at TEXT
+);
 """
 
 RESET_SQL = """
@@ -345,6 +379,9 @@ DROP TABLE IF EXISTS soak_results;
 DROP TABLE IF EXISTS baselines;
 DROP TABLE IF EXISTS archreview_results;
 DROP TABLE IF EXISTS labcompare_results;
+DROP TABLE IF EXISTS distributed_assignments;
+DROP TABLE IF EXISTS distributed_jobs;
+DROP TABLE IF EXISTS workers;
 DROP TABLE IF EXISTS runs;
 DROP TABLE IF EXISTS schedules;
 DROP TABLE IF EXISTS schema_version;
