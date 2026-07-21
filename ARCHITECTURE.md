@@ -19,6 +19,7 @@ never imports eval; providers never import storage.
 
 ```
 CLI / entry          cli.py, commands/, __main__.py
+API / server         api/                # FastAPI, async jobs, optional auth
 Orchestration        sweep, scenario, qa_runner, labcompare
 Burn loop            core/, tasks/, tiers, hooks
 Eval / security      eval/, probe/, archreview/
@@ -29,11 +30,28 @@ Support / infra      config, paths, secrets, doctor, reporting, exporters,
                      scheduler, inference
 ```
 
+```mermaid
+flowchart TB
+    CLI["CLI / entry\ncli.py, commands/"] --> Commands["commands/\nauth, admin, benchmark, eval, security, load, api, rag"]
+    API["API / server\natomics/api/"] --> Commands
+    Commands --> Orchestration["Orchestration\nsweep, scenario, labcompare, qa_runner"]
+    Commands --> Burn["Burn loop\ncore/ engine, runner, guard"]
+    Commands --> Eval["Eval / security\neval/, probe/, archreview/"]
+    Commands --> Load["Load testing\nstress, soak, capacity, profiles"]
+    Orchestration --> Providers
+    Burn --> Providers
+    Eval --> Providers
+    Load --> Providers
+    Providers["Providers\nproviders/, auth/"] --> Storage["Storage\nstorage/"]
+    Providers --> Support["Support / infra\nconfig, secrets, scheduler, reporting"]
+```
+
 ### Layer responsibilities
 
 | Layer | Owns | Key modules |
 |-------|------|-------------|
-| CLI | Argument parsing, wiring, Rich output. No business logic that can't be reached another way. | `cli.py`, `commands/` |
+| CLI | Thin Click registration in `cli.py`; command modules in `commands/` handle argument parsing, wiring, and Rich output. No business logic that can't be reached another way. | `cli.py`, `commands/` |
+| API / server | FastAPI HTTP surface for runs, evals, reports, and async jobs; optional auth. | `api/` |
 | Orchestration | Multi-run/multi-model coordination over the lower layers. | `sweep.py`, `scenario.py`, `qa_runner.py`, `labcompare.py` |
 | Burn loop | The continuous token-burn benchmark. | `core/engine.py`, `core/runner.py`, `core/guard.py`, `tasks/` |
 | Eval / security | LLM quality and security evaluation suites. | `eval/`, `probe/`, `archreview/` |
@@ -189,7 +207,7 @@ New code should follow the target column, not copy whichever suite you opened fi
 | Parent run row | `create_run()` + `complete_*_run()` | done — all suites create + finalize a run row |
 | Stats helpers | one shared `stats` module | done — `atomics/stats.py` |
 | Provider build | `_make_provider()` | done — single factory |
-| CLI modules | one module per command under `commands/` | refusal/codereview extracted; remaining commands still live in `cli.py` |
+| CLI modules | one module per command under `commands/` | done — all commands extracted into `commands/<group>.py` |
 | Repository modules | persistence grouped by domain | generic records extracted; `storage/repository.py` remains a split candidate |
 
 ---
@@ -228,6 +246,4 @@ handles API keys and can send data to LLM providers. Rules for contributors:
 
 ## Module split candidates (tech debt, tracked)
 
-Large modules that are future split targets: `cli.py` (~3500 lines; per-command
-modules), `storage/repository.py` (~780; per-suite persistence mixins). Orphaned
-utilities to wire in or remove: `inference.py`, `workers/bridge.py`.
+Large modules that are future split targets: `storage/repository.py` (~780; per-suite persistence mixins). Orphaned utilities to wire in or remove: `inference.py`, `workers/bridge.py`.

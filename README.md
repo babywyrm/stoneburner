@@ -172,7 +172,8 @@ atomics secrets delete ANTHROPIC_API_KEY
 ```
 stoneburner/
 ├── atomics/              # Core Python package
-│   ├── commands/         # Extracted Click commands and shared CLI policy
+│   ├── api/              # HTTP API server (FastAPI) — runs, evals, reports, jobs
+│   ├── commands/         # Click command modules (auth, admin, benchmark, eval, security, load, api)
 │   ├── core/             # Loop engine, task runner, rate/budget guard
 │   ├── eval/             # Evaluation framework (eval, adversarial, redblue)
 │   ├── probe/            # Live ecosystem probe suite
@@ -180,10 +181,10 @@ stoneburner/
 │   ├── providers/        # LLM adapters (Claude, Bedrock, OpenAI, Ollama, vLLM, brain-gateway)
 │   ├── storage/          # SQLite metrics persistence (schema v20)
 │   ├── scheduler/        # Cron/systemd/launchd generation and installation
-│   └── cli.py            # Click CLI entry point
+│   └── cli.py            # Thin Click root — registers commands from commands/
 ├── profiles/             # Custom target profiles (local/ gitignored)
 ├── qa/                   # QA fixture suites (local/ gitignored)
-├── tests/                # 1593+ tests at 85% coverage
+├── tests/                # 1683+ tests at 85% coverage
 └── docs/                 # Detailed documentation
 ```
 
