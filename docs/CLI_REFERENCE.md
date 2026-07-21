@@ -130,3 +130,13 @@ Real retrieval (`rag-index`, `rag --index`, `rag-retrieval`) requires the option
 | `atomics logout` | Clear cached OAuth tokens |
 | `atomics whoami` | Show current auth mode and identity |
 | `atomics completion` | Generate shell completion scripts |
+
+## API Server
+
+| Command | Description |
+|---------|-------------|
+| `atomics server` | Run the atomics HTTP API server |
+| `atomics server --no-auth` | Disable API key authentication (local dev only) |
+| `atomics server --api-key KEY` | Allow one API key (repeatable) |
+| `atomics server --host 0.0.0.0 --port 8080` | Bind to all interfaces on port 8080 |
+| `atomics server --log-level debug` | Verbose uvicorn logging |

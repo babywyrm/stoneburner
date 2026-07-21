@@ -2,7 +2,10 @@
 
 ## Unreleased
 
+## 0.11.0 (2026-07-20) — API server mode, real RAG retrieval, richer multi-turn fixtures
+
 ### Added
+- API server mode: `atomics server` runs a FastAPI service with async job scheduling (`POST /api/v1/runs`, `POST /api/v1/evals`, `GET /api/v1/jobs/{id}`), API key authentication (`X-API-Key`), and read-only endpoints for comparison (`/api/v1/compare`) and recent runs (`/api/v1/reports/recent-runs`). Requires the `[api]` extra.
 - Added 20 new multi-turn conversation fixtures (`mt-eval-16` through `mt-eval-35`) covering contradiction detection, persona drift/stability, long-context retention, multi-turn tool-use, and security-focused scenarios. Long-context fixtures use `max_output_tokens=1024` to avoid truncating summary turns.
 - RAG pipeline with real retrieval: `atomics rag-index` builds a sqlite-vec index from local documents, `atomics rag --index` runs existing fixtures against retrieved chunks, and `atomics rag-retrieval` reports recall@k, precision@k, MRR, and nDCG@k. Optional `[rag]` extra includes `sqlite-vec` and `sentence-transformers`.
 
