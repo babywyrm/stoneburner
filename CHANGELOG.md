@@ -3,7 +3,7 @@
 ## Unreleased
 
 ### Added
-- Distributed benchmark runs: `atomics distributed run` submits split-mode jobs across multiple workers; `atomics worker` starts a worker process that polls the coordinator, executes tasks, and reports results.
+- Distributed benchmark runs: `atomics distributed run` submits split-mode jobs across multiple workers; `atomics worker` starts a worker process that polls the coordinator, executes tasks, and reports results. Workers can now target any provider/model/host (`--provider`, `--model`, `--host`).
 - New API endpoints for worker registration, heartbeat, task polling, and result submission under `/api/v1/workers` and `/api/v1/distributed/runs`.
 - Pluggable worker API-key authentication (`X-API-Key`) for distributed endpoints.
 - End-to-end local test coverage for distributed runs.

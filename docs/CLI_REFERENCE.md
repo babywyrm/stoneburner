@@ -155,9 +155,13 @@ Start a worker process that registers with the coordinator, heartbeats, polls fo
 | `--label KEY=VALUE` | Worker label (repeatable) |
 | `--endpoint URL` | Optional push endpoint URL for this worker |
 | `--heartbeat-interval N` | Heartbeat interval in seconds (default: 30) |
+| `--provider`, `-p` | Provider used by this worker (default: `ollama`) |
+| `--model`, `-m` | Model override for this worker |
+| `--host`, `-h` | Provider host/URL override (e.g. `http://nuc:30080`) |
 
 ```bash
 ATOMICS_WORKER_API_KEY=sk-abc123 uv run atomics worker --label gpu=1
+ATOMICS_WORKER_API_KEY=sk-abc123 uv run atomics worker --provider brain-gateway --host http://nuc:30080 --model qwen3:4b
 ```
 
 ## atomics distributed

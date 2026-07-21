@@ -16,7 +16,19 @@ from atomics.distributed.worker_client import WorkerClient
 @click.option("--label", "labels", multiple=True, help="Worker label as key=value")
 @click.option("--endpoint", help="Push endpoint URL for this worker")
 @click.option("--heartbeat-interval", default=30, show_default=True, help="Heartbeat interval in seconds")
-def worker(coordinator: str, api_key: str, labels: tuple[str, ...], endpoint: str | None, heartbeat_interval: int) -> None:
+@click.option("--provider", "-p", default="ollama", show_default=True, help="Provider used by this worker (ollama, brain-gateway, vllm, ...)")
+@click.option("--model", "-m", help="Model override for this worker")
+@click.option("--host", "-h", help="Provider host/URL override (e.g. http://nuc:30080)")
+def worker(
+    coordinator: str,
+    api_key: str,
+    labels: tuple[str, ...],
+    endpoint: str | None,
+    heartbeat_interval: int,
+    provider: str,
+    model: str | None,
+    host: str | None,
+) -> None:
     """Start a distributed worker process."""
     if not api_key:
         raise click.UsageError("--api-key is required (or set ATOMICS_WORKER_API_KEY)")
@@ -33,6 +45,9 @@ def worker(coordinator: str, api_key: str, labels: tuple[str, ...], endpoint: st
         labels=label_dict,
         endpoint=endpoint,
         heartbeat_interval=heartbeat_interval,
+        provider_name=provider,
+        model=model,
+        host=host,
     )
     try:
         asyncio.run(client.run())
