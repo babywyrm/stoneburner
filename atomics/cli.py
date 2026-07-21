@@ -7,10 +7,12 @@ import click
 from atomics.commands import admin as admin_commands
 from atomics.commands import api as api_commands
 from atomics.commands import benchmark as benchmark_commands
+from atomics.commands import distributed as distributed_commands
 from atomics.commands import eval as eval_commands
 from atomics.commands import load as load_commands
 from atomics.commands import rag as rag_commands
 from atomics.commands import security as security_commands
+from atomics.commands import worker as worker_commands
 from atomics.commands.auth import login, logout, secrets_group, whoami
 from atomics.commands.common import setup_logging
 
@@ -77,3 +79,5 @@ refusal = security_commands.refusal
 codereview = security_commands.codereview
 
 cli.add_command(api_commands.server)
+cli.add_command(worker_commands.worker)
+cli.add_command(distributed_commands.distributed)
