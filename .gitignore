@@ -59,3 +59,4 @@ docs/superpowers/plans/
 # Node (optional workers)
 node_modules/
 workers/npm/node_modules/
+.worktrees/
