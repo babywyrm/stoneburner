@@ -16,7 +16,7 @@ def test_labcompare_cli_renders_table():
         CellResult("brainbox", "http://b:11434", "m", tokens_per_second=7.0,
                    latency_ms=1400.0, vram_fit_pct=0.65, quality_score=0.94),
     ]
-    with patch("atomics.cli._run_labcompare_sync", return_value=fake_cells):
+    with patch("atomics.commands.benchmark._run_labcompare_sync", return_value=fake_cells):
         runner = CliRunner()
         result = runner.invoke(cli, [
             "labcompare",

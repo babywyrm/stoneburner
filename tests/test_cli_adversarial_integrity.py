@@ -152,11 +152,11 @@ def _mock_cli(monkeypatch, summaries, tmp_path) -> None:
         return summary
 
     monkeypatch.setattr(
-        "atomics.cli.load_settings",
+        "atomics.commands.security.load_settings",
         lambda: SimpleNamespace(db_path=tmp_path / "metrics.db"),
     )
     monkeypatch.setattr(
-        "atomics.cli._make_provider",
+        "atomics.commands.security._make_provider",
         lambda *_args, **_kwargs: DummyProvider(),
     )
     monkeypatch.setattr(
@@ -770,11 +770,11 @@ def test_cli_uses_adapter_name_and_default_model_without_model_flag(
         return summary
 
     monkeypatch.setattr(
-        "atomics.cli.load_settings",
+        "atomics.commands.security.load_settings",
         lambda: SimpleNamespace(db_path=tmp_path / "effective.db"),
     )
     monkeypatch.setattr(
-        "atomics.cli._make_provider",
+        "atomics.commands.security._make_provider",
         lambda *_args, **_kwargs: Provider(),
     )
     monkeypatch.setattr(
@@ -834,11 +834,11 @@ def test_compare_uses_actual_adapter_and_effective_default_model(
         return summary
 
     monkeypatch.setattr(
-        "atomics.cli.load_settings",
+        "atomics.commands.security.load_settings",
         lambda: SimpleNamespace(db_path=tmp_path / "compare-effective.db"),
     )
     monkeypatch.setattr(
-        "atomics.cli._make_provider",
+        "atomics.commands.security._make_provider",
         lambda *_args, **_kwargs: next(providers),
     )
     monkeypatch.setattr(
@@ -997,11 +997,11 @@ def test_cli_uses_default_label_but_executes_with_none_model(
         )
 
     monkeypatch.setattr(
-        "atomics.cli.load_settings",
+        "atomics.commands.security.load_settings",
         lambda: SimpleNamespace(db_path=tmp_path / "none-model.db"),
     )
     monkeypatch.setattr(
-        "atomics.cli._make_provider",
+        "atomics.commands.security._make_provider",
         lambda *_args, **_kwargs: next(providers),
     )
     monkeypatch.setattr(

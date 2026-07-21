@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import json
+import logging
 import time
 from pathlib import Path
 from typing import Protocol, cast
 
 import click
 from rich.console import Console
+from rich.logging import RichHandler
 from rich.status import Status
 
 from atomics.config import AtomicsSettings
@@ -21,6 +23,24 @@ PROVIDER_CHOICES = click.Choice(
     ["claude", "bedrock", "openai", "ollama", "vllm", "brain-gateway", "groq", "together", "gemini", "llamacpp"],
     case_sensitive=False,
 )
+
+
+def setup_logging(level: str, *, rich_tracebacks: bool = False) -> None:
+    """Configure Rich logging for the atomics logger."""
+    numeric = getattr(logging, level.upper(), logging.INFO)
+    logging.basicConfig(
+        level=logging.WARNING,
+        format="%(message)s",
+        datefmt="[%X]",
+        handlers=[RichHandler(rich_tracebacks=rich_tracebacks, markup=True)],
+        force=True,
+    )
+    # Only our own loggers get the requested level; third-party stays quiet.
+    logging.getLogger("atomics").setLevel(numeric)
+
+
+# Backward-compatible alias for earlier command modules.
+_setup_logging = setup_logging
 
 
 class SerializableSummary(Protocol):
