@@ -33,7 +33,7 @@ def _mock_adversarial_cli(monkeypatch, summaries):
     async def fake_run_adversarial(*_args, **_kwargs):
         return next(remaining)
 
-    monkeypatch.setattr("atomics.cli._make_provider", lambda *_args, **_kwargs: DummyProvider())
+    monkeypatch.setattr("atomics.commands.security._make_provider", lambda *_args, **_kwargs: DummyProvider())
     monkeypatch.setattr("atomics.eval.adversarial.select_fixtures", lambda _categories: [])
     monkeypatch.setattr(
         "atomics.eval.adversarial.runner.run_adversarial",
