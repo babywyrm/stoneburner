@@ -54,7 +54,7 @@ def create_app(
         settings = replace(settings, db_path=db_path)
     app = FastAPI(
         title="atomics API",
-        version="0.11.0",
+        version="0.12.0",
         lifespan=lifespan,
     )
     app.state.settings = settings
