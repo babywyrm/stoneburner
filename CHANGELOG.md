@@ -7,6 +7,11 @@
 - New API endpoints for worker registration, heartbeat, task polling, and result submission under `/api/v1/workers` and `/api/v1/distributed/runs`.
 - Pluggable worker API-key authentication (`X-API-Key`) for distributed endpoints.
 - End-to-end local test coverage for distributed runs.
+- Coordinator edge-case tests: offline-worker requeue, timeout requeue, retry-count increments, partial job status, and `recover_jobs`.
+
+### Fixed
+- `atomics distributed status` now emits clean JSON instead of Rich-markup JSON.
+- SQLite `ResourceWarning`s in tests by closing all connections opened during tests via `tests/conftest.py`.
 
 ## 0.11.0 (2026-07-20) — API server mode, real RAG retrieval, richer multi-turn fixtures
 

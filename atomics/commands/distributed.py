@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import json
+
 import click
 import httpx
 from rich.console import Console
-from rich.json import JSON
 
 
 @click.group()
@@ -56,4 +57,4 @@ def status(coordinator: str, api_key: str, job_id: str) -> None:
     headers = {"X-API-Key": api_key}
     resp = httpx.get(f"{coordinator}/api/v1/distributed/runs/{job_id}", headers=headers)
     resp.raise_for_status()
-    Console().print(JSON(resp.text))
+    click.echo(json.dumps(resp.json(), indent=2))

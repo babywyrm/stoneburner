@@ -61,3 +61,88 @@ def test_submit_assignment_completes_job(coordinator):
     job2 = coordinator.get_job(job.job_id)
     assert job2 is not None
     assert job2.status.value == "completed"
+
+
+def test_requeue_offline_worker_assignment(coordinator):
+    w1 = coordinator.register_worker(WorkerRegisterRequest())
+    job = coordinator.create_split_job(
+        DistributedRunRequest(mode=JobMode.SPLIT), [{"i": 1}]
+    )
+    a1 = coordinator.claim_assignment(w1.worker_id)
+    assert a1 is not None
+    assert a1.worker_id == w1.worker_id
+
+    # Mark worker offline and heartbeat a second worker.
+    coordinator._conn.execute(
+        "UPDATE workers SET status = ? WHERE worker_id = ?",
+        ("offline", w1.worker_id),
+    )
+    coordinator._conn.commit()
+
+    w2 = coordinator.register_worker(WorkerRegisterRequest())
+    a2 = coordinator.claim_assignment(w2.worker_id)
+    assert a2 is not None
+    assert a2.assignment_id == a1.assignment_id
+    assert a2.worker_id == w2.worker_id
+
+
+def test_requeue_timed_out_assignment(coordinator):
+    w1 = coordinator.register_worker(WorkerRegisterRequest())
+    job = coordinator.create_split_job(
+        DistributedRunRequest(mode=JobMode.SPLIT, timeout_seconds=1),
+        [{"i": 1}],
+    )
+    a1 = coordinator.claim_assignment(w1.worker_id)
+    assert a1 is not None
+
+    # Manually age the started_at timestamp so the timeout requeue fires.
+    old_started = "2026-01-01T00:00:00+00:00"
+    coordinator._conn.execute(
+        "UPDATE distributed_assignments SET started_at = ? WHERE assignment_id = ?",
+        (old_started, a1.assignment_id),
+    )
+    coordinator._conn.commit()
+
+    a2 = coordinator.claim_assignment(w1.worker_id)
+    assert a2 is not None
+    assert a2.assignment_id == a1.assignment_id
+    assert a2.retry_count == 2
+
+
+def test_partial_job_status_on_failure(coordinator):
+    w = coordinator.register_worker(WorkerRegisterRequest())
+    job = coordinator.create_split_job(
+        DistributedRunRequest(mode=JobMode.SPLIT), [{"i": 1}, {"i": 2}]
+    )
+    a1 = coordinator.claim_assignment(w.worker_id)
+    a2 = coordinator.claim_assignment(w.worker_id)
+    assert a1 is not None and a2 is not None
+
+    coordinator.submit_assignment(a1.assignment_id, '{"ok": true}')
+    coordinator.submit_assignment(a2.assignment_id, None, error="boom")
+
+    job2 = coordinator.get_job(job.job_id)
+    assert job2 is not None
+    assert job2.status.value == "partial"
+
+
+def test_recover_jobs_requeues_stale_assigned_work(coordinator):
+    w = coordinator.register_worker(WorkerRegisterRequest())
+    coordinator.create_split_job(
+        DistributedRunRequest(mode=JobMode.SPLIT, timeout_seconds=1),
+        [{"i": 1}],
+    )
+    a1 = coordinator.claim_assignment(w.worker_id)
+    assert a1 is not None
+
+    old_started = "2026-01-01T00:00:00+00:00"
+    coordinator._conn.execute(
+        "UPDATE distributed_assignments SET started_at = ? WHERE assignment_id = ?",
+        (old_started, a1.assignment_id),
+    )
+    coordinator._conn.commit()
+
+    coordinator.recover_jobs()
+    a2 = coordinator.claim_assignment(w.worker_id)
+    assert a2 is not None
+    assert a2.assignment_id == a1.assignment_id
