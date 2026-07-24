@@ -567,3 +567,129 @@ def test_cli_rag_help():
     assert "grounding" in result.output.lower() or "RAG" in result.output
     assert "--judge-provider" in result.output
     assert "--fixtures" in result.output
+
+
+# ── Runner edge cases ────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_run_rag_provider_exception_creates_failed_result():
+    provider = AsyncMock()
+    provider.name = "mock"
+    provider.generate = AsyncMock(side_effect=RuntimeError("provider failed"))
+    judge = AsyncMock()
+
+    fixture = RAGFixture(
+        id="rag-fail",
+        complexity=TaskComplexity.LIGHT,
+        question="test question",
+        context_chunks=[RAGChunk(content="context", label="relevant", source="x.md")],
+    )
+    summary = await run_rag(provider, judge_provider=judge, fixtures=[fixture])
+    assert len(summary.fixture_results) == 1
+    fr = summary.fixture_results[0]
+    assert fr.task_result.status == TaskStatus.FAILED
+    assert "provider failed" in fr.task_result.error_message
+    assert fr.judge is None
+
+
+@pytest.mark.asyncio
+async def test_run_rag_judge_parse_failure_handled():
+    provider = AsyncMock()
+    provider.name = "mock"
+    provider.generate = AsyncMock(
+        return_value=ProviderResponse(
+            text="some answer", model="mock", input_tokens=5, output_tokens=5,
+            total_tokens=10, latency_ms=1.0, estimated_cost_usd=0.0,
+        )
+    )
+    judge = AsyncMock()
+    judge.name = "mock-judge"
+    judge.generate = AsyncMock(
+        return_value=SimpleNamespace(
+            text="unparseable judge output", model="judge", input_tokens=5,
+            output_tokens=5, total_tokens=10, latency_ms=1.0, estimated_cost_usd=0.0,
+        )
+    )
+
+    fixture = RAGFixture(
+        id="rag-parse-fail",
+        complexity=TaskComplexity.LIGHT,
+        question="test",
+        context_chunks=[RAGChunk(content="context", label="relevant", source="x.md")],
+    )
+    summary = await run_rag(provider, judge_provider=judge, fixtures=[fixture])
+    fr = summary.fixture_results[0]
+    assert fr.judge is not None
+    assert fr.judge.parse_failed
+    assert summary.parse_failure_rate == 1.0
+
+
+@pytest.mark.asyncio
+async def test_run_rag_empty_fixtures_returns_empty_summary():
+    provider = AsyncMock()
+    provider.name = "mock"
+    summary = await run_rag(provider, fixtures=[])
+    assert summary.fixture_results == []
+    assert summary.overall_rag_score is None
+    assert summary.total_tokens == 0
+
+
+@pytest.mark.asyncio
+async def test_run_rag_with_index_returns_empty_results():
+    """When index search returns nothing, runner still populates summary stats."""
+    provider = AsyncMock()
+    provider.name = "mock"
+    provider.generate = AsyncMock(
+        return_value=ProviderResponse(
+            text="I cannot answer from the context.", model="mock", input_tokens=5,
+            output_tokens=5, total_tokens=10, latency_ms=1.0, estimated_cost_usd=0.0,
+        )
+    )
+    judge = AsyncMock()
+    judge.name = "mock-judge"
+    judge.generate = AsyncMock(
+        return_value=SimpleNamespace(
+            text="GROUNDING: 0\nFAITHFULNESS: 3\nABSTENTION: 3\nRATIONALE: No context.",
+            model="judge", input_tokens=5, output_tokens=5, total_tokens=10,
+            latency_ms=1.0, estimated_cost_usd=0.0,
+        )
+    )
+
+    class EmptyIndex:
+        def search(self, query: str, top_k: int = 5) -> list:
+            return []
+        def info(self) -> dict:
+            return {"chunk_count": "0", "embedding_model": "mock"}
+
+    fixture = RAGFixture(
+        id="rag-empty-index",
+        complexity=TaskComplexity.LIGHT,
+        question="test",
+        context_chunks=[RAGChunk(content="placeholder", label="relevant", source="x.md")],
+        context_contains_answer=False,
+    )
+    summary = await run_rag(provider, judge_provider=judge, fixtures=[fixture], index=EmptyIndex(), top_k=5)
+    assert summary.avg_retrieved_chunks == 0.0
+    assert summary.unique_sources_retrieved == 0
+    assert summary.index_info is not None
+
+
+@pytest.mark.asyncio
+async def test_run_rag_uses_provider_as_judge_when_none_provided():
+    provider = AsyncMock()
+    provider.name = "mock-provider"
+    provider.generate = AsyncMock(
+        return_value=ProviderResponse(
+            text="answer", model="mock", input_tokens=5, output_tokens=5,
+            total_tokens=10, latency_ms=1.0, estimated_cost_usd=0.0,
+        )
+    )
+    fixture = RAGFixture(
+        id="rag-default-judge",
+        complexity=TaskComplexity.LIGHT,
+        question="test",
+        context_chunks=[RAGChunk(content="context", label="relevant", source="x.md")],
+    )
+    summary = await run_rag(provider, fixtures=[fixture])
+    assert summary.judge_provider == "mock-provider"

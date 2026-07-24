@@ -190,7 +190,7 @@ async def run_rag(
     """Run the RAG evaluation suite."""
     effective_judge = judge_provider or provider
     effective_run_id = run_id or uuid.uuid4().hex[:12]
-    selected = fixtures or ALL_RAG_FIXTURES
+    selected = fixtures if fixtures is not None else ALL_RAG_FIXTURES
     started = datetime.now(UTC)
 
     results: list[RAGFixtureResult] = []
