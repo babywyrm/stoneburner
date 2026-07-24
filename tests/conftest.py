@@ -2,10 +2,25 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+import sqlite3
+from collections.abc import Callable, Iterator
 from pathlib import Path
 
 import pytest
+
+# Track and close all sqlite3 connections opened during tests so we don't leak
+# them and trigger ResourceWarnings.
+_orig_connect = sqlite3.connect
+_open_connections: list[sqlite3.Connection] = []
+
+
+def _tracked_connect(*args, **kwargs):  # type: ignore[no-untyped-def]
+    conn = _orig_connect(*args, **kwargs)
+    _open_connections.append(conn)
+    return conn
+
+
+sqlite3.connect = _tracked_connect
 
 from atomics.config import AtomicsSettings
 from atomics.core.engine import LoopEngine
@@ -53,6 +68,18 @@ def tmp_db_path(tmp_path: Path) -> Path:
 @pytest.fixture
 def metrics_repo(tmp_db_path: Path) -> MetricsRepository:
     return MetricsRepository(tmp_db_path)
+
+
+@pytest.fixture(autouse=True)
+def _close_sqlite_connections() -> Iterator[None]:
+    """Close any sqlite3 connections opened during a test."""
+    yield
+    while _open_connections:
+        conn = _open_connections.pop()
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 
 @pytest.fixture
