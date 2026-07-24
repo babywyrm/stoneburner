@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.12.0 (2026-07-23) — Distributed benchmark runs
 
 ### Added
 - Distributed benchmark runs: `atomics distributed run` submits split-mode jobs across multiple workers; `atomics worker` starts a worker process that polls the coordinator, executes tasks, and reports results. Workers can now target any provider/model/host (`--provider`, `--model`, `--host`).
