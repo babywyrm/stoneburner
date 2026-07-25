@@ -212,6 +212,36 @@ def test_fleet_status_prints_a_row_per_host(monkeypatch):
         json.loads(result.output)
 
 
+def test_a_host_that_ran_nothing_does_not_cost_the_table_a_column(monkeypatch):
+    """The one run where the numbers matter most must not be the narrowest.
+
+    A worker killed mid-run reports no model, which read as "the hosts disagree
+    about the model" and brought the Model column back, squeezing the rest until
+    a label rendered as `box=sur` / `vivor` across two lines.
+    """
+    from click.testing import CliRunner
+
+    from atomics.commands.distributed import distributed
+
+    payload = json.loads(_FLEET_STATUS["summary_json"])
+    dead = payload["workers"][1]
+    dead.update({"completed": 0, "failed": 4, "model": None, "provider": None})
+    status = {**_FLEET_STATUS, "summary_json": json.dumps(payload)}
+
+    _stub_status_response(monkeypatch, status)
+    result = CliRunner().invoke(
+        distributed, ["status", "job-1", "--api-key", "client-key"]
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "Model" not in result.output
+    assert "model: qwen3:14b" in result.output
+    # Both identifiers still whole, which is what the extra room buys.
+    assert "5b5fc1a2d3e4" in result.output
+    assert "683d3f5b7c8a" in result.output
+    assert "gpu=3060" in result.output
+
+
 def test_split_status_still_prints_plain_json(monkeypatch):
     """Split jobs keep their existing machine-readable output."""
     from click.testing import CliRunner

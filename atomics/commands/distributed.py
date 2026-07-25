@@ -97,16 +97,22 @@ def _render_fleet_table(job: dict, summary: dict) -> None:
     comparison and buys a whole column back.
     """
     workers = summary.get("workers", [])
-    models = {str(w.get("model") or "") for w in workers}
-    uniform_model = models.pop() if len(models) == 1 else None
+    # A host that completed nothing has no model to report, and must not be the
+    # reason the column reappears: the run where one host died is exactly when
+    # the remaining numbers most need the room.
+    reported_models = sorted({str(w.get("model")) for w in workers if w.get("model")})
+    show_model_column = len(reported_models) > 1
+    uniform_model = reported_models[0] if len(reported_models) == 1 else None
 
     table = Table(
         title=f"Fleet run {job.get('job_id', '')} — {job.get('status', '')}",
         caption=f"model: {uniform_model}" if uniform_model else None,
     )
-    table.add_column("Worker", overflow="fold")
+    # A 12-hex worker id has to arrive in one piece; wrapped after 11 characters
+    # it is no more usable than the truncation this replaced.
+    table.add_column("Worker", overflow="fold", min_width=12)
     table.add_column("Labels", overflow="fold")
-    if not uniform_model:
+    if show_model_column:
         table.add_column("Model", overflow="fold")
     table.add_column("Done", justify="right")
     table.add_column("Fail", justify="right")
@@ -122,14 +128,17 @@ def _render_fleet_table(job: dict, summary: dict) -> None:
             str(worker.get("worker_id", "")),
             labels or "-",
         ]
-        if not uniform_model:
+        if show_model_column:
             row.append(str(worker.get("model") or "-"))
         row += [
             str(worker.get("completed", 0)),
             f"[red]{failed}[/red]" if failed else "0",
             f"{worker.get('mean_latency_ms', 0.0):.1f}",
             f"{worker.get('p95_latency_ms', 0.0):.1f}",
-            f"{worker.get('mean_tokens_per_second', 0.0):.1f}",
+            # No decimals: the fractional part of a tokens-per-second figure is
+            # noise, and the two characters it costs pushed the table past 80
+            # columns, which clipped the cost column off the right edge.
+            f"{worker.get('mean_tokens_per_second', 0.0):.0f}",
             f"{worker.get('estimated_cost_usd', 0.0):.4f}",
         ]
         table.add_row(*row)
