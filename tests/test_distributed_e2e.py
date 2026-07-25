@@ -46,6 +46,77 @@ class FakeProvider(BaseProvider):
 
 
 @pytest.mark.asyncio
+async def test_end_to_end_fleet_run(client):
+    """Two hosts, one identical task set each, one comparable rollup.
+
+    Drives the real HTTP routes rather than the coordinator directly, so the whole
+    path is covered: label-matched broadcast, per-host pinning enforced at claim
+    time, and the per-worker summary a completed fleet run must produce.
+    """
+    fast = client.post(
+        "/api/v1/workers/register", json={"labels": {"gpu": "4090", "site": "lab"}}
+    ).json()["worker_id"]
+    slow = client.post(
+        "/api/v1/workers/register", json={"labels": {"gpu": "3060", "site": "lab"}}
+    ).json()["worker_id"]
+    # Present but unselected, to prove the selector actually narrows the fleet.
+    other_site = client.post(
+        "/api/v1/workers/register", json={"labels": {"gpu": "4090", "site": "desk"}}
+    ).json()["worker_id"]
+
+    run_resp = client.post(
+        "/api/v1/distributed/runs",
+        json={
+            "mode": "fleet",
+            "run_request": {"iterations": 2, "tier": "ez"},
+            "worker_selector": {"site": "lab"},
+        },
+    )
+    assert run_resp.status_code == 202
+    job_id = run_resp.json()["job_id"]
+
+    assert client.get(f"/api/v1/workers/{other_site}/jobs/next").json() is None
+
+    prompts_seen: dict[str, list[str]] = {fast: [], slow: []}
+    for worker_id in (fast, slow):
+        for _ in range(2):
+            poll = client.get(f"/api/v1/workers/{worker_id}/jobs/next")
+            assert poll.status_code == 200
+            body = poll.json()
+            assert body is not None, f"{worker_id} ran out of work early"
+            assignment = TaskAssignment(**body)
+            assert assignment.target_worker_id == worker_id
+            prompts_seen[worker_id].append(assignment.task_spec["prompt"])
+
+            with patch(
+                "atomics.distributed.worker_runner.make_provider",
+                return_value=FakeProvider(),
+            ):
+                result = await execute_assignment(
+                    assignment, provider_name="fake", model="fake-model"
+                )
+            submit = client.post(
+                f"/api/v1/workers/{worker_id}/jobs/{assignment.assignment_id}/result",
+                json={"status": "completed", "result_json": json.dumps(result)},
+            )
+            assert submit.status_code == 200
+        # Its slice is done, and it must not start eating the other host's work.
+        assert client.get(f"/api/v1/workers/{worker_id}/jobs/next").json() is None
+
+    assert sorted(prompts_seen[fast]) == sorted(prompts_seen[slow])
+
+    finished = client.get(f"/api/v1/distributed/runs/{job_id}").json()
+    assert finished["status"] == "completed"
+    summary = json.loads(finished["summary_json"])
+    by_id = {w["worker_id"]: w for w in summary["workers"]}
+    assert set(by_id) == {fast, slow}
+    assert by_id[fast]["completed"] == 2
+    assert by_id[slow]["completed"] == 2
+    assert by_id[fast]["labels"]["gpu"] == "4090"
+    assert summary["completed"] == 4
+
+
+@pytest.mark.asyncio
 async def test_end_to_end_split_run(client):
     # 1. Register a worker
     reg = client.post("/api/v1/workers/register", json={"labels": {"provider": "fake"}})

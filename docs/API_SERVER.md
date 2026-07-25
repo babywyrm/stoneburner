@@ -46,7 +46,7 @@ curl -H "X-API-Key: $ATOMICS_API_KEY" http://127.0.0.1:8000/api/v1/runs \
 | POST | `/api/v1/workers/{worker_id}/heartbeat` | Worker heartbeat |
 | GET | `/api/v1/workers/{worker_id}/jobs/next` | Claim next task assignment |
 | POST | `/api/v1/workers/{worker_id}/jobs/{assignment_id}/result` | Submit task result |
-| POST | `/api/v1/distributed/runs` | Start a split-mode distributed run |
+| POST | `/api/v1/distributed/runs` | Start a distributed run (split or fleet) |
 | GET | `/api/v1/distributed/runs/{job_id}` | Distributed run status |
 
 ## Example: start a run and poll
@@ -90,18 +90,42 @@ Split benchmark work across multiple worker processes that poll a coordinator (t
 | GET | `/api/v1/workers/{worker_id}/jobs/next` | Claim the next pending assignment (or empty) |
 | POST | `/api/v1/workers/{worker_id}/jobs/{assignment_id}/result` | Submit assignment result or error |
 
-Heartbeat, claim, and result endpoints require worker authentication via `X-API-Key` (pluggable `WorkerAuth`; uses the server API keys when auth is enabled).
+Every worker endpoint, registration included, requires worker authentication via `X-API-Key` (pluggable `WorkerAuth`; uses the server API keys when auth is enabled). A worker has no id yet at registration, so the worker key is the only credential it can present.
+
+A worker that stops sending heartbeats for 120 seconds is marked offline. It is then excluded from new fleet runs, and its pinned work is failed rather than left for a host that is not coming back.
 
 ### Distributed run endpoints
 
 | Method | Path | Description |
 |--------|------|-------------|
-| POST | `/api/v1/distributed/runs` | Start a split-mode run (`202` + job body) |
+| POST | `/api/v1/distributed/runs` | Start a distributed run (`202` + job body) |
 | GET | `/api/v1/distributed/runs/{job_id}` | Job status, assignments, and aggregated progress |
 
-`POST /api/v1/distributed/runs` accepts a body with `mode` (`split`) and `run_request` (tier/iterations, plus optional provider/model). Only `split` mode is accepted in Phase 1.
+Both require client authentication via `X-API-Key`. Submitting a run spends GPU time and cloud budget, so neither is anonymous.
 
-A `provider`/`model` in `run_request` pins every task to that provider; omit them and each worker uses its own configured provider. `worker_selector` is **rejected with `400`** in Phase 1 — split mode assigns each task to the next available worker, so a selector cannot be honored.
+`POST /api/v1/distributed/runs` accepts `mode`, `run_request` (tier/iterations, plus optional provider/model), and for fleet mode an optional `worker_selector`.
+
+| `mode` | Behavior |
+|--------|----------|
+| `split` | One assignment per task, claimed by whichever worker asks first. `worker_selector` is **rejected with `400`**, since each task goes to the next available worker and a selector could not be honored. |
+| `fleet` | Every worker matching `worker_selector` receives the identical task set, for cross-host comparison. |
+| `full` | Declared but unimplemented; **rejected with `400`**. |
+
+A `provider`/`model` in `run_request` pins every task to that provider; omit them and each worker uses its own configured provider.
+
+For fleet runs, a worker must match every pair in `worker_selector`; an absent or empty selector matches all online workers. A selector matching no online worker is **rejected with `400`** rather than creating a job that can never progress. The matching workers are snapshotted at submit time.
+
+When a job reaches a terminal status, `summary_json` carries a per-worker rollup: completed and failed counts, tokens, mean and p95 latency, throughput, and estimated cost, plus job totals.
+
+```bash
+# Fleet run across every 4090 in the lab
+curl -X POST "$COORDINATOR/api/v1/distributed/runs" \
+  -H "X-API-Key: $ATOMICS_API_KEY" \
+  -H 'Content-Type: application/json' \
+  -d '{"mode": "fleet",
+       "run_request": {"tier": "baseline", "iterations": 20},
+       "worker_selector": {"gpu": "4090", "site": "lab"}}'
+```
 
 ### Example: local three-terminal setup
 
@@ -117,5 +141,9 @@ ATOMICS_WORKER_API_KEY="$ATOMICS_API_KEY" uv run atomics worker --label gpu=1
 
 # Terminal 3 — submit and poll
 uv run atomics distributed run -p ollama -t baseline -n 4
+uv run atomics distributed status <job_id>
+
+# Or compare every labelled host on identical work
+uv run atomics distributed run --mode fleet --label gpu=1 -n 20
 uv run atomics distributed status <job_id>
 ```

@@ -141,7 +141,7 @@ Real retrieval (`rag-index`, `rag --index`, `rag-retrieval`) requires the option
 | `atomics server --host 0.0.0.0 --port 8080` | Bind to all interfaces on port 8080 |
 | `atomics server --log-level debug` | Verbose uvicorn logging |
 | `atomics worker` | Start a distributed worker (polls coordinator for tasks) |
-| `atomics distributed run` | Submit a split-mode distributed run |
+| `atomics distributed run` | Submit a distributed run (split or fleet mode) |
 | `atomics distributed status JOB_ID` | Poll distributed run status |
 
 ## atomics worker
@@ -169,7 +169,12 @@ uv run atomics worker --provider brain-gateway --host http://nuc:30080 --model q
 
 ## atomics distributed
 
-Submit and inspect distributed benchmark runs. Phase 1 supports `split` mode only (tasks are divided across registered workers).
+Submit and inspect distributed benchmark runs. Two modes:
+
+- `split` divides the tasks across registered workers, to finish a run faster.
+- `fleet` gives every matching worker the identical task set, to compare hosts.
+
+`full` (one worker runs an entire run) is declared but unimplemented and rejected.
 
 ### `atomics distributed run`
 
@@ -177,22 +182,41 @@ Submit and inspect distributed benchmark runs. Phase 1 supports `split` mode onl
 |--------|-------------|
 | `--coordinator URL` | Coordinator base URL (default: `http://127.0.0.1:8000`) |
 | `--api-key KEY` | Client API key (or `ATOMICS_API_KEY`) |
-| `--mode [split]` | Job mode (only `split` in Phase 1) |
+| `--mode [split\|fleet]` | Job mode (default: `split`) |
 | `-p, --provider TEXT` | Pin every task to this provider (default: each worker's own) |
 | `-t, --tier TEXT` | Burn tier (default: `baseline`) |
 | `-m, --model TEXT` | Model override for the executing provider |
-| `-n INTEGER` | Number of tasks (default: 1) |
-| `--label KEY=VALUE` | Worker selector. **Rejected in Phase 1** — split mode assigns each task to the next available worker |
+| `-n INTEGER` | Tasks per worker in fleet mode; tasks in total in split mode (default: 1) |
+| `--label KEY=VALUE` | Worker selector, repeatable. Fleet mode only; **rejected for `split`**, which assigns each task to the next available worker |
 
 Reads the client key from `ATOMICS_API_KEY`; pass `--api-key` to override.
 
 ```bash
-# Pin the whole run to one provider
+# Split: divide 4 tasks across whichever workers are free
+uv run atomics distributed run -t baseline -n 4
+
+# Split, pinning the whole run to one provider
 uv run atomics distributed run -p ollama -t baseline -n 4
 
-# Let each worker use its own configured provider
-uv run atomics distributed run -t baseline -n 4
+# Fleet: run all 20 tasks on every 4090 in the lab, then compare
+uv run atomics distributed run --mode fleet --label gpu=4090 --label site=lab -n 20
+
+# Fleet across every online worker
+uv run atomics distributed run --mode fleet -n 20
 ```
+
+Fleet notes:
+
+- A worker must match **every** `--label` pair. Omitting `--label` broadcasts to
+  all online workers.
+- The set of workers is snapshotted when the run is submitted, so a worker that
+  registers mid-run does not join it.
+- A selector matching no online worker is rejected rather than creating a job that
+  cannot progress.
+- Every host receives the same prompts; that is what makes the results comparable.
+- A host that stops heartbeating for 120s has its remaining tasks marked failed.
+  They are never re-run on another host, since that would silently blend two
+  machines into one result. The job then reports `partial`.
 
 ### `atomics distributed status`
 
@@ -201,7 +225,12 @@ uv run atomics distributed run -t baseline -n 4
 | `JOB_ID` | Distributed job id (required) |
 | `--coordinator URL` | Coordinator base URL (default: `http://127.0.0.1:8000`) |
 | `--api-key KEY` | Client API key (or `ATOMICS_API_KEY`) |
+| `--json-out PATH` | Write the job and its per-worker rollup to a file |
+
+Fleet jobs print a row per host — completed, failed, mean and p95 latency,
+throughput, and cost. Split jobs print the job as JSON.
 
 ```bash
 uv run atomics distributed status <job_id>
+uv run atomics distributed status <job_id> --json-out fleet.json
 ```

@@ -10,6 +10,8 @@ complete, add a `STATUS: COMPLETED` banner, and move it here.
 
 | Document | Shipped in |
 |---|---|
+| `plans/2026-07-25-fleet-mode.md` | unreleased — `atomics distributed run --mode fleet` |
+| `specs/2026-07-25-fleet-mode-design.md` | unreleased — fleet mode, coordinator auth, worker liveness |
 | `plans/2026-05-23-redblue-suites.md` | v0.6.0 — adversarial + red/blue suites, live probe |
 | `plans/2026-06-02-think-time-soak.md` | v0.6.0 — `atomics soak --think-time` |
 | `specs/2026-05-23-redblue-suites-design.md` | v0.6.0 |
