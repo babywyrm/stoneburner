@@ -4,11 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 
-import click
 from fastapi import HTTPException
 
 from atomics.api.models import EvalRequest, RunRequest
-from atomics.commands.common import _make_provider
 from atomics.config import load_settings
 from atomics.eval.adversarial.runner import run_adversarial
 from atomics.eval.codegen.runner import run_codegen
@@ -17,6 +15,7 @@ from atomics.eval.rag.runner import run_rag
 from atomics.eval.runner import run_eval
 from atomics.models import BurnTier
 from atomics.providers.base import BaseProvider
+from atomics.providers.factory import ProviderConfigError, make_provider
 
 SUPPORTED_EVAL_SUITES = frozenset(
     {"accuracy", "rag", "multiturn", "adversarial", "codegen"}
@@ -34,8 +33,8 @@ def validate_eval_suite(suite: str) -> str:
 def _provider_for(name: str, model: str | None) -> BaseProvider:
     settings = load_settings()
     try:
-        return _make_provider(name, model, None, settings)
-    except click.ClickException as exc:
+        return make_provider(name, model, None, settings)
+    except ProviderConfigError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except (ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

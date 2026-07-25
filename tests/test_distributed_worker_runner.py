@@ -40,7 +40,7 @@ async def test_execute_assignment_with_mock_provider():
 
     with (
         patch(
-            "atomics.distributed.worker_runner._make_provider",
+            "atomics.distributed.worker_runner.make_provider",
             return_value=fake_provider,
         ) as make_provider,
         patch(
@@ -118,7 +118,7 @@ async def test_pinned_provider_overrides_worker_default(
 
     with (
         patch(
-            "atomics.distributed.worker_runner._make_provider",
+            "atomics.distributed.worker_runner.make_provider",
             return_value=MagicMock(name="provider"),
         ) as make_provider,
         patch(
@@ -166,7 +166,7 @@ async def test_execute_assignment_builds_fallback_task():
 
     with (
         patch(
-            "atomics.distributed.worker_runner._make_provider",
+            "atomics.distributed.worker_runner.make_provider",
             return_value=MagicMock(name="provider"),
         ),
         patch(
