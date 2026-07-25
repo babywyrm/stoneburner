@@ -14,16 +14,20 @@ uv sync --extra api
 # local development with no auth (do not use in production)
 uv run atomics server --no-auth
 
-# production with API key
-uv run atomics server --api-key sk-abc123 --api-key sk-xyz789
+# production with API keys — pass --api-key once per accepted key
+export ATOMICS_API_KEY="$(openssl rand -hex 24)"
+uv run atomics server --api-key "$ATOMICS_API_KEY"
 ```
 
 ## Authentication
 
 API routes (except health) require an `X-API-Key` header when API keys are configured.
 
+Examples below read the key from `$ATOMICS_API_KEY` rather than inlining it, so
+keys stay out of shell history and out of anything you paste into an issue.
+
 ```bash
-curl -H "X-API-Key: sk-abc123" http://127.0.0.1:8000/api/v1/runs \
+curl -H "X-API-Key: $ATOMICS_API_KEY" http://127.0.0.1:8000/api/v1/runs \
   -H "Content-Type: application/json" \
   -d '{"provider": "ollama", "iterations": 3}'
 ```
@@ -48,12 +52,12 @@ curl -H "X-API-Key: sk-abc123" http://127.0.0.1:8000/api/v1/runs \
 ## Example: start a run and poll
 
 ```bash
-JOB_ID=$(curl -s -H "X-API-Key: sk-abc123" -H "Content-Type: application/json" \
+JOB_ID=$(curl -s -H "X-API-Key: $ATOMICS_API_KEY" -H "Content-Type: application/json" \
   -d '{"provider": "ollama", "model": "qwen3:14b", "tier": "ez", "iterations": 3}' \
   http://127.0.0.1:8000/api/v1/runs | jq -r '.job_id')
 
 sleep 2
-curl -s -H "X-API-Key: sk-abc123" http://127.0.0.1:8000/api/v1/jobs/$JOB_ID | jq
+curl -s -H "X-API-Key: $ATOMICS_API_KEY" http://127.0.0.1:8000/api/v1/jobs/$JOB_ID | jq
 ```
 
 ## Eval suites
@@ -61,7 +65,7 @@ curl -s -H "X-API-Key: sk-abc123" http://127.0.0.1:8000/api/v1/jobs/$JOB_ID | jq
 POST `/api/v1/evals` accepts `"suite": "accuracy" | "rag" | "multiturn" | "adversarial" | "codegen"`.
 
 ```bash
-curl -H "X-API-Key: sk-abc123" -H "Content-Type: application/json" \
+curl -H "X-API-Key: $ATOMICS_API_KEY" -H "Content-Type: application/json" \
   -d '{"suite": "rag", "provider": "ollama", "model": "qwen3:14b"}' \
   http://127.0.0.1:8000/api/v1/evals
 ```
@@ -101,14 +105,17 @@ A `provider`/`model` in `run_request` pins every task to that provider; omit the
 
 ### Example: local three-terminal setup
 
+All three terminals share one key; generate it once with
+`export ATOMICS_API_KEY="$(openssl rand -hex 24)"`.
+
 ```bash
 # Terminal 1 — coordinator
-uv run atomics server --api-key sk-abc123
+uv run atomics server --api-key "$ATOMICS_API_KEY"
 
 # Terminal 2 — worker
-ATOMICS_WORKER_API_KEY=sk-abc123 uv run atomics worker --label gpu=1
+ATOMICS_WORKER_API_KEY="$ATOMICS_API_KEY" uv run atomics worker --label gpu=1
 
 # Terminal 3 — submit and poll
-ATOMICS_API_KEY=sk-abc123 uv run atomics distributed run -p ollama -t baseline -n 4
-ATOMICS_API_KEY=sk-abc123 uv run atomics distributed status <job_id>
+uv run atomics distributed run -p ollama -t baseline -n 4
+uv run atomics distributed status <job_id>
 ```

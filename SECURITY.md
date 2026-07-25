@@ -3,6 +3,37 @@
 This document covers operational security decisions in stoneburner that users
 and operators should be aware of.
 
+## Secret scanning
+
+Run both scanners before pushing. The git-history scans are the ones that
+matter — they cover exactly what leaves the machine, and ignore untracked local
+files such as `profiles/local/`, `qa/local/`, and `.env`.
+
+```bash
+# Committed history
+trufflehog git file://. --results=verified,unknown --fail \
+  --exclude-detectors=Polygon,Pastebin,URI
+gitleaks git --no-banner --config .gitleaks.toml
+
+# Working tree, including staged-but-uncommitted changes
+trufflehog filesystem . --exclude-paths=.trufflehogignore --fail \
+  --exclude-detectors=Polygon,Pastebin,URI
+gitleaks dir --no-banner --config .gitleaks.toml
+```
+
+Both should report no findings. Configuration notes:
+
+- `Polygon`, `Pastebin`, and `URI` are excluded as high-noise TruffleHog
+  detectors: they fire on public endpoint URLs in fixtures and documentation.
+- TruffleHog's `--config` accepts only custom detector definitions, so path and
+  detector exclusions must be CLI flags. Paths live in `.trufflehogignore`.
+- `.gitleaks.toml` must be passed explicitly; gitleaks does not auto-discover
+  it. It extends the upstream ruleset with path exclusions and an allowlist for
+  documented placeholders that remain in git history.
+- Examples in `docs/` read keys from `$ATOMICS_API_KEY` rather than inlining
+  them. Keep it that way: a literal `sk-`-prefixed placeholder trips
+  credential detectors and trains readers to paste keys into shell history.
+
 ## Post-run hooks (`--hook` / `ATOMICS_POST_RUN_HOOK`)
 
 The `atomics run --hook "command"` flag (or `ATOMICS_POST_RUN_HOOK` env var)
