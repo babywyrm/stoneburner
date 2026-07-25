@@ -155,17 +155,20 @@ class Coordinator:
             WHERE assignment_id = (
                 SELECT assignment_id FROM distributed_assignments
                 WHERE status = ?
+                  AND (target_worker_id IS NULL OR target_worker_id = ?)
                 ORDER BY assignment_id
                 LIMIT 1
             )
-            RETURNING assignment_id, job_id, worker_id, status, task_spec,
-                      result_json, retry_count, started_at, completed_at
+            RETURNING assignment_id, job_id, worker_id, target_worker_id, status,
+                      task_spec, result_json, retry_count, started_at,
+                      completed_at
             """,
             (
                 AssignmentStatus.ASSIGNED.value,
                 worker_id,
                 self._now(),
                 AssignmentStatus.PENDING.value,
+                worker_id,
             ),
         )
         row = cursor.fetchone()
@@ -180,17 +183,23 @@ class Coordinator:
         self._conn.commit()
         return self._row_to_assignment(row)
 
+    ASSIGNMENT_COLUMNS = (
+        "assignment_id, job_id, worker_id, target_worker_id, status, task_spec, "
+        "result_json, retry_count, started_at, completed_at"
+    )
+
     def _row_to_assignment(self, row: Any) -> TaskAssignment:
         return TaskAssignment(
             assignment_id=row[0],
             job_id=row[1],
             worker_id=row[2],
-            status=AssignmentStatus(row[3]),
-            task_spec=json.loads(row[4]),
-            result_json=row[5],
-            retry_count=row[6],
-            started_at=datetime.fromisoformat(row[7]) if row[7] else None,
-            completed_at=datetime.fromisoformat(row[8]) if row[8] else None,
+            target_worker_id=row[3],
+            status=AssignmentStatus(row[4]),
+            task_spec=json.loads(row[5]),
+            result_json=row[6],
+            retry_count=row[7],
+            started_at=datetime.fromisoformat(row[8]) if row[8] else None,
+            completed_at=datetime.fromisoformat(row[9]) if row[9] else None,
         )
 
     def submit_assignment(
@@ -219,8 +228,7 @@ class Coordinator:
 
     def get_assignment(self, assignment_id: str) -> TaskAssignment | None:
         row = self._conn.execute(
-            "SELECT assignment_id, job_id, worker_id, status, task_spec, "
-            "result_json, retry_count, started_at, completed_at "
+            f"SELECT {self.ASSIGNMENT_COLUMNS} "
             "FROM distributed_assignments WHERE assignment_id = ?",
             (assignment_id,),
         ).fetchone()

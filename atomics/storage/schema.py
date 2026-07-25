@@ -358,6 +358,10 @@ CREATE TABLE IF NOT EXISTS distributed_assignments (
     assignment_id TEXT PRIMARY KEY,
     job_id TEXT NOT NULL REFERENCES distributed_jobs(job_id),
     worker_id TEXT REFERENCES workers(worker_id),
+    -- NULL means any worker may claim this (split mode). A value pins the
+    -- assignment to one worker and only that worker (fleet mode), so a
+    -- per-host comparison cannot be silently satisfied by another host.
+    target_worker_id TEXT REFERENCES workers(worker_id),
     status TEXT NOT NULL DEFAULT 'pending',
     task_spec TEXT NOT NULL,
     result_json TEXT,
