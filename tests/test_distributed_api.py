@@ -3,8 +3,11 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 
+from atomics.api.config import ServerSettings
 from atomics.api.server import create_app
 from atomics.tasks import TASK_CATALOG
+
+API_KEY = "test-coordinator-key"
 
 
 @pytest.fixture
@@ -12,6 +15,97 @@ def client(tmp_path):
     app = create_app(no_auth=True, db_path=tmp_path / "distributed.db")
     with TestClient(app) as tc:
         yield tc
+
+
+@pytest.fixture
+def secured_client(tmp_path):
+    """A coordinator with authentication actually switched on."""
+    app = create_app(
+        ServerSettings(
+            no_auth=False,
+            api_keys={API_KEY},
+            db_path=tmp_path / "secured.db",
+        )
+    )
+    with TestClient(app) as tc:
+        yield tc
+
+
+def _auth() -> dict[str, str]:
+    return {"X-API-Key": API_KEY}
+
+
+# Every endpoint on this router, with a body where one is required. Submitting a
+# job spends GPU time and cloud budget, so an unauthenticated caller reaching any
+# of these is a real exposure rather than an information leak.
+DISTRIBUTED_ENDPOINTS = [
+    ("post", "/api/v1/workers/register", {}),
+    ("post", "/api/v1/distributed/runs", {"mode": "split", "run_request": {"iterations": 1}}),
+    ("get", "/api/v1/distributed/runs/any-job-id", None),
+]
+
+
+@pytest.mark.parametrize(("method", "path", "body"), DISTRIBUTED_ENDPOINTS)
+def test_distributed_endpoints_require_a_key(secured_client, method, path, body):
+    request = getattr(secured_client, method)
+    resp = request(path) if body is None else request(path, json=body)
+    assert resp.status_code == 401, f"{method.upper()} {path} answered anonymously"
+
+
+@pytest.mark.parametrize(("method", "path", "body"), DISTRIBUTED_ENDPOINTS)
+def test_distributed_endpoints_reject_an_unknown_key(secured_client, method, path, body):
+    request = getattr(secured_client, method)
+    headers = {"X-API-Key": "not-the-key"}
+    resp = (
+        request(path, headers=headers)
+        if body is None
+        else request(path, json=body, headers=headers)
+    )
+    assert resp.status_code == 401
+
+
+def test_registering_a_worker_succeeds_with_a_key(secured_client):
+    resp = secured_client.post(
+        "/api/v1/workers/register", json={"labels": {"gpu": "1"}}, headers=_auth()
+    )
+    assert resp.status_code == 200
+    assert "worker_id" in resp.json()
+
+
+def test_submitting_and_reading_a_run_succeeds_with_a_key(secured_client):
+    submitted = secured_client.post(
+        "/api/v1/distributed/runs",
+        json={"mode": "split", "run_request": {"iterations": 2}},
+        headers=_auth(),
+    )
+    assert submitted.status_code == 202
+    job_id = submitted.json()["job_id"]
+
+    fetched = secured_client.get(
+        f"/api/v1/distributed/runs/{job_id}", headers=_auth()
+    )
+    assert fetched.status_code == 200
+    assert fetched.json()["job_id"] == job_id
+
+
+def test_auth_is_checked_before_the_job_is_looked_up(secured_client):
+    """An anonymous caller must not learn whether a job id exists."""
+    resp = secured_client.get("/api/v1/distributed/runs/does-not-exist")
+    assert resp.status_code == 401
+
+
+def test_no_auth_backend_permits_the_distributed_endpoints(client):
+    """The --no-auth development path must keep working unchanged."""
+    registered = client.post("/api/v1/workers/register", json={})
+    assert registered.status_code == 200
+    submitted = client.post(
+        "/api/v1/distributed/runs",
+        json={"mode": "split", "run_request": {"iterations": 1}},
+    )
+    assert submitted.status_code == 202
+    assert client.get(
+        f"/api/v1/distributed/runs/{submitted.json()['job_id']}"
+    ).status_code == 200
 
 
 def test_register_worker(client):

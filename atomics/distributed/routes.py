@@ -4,7 +4,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
-from atomics.api.auth import AuthBackend
+from atomics.api.dependencies import require_auth, require_worker_auth
 from atomics.distributed.coordinator import Coordinator
 from atomics.distributed.models import (
     DistributedJob,
@@ -70,23 +70,11 @@ def get_coordinator(request: Request) -> Coordinator:
     return request.app.state.coordinator
 
 
-def get_worker_auth(request: Request) -> AuthBackend:
-    return request.app.state.worker_auth
-
-
-async def require_worker_auth(
-    request: Request, auth: AuthBackend = Depends(get_worker_auth)
-) -> None:
-    if not await auth.authenticate(request):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid worker API key"
-        )
-
-
 @router.post("/workers/register", response_model=WorkerRegisterResponse)
 async def register_worker(
     payload: WorkerRegisterRequest,
     coordinator: Coordinator = Depends(get_coordinator),
+    _: None = Depends(require_worker_auth),
 ) -> WorkerRegisterResponse:
     worker = coordinator.register_worker(payload)
     return WorkerRegisterResponse(worker_id=worker.worker_id)
@@ -142,6 +130,7 @@ async def submit_result(
 async def start_distributed_run(
     payload: DistributedRunRequest,
     coordinator: Coordinator = Depends(get_coordinator),
+    _: None = Depends(require_auth),
 ) -> DistributedJob:
     if payload.mode != JobMode.SPLIT:
         raise HTTPException(
@@ -171,6 +160,7 @@ async def start_distributed_run(
 async def get_job(
     job_id: str,
     coordinator: Coordinator = Depends(get_coordinator),
+    _: None = Depends(require_auth),
 ) -> DistributedJob:
     job = coordinator.get_job(job_id)
     if job is None:
