@@ -29,7 +29,12 @@ def distributed() -> None:
 @click.option("--tier", "-t", default="baseline", show_default=True)
 @click.option("--model", "-m", help="Model override for the executing provider")
 @click.option("-n", "iterations", default=1, show_default=True, help="Number of tasks")
-@click.option("--label", "labels", multiple=True, help="Worker selector key=value")
+@click.option(
+    "--label",
+    "labels",
+    multiple=True,
+    help="Worker selector key=value. Not supported yet — see fleet mode (phase 2).",
+)
 def run(
     coordinator: str,
     api_key: str,
@@ -43,20 +48,18 @@ def run(
     """Submit a distributed run to the coordinator."""
     if not api_key:
         raise click.UsageError("--api-key is required (or set ATOMICS_API_KEY)")
-    label_dict = {}
-    for label in labels:
-        if "=" not in label:
-            raise click.BadParameter(f"Label must be key=value: {label}")
-        k, v = label.split("=", 1)
-        label_dict[k] = v
+    if labels:
+        raise click.UsageError(
+            "--label is not supported yet: split mode assigns each task to the "
+            "next available worker, so a selector would be silently ignored. "
+            "Label-based targeting arrives with fleet mode."
+        )
     run_request: dict[str, object] = {"tier": tier, "iterations": iterations}
     if provider:
         run_request["provider"] = provider
     if model:
         run_request["model"] = model
     payload = {"mode": mode, "run_request": run_request}
-    if label_dict:
-        payload["worker_selector"] = label_dict
     headers = {"X-API-Key": api_key}
     resp = httpx.post(f"{coordinator}/api/v1/distributed/runs", json=payload, headers=headers)
     resp.raise_for_status()

@@ -148,6 +148,15 @@ async def start_distributed_run(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Only split mode is supported in phase 1",
         )
+    if payload.worker_selector:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "worker_selector is not supported in phase 1: split mode assigns "
+                "each task to the next available worker. Remove the selector or "
+                "wait for fleet mode."
+            ),
+        )
     if not payload.run_request:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
