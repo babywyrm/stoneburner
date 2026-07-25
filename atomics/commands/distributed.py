@@ -19,7 +19,14 @@ def distributed() -> None:
 @distributed.command()
 @click.option("--coordinator", default="http://127.0.0.1:8000", show_default=True)
 @click.option("--api-key", envvar="ATOMICS_API_KEY", help="Client API key")
-@click.option("--mode", default="split", show_default=True, type=click.Choice(["split"]))
+@click.option(
+    "--mode",
+    default="split",
+    show_default=True,
+    type=click.Choice(["split", "fleet"]),
+    help="split: divide the tasks across workers. fleet: run every task on every "
+    "matching worker, for comparing hosts.",
+)
 @click.option(
     "--provider",
     "-p",
@@ -33,7 +40,8 @@ def distributed() -> None:
     "--label",
     "labels",
     multiple=True,
-    help="Worker selector key=value. Not supported yet — see fleet mode (phase 2).",
+    help="Worker selector key=value, repeatable. Fleet mode only; a worker must "
+    "match every pair. Omit to broadcast to all online workers.",
 )
 def run(
     coordinator: str,
@@ -48,18 +56,27 @@ def run(
     """Submit a distributed run to the coordinator."""
     if not api_key:
         raise click.UsageError("--api-key is required (or set ATOMICS_API_KEY)")
-    if labels:
+    if labels and mode == "split":
         raise click.UsageError(
-            "--label is not supported yet: split mode assigns each task to the "
+            "--label only applies to fleet mode: split assigns each task to the "
             "next available worker, so a selector would be silently ignored. "
-            "Label-based targeting arrives with fleet mode."
+            "Use --mode fleet to target workers by label."
         )
+    selector: dict[str, str] = {}
+    for label in labels:
+        if "=" not in label:
+            raise click.BadParameter(f"Label must be key=value: {label!r}")
+        key, value = label.split("=", 1)
+        selector[key] = value
     run_request: dict[str, object] = {"tier": tier, "iterations": iterations}
     if provider:
         run_request["provider"] = provider
     if model:
         run_request["model"] = model
-    payload = {"mode": mode, "run_request": run_request}
+    payload: dict[str, object] = {"mode": mode, "run_request": run_request}
+    # Omitted rather than sent empty: an absent selector means every online worker.
+    if selector:
+        payload["worker_selector"] = selector
     headers = {"X-API-Key": api_key}
     resp = httpx.post(f"{coordinator}/api/v1/distributed/runs", json=payload, headers=headers)
     resp.raise_for_status()

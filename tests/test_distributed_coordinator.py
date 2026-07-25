@@ -50,6 +50,114 @@ def test_claim_assignment(coordinator):
     assert a.job_id == job.job_id
 
 
+def _assignments(coordinator, job_id: str) -> list[tuple[str, str]]:
+    """(target_worker_id, task_spec) for every assignment of a job."""
+    return [
+        (row[0], row[1])
+        for row in coordinator._conn.execute(
+            "SELECT target_worker_id, task_spec FROM distributed_assignments "
+            "WHERE job_id = ? ORDER BY assignment_id",
+            (job_id,),
+        )
+    ]
+
+
+def _offline(coordinator, worker_id: str) -> None:
+    coordinator._conn.execute(
+        "UPDATE workers SET status = 'offline' WHERE worker_id = ?", (worker_id,)
+    )
+    coordinator._conn.commit()
+
+
+def test_matching_workers_requires_every_selector_pair(coordinator):
+    both = coordinator.register_worker(
+        WorkerRegisterRequest(labels={"gpu": "4090", "site": "lab"})
+    )
+    coordinator.register_worker(WorkerRegisterRequest(labels={"gpu": "4090"}))
+    coordinator.register_worker(WorkerRegisterRequest(labels={"site": "lab"}))
+
+    matched = coordinator.matching_workers({"gpu": "4090", "site": "lab"})
+
+    assert [w.worker_id for w in matched] == [both.worker_id]
+
+
+def test_an_empty_selector_matches_every_online_worker(coordinator):
+    first = coordinator.register_worker(WorkerRegisterRequest(labels={"gpu": "4090"}))
+    second = coordinator.register_worker(WorkerRegisterRequest())
+
+    matched = coordinator.matching_workers({})
+
+    assert {w.worker_id for w in matched} == {first.worker_id, second.worker_id}
+
+
+def test_offline_workers_are_excluded_from_the_snapshot(coordinator):
+    online = coordinator.register_worker(WorkerRegisterRequest(labels={"gpu": "4090"}))
+    gone = coordinator.register_worker(WorkerRegisterRequest(labels={"gpu": "4090"}))
+    _offline(coordinator, gone.worker_id)
+
+    matched = coordinator.matching_workers({"gpu": "4090"})
+
+    assert [w.worker_id for w in matched] == [online.worker_id]
+
+
+def test_fleet_job_creates_one_assignment_per_worker_per_task(coordinator):
+    workers = [
+        coordinator.register_worker(WorkerRegisterRequest(labels={"gpu": "4090"}))
+        for _ in range(3)
+    ]
+    specs = [{"prompt": "a"}, {"prompt": "b"}]
+
+    job = coordinator.create_fleet_job(
+        DistributedRunRequest(mode=JobMode.FLEET), specs, workers
+    )
+
+    assert job.mode == JobMode.FLEET
+    rows = _assignments(coordinator, job.job_id)
+    assert len(rows) == 6
+    # Every assignment is pinned, and each worker got exactly len(specs) of them.
+    pinned_counts: dict[str, int] = {}
+    for target, _spec in rows:
+        assert target is not None
+        pinned_counts[target] = pinned_counts.get(target, 0) + 1
+    assert pinned_counts == {w.worker_id: 2 for w in workers}
+
+
+def test_every_worker_receives_the_identical_task_set(coordinator):
+    """The comparison is meaningless if hosts run different prompts.
+
+    Task specs are sampled randomly per call upstream, so building them per worker
+    would silently give each host different work while still producing the right
+    number of assignments.
+    """
+    workers = [
+        coordinator.register_worker(WorkerRegisterRequest()) for _ in range(3)
+    ]
+    specs = [{"prompt": "alpha"}, {"prompt": "beta"}]
+
+    job = coordinator.create_fleet_job(
+        DistributedRunRequest(mode=JobMode.FLEET), specs, workers
+    )
+
+    per_worker: dict[str, list[str]] = {}
+    for target, spec in _assignments(coordinator, job.job_id):
+        per_worker.setdefault(target, []).append(spec)
+    task_sets = {frozenset(specs) for specs in per_worker.values()}
+    assert len(task_sets) == 1, f"hosts received different task sets: {per_worker}"
+
+
+def test_fleet_assignments_are_only_claimable_by_their_own_worker(coordinator):
+    first = coordinator.register_worker(WorkerRegisterRequest())
+    second = coordinator.register_worker(WorkerRegisterRequest())
+    coordinator.create_fleet_job(
+        DistributedRunRequest(mode=JobMode.FLEET), [{"prompt": "a"}], [first]
+    )
+
+    assert coordinator.claim_assignment(second.worker_id) is None
+    claimed = coordinator.claim_assignment(first.worker_id)
+    assert claimed is not None
+    assert claimed.target_worker_id == first.worker_id
+
+
 def _pin(coordinator, job_id: str, worker_id: str) -> None:
     """Pin every assignment of a job to one worker, as fleet mode will."""
     coordinator._conn.execute(

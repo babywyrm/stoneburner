@@ -132,18 +132,21 @@ async def start_distributed_run(
     coordinator: Coordinator = Depends(get_coordinator),
     _: None = Depends(require_auth),
 ) -> DistributedJob:
-    if payload.mode != JobMode.SPLIT:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Only split mode is supported in phase 1",
-        )
-    if payload.worker_selector:
+    if payload.mode not in (JobMode.SPLIT, JobMode.FLEET):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
-                "worker_selector is not supported in phase 1: split mode assigns "
-                "each task to the next available worker. Remove the selector or "
-                "wait for fleet mode."
+                f"Unsupported mode {payload.mode.value!r}. Use 'split' to divide "
+                "work across workers or 'fleet' to run it on every matching worker."
+            ),
+        )
+    if payload.mode is JobMode.SPLIT and payload.worker_selector:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "worker_selector is not honored in split mode: each task goes to "
+                "the next available worker. Drop the selector, or use fleet mode "
+                "to target workers by label."
             ),
         )
     if not payload.run_request:
@@ -151,9 +154,23 @@ async def start_distributed_run(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="run_request is required",
         )
+    # Built once and shared across workers in fleet mode: each spec is sampled
+    # randomly, so per-worker generation would give each host different prompts.
     task_specs = _build_task_specs(payload.run_request)
-    job = coordinator.create_split_job(payload, task_specs)
-    return job
+    if payload.mode is JobMode.FLEET:
+        workers = coordinator.matching_workers(payload.worker_selector)
+        if not workers:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "No online workers match the selector "
+                    f"{payload.worker_selector or {}}. Register a worker with "
+                    "those labels, or omit the selector to broadcast to every "
+                    "online worker."
+                ),
+            )
+        return coordinator.create_fleet_job(payload, task_specs, workers)
+    return coordinator.create_split_job(payload, task_specs)
 
 
 @router.get("/distributed/runs/{job_id}", response_model=DistributedJob)
