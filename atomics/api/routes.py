@@ -9,7 +9,7 @@ from atomics.api._runners import (
     run_eval_suite,
     validate_eval_suite,
 )
-from atomics.api.auth import AuthBackend
+from atomics.api.dependencies import require_auth
 from atomics.api.jobs import Job, JobManager
 from atomics.api.models import (
     CompareResponse,
@@ -27,18 +27,6 @@ router = APIRouter(prefix="/api/v1")
 
 def get_job_manager(request: Request) -> JobManager:
     return request.app.state.job_manager
-
-
-def get_auth(request: Request) -> AuthBackend:
-    return request.app.state.auth
-
-
-async def require_auth(request: Request, auth: AuthBackend = Depends(get_auth)) -> None:
-    if not await auth.authenticate(request):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or missing API key",
-        )
 
 
 @router.get("/health", response_model=HealthResponse)
