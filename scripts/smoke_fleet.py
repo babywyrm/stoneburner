@@ -263,7 +263,8 @@ def phase_host_loss(stub: StubInferenceServer) -> None:
             timeout=absent_after + 40,
         )
         check("the silent host is marked offline", bool(offline),
-              "still online after the threshold elapsed")
+              f"offline: {offline[0]}" if offline
+              else "still online after the threshold elapsed")
 
         done = fleet.wait_terminal(job_id, timeout=120)
         check("the job resolves instead of waiting on a dead host", bool(done),
