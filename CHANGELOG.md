@@ -1,9 +1,20 @@
 # Changelog
 
-## Unreleased
+## 0.13.1 (2026-07-25) — Fixes found by running it for real
+
+Everything here was found by `scripts/smoke_fleet.py`, a new local harness that
+starts an actual coordinator and actual worker processes. The 1833-test suite
+drives FastAPI's `TestClient` — an in-process ASGI shim — against a fake
+provider, so none of these three defects were reachable from it.
+
+### Added
+- `scripts/smoke_fleet.py`: a two-phase local smoke test needing no credentials and no model. Phase one runs a two-host fleet job over real sockets against a stubbed OpenAI-compatible endpoint and checks auth, registration, broadcast, the rollup, and the rendered table. Phase two kills a worker mid-run and requires the coordinator to notice the silence, mark the host offline, fail its pinned slice, and let the job resolve to `partial`. It runs in about 30 seconds and touches no real database.
+- `atomics server --worker-absent-after SECONDS` (default 120) sets how long a worker may go silent before it is marked offline.
 
 ### Fixed
-- The fleet status table was unreadable at the default 80-column width. Nine columns left Rich shrinking each one until a worker id rendered as `5b5fc…` and a label as `box=a…`, so the table could not answer which host was faster — the only question fleet mode exists to answer. Identifiers now wrap instead of truncating, and the model moves to the caption when every host ran the same one, which is the usual case for a comparison and buys back a column. Found by running a real coordinator and two real worker processes; the unit test had used short synthetic worker ids (`host-a`) that never triggered truncation, and now uses realistic 12-hex ids.
+- **`atomics worker --host` was ignored for `-p vllm`.** The factory's vLLM branch reads its own `vllm_host` parameter, because CLI commands accept `--ollama-host` and `--vllm-host` independently and one positional cannot serve both; the worker only ever passed `host`. So a worker aimed at a specific box silently used `ATOMICS_VLLM_HOST` — by default `localhost:8000` — while reporting success. A worker has one `--host` and one provider, so it now routes that host to whichever parameter the selected provider actually reads. `ollama` and `llamacpp` were already correct.
+- **The worker absence window ignored the heartbeat interval it was derived from.** `--heartbeat-interval` is an operator flag, but the threshold was hardcoded at four times its *default*, so a worker configured with a 300-second interval was declared absent and had its pinned fleet work failed while behaving exactly as told. The window is now configurable and documented alongside the flag it depends on.
+- **The fleet status table was unreadable at 80 columns.** Nine columns left Rich shrinking each until a worker id rendered as `5b5fc…` and a label as `box=a…`, so the table could not say which host was faster — the only question fleet mode exists to answer. Identifiers are now given the room to arrive whole, the model moves to the caption when every host ran the same one, and tokens-per-second loses a decimal place that was costing the cost column its border. A host that completed nothing no longer counts as the hosts disagreeing about the model, which had brought the extra column back for precisely the run where the remaining numbers matter most. The unit test used synthetic ids like `host-a` that were too short to trigger any of it, and now uses realistic 12-hex ids.
 
 ## 0.13.0 (2026-07-25) — Distributed fleet mode, coordinator auth
 
