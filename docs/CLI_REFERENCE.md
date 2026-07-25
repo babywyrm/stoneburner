@@ -159,9 +159,12 @@ Start a worker process that registers with the coordinator, heartbeats, polls fo
 | `--model`, `-m` | Model override for this worker |
 | `--host`, `-h` | Provider host/URL override (e.g. `http://nuc:30080`) |
 
+Both examples read the key from the environment (`export ATOMICS_WORKER_API_KEY=...`)
+rather than inlining it, keeping keys out of shell history.
+
 ```bash
-ATOMICS_WORKER_API_KEY=sk-abc123 uv run atomics worker --label gpu=1
-ATOMICS_WORKER_API_KEY=sk-abc123 uv run atomics worker --provider brain-gateway --host http://nuc:30080 --model qwen3:4b
+uv run atomics worker --label gpu=1
+uv run atomics worker --provider brain-gateway --host http://nuc:30080 --model qwen3:4b
 ```
 
 ## atomics distributed
@@ -181,12 +184,14 @@ Submit and inspect distributed benchmark runs. Phase 1 supports `split` mode onl
 | `-n INTEGER` | Number of tasks (default: 1) |
 | `--label KEY=VALUE` | Worker selector. **Rejected in Phase 1** — split mode assigns each task to the next available worker |
 
+Reads the client key from `ATOMICS_API_KEY`; pass `--api-key` to override.
+
 ```bash
 # Pin the whole run to one provider
-ATOMICS_API_KEY=sk-abc123 uv run atomics distributed run -p ollama -t baseline -n 4
+uv run atomics distributed run -p ollama -t baseline -n 4
 
 # Let each worker use its own configured provider
-ATOMICS_API_KEY=sk-abc123 uv run atomics distributed run -t baseline -n 4
+uv run atomics distributed run -t baseline -n 4
 ```
 
 ### `atomics distributed status`
@@ -198,5 +203,5 @@ ATOMICS_API_KEY=sk-abc123 uv run atomics distributed run -t baseline -n 4
 | `--api-key KEY` | Client API key (or `ATOMICS_API_KEY`) |
 
 ```bash
-ATOMICS_API_KEY=sk-abc123 uv run atomics distributed status <job_id>
+uv run atomics distributed status <job_id>
 ```

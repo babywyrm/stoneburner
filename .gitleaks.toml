@@ -1,0 +1,45 @@
+# Gitleaks configuration for stoneburner.
+#
+# Extends the upstream ruleset rather than replacing it. Pass it explicitly:
+#   gitleaks git --config .gitleaks.toml
+# Gitleaks does not auto-discover this file. See SECURITY.md for the full
+# scan invocation.
+#
+# Allowlists are used instead of a fingerprint-based .gitleaksignore because
+# fingerprints embed line numbers and silently stop matching as files move.
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Paths that are not repository content: venvs, caches, worktrees, local run artifacts"
+paths = [
+  '''^1/''',
+  '''^\.venv/''',
+  '''^venv/''',
+  '''^\.worktrees/''',
+  '''__pycache__/''',
+  '''\.pyc$''',
+  '''^dist/''',
+  '''^build/''',
+  '''^data/''',
+  '''^logs/''',
+  '''^node_modules/''',
+]
+
+[[allowlists]]
+description = """
+Documented placeholders and test fixtures, not credentials.
+
+sk-abc123 / sk-xyz789 appeared in docs/API_SERVER.md and docs/CLI_REFERENCE.md
+curl and env-var examples. Those were switched to reading $ATOMICS_API_KEY so
+new commits do not add more, but the strings remain in git history and cannot be
+removed without rewriting it.
+
+sk-test-1234567890 is a unit-test fixture for ApiKeyAuth in tests/test_auth.py.
+"""
+regexes = [
+  '''sk-abc123''',
+  '''sk-xyz789''',
+  '''sk-test-1234567890''',
+]

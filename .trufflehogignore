@@ -1,0 +1,27 @@
+# Paths excluded from `trufflehog filesystem` scans, passed via
+# `--exclude-paths=.trufflehogignore`. One regex per line, matched against the
+# file path. See SECURITY.md for the full scan invocation.
+#
+# TruffleHog's --config file only accepts custom detector definitions, so path
+# and detector exclusions have to be supplied as CLI flags instead.
+
+# Virtual environments (third-party library fixtures trip every detector)
+^1/
+^\.venv/
+^venv/
+
+# Build, cache, and VCS metadata
+__pycache__/
+\.pyc$
+^\.git/
+^\.mypy_cache/
+^\.pytest_cache/
+^\.ruff_cache/
+^dist/
+^build/
+^node_modules/
+^\.worktrees/
+
+# Local-only run artifacts (gitignored, but present during local scans)
+^data/
+^logs/
