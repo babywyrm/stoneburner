@@ -103,7 +103,18 @@ async def execute_assignment(
     pinned_provider, pinned_model = _pinned_execution(assignment.task_spec)
     provider_name = pinned_provider or provider_name
     model = pinned_model or model
-    provider = make_provider(provider_name, model, host, settings)
+    provider = make_provider(
+        provider_name,
+        model,
+        host,
+        settings,
+        # The vllm branch reads its own `vllm_host` rather than the shared
+        # `host`, because CLI commands accept --ollama-host and --vllm-host
+        # independently and one positional cannot serve both. A worker has a
+        # single --host and exactly one provider, so it routes that host to
+        # whichever parameter the chosen provider actually reads.
+        vllm_host=host if provider_name == "vllm" else None,
+    )
     task, prompt = _resolve_task_definition(assignment.task_spec)
     logger.info(
         "Executing assignment %s job=%s task=%s",
