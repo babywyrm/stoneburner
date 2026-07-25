@@ -27,6 +27,7 @@ from atomics.core.engine import LoopEngine
 from atomics.models import BurnTier
 from atomics.providers.base import BaseProvider, ProviderResponse
 from atomics.storage.repository import MetricsRepository
+from tests.inference_stub import StubInferenceServer
 
 
 class MockProvider(BaseProvider):
@@ -80,6 +81,13 @@ def _close_sqlite_connections() -> Iterator[None]:
             conn.close()
         except Exception:
             pass
+
+
+@pytest.fixture
+def inference_stub() -> Iterator[StubInferenceServer]:
+    """A real HTTP inference endpoint on an ephemeral port."""
+    with StubInferenceServer() as stub:
+        yield stub
 
 
 @pytest.fixture

@@ -35,7 +35,7 @@ jobs:
         run: uv run mypy atomics/
 
       # addopts in pyproject supplies --cov=atomics --cov-report=term-missing.
-      # The floor is deliberately below current coverage (86.8%) so it catches
+      # The floor is deliberately below current coverage (87.1%) so it catches
       # regressions rather than blocking unrelated work; raise it as coverage
       # improves. Focused local runs stay ungated because the threshold lives
       # here rather than in addopts.
