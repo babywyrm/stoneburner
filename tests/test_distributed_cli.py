@@ -102,8 +102,8 @@ def test_distributed_run_omits_provider_when_unset(monkeypatch):
     assert "model" not in captured["run_request"]
 
 
-def test_distributed_run_rejects_label_instead_of_ignoring_it(monkeypatch):
-    """--label must fail loudly rather than submit an unhonored selector."""
+def test_distributed_run_rejects_label_in_split_mode(monkeypatch):
+    """Split assigns to the next free worker, so a selector still cannot be honored."""
     from click.testing import CliRunner
 
     from atomics.commands.distributed import distributed
@@ -115,8 +115,60 @@ def test_distributed_run_rejects_label_instead_of_ignoring_it(monkeypatch):
         "--label", "gpu=1",
     ])
     assert result.exit_code != 0
-    assert "not supported yet" in result.output
+    assert "fleet" in result.output
     assert captured == {}, "no request should be submitted when --label is rejected"
+
+
+def test_fleet_mode_sends_the_label_selector(monkeypatch):
+    from click.testing import CliRunner
+
+    from atomics.commands.distributed import distributed
+
+    captured = _capture_run_payload(monkeypatch)
+    result = CliRunner().invoke(distributed, [
+        "run",
+        "--api-key", "client-key",
+        "--mode", "fleet",
+        "--label", "gpu=4090",
+        "--label", "site=lab",
+    ])
+    assert result.exit_code == 0, result.output
+    assert captured["mode"] == "fleet"
+    assert captured["worker_selector"] == {"gpu": "4090", "site": "lab"}
+
+
+def test_fleet_mode_without_labels_sends_no_selector(monkeypatch):
+    """An absent selector means every online worker, so omit the key entirely."""
+    from click.testing import CliRunner
+
+    from atomics.commands.distributed import distributed
+
+    captured = _capture_run_payload(monkeypatch)
+    result = CliRunner().invoke(distributed, [
+        "run",
+        "--api-key", "client-key",
+        "--mode", "fleet",
+    ])
+    assert result.exit_code == 0, result.output
+    assert captured["mode"] == "fleet"
+    assert "worker_selector" not in captured
+
+
+def test_fleet_mode_rejects_a_malformed_label(monkeypatch):
+    from click.testing import CliRunner
+
+    from atomics.commands.distributed import distributed
+
+    captured = _capture_run_payload(monkeypatch)
+    result = CliRunner().invoke(distributed, [
+        "run",
+        "--api-key", "client-key",
+        "--mode", "fleet",
+        "--label", "gpu",
+    ])
+    assert result.exit_code != 0
+    assert "key=value" in result.output
+    assert captured == {}
 
 
 def test_distributed_run_rejects_unknown_provider(monkeypatch):

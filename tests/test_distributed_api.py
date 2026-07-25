@@ -138,6 +138,91 @@ def test_get_job(client):
     assert resp.json()["job_id"] == job_id
 
 
+def _fleet_assignments(client, job_id: str) -> list[tuple[str, str]]:
+    rows = client.app.state.coordinator._conn.execute(
+        "SELECT target_worker_id, task_spec FROM distributed_assignments "
+        "WHERE job_id = ?",
+        (job_id,),
+    ).fetchall()
+    return [(row[0], row[1]) for row in rows]
+
+
+def _register(client, labels: dict[str, str]) -> str:
+    resp = client.post("/api/v1/workers/register", json={"labels": labels})
+    assert resp.status_code == 200
+    return resp.json()["worker_id"]
+
+
+def test_fleet_run_broadcasts_to_every_matching_worker(client):
+    first = _register(client, {"gpu": "4090"})
+    second = _register(client, {"gpu": "4090"})
+    _register(client, {"gpu": "3060"})
+
+    resp = client.post(
+        "/api/v1/distributed/runs",
+        json={
+            "mode": "fleet",
+            "run_request": {"iterations": 2, "tier": "ez"},
+            "worker_selector": {"gpu": "4090"},
+        },
+    )
+    assert resp.status_code == 202
+    assert resp.json()["mode"] == "fleet"
+
+    rows = _fleet_assignments(client, resp.json()["job_id"])
+    assert len(rows) == 4
+    assert {target for target, _ in rows} == {first, second}
+    # Both hosts must run the same two prompts for the comparison to mean anything.
+    per_worker: dict[str, set[str]] = {}
+    for target, spec in rows:
+        per_worker.setdefault(target, set()).add(spec)
+    assert len({frozenset(specs) for specs in per_worker.values()}) == 1
+
+
+def test_fleet_run_with_no_matching_workers_is_rejected(client):
+    _register(client, {"gpu": "3060"})
+
+    resp = client.post(
+        "/api/v1/distributed/runs",
+        json={
+            "mode": "fleet",
+            "run_request": {"iterations": 1},
+            "worker_selector": {"gpu": "4090"},
+        },
+    )
+
+    assert resp.status_code == 400
+    assert "no online workers" in resp.json()["detail"].lower()
+    # A job that can never progress must not be left behind.
+    jobs = client.app.state.coordinator._conn.execute(
+        "SELECT COUNT(*) FROM distributed_jobs"
+    ).fetchone()[0]
+    assert jobs == 0
+
+
+def test_fleet_run_without_a_selector_uses_every_online_worker(client):
+    first = _register(client, {})
+    second = _register(client, {"gpu": "4090"})
+
+    resp = client.post(
+        "/api/v1/distributed/runs",
+        json={"mode": "fleet", "run_request": {"iterations": 1}},
+    )
+
+    assert resp.status_code == 202
+    rows = _fleet_assignments(client, resp.json()["job_id"])
+    assert {target for target, _ in rows} == {first, second}
+
+
+def test_full_mode_is_still_rejected(client):
+    """Only fleet was implemented; full must not silently behave like split."""
+    resp = client.post(
+        "/api/v1/distributed/runs",
+        json={"mode": "full", "run_request": {"iterations": 1}},
+    )
+    assert resp.status_code == 400
+
+
 def _task_specs(client, job_id: str) -> list[dict]:
     rows = client.app.state.coordinator._conn.execute(
         "SELECT task_spec FROM distributed_assignments WHERE job_id = ?",

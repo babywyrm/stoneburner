@@ -74,16 +74,43 @@ class Coordinator:
         self._conn.commit()
         return self.get_worker(worker_id)
 
+    WORKER_COLUMNS = (
+        "worker_id, labels, capabilities, endpoint, api_key_hint, status, "
+        "last_seen_at, registered_at"
+    )
+
     def get_worker(self, worker_id: str) -> Worker | None:
         row = self._conn.execute(
-            "SELECT worker_id, labels, capabilities, endpoint, api_key_hint, "
-            "status, last_seen_at, registered_at "
-            "FROM workers WHERE worker_id = ?",
+            f"SELECT {self.WORKER_COLUMNS} FROM workers WHERE worker_id = ?",
             (worker_id,),
         ).fetchone()
         if not row:
             return None
         return self._row_to_worker(row)
+
+    def matching_workers(self, selector: dict[str, str] | None) -> list[Worker]:
+        """Online workers whose labels satisfy every pair in the selector.
+
+        An empty or absent selector matches every online worker. Matching is exact
+        key/value equality, and extra labels on a worker do not disqualify it.
+
+        Offline workers are excluded: a fleet run broadcasts to the hosts that are
+        actually present when it is submitted, and pinning work to an absent worker
+        would produce assignments nothing can ever claim.
+        """
+        rows = self._conn.execute(
+            f"SELECT {self.WORKER_COLUMNS} FROM workers WHERE status = ? "
+            "ORDER BY registered_at, worker_id",
+            (WorkerStatus.ONLINE.value,),
+        ).fetchall()
+        workers = [self._row_to_worker(row) for row in rows]
+        if not selector:
+            return workers
+        return [
+            worker
+            for worker in workers
+            if all(worker.labels.get(key) == value for key, value in selector.items())
+        ]
 
     def _row_to_worker(self, row: Any) -> Worker:
         return Worker(
@@ -97,10 +124,10 @@ class Coordinator:
             registered_at=datetime.fromisoformat(row[7]),
         )
 
-    def create_split_job(
-        self, request: DistributedRunRequest, task_specs: list[dict[str, Any]]
+    def _insert_job(
+        self, request: DistributedRunRequest, mode: JobMode
     ) -> DistributedJob:
-        job_id = uuid.uuid4().hex[:12]
+        """Insert the job row. Caller adds assignments, then commits."""
         parent_run_id = None
         if request.run_request:
             run_id = request.run_request.get("run_id")
@@ -108,10 +135,9 @@ class Coordinator:
                 parent_run_id = run_id
         if not parent_run_id:
             parent_run_id = uuid.uuid4().hex[:12]
-        now = self._now()
         job = DistributedJob(
-            job_id=job_id,
-            mode=JobMode.SPLIT,
+            job_id=uuid.uuid4().hex[:12],
+            mode=mode,
             parent_run_id=parent_run_id,
             status=JobStatus.PENDING,
             request_json=request.model_dump_json(),
@@ -127,21 +153,60 @@ class Coordinator:
                 job.parent_run_id,
                 job.status.value,
                 job.request_json,
-                now,
+                self._now(),
             ),
         )
+        return job
+
+    def _insert_assignment(
+        self,
+        job_id: str,
+        spec: dict[str, Any],
+        *,
+        target_worker_id: str | None = None,
+    ) -> None:
+        self._conn.execute(
+            "INSERT INTO distributed_assignments "
+            "(assignment_id, job_id, status, task_spec, target_worker_id) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (
+                uuid.uuid4().hex[:12],
+                job_id,
+                AssignmentStatus.PENDING.value,
+                json.dumps(spec),
+                target_worker_id,
+            ),
+        )
+
+    def create_split_job(
+        self, request: DistributedRunRequest, task_specs: list[dict[str, Any]]
+    ) -> DistributedJob:
+        """One assignment per task, claimable by whichever worker asks first."""
+        job = self._insert_job(request, JobMode.SPLIT)
         for spec in task_specs:
-            assignment_id = uuid.uuid4().hex[:12]
-            self._conn.execute(
-                "INSERT INTO distributed_assignments "
-                "(assignment_id, job_id, status, task_spec) VALUES (?, ?, ?, ?)",
-                (
-                    assignment_id,
-                    job_id,
-                    AssignmentStatus.PENDING.value,
-                    json.dumps(spec),
-                ),
-            )
+            self._insert_assignment(job.job_id, spec)
+        self._conn.commit()
+        return job
+
+    def create_fleet_job(
+        self,
+        request: DistributedRunRequest,
+        task_specs: list[dict[str, Any]],
+        workers: list[Worker],
+    ) -> DistributedJob:
+        """Broadcast one task set to every worker, pinned per host.
+
+        `task_specs` is reused across workers rather than regenerated, which is
+        what makes the hosts comparable: the caller must build it once. Producing
+        specs per worker would yield the right assignment count while quietly
+        giving each host different prompts.
+        """
+        job = self._insert_job(request, JobMode.FLEET)
+        for worker in workers:
+            for spec in task_specs:
+                self._insert_assignment(
+                    job.job_id, spec, target_worker_id=worker.worker_id
+                )
         self._conn.commit()
         return job
 
