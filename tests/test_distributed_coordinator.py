@@ -9,6 +9,7 @@ from atomics.distributed.models import (
     JobMode,
     JobStatus,
     WorkerRegisterRequest,
+    WorkerStatus,
 )
 from atomics.storage.schema import init_db
 
@@ -360,6 +361,84 @@ def test_a_departed_hosts_pending_work_fails_with_its_slice(coordinator):
     after = coordinator.get_job(job.job_id)
     assert after is not None
     assert after.status == JobStatus.PARTIAL
+
+
+def _go_silent(coordinator, worker_id: str, seconds: int = 600) -> None:
+    """Backdate last_seen_at so the worker reads as having stopped heartbeating."""
+    past = (datetime.now(UTC) - timedelta(seconds=seconds)).isoformat()
+    coordinator._conn.execute(
+        "UPDATE workers SET last_seen_at = ? WHERE worker_id = ?", (past, worker_id)
+    )
+    coordinator._conn.commit()
+
+
+def test_a_worker_that_stops_heartbeating_is_marked_offline(coordinator):
+    worker = coordinator.register_worker(WorkerRegisterRequest())
+    _go_silent(coordinator, worker.worker_id)
+
+    coordinator._mark_absent_workers()
+
+    assert coordinator.get_worker(worker.worker_id).status == WorkerStatus.OFFLINE
+
+
+def test_a_recently_seen_worker_stays_online(coordinator):
+    """Guard against sweeping up healthy hosts."""
+    worker = coordinator.register_worker(WorkerRegisterRequest())
+    _go_silent(coordinator, worker.worker_id, seconds=5)
+
+    coordinator._mark_absent_workers()
+
+    assert coordinator.get_worker(worker.worker_id).status == WorkerStatus.ONLINE
+
+
+def test_a_silent_host_is_not_handed_a_new_fleet_slice(coordinator):
+    alive = coordinator.register_worker(WorkerRegisterRequest(labels={"gpu": "4090"}))
+    silent = coordinator.register_worker(WorkerRegisterRequest(labels={"gpu": "4090"}))
+    _go_silent(coordinator, silent.worker_id)
+
+    matched = coordinator.matching_workers({"gpu": "4090"})
+
+    assert [w.worker_id for w in matched] == [alive.worker_id]
+
+
+def test_a_silent_hosts_pinned_work_fails_even_if_it_claimed_nothing(coordinator):
+    """The realistic dead-host case: killed before it ever asked for work.
+
+    Those assignments stay pending, so the stale-assignment scan never sees them.
+    Without the liveness sweep the job waits on a host that cannot claim anything.
+    """
+    silent = coordinator.register_worker(WorkerRegisterRequest())
+    job = coordinator.create_fleet_job(
+        DistributedRunRequest(mode=JobMode.FLEET), [{"i": 1}, {"i": 2}], [silent]
+    )
+    _go_silent(coordinator, silent.worker_id)
+
+    coordinator._requeue_stale_assignments()
+
+    statuses = [
+        row[0]
+        for row in coordinator._conn.execute(
+            "SELECT status FROM distributed_assignments WHERE job_id = ?",
+            (job.job_id,),
+        )
+    ]
+    assert statuses == [AssignmentStatus.FAILED.value] * 2
+    assert coordinator.get_job(job.job_id).status == JobStatus.PARTIAL
+
+
+def test_a_silent_worker_does_not_fail_unpinned_work(coordinator):
+    """Split mode must still recover rather than lose the task."""
+    first = coordinator.register_worker(WorkerRegisterRequest())
+    second = coordinator.register_worker(WorkerRegisterRequest())
+    coordinator.create_split_job(DistributedRunRequest(mode=JobMode.SPLIT), [{"i": 1}])
+    claimed = coordinator.claim_assignment(first.worker_id)
+    assert claimed is not None
+    _go_silent(coordinator, first.worker_id)
+
+    reclaimed = coordinator.claim_assignment(second.worker_id)
+
+    assert reclaimed is not None
+    assert reclaimed.assignment_id == claimed.assignment_id
 
 
 def test_a_pinned_assignment_fails_once_its_retries_are_exhausted(coordinator):
