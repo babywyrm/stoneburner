@@ -10,6 +10,7 @@ import pytest
 from rich.console import Console
 
 from atomics.commands.common import (
+    PROVIDER_CHOICES,
     FixtureProgress,
     _make_provider,
     effective_model,
@@ -25,6 +26,7 @@ from atomics.eval.outcomes import (
     ProviderOutcomeKind,
     RunIntegrity,
 )
+from atomics.providers.factory import PROVIDER_NAMES
 
 
 class _Summary:
@@ -103,6 +105,26 @@ def test_make_provider_rejects_unknown_provider() -> None:
     settings = SimpleNamespace()
     with pytest.raises(click.ClickException, match="Unknown provider"):
         _make_provider("invalid", None, None, settings)
+
+
+def test_make_provider_translates_domain_error_into_a_cli_error() -> None:
+    """CLI users keep seeing ClickException even though the factory raises its own."""
+    settings = SimpleNamespace(anthropic_api_key="")
+    with pytest.raises(click.ClickException, match="ANTHROPIC_API_KEY not set"):
+        _make_provider("claude", None, None, settings)
+
+
+def test_make_provider_labels_endpoint_errors_with_cli_flag_names() -> None:
+    """The wrapper's job: name the flag the user actually typed."""
+    with pytest.raises(click.ClickException) as excinfo:
+        _make_provider("ollama", None, "file:///etc/passwd", SimpleNamespace())
+
+    assert "--ollama-host" in str(excinfo.value)
+
+
+def test_provider_choices_match_the_factory_supported_names() -> None:
+    """The CLI must offer exactly what the factory can build, with no third list."""
+    assert list(PROVIDER_CHOICES.choices) == list(PROVIDER_NAMES)
 
 
 def test_evaluation_record_from_fixture_rolls_up_attempt_usage() -> None:

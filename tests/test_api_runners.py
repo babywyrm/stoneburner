@@ -5,12 +5,12 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import click
 import pytest
 from fastapi import HTTPException
 
 from atomics.api import _runners as runners
 from atomics.api.models import EvalRequest, RunRequest
+from atomics.providers.factory import ProviderConfigError
 
 
 def _settings(db_path=":memory:", default_model="test-model"):
@@ -232,13 +232,14 @@ async def test_run_eval_suite_unsupported_raises_value_error():
         await runners.run_eval_suite(payload)
 
 
-def test_provider_for_click_exception_maps_to_http_400():
+def test_provider_for_config_error_maps_to_http_400():
+    """The API translates the factory's own error, not a CLI exception."""
     with (
         patch.object(runners, "load_settings", return_value=_settings()),
         patch.object(
             runners,
-            "_make_provider",
-            side_effect=click.ClickException("bad provider"),
+            "make_provider",
+            side_effect=ProviderConfigError("bad provider"),
         ),
     ):
         with pytest.raises(HTTPException) as exc_info:
@@ -294,7 +295,7 @@ def test_provider_for_value_error_maps_to_http_400():
         patch.object(runners, "load_settings", return_value=_settings()),
         patch.object(
             runners,
-            "_make_provider",
+            "make_provider",
             side_effect=ValueError("unknown provider"),
         ),
     ):

@@ -5,11 +5,11 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from atomics.commands.common import _make_provider
 from atomics.config import AtomicsSettings, load_settings
 from atomics.core.runner import execute_task
 from atomics.distributed.models import TaskAssignment
 from atomics.models import TaskCategory, TaskComplexity, TaskDefinition
+from atomics.providers.factory import make_provider
 from atomics.tasks.catalog import TASK_CATALOG
 
 logger = logging.getLogger("atomics.distributed.worker_runner")
@@ -68,7 +68,7 @@ def _pinned_execution(task_spec: dict[str, Any]) -> tuple[str | None, str | None
 
     A pinned provider overrides the worker's own default so the submitter's
     routing choice is honored. If the worker cannot build that provider,
-    `_make_provider` raises and the assignment fails loudly rather than
+    `make_provider` raises and the assignment fails loudly rather than
     silently running somewhere else.
     """
     provider = task_spec.get("provider")
@@ -103,7 +103,7 @@ async def execute_assignment(
     pinned_provider, pinned_model = _pinned_execution(assignment.task_spec)
     provider_name = pinned_provider or provider_name
     model = pinned_model or model
-    provider = _make_provider(provider_name, model, host, settings)
+    provider = make_provider(provider_name, model, host, settings)
     task, prompt = _resolve_task_definition(assignment.task_spec)
     logger.info(
         "Executing assignment %s job=%s task=%s",

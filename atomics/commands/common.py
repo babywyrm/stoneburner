@@ -16,13 +16,15 @@ from rich.status import Status
 from atomics.config import AtomicsSettings
 from atomics.eval.outcomes import RunIntegrity
 from atomics.providers.base import BaseProvider
-from atomics.storage.records import EvaluationResultRecord
-from atomics.validation import sanitize_error, validate_endpoint_url
-
-PROVIDER_CHOICES = click.Choice(
-    ["claude", "bedrock", "openai", "ollama", "vllm", "brain-gateway", "groq", "together", "gemini", "llamacpp"],
-    case_sensitive=False,
+from atomics.providers.factory import (
+    PROVIDER_NAMES,
+    ProviderConfigError,
+    make_provider,
 )
+from atomics.storage.records import EvaluationResultRecord
+from atomics.validation import sanitize_error
+
+PROVIDER_CHOICES = click.Choice(list(PROVIDER_NAMES), case_sensitive=False)
 
 
 def setup_logging(level: str, *, rich_tracebacks: bool = False) -> None:
@@ -205,116 +207,25 @@ def _make_provider(
     context_tokens: int | None = None,
     inference_timeout: int | None = None,
 ) -> BaseProvider:
-    """Build a provider instance for any command."""
-    if host:
-        try:
-            host = validate_endpoint_url(
-                host,
-                label="--ollama-host/--judge-host",
-            )
-        except ValueError as exc:
-            raise click.ClickException(str(exc)) from exc
-    if vllm_host:
-        try:
-            vllm_host = validate_endpoint_url(vllm_host, label="--vllm-host")
-        except ValueError as exc:
-            raise click.ClickException(str(exc)) from exc
+    """Build a provider, reporting configuration problems as CLI errors.
 
-    if name == "claude":
-        if not settings.anthropic_api_key:
-            raise click.ClickException(
-                "ANTHROPIC_API_KEY not set. Export it or add to .env"
-            )
-        from atomics.providers.claude import ClaudeProvider
-
-        return ClaudeProvider(
-            api_key=settings.anthropic_api_key,
-            default_model=mdl or settings.default_model,
-        )
-    if name == "bedrock":
-        from atomics.providers.bedrock import BedrockProvider
-
-        return BedrockProvider(
+    The construction itself lives in `atomics.providers.factory` so the API
+    server and distributed workers can call it without importing the command
+    layer. This wrapper exists to translate the domain error into Click's, and
+    to label endpoint failures with the flag names a CLI user actually typed.
+    """
+    try:
+        return make_provider(
+            name,
+            mdl,
+            host,
+            settings,
+            vllm_host=vllm_host,
             region=region,
-            model_id=mdl or "us.anthropic.claude-sonnet-4-6",
-        )
-    if name == "openai":
-        if not settings.openai_api_key:
-            raise click.ClickException(
-                "OPENAI_API_KEY not set. Export it or install with: "
-                "uv sync --extra openai"
-            )
-        from atomics.providers.openai import OpenAIProvider
-
-        return OpenAIProvider(
-            api_key=settings.openai_api_key,
-            default_model=mdl or "gpt-4o",
-        )
-    if name == "vllm":
-        from atomics.providers.vllm import VllmProvider
-
-        return VllmProvider(
-            base_url=vllm_host or settings.vllm_host,
-            default_model=mdl or settings.vllm_model,
-            timeout=inference_timeout or settings.vllm_timeout,
-        )
-    if name == "brain-gateway":
-        from atomics.providers.brain_gateway import BrainGatewayProvider
-
-        return BrainGatewayProvider(
-            url=host or settings.brain_gateway_url,
-            default_model=mdl,
-        )
-    if name == "ollama":
-        from atomics.providers.ollama import OllamaProvider
-
-        return OllamaProvider(
-            host=host or settings.ollama_host,
-            default_model=mdl or settings.ollama_model,
-            timeout=inference_timeout or settings.ollama_timeout,
             context_tokens=context_tokens,
+            inference_timeout=inference_timeout,
+            host_label="--ollama-host/--judge-host",
+            vllm_host_label="--vllm-host",
         )
-    if name == "llamacpp":
-        from atomics.providers.llamacpp import LlamaCppProvider
-
-        return LlamaCppProvider(
-            base_url=host or settings.llamacpp_host,
-            default_model=mdl or "local",
-        )
-    if name == "groq":
-        if not settings.groq_api_key:
-            raise click.ClickException(
-                "GROQ_API_KEY not set. Get one at https://console.groq.com/keys"
-            )
-        from atomics.providers.groq import GroqProvider
-
-        return GroqProvider(
-            api_key=settings.groq_api_key,
-            default_model=mdl or "llama-3.3-70b-versatile",
-        )
-    if name == "together":
-        if not settings.together_api_key:
-            raise click.ClickException(
-                "TOGETHER_API_KEY not set. Get one at https://api.together.xyz/settings/api-keys"
-            )
-        from atomics.providers.together import TogetherProvider
-
-        return TogetherProvider(
-            api_key=settings.together_api_key,
-            default_model=mdl or "meta-llama/Llama-3.3-70B-Instruct-Turbo",
-        )
-    if name == "gemini":
-        if not settings.gemini_api_key:
-            raise click.ClickException(
-                "GEMINI_API_KEY not set. Get one at https://aistudio.google.com/apikey"
-            )
-        from atomics.providers.gemini import GeminiProvider
-
-        return GeminiProvider(
-            api_key=settings.gemini_api_key,
-            default_model=mdl or "gemini-2.5-flash",
-        )
-    raise click.ClickException(
-        f"Unknown provider: {name!r}. "
-        "Valid: claude, bedrock, openai, ollama, vllm, brain-gateway, groq, together, gemini, llamacpp"
-    )
+    except ProviderConfigError as exc:
+        raise click.ClickException(str(exc)) from exc

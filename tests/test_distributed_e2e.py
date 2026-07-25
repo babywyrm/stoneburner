@@ -72,7 +72,7 @@ async def test_end_to_end_split_run(client):
 
     # 4. Execute the assignment with a mocked provider (no network)
     with patch(
-        "atomics.distributed.worker_runner._make_provider",
+        "atomics.distributed.worker_runner.make_provider",
         return_value=FakeProvider(),
     ):
         result = await execute_assignment(assignment, provider_name="fake", model="fake-model")
