@@ -210,6 +210,18 @@ uv run python -m pytest -v
 uv run python -m pytest --cov=atomics --cov-report=term-missing
 ```
 
+The suite drives FastAPI's `TestClient`, an in-process shim, so it proves the
+logic but not that the pieces work as separate processes. For that:
+
+```bash
+uv run python scripts/smoke_fleet.py
+```
+
+This starts a real coordinator and real worker processes, runs a two-host fleet
+job against a stubbed OpenAI-compatible endpoint, then kills a worker mid-run to
+confirm the job resolves to `partial` instead of waiting on a dead host. It needs
+no credentials and no model, and touches no real database.
+
 ## Further Reading
 
 | Document | Description |

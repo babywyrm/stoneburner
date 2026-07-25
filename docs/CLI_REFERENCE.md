@@ -140,6 +140,7 @@ Real retrieval (`rag-index`, `rag --index`, `rag-retrieval`) requires the option
 | `atomics server --api-key KEY` | Allow one API key (repeatable) |
 | `atomics server --host 0.0.0.0 --port 8080` | Bind to all interfaces on port 8080 |
 | `atomics server --log-level debug` | Verbose uvicorn logging |
+| `atomics server --worker-absent-after N` | Seconds of worker silence before it is marked offline (default: 120) |
 | `atomics worker` | Start a distributed worker (polls coordinator for tasks) |
 | `atomics distributed run` | Submit a distributed run (split or fleet mode) |
 | `atomics distributed status JOB_ID` | Poll distributed run status |
@@ -159,12 +160,20 @@ Start a worker process that registers with the coordinator, heartbeats, polls fo
 | `--model`, `-m` | Model override for this worker |
 | `--host`, `-h` | Provider host/URL override (e.g. `http://nuc:30080`) |
 
+`--host` applies to whichever provider the worker selected, including `vllm`.
+
+If you raise `--heartbeat-interval`, raise the coordinator's
+`--worker-absent-after` to match: a worker silent for longer than that window is
+marked offline and its pinned fleet work fails. The default 120 seconds allows
+roughly four missed heartbeats at the default 30-second interval.
+
 Both examples read the key from the environment (`export ATOMICS_WORKER_API_KEY=...`)
 rather than inlining it, keeping keys out of shell history.
 
 ```bash
 uv run atomics worker --label gpu=1
 uv run atomics worker --provider brain-gateway --host http://nuc:30080 --model qwen3:4b
+uv run atomics worker --provider vllm --host http://nuc:30080/v1 --label gpu=4090
 ```
 
 ## atomics distributed
