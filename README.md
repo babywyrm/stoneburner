@@ -199,8 +199,12 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the full layer map and contributor gu
 
 ## Running Tests
 
+The `api` extra is required to run the suite: the API and distributed test
+modules import FastAPI at module scope, so without it pytest errors during
+collection instead of skipping.
+
 ```bash
-uv sync --extra dev
+uv sync --extra dev --extra api
 uv run python -m pytest -v
 uv run python -m pytest --cov=atomics --cov-report=term-missing
 ```

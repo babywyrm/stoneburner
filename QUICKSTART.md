@@ -395,8 +395,11 @@ ATOMICS_OLLAMA_TIMEOUT=600   # big reasoning models on hard prompts
 
 ## 8. Running the test suite
 
+The `api` extra is required — the API and distributed test modules import
+FastAPI at module scope, so without it pytest errors during collection.
+
 ```bash
-uv sync --extra dev
+uv sync --extra dev --extra api
 uv run pytest -q                                   # full suite
 uv run pytest --cov=atomics --cov-report=term-missing
 ```

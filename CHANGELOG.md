@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+- `atomics distributed run` now honors `--provider` / `--model`. The pinned provider travels with every task spec and overrides the worker's own default, so a targeted run executes where it was aimed; previously both flags were accepted, stored in the run request, and ignored. A worker that cannot build the pinned provider fails the assignment with a recorded error rather than silently substituting a different one.
+- `--provider` no longer defaults to `claude` — a default would override every worker on every run. Omitting it keeps the previous worker-decides behavior. It is now also validated against the known provider list up front instead of failing deep inside the worker.
+- `atomics distributed run --label` and the API's `worker_selector` are rejected instead of silently ignored: split mode assigns each task to the next available worker, so a selector could never be honored and runs looked targeted while landing anywhere. The CLI fails before submitting and `POST /api/v1/distributed/runs` returns `400`. Label-based targeting arrives with fleet mode (Phase 2).
+
+### Added
+- End-to-end tests that drive the real CLI against a local HTTP server speaking the OpenAI chat-completions dialect (`tests/inference_stub.py`), covering `atomics eval`, `atomics adversarial`, and `atomics qa --profile`. Each asserts both on the JSON artifact produced and on the requests actually received — including that the model under test and the judge model do not cross on the wire — closing a gap where provider tests injected fake clients and CLI tests replaced the runner under test.
+- Coverage floor in CI (`--cov-fail-under=85`, currently 87.1%). The threshold lives on the CI command line rather than in `addopts`, so focused local runs are not gated on whole-package coverage.
+- Tests asserting that every committed profile in `profiles/examples/` loads and renders its body template into valid JSON.
+- `SECURITY.md` now documents the secret-scanning workflow (TruffleHog and gitleaks, over both git history and the working tree) with a working invocation for each.
+- `.gitleaks.toml` extending the upstream ruleset with path exclusions and a documented allowlist for placeholder strings that remain in git history.
+
+### Fixed
+- CI synced only the `dev` extra, so the 13 test modules importing `fastapi` at module scope errored during collection on every run. Both workflows now sync `--extra api`, as do the test-suite instructions in `README.md` and `QUICKSTART.md`, which had the same omission.
+- `profiles/examples/ctf-ai-gate.yaml` used a flat `url`/`method`/`headers`/`body`/`response_field` schema that `load_profile` does not read, so copying it as documented failed with `http type requires http.url`. Its body template also used single-brace `{prompt}`, which `render_body` never substitutes. Rewritten against the nested `http:` / `response:` schema.
+- The `stoneburner-target-profiles` skill documented those same wrong key names and claimed `response.text_field` accepts dot-paths; extraction is a flat `dict.get`, so nested paths never worked.
+- `.trufflehog.yaml` used `exclude_paths` / `exclude_detectors` keys that TruffleHog's `--config` does not accept, so any scan referencing it exited with a parse error. Replaced with `.trufflehogignore` for the `--exclude-paths` flag, which is what the tool actually consumes.
+- Documentation examples inlined a literal `sk-abc123` API key, which tripped credential scanners and modelled pasting keys into shell history. `docs/API_SERVER.md` and `docs/CLI_REFERENCE.md` now read `$ATOMICS_API_KEY` from the environment.
+
 ## 0.12.0 (2026-07-23) — Distributed benchmark runs
 
 ### Added
