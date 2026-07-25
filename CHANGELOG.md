@@ -1,6 +1,10 @@
 # Changelog
 
-## Unreleased
+## 0.13.0 (2026-07-25) — Distributed fleet mode, coordinator auth
+
+### Upgrade notes
+- **Breaking for external API clients.** `POST /api/v1/workers/register`, `POST /api/v1/distributed/runs`, and `GET /api/v1/distributed/runs/{job_id}` previously answered without credentials and now require `X-API-Key`. The bundled worker and CLI already sent it, so first-party use is unaffected; anything else calling these endpoints anonymously must start sending a key. `--no-auth` still bypasses all of it for local development.
+- No database migration needed. The new `distributed_assignments.target_worker_id` column is added in place on first open, and `SCHEMA_VERSION` stays at 20, so existing run history, schedules, and the evaluation ledger are preserved.
 
 ### Added
 - **Fleet mode** — `atomics distributed run --mode fleet` broadcasts an identical task set to every worker matching `--label`, so the same suite can be compared across hosts. `JobMode` had declared `FLEET` since Phase 1 with nothing implementing it, and `Worker.labels` was persisted and never consulted. A worker must match every label pair; an omitted selector broadcasts to all online workers; a selector matching no online worker is rejected rather than creating a job that cannot progress. The matching workers are snapshotted at submit time, and the task set is built once and shared, since per-worker generation would have given each host different prompts while still producing the right assignment count.
