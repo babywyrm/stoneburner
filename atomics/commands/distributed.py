@@ -87,33 +87,53 @@ def run(
 
 
 def _render_fleet_table(job: dict, summary: dict) -> None:
-    """Print one row per host so the comparison is readable at a glance."""
+    """Print one row per host so the comparison is readable at a glance.
+
+    Nine columns do not fit an 80-column terminal: Rich shrinks them until a
+    worker id reads `5b5fc…` and a label reads `box=a…`, which cannot answer
+    which host was faster — the only question fleet mode exists to answer. So
+    identifiers are allowed to wrap instead of truncate, and the model moves to
+    the caption when every host ran the same one, which is the usual case for a
+    comparison and buys a whole column back.
+    """
+    workers = summary.get("workers", [])
+    models = {str(w.get("model") or "") for w in workers}
+    uniform_model = models.pop() if len(models) == 1 else None
+
     table = Table(
-        title=f"Fleet run {job.get('job_id', '')} — {job.get('status', '')}"
+        title=f"Fleet run {job.get('job_id', '')} — {job.get('status', '')}",
+        caption=f"model: {uniform_model}" if uniform_model else None,
     )
-    table.add_column("Worker")
-    table.add_column("Labels")
-    table.add_column("Model")
+    table.add_column("Worker", overflow="fold")
+    table.add_column("Labels", overflow="fold")
+    if not uniform_model:
+        table.add_column("Model", overflow="fold")
     table.add_column("Done", justify="right")
-    table.add_column("Failed", justify="right")
+    table.add_column("Fail", justify="right")
     table.add_column("Mean ms", justify="right")
     table.add_column("p95 ms", justify="right")
     table.add_column("Tok/s", justify="right")
-    table.add_column("Cost USD", justify="right")
-    for worker in summary.get("workers", []):
-        labels = ",".join(f"{k}={v}" for k, v in (worker.get("labels") or {}).items())
+    table.add_column("Cost", justify="right")
+
+    for worker in workers:
+        labels = " ".join(f"{k}={v}" for k, v in (worker.get("labels") or {}).items())
         failed = worker.get("failed", 0)
-        table.add_row(
+        row = [
             str(worker.get("worker_id", "")),
             labels or "-",
-            str(worker.get("model") or "-"),
+        ]
+        if not uniform_model:
+            row.append(str(worker.get("model") or "-"))
+        row += [
             str(worker.get("completed", 0)),
             f"[red]{failed}[/red]" if failed else "0",
-            f"{worker.get('mean_latency_ms', 0.0)}",
-            f"{worker.get('p95_latency_ms', 0.0)}",
-            f"{worker.get('mean_tokens_per_second', 0.0)}",
-            f"{worker.get('estimated_cost_usd', 0.0)}",
-        )
+            f"{worker.get('mean_latency_ms', 0.0):.1f}",
+            f"{worker.get('p95_latency_ms', 0.0):.1f}",
+            f"{worker.get('mean_tokens_per_second', 0.0):.1f}",
+            f"{worker.get('estimated_cost_usd', 0.0):.4f}",
+        ]
+        table.add_row(*row)
+
     console = Console()
     console.print(table)
     console.print(
