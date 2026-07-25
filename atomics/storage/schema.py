@@ -420,6 +420,69 @@ def _backup_before_wipe(conn: sqlite3.Connection, db_path: Path, current: int) -
     return backup_path
 
 
+def _expected_table_columns() -> dict[str, list[tuple]]:
+    """Columns SCHEMA_SQL would create, read back from a scratch database.
+
+    Parsing the DDL by hand would mean maintaining a second description of the
+    schema alongside the first, free to drift from it. Letting SQLite build the
+    schema and report on it keeps one source of truth.
+    """
+    scratch = sqlite3.connect(":memory:")
+    try:
+        scratch.executescript(SCHEMA_SQL)
+        tables = [
+            row[0]
+            for row in scratch.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table'"
+            )
+        ]
+        return {
+            table: list(scratch.execute(f"PRAGMA table_info({table})"))
+            for table in tables
+        }
+    finally:
+        scratch.close()
+
+
+def _reconcile_added_columns(conn: sqlite3.Connection) -> list[str]:
+    """Add nullable columns SCHEMA_SQL defines that this database is missing.
+
+    Lets a new nullable column reach existing databases without the backup-then-
+    drop reset that a SCHEMA_VERSION bump triggers — losing a user's run history
+    to add one column is a bad trade.
+
+    Additions only. A type change, a new NOT NULL, or a dropped column still
+    requires a version bump, because SQLite cannot apply those to a populated
+    table.
+    """
+    added: list[str] = []
+    for table, expected in _expected_table_columns().items():
+        existing = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+        if not existing:
+            # Table absent entirely; CREATE TABLE IF NOT EXISTS just made it.
+            continue
+        for _cid, name, col_type, notnull, default, pk in expected:
+            if name in existing:
+                continue
+            if notnull or pk:
+                logger.warning(
+                    "Cannot add %s.%s in place (NOT NULL or PRIMARY KEY); it "
+                    "needs a SCHEMA_VERSION bump to reach existing databases.",
+                    table,
+                    name,
+                )
+                continue
+            clause = f"{name} {col_type}".strip()
+            if default is not None:
+                # table_info reports the default as SQL literal text already.
+                clause += f" DEFAULT {default}"
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {clause}")
+            added.append(f"{table}.{name}")
+    if added:
+        logger.info("Added missing columns in place: %s", ", ".join(added))
+    return added
+
+
 def _execute_sql_statements(conn: sqlite3.Connection, script: str) -> None:
     """Execute a SQL script without sqlite3's implicit transaction commits."""
     statement = ""
@@ -464,6 +527,10 @@ def init_db(db_path: Path) -> sqlite3.Connection:
         if current != 0 and current < SCHEMA_VERSION:
             _execute_sql_statements(conn, RESET_SQL)
         _execute_sql_statements(conn, SCHEMA_SQL)
+        # CREATE TABLE IF NOT EXISTS is a no-op on a table that already exists,
+        # so a column added to SCHEMA_SQL since this database was written would
+        # otherwise never appear without a destructive version bump.
+        _reconcile_added_columns(conn)
         conn.execute(
             "INSERT OR REPLACE INTO schema_version (version) VALUES (?)",
             (SCHEMA_VERSION,),
