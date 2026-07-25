@@ -22,12 +22,22 @@ from rich.console import Console
     help="Disable API key authentication (local dev only)",
 )
 @click.option("--log-level", default="info", help="Uvicorn log level")
+@click.option(
+    "--worker-absent-after",
+    default=120.0,
+    show_default=True,
+    type=float,
+    help="Seconds without a heartbeat before a distributed worker is marked "
+    "offline and its pinned fleet work fails. Raise it above roughly four times "
+    "your workers' --heartbeat-interval.",
+)
 def server(
     host: str,
     port: int,
     api_keys: tuple[str, ...],
     no_auth: bool,
     log_level: str,
+    worker_absent_after: float,
 ) -> None:
     """Run the atomics API server."""
     console = Console()
@@ -52,6 +62,7 @@ def server(
         api_keys=set(api_keys),
         no_auth=no_auth,
         log_level=log_level,
+        worker_absent_after_seconds=worker_absent_after,
     )
     app = create_app(settings)
     uvicorn.run(app, host=host, port=port, log_level=log_level)

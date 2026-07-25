@@ -28,7 +28,10 @@ async def lifespan(app: FastAPI):
         app.state.worker_auth = NoAuth()
     else:
         app.state.worker_auth = WorkerAuth(set(settings.api_keys))
-    app.state.coordinator = Coordinator(init_db(settings.db_path))
+    app.state.coordinator = Coordinator(
+        init_db(settings.db_path),
+        worker_absent_after_seconds=settings.worker_absent_after_seconds,
+    )
     yield
     # Shutdown: cancel any running jobs gracefully
     manager: JobManager = app.state.job_manager
