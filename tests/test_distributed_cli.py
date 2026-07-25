@@ -55,6 +55,68 @@ def test_distributed_status_outputs_clean_json(monkeypatch):
     assert data["status"] == "completed"
 
 
+def _capture_run_payload(monkeypatch) -> dict:
+    """Invoke `distributed run` against a stubbed coordinator and return the payload."""
+    from unittest.mock import MagicMock
+
+    captured: dict = {}
+    fake_response = MagicMock()
+    fake_response.json.return_value = {"job_id": "job-1"}
+    fake_response.raise_for_status.return_value = None
+
+    def fake_post(url, *, json=None, headers=None):
+        captured.update(json or {})
+        return fake_response
+
+    monkeypatch.setattr("atomics.commands.distributed.httpx.post", fake_post)
+    return captured
+
+
+def test_distributed_run_sends_pinned_provider(monkeypatch):
+    from click.testing import CliRunner
+
+    from atomics.commands.distributed import distributed
+
+    captured = _capture_run_payload(monkeypatch)
+    result = CliRunner().invoke(distributed, [
+        "run",
+        "--api-key", "client-key",
+        "--provider", "vllm",
+        "--model", "qwen3:14b",
+    ])
+    assert result.exit_code == 0, result.output
+    assert captured["run_request"]["provider"] == "vllm"
+    assert captured["run_request"]["model"] == "qwen3:14b"
+
+
+def test_distributed_run_omits_provider_when_unset(monkeypatch):
+    """Without -p the request must stay silent so workers keep their own provider."""
+    from click.testing import CliRunner
+
+    from atomics.commands.distributed import distributed
+
+    captured = _capture_run_payload(monkeypatch)
+    result = CliRunner().invoke(distributed, ["run", "--api-key", "client-key"])
+    assert result.exit_code == 0, result.output
+    assert "provider" not in captured["run_request"]
+    assert "model" not in captured["run_request"]
+
+
+def test_distributed_run_rejects_unknown_provider(monkeypatch):
+    from click.testing import CliRunner
+
+    from atomics.commands.distributed import distributed
+
+    _capture_run_payload(monkeypatch)
+    result = CliRunner().invoke(distributed, [
+        "run",
+        "--api-key", "client-key",
+        "--provider", "not-a-provider",
+    ])
+    assert result.exit_code != 0
+    assert "not-a-provider" in result.output
+
+
 def test_worker_cli_passes_provider_model_host(monkeypatch):
     """atomics worker should pass provider/model/host to WorkerClient."""
     import asyncio

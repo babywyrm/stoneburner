@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from atomics.api.auth import AuthBackend
@@ -28,11 +30,27 @@ def _parse_tier(value: object) -> BurnTier:
         return BurnTier.BASELINE
 
 
-def _build_task_specs(run_request: dict) -> list[dict]:
+def _pinned_execution(run_request: dict[str, Any]) -> dict[str, str]:
+    """Return the provider/model the submitter pinned for this run, if any.
+
+    Workers default to their own locally configured provider. When the run
+    request names one, it travels with every task spec so the work executes
+    where the submitter asked rather than wherever it happens to land.
+    """
+    pinned: dict[str, str] = {}
+    for key in ("provider", "model"):
+        value = run_request.get(key)
+        if isinstance(value, str) and value:
+            pinned[key] = value
+    return pinned
+
+
+def _build_task_specs(run_request: dict[str, Any]) -> list[dict[str, Any]]:
     """Build one catalog-backed task spec per iteration for split runs."""
     tier = _parse_tier(run_request.get("tier", "baseline"))
     iterations = int(run_request.get("iterations", 1))
-    specs: list[dict] = []
+    pinned = _pinned_execution(run_request)
+    specs: list[dict[str, Any]] = []
     for _ in range(max(iterations, 0)):
         task, prompt = get_weighted_task(tier)
         specs.append(
@@ -42,6 +60,7 @@ def _build_task_specs(run_request: dict) -> list[dict]:
                 "category": task.category.value,
                 "complexity": task.complexity.value,
                 "max_output_tokens": task.max_output_tokens,
+                **pinned,
             }
         )
     return specs

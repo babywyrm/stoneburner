@@ -8,6 +8,8 @@ import click
 import httpx
 from rich.console import Console
 
+from atomics.commands.common import PROVIDER_CHOICES
+
 
 @click.group()
 def distributed() -> None:
@@ -18,12 +20,26 @@ def distributed() -> None:
 @click.option("--coordinator", default="http://127.0.0.1:8000", show_default=True)
 @click.option("--api-key", envvar="ATOMICS_API_KEY", help="Client API key")
 @click.option("--mode", default="split", show_default=True, type=click.Choice(["split"]))
-@click.option("--provider", "-p", default="claude", show_default=True)
+@click.option(
+    "--provider",
+    "-p",
+    type=PROVIDER_CHOICES,
+    help="Pin every task to this provider. Default: each worker's own provider.",
+)
 @click.option("--tier", "-t", default="baseline", show_default=True)
-@click.option("--model", "-m", help="Model override")
+@click.option("--model", "-m", help="Model override for the executing provider")
 @click.option("-n", "iterations", default=1, show_default=True, help="Number of tasks")
 @click.option("--label", "labels", multiple=True, help="Worker selector key=value")
-def run(coordinator: str, api_key: str, mode: str, provider: str, tier: str, model: str | None, iterations: int, labels: tuple[str, ...]) -> None:
+def run(
+    coordinator: str,
+    api_key: str,
+    mode: str,
+    provider: str | None,
+    tier: str,
+    model: str | None,
+    iterations: int,
+    labels: tuple[str, ...],
+) -> None:
     """Submit a distributed run to the coordinator."""
     if not api_key:
         raise click.UsageError("--api-key is required (or set ATOMICS_API_KEY)")
@@ -33,7 +49,9 @@ def run(coordinator: str, api_key: str, mode: str, provider: str, tier: str, mod
             raise click.BadParameter(f"Label must be key=value: {label}")
         k, v = label.split("=", 1)
         label_dict[k] = v
-    run_request = {"provider": provider, "tier": tier, "iterations": iterations}
+    run_request: dict[str, object] = {"tier": tier, "iterations": iterations}
+    if provider:
+        run_request["provider"] = provider
     if model:
         run_request["model"] = model
     payload = {"mode": mode, "run_request": run_request}
