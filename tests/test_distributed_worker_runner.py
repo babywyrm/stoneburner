@@ -144,6 +144,52 @@ async def test_pinned_provider_overrides_worker_default(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("provider_name", "attribute"),
+    [("vllm", "_base_url"), ("llamacpp", "_base_url"), ("ollama", "_host")],
+)
+async def test_worker_host_reaches_the_provider_it_selected(provider_name, attribute):
+    """`atomics worker -p X -h URL` must actually talk to URL.
+
+    The vllm branch of the factory reads its own `vllm_host` parameter, which the
+    worker never passed, so `--host` was accepted and discarded and the worker
+    quietly used ATOMICS_VLLM_HOST (default localhost:8000) instead of the box
+    the operator named. Asserting on the constructed provider rather than on the
+    factory call keeps this honest: it fails if the routing is dropped anywhere
+    between the flag and the HTTP client.
+    """
+    host = "http://10.0.0.9:30080/v1"
+    assignment = TaskAssignment(
+        assignment_id="a4",
+        job_id="j4",
+        task_spec={"task_name": "general_qa/quick_question", "prompt": "hello"},
+    )
+    fake_result = TaskResult(
+        run_id="j4",
+        category=TaskCategory.GENERAL_QA,
+        task_name="quick_question",
+        provider=provider_name,
+        model="m",
+        status=TaskStatus.SUCCESS,
+        response="ok",
+    )
+
+    with (
+        patch(
+            "atomics.distributed.worker_runner.execute_task",
+            new_callable=AsyncMock,
+            return_value=fake_result,
+        ) as exec_task,
+    ):
+        await execute_assignment(
+            assignment, provider_name=provider_name, host=host
+        )
+
+    provider = exec_task.await_args.kwargs["provider"]
+    assert getattr(provider, attribute) == host.rstrip("/")
+
+
+@pytest.mark.asyncio
 async def test_execute_assignment_builds_fallback_task():
     assignment = TaskAssignment(
         assignment_id="a2",
