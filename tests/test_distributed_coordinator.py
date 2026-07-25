@@ -1,7 +1,15 @@
+from datetime import UTC, datetime, timedelta
+
 import pytest
 
 from atomics.distributed.coordinator import Coordinator
-from atomics.distributed.models import DistributedRunRequest, JobMode, WorkerRegisterRequest
+from atomics.distributed.models import (
+    AssignmentStatus,
+    DistributedRunRequest,
+    JobMode,
+    JobStatus,
+    WorkerRegisterRequest,
+)
 from atomics.storage.schema import init_db
 
 
@@ -222,6 +230,209 @@ def test_a_pinned_assignment_does_not_block_an_unpinned_one(coordinator):
     claimed = coordinator.claim_assignment(other.worker_id)
     assert claimed is not None
     assert claimed.task_spec == {"pinned": False}
+
+
+def _backdate(coordinator, assignment_id: str, seconds: int = 3600) -> None:
+    """Push started_at into the past so the assignment reads as timed out."""
+    past = (datetime.now(UTC) - timedelta(seconds=seconds)).isoformat()
+    coordinator._conn.execute(
+        "UPDATE distributed_assignments SET started_at = ? WHERE assignment_id = ?",
+        (past, assignment_id),
+    )
+    coordinator._conn.commit()
+
+
+def test_pinned_assignment_fails_when_its_worker_goes_offline(coordinator):
+    owner = coordinator.register_worker(WorkerRegisterRequest())
+    coordinator.create_fleet_job(
+        DistributedRunRequest(mode=JobMode.FLEET), [{"i": 1}], [owner]
+    )
+    claimed = coordinator.claim_assignment(owner.worker_id)
+    assert claimed is not None
+
+    _offline(coordinator, owner.worker_id)
+    coordinator._requeue_stale_assignments()
+
+    after = coordinator.get_assignment(claimed.assignment_id)
+    assert after is not None
+    assert after.status == AssignmentStatus.FAILED
+
+
+def test_a_dead_hosts_tasks_are_never_given_to_another_worker(coordinator):
+    """The regression this design exists to prevent.
+
+    If a dead host's slice migrated to a live one, the job would still report
+    completed while the per-host comparison had quietly become a blend of two
+    machines — a wrong answer that looks like a right one.
+    """
+    dead = coordinator.register_worker(WorkerRegisterRequest())
+    alive = coordinator.register_worker(WorkerRegisterRequest())
+    coordinator.create_fleet_job(
+        DistributedRunRequest(mode=JobMode.FLEET),
+        [{"i": 1}, {"i": 2}],
+        [dead],
+    )
+    # One assignment in flight, one still pending, then the host disappears.
+    assert coordinator.claim_assignment(dead.worker_id) is not None
+    _offline(coordinator, dead.worker_id)
+
+    for _ in range(5):
+        assert coordinator.claim_assignment(alive.worker_id) is None
+
+
+def test_pinned_assignment_that_timed_out_keeps_its_pin_while_the_worker_lives(
+    coordinator,
+):
+    owner = coordinator.register_worker(WorkerRegisterRequest())
+    other = coordinator.register_worker(WorkerRegisterRequest())
+    coordinator.create_fleet_job(
+        DistributedRunRequest(mode=JobMode.FLEET, timeout_seconds=1),
+        [{"i": 1}],
+        [owner],
+    )
+    claimed = coordinator.claim_assignment(owner.worker_id)
+    assert claimed is not None
+    _backdate(coordinator, claimed.assignment_id)
+
+    coordinator._requeue_stale_assignments()
+
+    after = coordinator.get_assignment(claimed.assignment_id)
+    assert after is not None
+    assert after.status == AssignmentStatus.PENDING
+    assert after.target_worker_id == owner.worker_id
+    # A slow host gets another try; a different host still cannot take the work.
+    assert coordinator.claim_assignment(other.worker_id) is None
+    assert coordinator.claim_assignment(owner.worker_id) is not None
+
+
+def test_unpinned_stale_assignments_still_requeue_to_anyone(coordinator):
+    """Split mode's recovery path must not change."""
+    first = coordinator.register_worker(WorkerRegisterRequest())
+    second = coordinator.register_worker(WorkerRegisterRequest())
+    coordinator.create_split_job(
+        DistributedRunRequest(mode=JobMode.SPLIT, timeout_seconds=1), [{"i": 1}]
+    )
+    claimed = coordinator.claim_assignment(first.worker_id)
+    assert claimed is not None
+    _backdate(coordinator, claimed.assignment_id)
+
+    reclaimed = coordinator.claim_assignment(second.worker_id)
+    assert reclaimed is not None
+    assert reclaimed.assignment_id == claimed.assignment_id
+
+
+def test_an_unpinned_assignment_from_an_offline_worker_still_requeues(coordinator):
+    """Split mode again: an offline worker's task goes back in the shared pool."""
+    first = coordinator.register_worker(WorkerRegisterRequest())
+    second = coordinator.register_worker(WorkerRegisterRequest())
+    coordinator.create_split_job(DistributedRunRequest(mode=JobMode.SPLIT), [{"i": 1}])
+    claimed = coordinator.claim_assignment(first.worker_id)
+    assert claimed is not None
+    _offline(coordinator, first.worker_id)
+
+    reclaimed = coordinator.claim_assignment(second.worker_id)
+    assert reclaimed is not None
+    assert reclaimed.assignment_id == claimed.assignment_id
+    assert reclaimed.status == AssignmentStatus.ASSIGNED
+
+
+def test_a_departed_hosts_pending_work_fails_with_its_slice(coordinator):
+    """Otherwise the job waits forever on tasks only a departed host could claim."""
+    dead = coordinator.register_worker(WorkerRegisterRequest())
+    job = coordinator.create_fleet_job(
+        DistributedRunRequest(mode=JobMode.FLEET),
+        [{"i": 1}, {"i": 2}, {"i": 3}],
+        [dead],
+    )
+    assert coordinator.claim_assignment(dead.worker_id) is not None
+    _offline(coordinator, dead.worker_id)
+
+    coordinator._requeue_stale_assignments()
+
+    statuses = [
+        row[0]
+        for row in coordinator._conn.execute(
+            "SELECT status FROM distributed_assignments WHERE job_id = ?",
+            (job.job_id,),
+        )
+    ]
+    assert statuses == [AssignmentStatus.FAILED.value] * 3
+    after = coordinator.get_job(job.job_id)
+    assert after is not None
+    assert after.status == JobStatus.PARTIAL
+
+
+def test_a_pinned_assignment_fails_once_its_retries_are_exhausted(coordinator):
+    """A host that keeps timing out must not hold the job open indefinitely.
+
+    This is the path a killed worker actually takes: nothing marks it offline, so
+    its work is only ever judged by the timeout.
+    """
+    owner = coordinator.register_worker(WorkerRegisterRequest())
+    job = coordinator.create_fleet_job(
+        DistributedRunRequest(mode=JobMode.FLEET, timeout_seconds=1, max_retries=0),
+        [{"i": 1}],
+        [owner],
+    )
+    claimed = coordinator.claim_assignment(owner.worker_id)
+    assert claimed is not None
+    _backdate(coordinator, claimed.assignment_id)
+
+    coordinator._requeue_stale_assignments()
+
+    after = coordinator.get_assignment(claimed.assignment_id)
+    assert after is not None
+    assert after.status == AssignmentStatus.FAILED
+    job_after = coordinator.get_job(job.job_id)
+    assert job_after is not None
+    assert job_after.status == JobStatus.PARTIAL
+
+
+def test_a_pinned_assignment_retries_before_it_fails(coordinator):
+    """The retry budget must actually be spent, not skipped."""
+    owner = coordinator.register_worker(WorkerRegisterRequest())
+    coordinator.create_fleet_job(
+        DistributedRunRequest(mode=JobMode.FLEET, timeout_seconds=1, max_retries=1),
+        [{"i": 1}],
+        [owner],
+    )
+
+    first = coordinator.claim_assignment(owner.worker_id)
+    assert first is not None
+    _backdate(coordinator, first.assignment_id)
+    coordinator._requeue_stale_assignments()
+    assert coordinator.get_assignment(first.assignment_id).status == (
+        AssignmentStatus.PENDING
+    )
+
+    second = coordinator.claim_assignment(owner.worker_id)
+    assert second is not None
+    _backdate(coordinator, second.assignment_id)
+    coordinator._requeue_stale_assignments()
+
+    assert coordinator.get_assignment(first.assignment_id).status == (
+        AssignmentStatus.FAILED
+    )
+
+
+def test_job_reports_partial_when_one_host_drops_out(coordinator):
+    good = coordinator.register_worker(WorkerRegisterRequest())
+    bad = coordinator.register_worker(WorkerRegisterRequest())
+    job = coordinator.create_fleet_job(
+        DistributedRunRequest(mode=JobMode.FLEET), [{"i": 1}], [good, bad]
+    )
+
+    finished = coordinator.claim_assignment(good.worker_id)
+    assert finished is not None
+    coordinator.submit_assignment(finished.assignment_id, '{"ok": true}')
+
+    assert coordinator.claim_assignment(bad.worker_id) is not None
+    _offline(coordinator, bad.worker_id)
+    coordinator._requeue_stale_assignments()
+
+    after = coordinator.get_job(job.job_id)
+    assert after is not None
+    assert after.status == JobStatus.PARTIAL
 
 
 def test_submit_assignment_completes_job(coordinator):
