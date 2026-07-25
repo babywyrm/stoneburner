@@ -102,6 +102,23 @@ def test_distributed_run_omits_provider_when_unset(monkeypatch):
     assert "model" not in captured["run_request"]
 
 
+def test_distributed_run_rejects_label_instead_of_ignoring_it(monkeypatch):
+    """--label must fail loudly rather than submit an unhonored selector."""
+    from click.testing import CliRunner
+
+    from atomics.commands.distributed import distributed
+
+    captured = _capture_run_payload(monkeypatch)
+    result = CliRunner().invoke(distributed, [
+        "run",
+        "--api-key", "client-key",
+        "--label", "gpu=1",
+    ])
+    assert result.exit_code != 0
+    assert "not supported yet" in result.output
+    assert captured == {}, "no request should be submitted when --label is rejected"
+
+
 def test_distributed_run_rejects_unknown_provider(monkeypatch):
     from click.testing import CliRunner
 

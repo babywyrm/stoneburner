@@ -59,6 +59,8 @@ class DistributedRunRequest(BaseModel):
     mode: JobMode = JobMode.SPLIT
     run_request: dict[str, Any] | None = None
     eval_request: dict[str, Any] | None = None
+    # Retained so the API can reject it explicitly; dropping the field would
+    # make Pydantic ignore it and reintroduce silent no-op targeting.
     worker_selector: dict[str, str] | None = None
     timeout_seconds: int = 600
     max_retries: int = 2

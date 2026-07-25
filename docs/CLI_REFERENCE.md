@@ -175,14 +175,18 @@ Submit and inspect distributed benchmark runs. Phase 1 supports `split` mode onl
 | `--coordinator URL` | Coordinator base URL (default: `http://127.0.0.1:8000`) |
 | `--api-key KEY` | Client API key (or `ATOMICS_API_KEY`) |
 | `--mode [split]` | Job mode (only `split` in Phase 1) |
-| `-p, --provider TEXT` | Provider (default: `claude`) |
+| `-p, --provider TEXT` | Pin every task to this provider (default: each worker's own) |
 | `-t, --tier TEXT` | Burn tier (default: `baseline`) |
-| `-m, --model TEXT` | Model override |
+| `-m, --model TEXT` | Model override for the executing provider |
 | `-n INTEGER` | Number of tasks (default: 1) |
-| `--label KEY=VALUE` | Worker selector (repeatable) |
+| `--label KEY=VALUE` | Worker selector. **Rejected in Phase 1** — split mode assigns each task to the next available worker |
 
 ```bash
-ATOMICS_API_KEY=sk-abc123 uv run atomics distributed run -p ollama -t baseline -n 4 --label gpu=1
+# Pin the whole run to one provider
+ATOMICS_API_KEY=sk-abc123 uv run atomics distributed run -p ollama -t baseline -n 4
+
+# Let each worker use its own configured provider
+ATOMICS_API_KEY=sk-abc123 uv run atomics distributed run -t baseline -n 4
 ```
 
 ### `atomics distributed status`

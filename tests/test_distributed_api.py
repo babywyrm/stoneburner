@@ -52,6 +52,20 @@ def _task_specs(client, job_id: str) -> list[dict]:
     return [json.loads(row[0]) for row in rows]
 
 
+def test_worker_selector_is_rejected_not_ignored(client):
+    """An unhonored selector must 400 rather than produce an untargeted run."""
+    resp = client.post(
+        "/api/v1/distributed/runs",
+        json={
+            "mode": "split",
+            "run_request": {"iterations": 1, "tier": "ez"},
+            "worker_selector": {"gpu": "1"},
+        },
+    )
+    assert resp.status_code == 400
+    assert "worker_selector" in resp.json()["detail"]
+
+
 def test_pinned_provider_travels_with_every_task_spec(client):
     """A provider named on the run request must reach the workers executing it."""
     resp = client.post(

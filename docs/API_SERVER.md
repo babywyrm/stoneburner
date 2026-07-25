@@ -95,7 +95,9 @@ Heartbeat, claim, and result endpoints require worker authentication via `X-API-
 | POST | `/api/v1/distributed/runs` | Start a split-mode run (`202` + job body) |
 | GET | `/api/v1/distributed/runs/{job_id}` | Job status, assignments, and aggregated progress |
 
-`POST /api/v1/distributed/runs` accepts a body with `mode` (`split`), `run_request` (provider/tier/iterations/model), and optional `worker_selector` labels. Only `split` mode is accepted in Phase 1.
+`POST /api/v1/distributed/runs` accepts a body with `mode` (`split`) and `run_request` (tier/iterations, plus optional provider/model). Only `split` mode is accepted in Phase 1.
+
+A `provider`/`model` in `run_request` pins every task to that provider; omit them and each worker uses its own configured provider. `worker_selector` is **rejected with `400`** in Phase 1 — split mode assigns each task to the next available worker, so a selector cannot be honored.
 
 ### Example: local three-terminal setup
 
@@ -107,6 +109,6 @@ uv run atomics server --api-key sk-abc123
 ATOMICS_WORKER_API_KEY=sk-abc123 uv run atomics worker --label gpu=1
 
 # Terminal 3 — submit and poll
-ATOMICS_API_KEY=sk-abc123 uv run atomics distributed run -p ollama -t baseline -n 4 --label gpu=1
+ATOMICS_API_KEY=sk-abc123 uv run atomics distributed run -p ollama -t baseline -n 4
 ATOMICS_API_KEY=sk-abc123 uv run atomics distributed status <job_id>
 ```
