@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from sqlite3 import Connection
 from typing import Any
 
@@ -96,8 +96,10 @@ class Coordinator:
 
         Offline workers are excluded: a fleet run broadcasts to the hosts that are
         actually present when it is submitted, and pinning work to an absent worker
-        would produce assignments nothing can ever claim.
+        would produce assignments nothing can ever claim. Liveness is refreshed
+        first so a host that stopped heartbeating is not handed a fresh slice.
         """
+        self._mark_absent_workers()
         rows = self._conn.execute(
             f"SELECT {self.WORKER_COLUMNS} FROM workers WHERE status = ? "
             "ORDER BY registered_at, worker_id",
@@ -360,6 +362,53 @@ class Coordinator:
             return timeout
         return 600
 
+    # Roughly four missed heartbeats at the worker's default 30s interval. Chosen
+    # to be forgiving: the cost of declaring a live worker absent is failing work
+    # it could have finished, while the cost of waiting is only a slower verdict.
+    WORKER_ABSENT_AFTER_SECONDS = 120
+
+    def _mark_absent_workers(self) -> None:
+        """Mark online workers that have stopped heartbeating as offline.
+
+        Nothing else in the coordinator ever set OFFLINE, so a killed worker stayed
+        'online' indefinitely. Fleet mode cannot tolerate that: its assignments are
+        claimable only by their target, so an absent target means a job waiting on
+        a host that is never coming back.
+        """
+        cutoff = datetime.now(UTC) - timedelta(seconds=self.WORKER_ABSENT_AFTER_SECONDS)
+        self._conn.execute(
+            "UPDATE workers SET status = ? "
+            "WHERE status = ? AND last_seen_at IS NOT NULL AND last_seen_at < ?",
+            (
+                WorkerStatus.OFFLINE.value,
+                WorkerStatus.ONLINE.value,
+                cutoff.isoformat(),
+            ),
+        )
+        self._conn.commit()
+
+    def _fail_absent_worker_slices(self) -> set[str]:
+        """Fail pinned work belonging to offline workers. Returns affected job ids.
+
+        Handles the host that died before claiming anything: those assignments are
+        still `pending`, so the stale-assignment scan never looks at them, and the
+        job would wait forever on a worker that cannot ask for work.
+        """
+        rows = self._conn.execute(
+            "SELECT DISTINCT a.job_id, a.target_worker_id "
+            "FROM distributed_assignments a "
+            "JOIN workers w ON w.worker_id = a.target_worker_id "
+            "WHERE a.status IN (?, ?) AND w.status = ?",
+            (
+                AssignmentStatus.PENDING.value,
+                AssignmentStatus.ASSIGNED.value,
+                WorkerStatus.OFFLINE.value,
+            ),
+        ).fetchall()
+        for job_id, worker_id in rows:
+            self._fail_pinned_slice(job_id, worker_id)
+        return {job_id for job_id, _ in rows}
+
     def _max_retries_for_job(self, request_json: str) -> int:
         try:
             payload = json.loads(request_json)
@@ -393,6 +442,8 @@ class Coordinator:
         )
 
     def _requeue_stale_assignments(self) -> None:
+        self._mark_absent_workers()
+        failed_jobs = self._fail_absent_worker_slices()
         rows = self._conn.execute(
             """
             SELECT a.assignment_id, a.started_at, a.target_worker_id, a.job_id,
@@ -405,7 +456,6 @@ class Coordinator:
             (AssignmentStatus.ASSIGNED.value,),
         ).fetchall()
         now = datetime.now(UTC)
-        failed_jobs: set[str] = set()
         for (
             assignment_id,
             started_at,
