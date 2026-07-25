@@ -81,6 +81,9 @@ class TaskAssignment(BaseModel):
     assignment_id: str
     job_id: str
     worker_id: str | None = None
+    # None: claimable by any worker (split). Set: only this worker may run it
+    # (fleet), and it is never reassigned elsewhere.
+    target_worker_id: str | None = None
     status: AssignmentStatus = AssignmentStatus.PENDING
     task_spec: dict[str, Any]
     result_json: str | None = None

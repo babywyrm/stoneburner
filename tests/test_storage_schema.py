@@ -121,6 +121,91 @@ def test_reconciliation_leaves_a_current_database_untouched(tmp_path: Path) -> N
         second.close()
 
 
+# distributed_assignments as Phase 1 shipped it, before fleet mode added
+# target_worker_id. Stands in for a real database on disk from before the upgrade.
+_PRE_FLEET_DISTRIBUTED_SQL = """
+CREATE TABLE schema_version (version INTEGER PRIMARY KEY);
+CREATE TABLE workers (
+    worker_id TEXT PRIMARY KEY,
+    labels TEXT NOT NULL DEFAULT '{}',
+    capabilities TEXT,
+    endpoint TEXT,
+    api_key_hint TEXT,
+    status TEXT NOT NULL DEFAULT 'online',
+    last_seen_at TEXT,
+    registered_at TEXT NOT NULL
+);
+CREATE TABLE distributed_jobs (
+    job_id TEXT PRIMARY KEY,
+    mode TEXT NOT NULL,
+    parent_run_id TEXT,
+    status TEXT NOT NULL DEFAULT 'pending',
+    request_json TEXT NOT NULL,
+    summary_json TEXT,
+    created_at TEXT NOT NULL,
+    completed_at TEXT
+);
+CREATE TABLE distributed_assignments (
+    assignment_id TEXT PRIMARY KEY,
+    job_id TEXT NOT NULL REFERENCES distributed_jobs(job_id),
+    worker_id TEXT REFERENCES workers(worker_id),
+    status TEXT NOT NULL DEFAULT 'pending',
+    task_spec TEXT NOT NULL,
+    result_json TEXT,
+    retry_count INTEGER DEFAULT 0,
+    started_at TEXT,
+    completed_at TEXT
+);
+"""
+
+
+def test_a_pre_fleet_database_gains_target_worker_id_without_losing_work(
+    tmp_path: Path,
+) -> None:
+    """The upgrade users will actually perform: keep the job, gain the column.
+
+    Exercised end to end rather than only through the generic reconciliation
+    tests, because the promise being kept here is that adding fleet mode does not
+    reset anyone's distributed history.
+    """
+    from atomics.distributed.coordinator import Coordinator
+
+    db_path = tmp_path / "pre-fleet.db"
+    conn = sqlite3.connect(str(db_path))
+    try:
+        conn.executescript(_PRE_FLEET_DISTRIBUTED_SQL)
+        conn.execute(
+            "INSERT INTO schema_version (version) VALUES (?)", (SCHEMA_VERSION,)
+        )
+        conn.execute(
+            "INSERT INTO distributed_jobs (job_id, mode, status, request_json, created_at) "
+            "VALUES ('job-1', 'split', 'pending', '{}', '2026-01-01T00:00:00+00:00')"
+        )
+        conn.execute(
+            "INSERT INTO distributed_assignments (assignment_id, job_id, status, task_spec) "
+            "VALUES ('assign-1', 'job-1', 'pending', '{\"i\": 1}')"
+        )
+        conn.execute(
+            "INSERT INTO workers (worker_id, registered_at) "
+            "VALUES ('worker-1', '2026-01-01T00:00:00+00:00')"
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    upgraded = init_db(db_path)
+    try:
+        assert "target_worker_id" in _column_names(upgraded, "distributed_assignments")
+
+        # The pending assignment survived and is still claimable, with no pin.
+        claimed = Coordinator(upgraded).claim_assignment("worker-1")
+        assert claimed is not None
+        assert claimed.assignment_id == "assign-1"
+        assert claimed.target_worker_id is None
+    finally:
+        upgraded.close()
+
+
 def test_reconciliation_backfills_the_column_as_null(tmp_path: Path) -> None:
     """An added column must read as NULL on pre-existing rows, not fabricate data.
 

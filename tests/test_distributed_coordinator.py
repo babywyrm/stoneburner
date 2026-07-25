@@ -50,6 +50,72 @@ def test_claim_assignment(coordinator):
     assert a.job_id == job.job_id
 
 
+def _pin(coordinator, job_id: str, worker_id: str) -> None:
+    """Pin every assignment of a job to one worker, as fleet mode will."""
+    coordinator._conn.execute(
+        "UPDATE distributed_assignments SET target_worker_id = ? WHERE job_id = ?",
+        (worker_id, job_id),
+    )
+    coordinator._conn.commit()
+
+
+def test_a_pinned_assignment_is_not_claimable_by_another_worker(coordinator):
+    """Fleet mode's core invariant: work aimed at one host stays on that host."""
+    owner = coordinator.register_worker(WorkerRegisterRequest(labels={"host": "a"}))
+    other = coordinator.register_worker(WorkerRegisterRequest(labels={"host": "b"}))
+    job = coordinator.create_split_job(
+        DistributedRunRequest(mode=JobMode.SPLIT), [{"i": 1}]
+    )
+    _pin(coordinator, job.job_id, owner.worker_id)
+
+    assert coordinator.claim_assignment(other.worker_id) is None
+
+
+def test_a_worker_claims_its_own_pinned_assignment(coordinator):
+    owner = coordinator.register_worker(WorkerRegisterRequest())
+    job = coordinator.create_split_job(
+        DistributedRunRequest(mode=JobMode.SPLIT), [{"i": 1}]
+    )
+    _pin(coordinator, job.job_id, owner.worker_id)
+
+    claimed = coordinator.claim_assignment(owner.worker_id)
+    assert claimed is not None
+    assert claimed.worker_id == owner.worker_id
+    assert claimed.target_worker_id == owner.worker_id
+
+
+def test_unpinned_assignments_remain_claimable_by_any_worker(coordinator):
+    """Split mode must not change: an unpinned assignment goes to whoever asks."""
+    coordinator.register_worker(WorkerRegisterRequest(labels={"host": "a"}))
+    other = coordinator.register_worker(WorkerRegisterRequest(labels={"host": "b"}))
+    coordinator.create_split_job(DistributedRunRequest(mode=JobMode.SPLIT), [{"i": 1}])
+
+    claimed = coordinator.claim_assignment(other.worker_id)
+    assert claimed is not None
+    assert claimed.target_worker_id is None
+
+
+def test_a_pinned_assignment_does_not_block_an_unpinned_one(coordinator):
+    """A worker skipped over someone else's pinned row must still get its own work.
+
+    The claim query selects a single row, so an ORDER BY that reaches the pinned
+    row first could starve a worker that has perfectly good unpinned work waiting.
+    """
+    owner = coordinator.register_worker(WorkerRegisterRequest())
+    other = coordinator.register_worker(WorkerRegisterRequest())
+    pinned_job = coordinator.create_split_job(
+        DistributedRunRequest(mode=JobMode.SPLIT), [{"pinned": True}]
+    )
+    _pin(coordinator, pinned_job.job_id, owner.worker_id)
+    coordinator.create_split_job(
+        DistributedRunRequest(mode=JobMode.SPLIT), [{"pinned": False}]
+    )
+
+    claimed = coordinator.claim_assignment(other.worker_id)
+    assert claimed is not None
+    assert claimed.task_spec == {"pinned": False}
+
+
 def test_submit_assignment_completes_job(coordinator):
     w = coordinator.register_worker(WorkerRegisterRequest())
     job = coordinator.create_split_job(
