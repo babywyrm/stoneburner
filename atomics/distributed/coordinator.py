@@ -19,6 +19,7 @@ from atomics.distributed.models import (
     WorkerRegisterRequest,
     WorkerStatus,
 )
+from atomics.distributed.rollup import AssignmentRecord, build_rollup
 
 
 class Coordinator:
@@ -347,10 +348,45 @@ class Coordinator:
             )
             self._conn.execute(
                 "UPDATE distributed_jobs "
-                "SET status = ?, completed_at = ? WHERE job_id = ?",
-                (new_status, self._now(), job_id),
+                "SET status = ?, completed_at = ?, summary_json = ? WHERE job_id = ?",
+                (new_status, self._now(), self._build_summary_json(job_id), job_id),
             )
             self._conn.commit()
+
+    def _build_summary_json(self, job_id: str) -> str:
+        """Summarize a finished job per worker.
+
+        summary_json has existed since phase 1 with nothing ever writing to it, so
+        a completed distributed job reported a status and no numbers.
+        """
+        rows = self._conn.execute(
+            "SELECT COALESCE(a.target_worker_id, a.worker_id) AS host, a.status, "
+            "a.result_json, w.labels "
+            "FROM distributed_assignments a "
+            "LEFT JOIN workers w "
+            "  ON w.worker_id = COALESCE(a.target_worker_id, a.worker_id) "
+            "WHERE a.job_id = ? "
+            "ORDER BY host, a.assignment_id",
+            (job_id,),
+        ).fetchall()
+        records = []
+        for host, status_value, result_json, labels_json in rows:
+            result = None
+            if result_json:
+                try:
+                    result = json.loads(result_json)
+                except json.JSONDecodeError:
+                    result = None
+            records.append(
+                AssignmentRecord(
+                    # An unclaimed, failed assignment has neither worker set.
+                    worker_id=host or "unassigned",
+                    labels=json.loads(labels_json) if labels_json else {},
+                    status=status_value,
+                    result=result,
+                )
+            )
+        return json.dumps(build_rollup(records).to_dict())
 
     def _timeout_seconds_for_job(self, request_json: str) -> int:
         try:

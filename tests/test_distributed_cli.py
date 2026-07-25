@@ -1,3 +1,8 @@
+import json
+
+import pytest
+
+
 def test_worker_help():
     from click.testing import CliRunner
 
@@ -117,6 +122,122 @@ def test_distributed_run_rejects_label_in_split_mode(monkeypatch):
     assert result.exit_code != 0
     assert "fleet" in result.output
     assert captured == {}, "no request should be submitted when --label is rejected"
+
+
+def _stub_status_response(monkeypatch, payload: dict) -> None:
+    from unittest.mock import MagicMock
+
+    fake_response = MagicMock()
+    fake_response.json.return_value = payload
+    fake_response.raise_for_status.return_value = None
+    monkeypatch.setattr(
+        "atomics.commands.distributed.httpx.get",
+        lambda url, *, headers=None: fake_response,
+    )
+
+
+_FLEET_STATUS = {
+    "job_id": "job-1",
+    "status": "partial",
+    "mode": "fleet",
+    "summary_json": json.dumps(
+        {
+            "workers": [
+                {
+                    "worker_id": "host-a",
+                    "labels": {"gpu": "4090"},
+                    "completed": 4,
+                    "failed": 0,
+                    "input_tokens": 40,
+                    "output_tokens": 80,
+                    "mean_latency_ms": 120.5,
+                    "p95_latency_ms": 200.0,
+                    "mean_tokens_per_second": 55.0,
+                    "estimated_cost_usd": 0.02,
+                    "provider": "ollama",
+                    "model": "qwen3:14b",
+                },
+                {
+                    "worker_id": "host-b",
+                    "labels": {"gpu": "3060"},
+                    "completed": 2,
+                    "failed": 2,
+                    "input_tokens": 20,
+                    "output_tokens": 30,
+                    "mean_latency_ms": 480.0,
+                    "p95_latency_ms": 600.0,
+                    "mean_tokens_per_second": 12.0,
+                    "estimated_cost_usd": 0.01,
+                    "provider": "ollama",
+                    "model": "qwen3:14b",
+                },
+            ],
+            "completed": 6,
+            "failed": 2,
+            "total_input_tokens": 60,
+            "total_output_tokens": 110,
+            "estimated_cost_usd": 0.03,
+        }
+    ),
+}
+
+
+def test_fleet_status_prints_a_row_per_host(monkeypatch):
+    from click.testing import CliRunner
+
+    from atomics.commands.distributed import distributed
+
+    _stub_status_response(monkeypatch, _FLEET_STATUS)
+    result = CliRunner().invoke(
+        distributed, ["status", "job-1", "--api-key", "client-key"]
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "host-a" in result.output
+    assert "host-b" in result.output
+    # The comparison is the point: both hosts' latencies must be visible.
+    assert "120.5" in result.output
+    assert "480.0" in result.output
+    # Rendered, not dumped: raw JSON already contains every value above, so the
+    # test would pass against the old output without these two assertions.
+    assert "mean_latency_ms" not in result.output
+    with pytest.raises(json.JSONDecodeError):
+        json.loads(result.output)
+
+
+def test_split_status_still_prints_plain_json(monkeypatch):
+    """Split jobs keep their existing machine-readable output."""
+    from click.testing import CliRunner
+
+    from atomics.commands.distributed import distributed
+
+    _stub_status_response(
+        monkeypatch, {"job_id": "job-1", "status": "completed", "mode": "split"}
+    )
+    result = CliRunner().invoke(
+        distributed, ["status", "job-1", "--api-key", "client-key"]
+    )
+
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.output)["mode"] == "split"
+
+
+def test_status_json_out_writes_the_rollup(monkeypatch, tmp_path):
+    from click.testing import CliRunner
+
+    from atomics.commands.distributed import distributed
+
+    _stub_status_response(monkeypatch, _FLEET_STATUS)
+    out = tmp_path / "fleet.json"
+    result = CliRunner().invoke(
+        distributed,
+        ["status", "job-1", "--api-key", "client-key", "--json-out", str(out)],
+    )
+
+    assert result.exit_code == 0, result.output
+    written = json.loads(out.read_text())
+    assert written["job_id"] == "job-1"
+    assert len(written["summary"]["workers"]) == 2
 
 
 def test_fleet_mode_sends_the_label_selector(monkeypatch):
