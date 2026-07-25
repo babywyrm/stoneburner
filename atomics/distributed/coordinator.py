@@ -360,10 +360,43 @@ class Coordinator:
             return timeout
         return 600
 
+    def _max_retries_for_job(self, request_json: str) -> int:
+        try:
+            payload = json.loads(request_json)
+        except json.JSONDecodeError:
+            return 2
+        retries = payload.get("max_retries", 2)
+        if isinstance(retries, int) and retries >= 0:
+            return retries
+        return 2
+
+    def _fail_pinned_slice(self, job_id: str, worker_id: str) -> None:
+        """Fail every unfinished assignment of this job pinned to one worker.
+
+        Pinned work is claimable only by its target, so once that host is judged
+        unable to finish, leaving the rest pending would hang the job behind a
+        worker that is never coming back. Failing the slice as a unit lets the job
+        resolve to PARTIAL with the host's losses visible, while its tasks are
+        still never executed anywhere else.
+        """
+        self._conn.execute(
+            "UPDATE distributed_assignments SET status = ?, completed_at = ? "
+            "WHERE job_id = ? AND target_worker_id = ? AND status IN (?, ?)",
+            (
+                AssignmentStatus.FAILED.value,
+                self._now(),
+                job_id,
+                worker_id,
+                AssignmentStatus.PENDING.value,
+                AssignmentStatus.ASSIGNED.value,
+            ),
+        )
+
     def _requeue_stale_assignments(self) -> None:
         rows = self._conn.execute(
             """
-            SELECT a.assignment_id, a.started_at, j.request_json, w.status
+            SELECT a.assignment_id, a.started_at, a.target_worker_id, a.job_id,
+                   a.retry_count, j.request_json, w.status
             FROM distributed_assignments a
             JOIN distributed_jobs j ON j.job_id = a.job_id
             LEFT JOIN workers w ON w.worker_id = a.worker_id
@@ -372,27 +405,60 @@ class Coordinator:
             (AssignmentStatus.ASSIGNED.value,),
         ).fetchall()
         now = datetime.now(UTC)
-        for assignment_id, started_at, request_json, worker_status in rows:
-            stale = False
-            if worker_status is None or worker_status == WorkerStatus.OFFLINE.value:
-                stale = True
-            elif started_at:
+        failed_jobs: set[str] = set()
+        for (
+            assignment_id,
+            started_at,
+            target_worker_id,
+            job_id,
+            retry_count,
+            request_json,
+            worker_status,
+        ) in rows:
+            worker_gone = (
+                worker_status is None or worker_status == WorkerStatus.OFFLINE.value
+            )
+            timed_out = False
+            if not worker_gone and started_at:
                 started = datetime.fromisoformat(started_at)
                 if started.tzinfo is None:
                     started = started.replace(tzinfo=UTC)
                 timeout = self._timeout_seconds_for_job(request_json)
-                if (now - started).total_seconds() > timeout:
-                    stale = True
-            if stale:
-                self._conn.execute(
-                    """
-                    UPDATE distributed_assignments
-                    SET status = ?, worker_id = NULL, started_at = NULL
-                    WHERE assignment_id = ?
-                    """,
-                    (AssignmentStatus.PENDING.value, assignment_id),
-                )
+                timed_out = (now - started).total_seconds() > timeout
+            if not (worker_gone or timed_out):
+                continue
+
+            if target_worker_id:
+                if worker_gone:
+                    # The host is definitively absent, so its whole slice dies
+                    # with it rather than waiting on a worker that has left.
+                    self._fail_pinned_slice(job_id, target_worker_id)
+                    failed_jobs.add(job_id)
+                    continue
+                if retry_count > self._max_retries_for_job(request_json):
+                    # Out of attempts on this task. Only this assignment fails:
+                    # the host is still heartbeating, so the rest of its slice
+                    # may well succeed.
+                    self._conn.execute(
+                        "UPDATE distributed_assignments "
+                        "SET status = ?, completed_at = ? WHERE assignment_id = ?",
+                        (AssignmentStatus.FAILED.value, self._now(), assignment_id),
+                    )
+                    failed_jobs.add(job_id)
+                    continue
+
+            self._conn.execute(
+                """
+                UPDATE distributed_assignments
+                SET status = ?, worker_id = NULL, started_at = NULL
+                WHERE assignment_id = ?
+                """,
+                (AssignmentStatus.PENDING.value, assignment_id),
+            )
         self._conn.commit()
+        # After failing work, the job may now be terminal.
+        for job_id in failed_jobs:
+            self._update_job_status(job_id)
 
     def recover_jobs(self) -> None:
         """Re-queue assigned work for offline workers or stale started_at."""
