@@ -215,6 +215,47 @@ prompts_file: "{prompts_file}"
         assert p.prompts == ["inline prompt"]
 
 
+# ── Committed examples ────────────────────────────────────────────────────────
+
+EXAMPLES_DIR = Path(__file__).resolve().parent.parent / "profiles" / "examples"
+
+
+def _example_profiles() -> list[Path]:
+    paths = sorted(EXAMPLES_DIR.glob("*.yaml"))
+    assert paths, f"no example profiles found in {EXAMPLES_DIR}"
+    return paths
+
+
+class TestCommittedExamples:
+    """The shipped examples are copy-paste templates, so they must actually load.
+
+    Every other test here builds profiles in-process from known-good keys, which
+    is why a committed example using a flat `url:`/`body:`/`response_field:`
+    schema shipped broken: the loader only reads `http.url`, `http.body_template`
+    and `response.text_field`.
+    """
+
+    @pytest.mark.parametrize("path", _example_profiles(), ids=lambda p: p.name)
+    def test_example_loads(self, path: Path):
+        profile = load_profile(str(path))
+        assert profile.name
+        if profile.type == "http":
+            assert profile.http_url
+        else:
+            assert profile.ollama_host
+
+    @pytest.mark.parametrize("path", _example_profiles(), ids=lambda p: p.name)
+    def test_example_body_template_substitutes_prompt(self, path: Path):
+        """A single-brace `{prompt}` looks right but is never substituted."""
+        profile = load_profile(str(path))
+        if profile.type != "http" or not profile.http_body_template:
+            pytest.skip("no HTTP body template to render")
+        rendered = render_body(profile, "a probe prompt")
+        assert "a probe prompt" in rendered
+        assert "prompt }}" not in rendered
+        json.loads(rendered)
+
+
 # ── Template rendering ────────────────────────────────────────────────────────
 
 
