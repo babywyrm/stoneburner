@@ -174,12 +174,13 @@ stoneburner/
 ├── atomics/              # Core Python package
 │   ├── api/              # HTTP API server (FastAPI) — runs, evals, reports, jobs
 │   ├── commands/         # Click command modules (auth, admin, benchmark, eval, security, load, api, worker, distributed)
-│   ├── distributed/      # Split-mode coordinator + worker (Phase 1)
+│   ├── distributed/      # Coordinator + worker for split and fleet runs
 │   │   ├── coordinator.py
 │   │   ├── models.py
 │   │   ├── worker_client.py
 │   │   ├── worker_runner.py
 │   │   ├── routes.py
+│   │   ├── rollup.py     # Per-worker aggregation of fleet results
 │   │   └── auth.py
 │   ├── core/             # Loop engine, task runner, rate/budget guard
 │   ├── eval/             # Evaluation framework (eval, adversarial, redblue)
@@ -191,7 +192,7 @@ stoneburner/
 │   └── cli.py            # Thin Click root — registers commands from commands/
 ├── profiles/             # Custom target profiles (local/ gitignored)
 ├── qa/                   # QA fixture suites (local/ gitignored)
-├── tests/                # 1709+ tests at 85% coverage
+├── tests/                # 1830+ tests at 87% coverage
 └── docs/                 # Detailed documentation
 ```
 
