@@ -82,6 +82,68 @@ async def test_execute_assignment_with_mock_provider():
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("task_spec_extra", "expected_provider", "expected_model"),
+    [
+        ({}, "ollama", "qwen3:14b"),
+        ({"provider": "vllm"}, "vllm", "qwen3:14b"),
+        ({"provider": "vllm", "model": "pinned-model"}, "vllm", "pinned-model"),
+        ({"model": "pinned-model"}, "ollama", "pinned-model"),
+    ],
+)
+async def test_pinned_provider_overrides_worker_default(
+    task_spec_extra: dict[str, str],
+    expected_provider: str,
+    expected_model: str,
+):
+    """A provider pinned on the task spec wins over the worker's own default."""
+    assignment = TaskAssignment(
+        assignment_id="a3",
+        job_id="j3",
+        task_spec={
+            "task_name": "general_qa/quick_question",
+            "prompt": "hello",
+            **task_spec_extra,
+        },
+    )
+    fake_result = TaskResult(
+        run_id="j3",
+        category=TaskCategory.GENERAL_QA,
+        task_name="quick_question",
+        provider="mock",
+        model=expected_model,
+        status=TaskStatus.SUCCESS,
+        response="ok",
+    )
+
+    with (
+        patch(
+            "atomics.distributed.worker_runner._make_provider",
+            return_value=MagicMock(name="provider"),
+        ) as make_provider,
+        patch(
+            "atomics.distributed.worker_runner.execute_task",
+            new_callable=AsyncMock,
+            return_value=fake_result,
+        ) as exec_task,
+        patch(
+            "atomics.distributed.worker_runner.load_settings",
+            return_value=MagicMock(name="settings"),
+        ),
+    ):
+        await execute_assignment(
+            assignment,
+            provider_name="ollama",
+            model="qwen3:14b",
+        )
+
+    assert make_provider.call_args.args[0] == expected_provider
+    assert make_provider.call_args.args[1] == expected_model
+    # The pinned model must also reach cost/token attribution, not just the client.
+    assert exec_task.await_args.kwargs["model"] == expected_model
+
+
+@pytest.mark.asyncio
 async def test_execute_assignment_builds_fallback_task():
     assignment = TaskAssignment(
         assignment_id="a2",

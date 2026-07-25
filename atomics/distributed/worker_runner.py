@@ -63,6 +63,22 @@ def _resolve_task_definition(task_spec: dict[str, Any]) -> tuple[TaskDefinition,
     return task, prompt
 
 
+def _pinned_execution(task_spec: dict[str, Any]) -> tuple[str | None, str | None]:
+    """Return the provider/model this assignment pinned, if any.
+
+    A pinned provider overrides the worker's own default so the submitter's
+    routing choice is honored. If the worker cannot build that provider,
+    `_make_provider` raises and the assignment fails loudly rather than
+    silently running somewhere else.
+    """
+    provider = task_spec.get("provider")
+    model = task_spec.get("model")
+    return (
+        provider if isinstance(provider, str) and provider else None,
+        model if isinstance(model, str) and model else None,
+    )
+
+
 def _serialize_result(result: Any) -> dict[str, Any]:
     """Return a JSON-serializable dict from a TaskResult or similar object."""
     if hasattr(result, "model_dump"):
@@ -84,6 +100,9 @@ async def execute_assignment(
 ) -> dict[str, Any]:
     """Execute a single distributed assignment and return a serializable result."""
     settings = settings or load_settings()
+    pinned_provider, pinned_model = _pinned_execution(assignment.task_spec)
+    provider_name = pinned_provider or provider_name
+    model = pinned_model or model
     provider = _make_provider(provider_name, model, host, settings)
     task, prompt = _resolve_task_definition(assignment.task_spec)
     logger.info(

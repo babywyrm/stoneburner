@@ -44,6 +44,47 @@ def test_get_job(client):
     assert resp.json()["job_id"] == job_id
 
 
+def _task_specs(client, job_id: str) -> list[dict]:
+    rows = client.app.state.coordinator._conn.execute(
+        "SELECT task_spec FROM distributed_assignments WHERE job_id = ?",
+        (job_id,),
+    ).fetchall()
+    return [json.loads(row[0]) for row in rows]
+
+
+def test_pinned_provider_travels_with_every_task_spec(client):
+    """A provider named on the run request must reach the workers executing it."""
+    resp = client.post(
+        "/api/v1/distributed/runs",
+        json={
+            "mode": "split",
+            "run_request": {
+                "iterations": 3,
+                "tier": "ez",
+                "provider": "vllm",
+                "model": "qwen3:14b",
+            },
+        },
+    )
+    assert resp.status_code == 202
+    specs = _task_specs(client, resp.json()["job_id"])
+    assert len(specs) == 3
+    assert all(spec["provider"] == "vllm" for spec in specs)
+    assert all(spec["model"] == "qwen3:14b" for spec in specs)
+
+
+def test_unpinned_run_leaves_provider_to_the_worker(client):
+    """Omitting a provider must not silently pin one — workers keep their own."""
+    resp = client.post(
+        "/api/v1/distributed/runs",
+        json={"mode": "split", "run_request": {"iterations": 1, "tier": "ez"}},
+    )
+    specs = _task_specs(client, resp.json()["job_id"])
+    assert specs
+    assert all("provider" not in spec for spec in specs)
+    assert all("model" not in spec for spec in specs)
+
+
 def test_distributed_run_uses_real_task_specs(client):
     resp = client.post(
         "/api/v1/distributed/runs",
