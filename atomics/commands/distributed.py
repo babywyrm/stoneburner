@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import click
 import httpx
 from rich.console import Console
+from rich.table import Table
 
 from atomics.commands.common import PROVIDER_CHOICES
 
@@ -84,15 +86,80 @@ def run(
     Console().print(f"Submitted distributed run: {data['job_id']}")
 
 
+def _render_fleet_table(job: dict, summary: dict) -> None:
+    """Print one row per host so the comparison is readable at a glance."""
+    table = Table(
+        title=f"Fleet run {job.get('job_id', '')} — {job.get('status', '')}"
+    )
+    table.add_column("Worker")
+    table.add_column("Labels")
+    table.add_column("Model")
+    table.add_column("Done", justify="right")
+    table.add_column("Failed", justify="right")
+    table.add_column("Mean ms", justify="right")
+    table.add_column("p95 ms", justify="right")
+    table.add_column("Tok/s", justify="right")
+    table.add_column("Cost USD", justify="right")
+    for worker in summary.get("workers", []):
+        labels = ",".join(f"{k}={v}" for k, v in (worker.get("labels") or {}).items())
+        failed = worker.get("failed", 0)
+        table.add_row(
+            str(worker.get("worker_id", "")),
+            labels or "-",
+            str(worker.get("model") or "-"),
+            str(worker.get("completed", 0)),
+            f"[red]{failed}[/red]" if failed else "0",
+            f"{worker.get('mean_latency_ms', 0.0)}",
+            f"{worker.get('p95_latency_ms', 0.0)}",
+            f"{worker.get('mean_tokens_per_second', 0.0)}",
+            f"{worker.get('estimated_cost_usd', 0.0)}",
+        )
+    console = Console()
+    console.print(table)
+    console.print(
+        f"Total: {summary.get('completed', 0)} completed, "
+        f"{summary.get('failed', 0)} failed, "
+        f"{summary.get('total_output_tokens', 0)} output tokens, "
+        f"${summary.get('estimated_cost_usd', 0.0)}"
+    )
+
+
 @distributed.command()
 @click.option("--coordinator", default="http://127.0.0.1:8000", show_default=True)
 @click.option("--api-key", envvar="ATOMICS_API_KEY", help="Client API key")
+@click.option(
+    "--json-out",
+    type=click.Path(dir_okay=False, writable=True, path_type=Path),
+    help="Write the job and its per-worker rollup to this file.",
+)
 @click.argument("job_id")
-def status(coordinator: str, api_key: str, job_id: str) -> None:
+def status(
+    coordinator: str, api_key: str, job_id: str, json_out: Path | None
+) -> None:
     """Check status of a distributed run."""
     if not api_key:
         raise click.UsageError("--api-key is required (or set ATOMICS_API_KEY)")
     headers = {"X-API-Key": api_key}
     resp = httpx.get(f"{coordinator}/api/v1/distributed/runs/{job_id}", headers=headers)
     resp.raise_for_status()
-    click.echo(json.dumps(resp.json(), indent=2))
+    job = resp.json()
+
+    summary = {}
+    raw_summary = job.get("summary_json")
+    if raw_summary:
+        try:
+            summary = json.loads(raw_summary)
+        except json.JSONDecodeError:
+            summary = {}
+
+    if json_out:
+        json_out.write_text(json.dumps({**job, "summary": summary}, indent=2))
+        Console().print(f"Wrote {json_out}")
+        return
+
+    # A fleet run's whole purpose is the per-host comparison, which does not read
+    # well as nested JSON. Split runs keep the machine-readable output they had.
+    if job.get("mode") == "fleet" and summary.get("workers"):
+        _render_fleet_table(job, summary)
+        return
+    click.echo(json.dumps(job, indent=2))

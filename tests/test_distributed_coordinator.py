@@ -514,6 +514,70 @@ def test_job_reports_partial_when_one_host_drops_out(coordinator):
     assert after.status == JobStatus.PARTIAL
 
 
+def test_a_finished_fleet_job_records_a_per_worker_summary(coordinator):
+    """summary_json existed since phase 1 with nothing ever writing to it."""
+    import json as _json
+
+    first = coordinator.register_worker(WorkerRegisterRequest(labels={"gpu": "4090"}))
+    second = coordinator.register_worker(WorkerRegisterRequest(labels={"gpu": "3060"}))
+    job = coordinator.create_fleet_job(
+        DistributedRunRequest(mode=JobMode.FLEET), [{"i": 1}], [first, second]
+    )
+
+    for worker, latency in ((first, 100.0), (second, 300.0)):
+        claimed = coordinator.claim_assignment(worker.worker_id)
+        assert claimed is not None
+        coordinator.submit_assignment(
+            claimed.assignment_id,
+            _json.dumps(
+                {
+                    "latency_ms": latency,
+                    "input_tokens": 10,
+                    "output_tokens": 20,
+                    "estimated_cost_usd": 0.01,
+                    "tokens_per_second": 25.0,
+                    "provider": "ollama",
+                    "model": "qwen3:14b",
+                }
+            ),
+        )
+
+    finished = coordinator.get_job(job.job_id)
+    assert finished is not None
+    assert finished.status == JobStatus.COMPLETED
+    assert finished.summary_json is not None
+
+    summary = _json.loads(finished.summary_json)
+    by_id = {w["worker_id"]: w for w in summary["workers"]}
+    assert set(by_id) == {first.worker_id, second.worker_id}
+    assert by_id[first.worker_id]["mean_latency_ms"] == 100.0
+    assert by_id[second.worker_id]["mean_latency_ms"] == 300.0
+    assert by_id[first.worker_id]["labels"] == {"gpu": "4090"}
+    assert summary["total_output_tokens"] == 40
+
+
+def test_a_summary_records_the_host_that_failed(coordinator):
+    good = coordinator.register_worker(WorkerRegisterRequest())
+    bad = coordinator.register_worker(WorkerRegisterRequest())
+    job = coordinator.create_fleet_job(
+        DistributedRunRequest(mode=JobMode.FLEET), [{"i": 1}], [good, bad]
+    )
+    claimed = coordinator.claim_assignment(good.worker_id)
+    assert claimed is not None
+    coordinator.submit_assignment(claimed.assignment_id, '{"latency_ms": 50}')
+    _go_silent(coordinator, bad.worker_id)
+    coordinator._requeue_stale_assignments()
+
+    import json as _json
+
+    finished = coordinator.get_job(job.job_id)
+    assert finished is not None
+    summary = _json.loads(finished.summary_json)
+    by_id = {w["worker_id"]: w for w in summary["workers"]}
+    assert by_id[bad.worker_id]["failed"] == 1
+    assert by_id[good.worker_id]["completed"] == 1
+
+
 def test_submit_assignment_completes_job(coordinator):
     w = coordinator.register_worker(WorkerRegisterRequest())
     job = coordinator.create_split_job(
