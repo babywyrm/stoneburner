@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- The fleet status table was unreadable at the default 80-column width. Nine columns left Rich shrinking each one until a worker id rendered as `5b5fc…` and a label as `box=a…`, so the table could not answer which host was faster — the only question fleet mode exists to answer. Identifiers now wrap instead of truncating, and the model moves to the caption when every host ran the same one, which is the usual case for a comparison and buys back a column. Found by running a real coordinator and two real worker processes; the unit test had used short synthetic worker ids (`host-a`) that never triggered truncation, and now uses realistic 12-hex ids.
+
 ## 0.13.0 (2026-07-25) — Distributed fleet mode, coordinator auth
 
 ### Upgrade notes

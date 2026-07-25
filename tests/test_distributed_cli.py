@@ -144,7 +144,9 @@ _FLEET_STATUS = {
         {
             "workers": [
                 {
-                    "worker_id": "host-a",
+                    # Realistic 12-hex id: short synthetic names hid the fact
+                    # that Rich was truncating every column to unreadability.
+                    "worker_id": "5b5fc1a2d3e4",
                     "labels": {"gpu": "4090"},
                     "completed": 4,
                     "failed": 0,
@@ -158,7 +160,7 @@ _FLEET_STATUS = {
                     "model": "qwen3:14b",
                 },
                 {
-                    "worker_id": "host-b",
+                    "worker_id": "683d3f5b7c8a",
                     "labels": {"gpu": "3060"},
                     "completed": 2,
                     "failed": 2,
@@ -193,8 +195,13 @@ def test_fleet_status_prints_a_row_per_host(monkeypatch):
     )
 
     assert result.exit_code == 0, result.output
-    assert "host-a" in result.output
-    assert "host-b" in result.output
+    # Identifiers must survive intact at the default 80-column width. Truncated
+    # to "5b5fc…" and "box=a…" the table cannot answer which host was faster,
+    # which is the only reason fleet mode exists.
+    assert "5b5fc1a2d3e4" in result.output
+    assert "683d3f5b7c8a" in result.output
+    assert "gpu=4090" in result.output
+    assert "gpu=3060" in result.output
     # The comparison is the point: both hosts' latencies must be visible.
     assert "120.5" in result.output
     assert "480.0" in result.output
