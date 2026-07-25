@@ -391,6 +391,26 @@ def test_a_recently_seen_worker_stays_online(coordinator):
     assert coordinator.get_worker(worker.worker_id).status == WorkerStatus.ONLINE
 
 
+def test_the_absence_threshold_is_configurable(coordinator):
+    """An operator running slow heartbeats must be able to widen the window.
+
+    `atomics worker --heartbeat-interval` is a flag, but the threshold was fixed
+    at four times its *default*, so a worker configured with a 300s interval got
+    declared absent and had its pinned fleet work failed while behaving exactly
+    as told.
+    """
+    patient = Coordinator(coordinator._conn, worker_absent_after_seconds=900)
+    worker = patient.register_worker(WorkerRegisterRequest())
+    _go_silent(patient, worker.worker_id, seconds=600)
+
+    patient._mark_absent_workers()
+
+    assert patient.get_worker(worker.worker_id).status == WorkerStatus.ONLINE
+    # Same database, default threshold: the 600s silence is over the line.
+    coordinator._mark_absent_workers()
+    assert coordinator.get_worker(worker.worker_id).status == WorkerStatus.OFFLINE
+
+
 def test_a_silent_host_is_not_handed_a_new_fleet_slice(coordinator):
     alive = coordinator.register_worker(WorkerRegisterRequest(labels={"gpu": "4090"}))
     silent = coordinator.register_worker(WorkerRegisterRequest(labels={"gpu": "4090"}))

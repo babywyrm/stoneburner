@@ -25,8 +25,26 @@ from atomics.distributed.rollup import AssignmentRecord, build_rollup
 class Coordinator:
     """Manage workers, jobs, and task assignments in SQLite."""
 
-    def __init__(self, conn: Connection) -> None:
+    # Roughly four missed heartbeats at the worker's default 30s interval. Chosen
+    # to be forgiving: the cost of declaring a live worker absent is failing work
+    # it could have finished, while the cost of waiting is only a slower verdict.
+    WORKER_ABSENT_AFTER_SECONDS = 120.0
+
+    def __init__(
+        self,
+        conn: Connection,
+        *,
+        worker_absent_after_seconds: float | None = None,
+    ) -> None:
         self._conn = conn
+        # Overridable because the worker's heartbeat interval is: a fixed 120s
+        # threshold declares a worker on `--heartbeat-interval 300` absent and
+        # fails its pinned fleet work, though it is behaving as configured.
+        self._absent_after_seconds = (
+            self.WORKER_ABSENT_AFTER_SECONDS
+            if worker_absent_after_seconds is None
+            else worker_absent_after_seconds
+        )
 
     def _now(self) -> str:
         return datetime.now(UTC).isoformat()
@@ -398,11 +416,6 @@ class Coordinator:
             return timeout
         return 600
 
-    # Roughly four missed heartbeats at the worker's default 30s interval. Chosen
-    # to be forgiving: the cost of declaring a live worker absent is failing work
-    # it could have finished, while the cost of waiting is only a slower verdict.
-    WORKER_ABSENT_AFTER_SECONDS = 120
-
     def _mark_absent_workers(self) -> None:
         """Mark online workers that have stopped heartbeating as offline.
 
@@ -411,7 +424,7 @@ class Coordinator:
         claimable only by their target, so an absent target means a job waiting on
         a host that is never coming back.
         """
-        cutoff = datetime.now(UTC) - timedelta(seconds=self.WORKER_ABSENT_AFTER_SECONDS)
+        cutoff = datetime.now(UTC) - timedelta(seconds=self._absent_after_seconds)
         self._conn.execute(
             "UPDATE workers SET status = ? "
             "WHERE status = ? AND last_seen_at IS NOT NULL AND last_seen_at < ?",
