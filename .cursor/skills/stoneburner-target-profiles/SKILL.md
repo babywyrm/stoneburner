@@ -51,15 +51,40 @@ uv run atomics scenario --file scenario.yaml
 
 ## HTTP Profile Checklist
 
-For `type: http`, define:
+For `type: http`, nest the transport under `http:` and the parsing under
+`response:`. Flat top-level keys are silently ignored by the loader, which then
+rejects the profile with `http type requires http.url`.
 
-- `url`: local/private target URL in `profiles/local/`, sanitized placeholder in
-  committed examples
-- `method`: usually `POST`
-- `headers`: include auth only in local profiles
-- `body`: request template with `{prompt}`
-- `response_field`: dot-path to the model/application response text
-- `latency_field`: optional dot-path for app-reported latency
+```yaml
+name: my-gate
+type: http
+model: app-managed
+http:
+  url: http://gate-host:8080/api/ask
+  method: POST
+  headers:
+    Content-Type: application/json
+  body_template: |
+    {"query": "{{ prompt }}", "stream": false}
+  timeout: 30
+response:
+  format: json
+  text_field: response
+  latency_field: ""
+```
+
+- `http.url`: local/private target URL in `profiles/local/`, sanitized
+  placeholder in committed examples
+- `http.method`: usually `POST`
+- `http.headers`: include auth only in local profiles
+- `http.body_template`: request template using `{{ prompt }}`, `{{ model }}`,
+  `{{ num_predict }}` — double braces, single braces are not substituted
+- `response.text_field`: top-level key holding the response text. Nested
+  dot-paths are not supported; leave empty to auto-detect
+  `response`/`text`/`result`/`output`/`decision`/`message`, which falls back to
+  the whole JSON body when none match
+- `response.latency_field`: optional top-level key for app-reported latency in
+  ms; empty means measure round-trip time
 - `classify`: optional named pattern buckets for drift detection
 
 ## Classification Guidance
