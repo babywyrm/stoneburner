@@ -72,7 +72,12 @@ curl -H "X-API-Key: $ATOMICS_API_KEY" -H "Content-Type: application/json" \
 
 ## Distributed Runs
 
-Split benchmark work across multiple worker processes that poll a coordinator (the atomics API server). Phase 1 supports **split mode** only: the coordinator divides a run into task assignments; workers claim, execute, and report results. Full-run and fleet modes are future work.
+Spread benchmark work across multiple worker processes that poll a coordinator (the atomics API server). Workers claim, execute, and report assignments; two modes decide how the work is divided:
+
+- **split** — the coordinator divides one run into task assignments and any worker takes the next. Use it to finish a run faster.
+- **fleet** — every worker matching a label selector receives the identical task set. Use it to compare hosts.
+
+`full` (one worker runs an entire run) is declared but unimplemented and rejected.
 
 ### Coordinator / worker model
 

@@ -9,6 +9,7 @@ from pathlib import Path
 
 from fastapi import FastAPI
 
+from atomics import __version__
 from atomics.api.auth import ApiKeyAuth, NoAuth
 from atomics.api.config import ServerSettings
 from atomics.api.jobs import JobManager
@@ -54,7 +55,7 @@ def create_app(
         settings = replace(settings, db_path=db_path)
     app = FastAPI(
         title="atomics API",
-        version="0.12.0",
+        version=__version__,
         lifespan=lifespan,
     )
     app.state.settings = settings
