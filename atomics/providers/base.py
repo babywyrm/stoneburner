@@ -5,7 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
-from atomics.eval.outcomes import ProviderOutcome
+from atomics.providers.outcomes import ProviderOutcome
 
 
 @dataclass
