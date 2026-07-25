@@ -21,8 +21,12 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      # The api extra is required, not optional: tests/test_api_*.py and
+      # tests/test_distributed_*.py import fastapi at module scope, so without
+      # it collection errors out. The openai/bedrock/rag extras stay out — those
+      # tests skip themselves cleanly and rag pulls the full torch stack.
       - name: Sync dependencies
-        run: uv sync --extra dev
+        run: uv sync --extra dev --extra api
 
       - name: Lint
         run: uv run ruff check atomics/ tests/ --ignore E501
@@ -30,5 +34,10 @@ jobs:
       - name: Type check
         run: uv run mypy atomics/
 
+      # addopts in pyproject supplies --cov=atomics --cov-report=term-missing.
+      # The floor is deliberately below current coverage (86.8%) so it catches
+      # regressions rather than blocking unrelated work; raise it as coverage
+      # improves. Focused local runs stay ungated because the threshold lives
+      # here rather than in addopts.
       - name: Run tests
-        run: uv run pytest --override-ini="addopts=" -q --tb=short
+        run: uv run pytest -q --tb=short --cov-fail-under=85
