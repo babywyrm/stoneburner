@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- `RELEASING.md` — the release process, versioning and tag conventions, and the known issues in the current pipeline. There was no documented process, which is how the inconsistencies below accumulated.
+- `scripts/changelog_section.py` extracts a version's section from this file, and the release workflow now publishes that instead of asking GitHub to summarize commits. A tag with no changelog section fails the release rather than publishing an empty one.
+- `scripts/sync_releases.py` reconciles already-published GitHub releases with the changelog. Dry run by default; leaves hand-written release notes alone unless told otherwise.
+- Two tests guarding the drift that is invisible until release day: every tag has usable release notes, and every documented version was actually tagged.
+
+### Fixed
+- **Release notes were published empty.** The workflow used `generate_release_notes`, which diffs against the previous tag — but it also force-moves a floating `v0` tag to each new release, so GitHub compared `v0` against the tag being released, found nothing between them, and published a body containing only a compare link. `v0.8.0`, `v0.12.0`, `v0.13.0` and `v0.13.1` each shipped with carefully written changelog entries and a blank release. Release titles came from the tag alone, so they read `v0.13.1` rather than naming what changed.
+- **`0.11.0` was documented but never tagged.** The version was bumped in `pyproject.toml` and written up here, and no tag or release was ever created, leaving no point in history you could check out for it. Now tagged on the commit that set the version, dated to match.
+
 ## 0.13.1 (2026-07-25) — Fixes found by running it for real
 
 Everything here was found by `scripts/smoke_fleet.py`, a new local harness that

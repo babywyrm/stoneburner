@@ -230,6 +230,7 @@ no credentials and no model, and touches no real database.
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Layer map, primitives, contributor guide |
 | [SECURITY.md](SECURITY.md) | Operational security considerations |
 | [CHANGELOG.md](CHANGELOG.md) | Version history |
+| [RELEASING.md](RELEASING.md) | Release process, versioning and tag conventions |
 | [ROADMAP.md](ROADMAP.md) | Priorities and future directions |
 | [docs/CLI_REFERENCE.md](docs/CLI_REFERENCE.md) | Full CLI command reference |
 | [docs/SECURITY_SUITES.md](docs/SECURITY_SUITES.md) | Security evaluation suites |
