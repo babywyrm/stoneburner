@@ -4,9 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import csv
-import json
 import math
-import os
 import sys
 import time
 from datetime import datetime
@@ -14,7 +12,6 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from atomics.config import load_settings
 from atomics.providers.ollama import OllamaProvider
 from atomics.sweep import run_model_sweep
 
@@ -40,7 +37,6 @@ def _stats(values: list[float]) -> dict:
 
 
 async def main() -> None:
-    settings = load_settings()
     outdir = Path(f"data/variance_sweep_{datetime.now():%Y%m%d_%H%M%S}")
     outdir.mkdir(parents=True, exist_ok=True)
 
@@ -51,7 +47,7 @@ async def main() -> None:
 
     judge = OllamaProvider(host=HOST, default_model="qwen2.5:7b")
 
-    print(f"=== Variance Sweep ===")
+    print("=== Variance Sweep ===")
     print(f"Models: {', '.join(MODELS)}")
     print(f"Fixtures: {', '.join(FIXTURES)}")
     print(f"Runs: {RUNS}")
@@ -114,13 +110,15 @@ async def main() -> None:
     summary_lines: list[str] = []
 
     for model in MODELS:
-        q = _stats(all_results[model])
-        l = _stats(all_latencies[model])
+        quality = _stats(all_results[model])
+        latency = _stats(all_latencies[model])
         lines = [
-            f"",
-            f"--- {model} ({q['n']} runs) ---",
-            f"  Quality:  mean={q['mean']:.1f}%  stddev={q['stddev']:.1f}%  min={q['min']:.0f}%  max={q['max']:.0f}%",
-            f"  Latency:  mean={l['mean']:.0f}ms  stddev={l['stddev']:.0f}ms  min={l['min']:.0f}ms  max={l['max']:.0f}ms",
+            "",
+            f"--- {model} ({quality['n']} runs) ---",
+            f"  Quality:  mean={quality['mean']:.1f}%  stddev={quality['stddev']:.1f}%"
+            f"  min={quality['min']:.0f}%  max={quality['max']:.0f}%",
+            f"  Latency:  mean={latency['mean']:.0f}ms  stddev={latency['stddev']:.0f}ms"
+            f"  min={latency['min']:.0f}ms  max={latency['max']:.0f}ms",
         ]
         for line in lines:
             print(line)
