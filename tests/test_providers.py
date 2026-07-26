@@ -159,3 +159,48 @@ def test_providers_init_unknown_attr():
     import atomics.providers as p
     with pytest.raises(AttributeError, match="no attribute"):
         _ = p.NonExistentProvider
+
+
+def test_providers_declare_no_tool_support_by_default():
+    """Nine providers do not implement tools and must keep working untouched.
+
+    supports_tools is a plain class attribute and generate_with_tools is a
+    concrete method that raises. An @abstractmethod here would break every
+    existing provider at instantiation.
+    """
+    assert BaseProvider.supports_tools is False
+
+
+def test_tool_calls_defaults_to_empty_so_existing_construction_sites_hold():
+    """62 construction sites across 34 files must stay valid."""
+    from atomics.providers.base import ProviderResponse
+
+    resp = ProviderResponse(
+        text="hi", input_tokens=1, output_tokens=1, total_tokens=2,
+        model="m", latency_ms=1.0, estimated_cost_usd=0.0,
+    )
+    assert resp.tool_calls == ()
+
+
+@pytest.mark.asyncio
+async def test_generate_with_tools_raises_a_clear_error_when_unsupported():
+    """The error must name the provider, so a run never reads the absence of a
+    tool call as resistance.
+
+    Uses a minimal subclass rather than a real provider: the point is the base
+    class's default, and a real provider will have overridden it.
+    """
+
+    class ToollessProvider(BaseProvider):
+        @property
+        def name(self) -> str:  # pragma: no cover - not the subject
+            return "toolless"
+
+        async def generate(self, prompt, **kwargs):  # pragma: no cover - unused
+            raise AssertionError("not called")
+
+        async def health_check(self) -> bool:  # pragma: no cover - unused
+            raise AssertionError("not called")
+
+    with pytest.raises(NotImplementedError, match="does not support tool calling"):
+        await ToollessProvider().generate_with_tools("hi", tools=[])
