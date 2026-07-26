@@ -12,6 +12,7 @@ from atomics.commands import eval as eval_commands
 from atomics.commands import load as load_commands
 from atomics.commands import rag as rag_commands
 from atomics.commands import security as security_commands
+from atomics.commands import toolcall as toolcall_commands
 from atomics.commands import worker as worker_commands
 from atomics.commands.auth import login, logout, secrets_group, whoami
 from atomics.commands.common import setup_logging
@@ -35,6 +36,7 @@ def cli(ctx: click.Context, verbose: bool, progress: bool) -> None:
 
 cli.add_command(security_commands.refusal)
 cli.add_command(security_commands.codereview)
+cli.add_command(toolcall_commands.toolcall)
 cli.add_command(login)
 cli.add_command(logout)
 cli.add_command(whoami)

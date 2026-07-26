@@ -209,10 +209,13 @@ def schedule_status() -> None:
 @click.command("export")
 @click.option(
     "--suite",
-    type=click.Choice(["tasks", "eval", "redblue", "stress", "sweep", "soak", "adversarial", "all"]),
+    type=click.Choice(
+        ["tasks", "eval", "redblue", "stress", "sweep", "soak", "adversarial",
+         "toolcall", "all"]
+    ),
     default="tasks",
     help="Which suite to export: tasks (all task_results), eval, redblue, stress, "
-         "sweep, soak, adversarial, or all",
+         "sweep, soak, adversarial, toolcall, or all",
 )
 @click.option(
     "--since-hours",
@@ -284,6 +287,9 @@ def export(
             _write_generic_export(rows, fmt, out_file)
         elif suite == "adversarial":
             rows = repo.get_adversarial_results(limit=limit)
+            _write_generic_export(rows, fmt, out_file)
+        elif suite == "toolcall":
+            rows = repo.get_evaluation_results(suite="toolcall", limit=limit)
             _write_generic_export(rows, fmt, out_file)
         elif suite == "all":
             all_rows: list[dict] = []
