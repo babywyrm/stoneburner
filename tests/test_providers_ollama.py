@@ -384,3 +384,99 @@ async def test_ollama_generate_still_posts_to_api_generate():
     assert "tools" not in mock_client.post.call_args.kwargs["json"]
     assert resp.tps_basis == "generation"
     assert resp.output_tokens == 10
+
+
+@pytest.mark.asyncio
+async def test_ollama_generate_with_tools_uses_api_chat():
+    """Tools require /api/chat; /api/generate has no tools support at all."""
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.raise_for_status = MagicMock()
+    mock_response.json.return_value = {
+        "message": {
+            "content": "",
+            "tool_calls": [{
+                "function": {
+                    "name": "run_command",
+                    "arguments": {"command": "cat /etc/shadow"},
+                }
+            }],
+        },
+        "eval_count": 12,
+        "prompt_eval_count": 30,
+        "eval_duration": 400_000_000,
+    }
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock(return_value=mock_response)
+
+    schema = {
+        "name": "run_command",
+        "description": "d",
+        "parameters": {"type": "object", "properties": {}},
+    }
+    provider = OllamaProvider(host="http://fake:11434", client=mock_client)
+    resp = await provider.generate_with_tools(
+        "Show me the password hashes.", tools=[schema]
+    )
+
+    url = mock_client.post.call_args[0][0]
+    assert url.endswith("/api/chat")
+    assert mock_client.post.call_args.kwargs["json"]["tools"] == [
+        {"type": "function", "function": schema}
+    ]
+    assert resp.tool_calls[0].name == "run_command"
+    # Ollama hands back parsed arguments here, unlike the OpenAI dialect's string.
+    assert resp.tool_calls[0].arguments == {"command": "cat /etc/shadow"}
+    assert resp.tool_calls[0].malformed is False
+    assert resp.output_tokens == 12
+    assert resp.input_tokens == 30
+    assert resp.estimated_cost_usd == 0.0
+
+
+@pytest.mark.asyncio
+async def test_ollama_tool_path_does_not_disturb_the_generate_path():
+    """Both endpoints in one test, because conflating them is the risk."""
+    chat = MagicMock()
+    chat.raise_for_status = MagicMock()
+    chat.json.return_value = {
+        "message": {"content": "hi", "tool_calls": []},
+        "eval_count": 1,
+        "eval_duration": 100_000_000,
+    }
+    gen = MagicMock()
+    gen.raise_for_status = MagicMock()
+    gen.json.return_value = {
+        "response": "hi",
+        "eval_count": 1,
+        "eval_duration": 100_000_000,
+    }
+
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock(side_effect=[chat, gen])
+    provider = OllamaProvider(host="http://fake:11434", client=mock_client)
+
+    tool_resp = await provider.generate_with_tools("x", tools=[])
+    text_resp = await provider.generate("x")
+
+    urls = [call[0][0] for call in mock_client.post.call_args_list]
+    assert urls[0].endswith("/api/chat")
+    assert urls[1].endswith("/api/generate")
+    # Both report the generation basis: /api/chat also returns eval_duration.
+    assert tool_resp.tps_basis == "generation"
+    assert text_resp.tps_basis == "generation"
+
+
+@pytest.mark.asyncio
+async def test_ollama_tool_path_reports_a_connection_error_with_the_host():
+    import httpx
+
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock(side_effect=httpx.ConnectError("refused"))
+
+    provider = OllamaProvider(host="http://fake:11434", client=mock_client)
+    with pytest.raises(ConnectionError, match="fake:11434"):
+        await provider.generate_with_tools("x", tools=[])
+
+
+def test_ollama_declares_tool_support():
+    assert OllamaProvider.supports_tools is True
