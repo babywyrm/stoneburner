@@ -20,7 +20,12 @@ Three tests enforce the parts that can silently rot, all in
 - `test_every_released_tag_has_release_notes` — a tag with no changelog section
   would publish an empty release.
 - `test_every_documented_version_is_tagged` — a changelog entry nobody tagged.
-  This is how `0.11.0` was documented, bumped, and never released.
+  This is how `0.11.0` was documented, bumped, and never released. It exempts the
+  version being cut right now — the newest entry, when it is also the version
+  `pyproject.toml` declares and no tag exists yet — because step 3 below runs
+  before step 5, so every correct release passes through that state. The
+  exemption lapses as soon as a later version is documented on top of an
+  untagged one, which is the shape `0.11.0` actually had.
 - `test_no_version_ever_shipped_undocumented` — a version that appeared in
   `pyproject.toml` and never got written up at all. `0.4.0` and `0.5.0` went
   undocumented this way, leaving an unexplained jump from 0.3.0 to 0.6.0.
