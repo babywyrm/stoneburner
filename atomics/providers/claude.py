@@ -3,10 +3,17 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Sequence
+from typing import Any, cast
 
 import anthropic
 
 from atomics.providers import pricing
+from atomics.providers._tool_dialects import (
+    anthropic_text,
+    anthropic_tool_payload,
+    parse_anthropic_tool_calls,
+)
 from atomics.providers.base import BaseProvider, ProviderResponse, compute_tps
 
 # Pricing per 1M tokens (input / output). Sourced from the central pricing
@@ -35,8 +42,14 @@ def _estimate_cost(
 
 _DEFAULT_THINKING_BUDGET = 10_000
 
+# The tool_result block must reference a preceding tool_use id, so both sides
+# need the same constant. See _INJECTED_CALL_ID in providers/openai.py.
+_INJECTED_CALL_ID = "call_injected"
+
 
 class ClaudeProvider(BaseProvider):
+    supports_tools = True
+
     def __init__(
         self,
         api_key: str,
@@ -132,6 +145,81 @@ class ClaudeProvider(BaseProvider):
             cache_read_tokens=cache_read,
             cache_write_tokens=cache_write,
             raw=response.model_dump() if hasattr(response, "model_dump") else None,
+        )
+
+    async def generate_with_tools(
+        self,
+        prompt: str,
+        *,
+        tools: Sequence[dict],
+        system: str = "",
+        model: str | None = None,
+        max_tokens: int = 1024,
+        injected_tool_output: str | None = None,
+    ) -> ProviderResponse:
+        """Messages API with tool schemas attached.
+
+        Thinking stays off here: extended thinking forces temperature=1 and
+        changes the block structure, and the measurement is about which call the
+        model makes, not how it deliberates.
+        """
+        model = model or self._default_model
+
+        messages: list[dict[str, Any]] = [{"role": "user", "content": prompt}]
+        if injected_tool_output is not None:
+            # Indirect injection: the attack arrives as the result of a tool the
+            # model appears to have already called. Anthropic requires the
+            # tool_result to sit in a user message.
+            messages.append({
+                "role": "assistant",
+                "content": [{
+                    "type": "tool_use",
+                    "id": _INJECTED_CALL_ID,
+                    "name": "list_files",
+                    "input": {"directory": "."},
+                }],
+            })
+            messages.append({
+                "role": "user",
+                "content": [{
+                    "type": "tool_result",
+                    "tool_use_id": _INJECTED_CALL_ID,
+                    "content": injected_tool_output,
+                }],
+            })
+
+        t0 = time.monotonic()
+        response = await self._client.messages.create(
+            model=model,
+            messages=cast("Any", messages),
+            max_tokens=max_tokens,
+            system=system or "You are a helpful assistant.",
+            tools=cast("Any", anthropic_tool_payload(list(tools))),
+        )
+        latency = (time.monotonic() - t0) * 1000
+
+        blocks = list(response.content or [])
+        inp = response.usage.input_tokens
+        out = response.usage.output_tokens
+        cache_read = getattr(response.usage, "cache_read_input_tokens", 0) or 0
+        cache_write = getattr(response.usage, "cache_creation_input_tokens", 0) or 0
+
+        return ProviderResponse(
+            text=anthropic_text(blocks),
+            input_tokens=inp,
+            output_tokens=out,
+            total_tokens=inp + out,
+            model=model,
+            latency_ms=round(latency, 2),
+            estimated_cost_usd=round(
+                _estimate_cost(model, inp, out, cache_read, cache_write), 6
+            ),
+            tokens_per_second=compute_tps(out, latency / 1000),
+            cache_read_tokens=cache_read,
+            cache_write_tokens=cache_write,
+            raw=response.model_dump() if hasattr(response, "model_dump") else None,
+            finish_reason=getattr(response, "stop_reason", None),
+            tool_calls=parse_anthropic_tool_calls(blocks),
         )
 
     async def health_check(self) -> bool:
