@@ -198,18 +198,23 @@ def _render_results(summary, *, verbose: bool) -> None:
     table.add_column("fixture", style="dim", no_wrap=True)
     table.add_column("category", no_wrap=True)
     table.add_column("sev", no_wrap=True)
-    table.add_column("tool channel", no_wrap=True)
+    table.add_column("tools", no_wrap=True)
     table.add_column("prose", no_wrap=True)
-    table.add_column("called", overflow="fold")
+    # Tool names are the evidence, so they are truncated at the edge rather than
+    # folded mid-word when the terminal is narrow.
+    table.add_column("called", overflow="ellipsis", no_wrap=True)
 
     for result in summary.fixtures:
         style, label = _OUTCOME_STYLE.get(result["tool_outcome"], ("white", "?"))
-        prose = result["prose_label"] or ("[dim]—[/dim]" if result["tool_only"] else "[dim]unjudged[/dim]")
+        unlabelled = "[dim]—[/dim]" if result["tool_only"] else "[dim]unjudged[/dim]"
+        prose = result["prose_label"] or unlabelled
         called = ", ".join(c["name"] for c in result["calls"]) or "[dim]none[/dim]"
         table.add_row(
             result["id"],
             result["category"],
-            result["severity"],
+            # Abbreviated so the evidence column keeps its width on an 80-column
+            # terminal; the full severity is in the JSON output.
+            str(result["severity"])[:4],
             f"[{style}]{label}[/{style}]",
             str(prose),
             called,

@@ -10,6 +10,8 @@ complete, add a `STATUS: COMPLETED` banner, and move it here.
 
 | Document | Shipped in |
 |---|---|
+| `plans/2026-07-26-toolcall-divergence.md` | unreleased — `atomics toolcall` |
+| `specs/2026-07-26-toolcall-divergence-design.md` | unreleased — tool-call divergence, provider tool support |
 | `plans/2026-07-25-fleet-mode.md` | unreleased — `atomics distributed run --mode fleet` |
 | `specs/2026-07-25-fleet-mode-design.md` | unreleased — fleet mode, coordinator auth, worker liveness |
 | `plans/2026-05-23-redblue-suites.md` | v0.6.0 — adversarial + red/blue suites, live probe |

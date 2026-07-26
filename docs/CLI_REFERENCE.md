@@ -55,6 +55,11 @@ Full command reference for `atomics`. See also [QUICKSTART.md](../QUICKSTART.md)
 | `atomics adversarial --compare mistral-small:24b` | Run a second model, print per-fixture diff |
 | `atomics adversarial --json-out run.json` | Write full per-fixture results as JSON |
 | `atomics adversarial --fail-on-resilience 60` | CI gate — non-zero exit if resilience < 60% |
+| `atomics toolcall` | Tool-call divergence — refuses in prose, complies via function call (20 fixtures). Calls are never executed |
+| `atomics toolcall --category exfil --verbose` | Run one category and print the arguments the model asked for |
+| `atomics toolcall --channel tools` | Tool channel only — deterministic, needs no judge |
+| `atomics toolcall --runs 3` | Three passes per fixture, modal outcome reported |
+| `atomics toolcall --no-skip-incapable` | Non-zero exit if the model cannot emit tool calls (for sweeps) |
 | `atomics refusal` | Refusal-calibration eval — over- vs under-refusal |
 | `atomics codereview` | Secure-code-review eval — planted-vuln detection + false positives |
 | `atomics redblue --mode all` | Red/blue security capability eval (offensive + defensive) |
