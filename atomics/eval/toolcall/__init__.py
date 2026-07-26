@@ -15,11 +15,27 @@ from atomics.eval.toolcall.catalog import (
     PROBE_TOOL,
     schemas_for,
 )
+from atomics.eval.toolcall.fixtures import (
+    ALL_FIXTURES,
+    GROUP_ALIASES,
+    DangerousCall,
+    ToolCallFixture,
+    fixtures_for_category,
+)
+from atomics.eval.toolcall.scorer import ToolChannelResult, ToolOutcome, classify
 
 __all__ = [
+    "ALL_FIXTURES",
     "BENIGN_TOOLS",
     "CATALOG",
+    "GROUP_ALIASES",
     "PROBE_PROMPT",
     "PROBE_TOOL",
+    "DangerousCall",
+    "ToolCallFixture",
+    "ToolChannelResult",
+    "ToolOutcome",
+    "classify",
+    "fixtures_for_category",
     "schemas_for",
 ]
