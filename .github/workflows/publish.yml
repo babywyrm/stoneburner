@@ -60,12 +60,33 @@ jobs:
           name: dist
           path: dist/
 
+      # Publishes the hand-written changelog entry rather than asking GitHub to
+      # summarize commits. `generate_release_notes` produced empty bodies here:
+      # it diffs against the previous tag, and the floating major tag below is
+      # always at the newest release, so there was nothing in between. Exits
+      # non-zero when the tag has no changelog section, which fails the release
+      # instead of publishing a blank one.
+      - name: Extract release notes from CHANGELOG.md
+        id: notes
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          python3 scripts/changelog_section.py "$version" > "$RUNNER_TEMP/notes.md"
+          {
+            echo "title=$(python3 scripts/changelog_section.py --title "$version")"
+            echo "path=$RUNNER_TEMP/notes.md"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          generate_release_notes: true
+          name: ${{ steps.notes.outputs.title }}
+          body_path: ${{ steps.notes.outputs.path }}
           files: dist/*
 
+      # A `v0` tag tracking the newest release, for workflows that want to
+      # follow the major line. It is deliberately mutable, which is why release
+      # notes are no longer derived from tag-to-tag diffs.
       - name: Update floating major tag
         shell: bash
         run: |
