@@ -216,6 +216,66 @@ def test_no_version_ever_shipped_undocumented():
     assert not unaccounted, f"versions with no changelog entry or note: {unaccounted}"
 
 
+def _pyproject_version() -> str:
+    for line in (REPO / "pyproject.toml").read_text(encoding="utf-8").splitlines():
+        if line.startswith("version = "):
+            return line.split("=", 1)[1].strip().strip('"')
+    raise AssertionError("pyproject.toml declares no version")
+
+
+def _release_in_progress(
+    documented: list[str], tagged: set[str], current: str
+) -> str | None:
+    """The version being cut right now, if that is what we are looking at.
+
+    RELEASING.md has you write the changelog and bump the version, *then* run
+    this suite, then tag. So the newest entry is legitimately untagged for the
+    length of that verification, and without this the guard below fails on every
+    correct release — which is how a guard gets ignored, defeating the point of
+    having it.
+
+    Narrow deliberately: the version must be both the newest entry and the one
+    pyproject currently declares. 0.11.0's failure mode still gets caught,
+    because the exemption lapses the moment any later version is documented on
+    top of an untagged one, which is what actually happened there.
+    """
+    if not documented:
+        return None
+    newest = documented[0]
+    if newest in tagged or newest != current:
+        return None
+    return newest
+
+
+class TestReleaseInProgress:
+    """The exemption is load-bearing in both directions, so both are pinned."""
+
+    def test_the_version_being_cut_is_exempt(self):
+        assert (
+            _release_in_progress(["0.14.0", "0.13.1"], {"0.13.1"}, "0.14.0")
+            == "0.14.0"
+        )
+
+    def test_nothing_is_exempt_once_the_newest_is_tagged(self):
+        assert (
+            _release_in_progress(["0.14.0", "0.13.1"], {"0.14.0", "0.13.1"}, "0.14.0")
+            is None
+        )
+
+    def test_an_abandoned_bump_is_not_exempt(self):
+        """Documented, untagged, and no longer what pyproject declares."""
+        assert _release_in_progress(["0.14.0"], {"0.13.1"}, "0.13.1") is None
+
+    def test_the_0_11_0_scenario_is_still_caught(self):
+        """An untagged entry with a released version on top of it.
+
+        The exemption only ever covers the newest entry, so 0.11.0 stopped being
+        covered the moment 0.12.0 was written up.
+        """
+        documented = ["0.12.0", "0.11.0"]
+        assert _release_in_progress(documented, {"0.12.0"}, "0.12.0") is None
+
+
 def test_every_documented_version_is_tagged():
     """The reverse drift: a changelog entry nobody ever tagged.
 
@@ -223,7 +283,10 @@ def test_every_documented_version_is_tagged():
     """
     _require_full_history()
     tagged = {t.lstrip("v") for t in _released_tags()}
-    documented = set(list_versions())
+    documented = list_versions()
     # Pre-0.6.0 predates tagging in this repo.
     expected = {v for v in documented if tuple(map(int, v.split("."))) >= (0, 6, 0)}
+    in_progress = _release_in_progress(documented, tagged, _pyproject_version())
+    if in_progress:
+        expected.discard(in_progress)
     assert expected - tagged == set(), f"documented but never tagged: {sorted(expected - tagged)}"
