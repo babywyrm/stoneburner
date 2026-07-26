@@ -3,10 +3,16 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
+from typing import Any
 
 import httpx
 
 from atomics.model_classes import classify_model, supports_thinking
+from atomics.providers._tool_dialects import (
+    openai_tool_payload,
+    parse_ollama_tool_calls,
+)
 from atomics.providers.base import BaseProvider, ProviderResponse, compute_tps
 
 _THINK_TAG_RE = re.compile(r"<think>(.*?)</think>", re.DOTALL)
@@ -28,6 +34,8 @@ def _strip_thinking(text: str) -> tuple[str, str]:
 
 
 class OllamaProvider(BaseProvider):
+    supports_tools = True
+
     def __init__(
         self,
         host: str = "http://localhost:11434",
@@ -149,6 +157,92 @@ class OllamaProvider(BaseProvider):
             thinking_tokens=thinking_tokens,
             thinking_text=thinking_text,
             raw=data,
+        )
+
+    async def generate_with_tools(
+        self,
+        prompt: str,
+        *,
+        tools: Sequence[dict],
+        system: str = "",
+        model: str | None = None,
+        max_tokens: int = 1024,
+        injected_tool_output: str | None = None,
+    ) -> ProviderResponse:
+        """Tool-calling path, on /api/chat.
+
+        Separate from generate() by design, not by accident. /api/generate has no
+        tools support at all, and its response shape is what supplies
+        eval_duration, the <think> text, and the token counts that generate()
+        depends on. Routing both through /api/chat, or sharing the parsing
+        between them, would silently change the throughput basis and token
+        accounting for every Ollama figure in the project — including the
+        published leaderboard. A test pins generate() to /api/generate.
+        """
+        model = model or self._default_model
+
+        messages: list[dict[str, Any]] = []
+        if system:
+            messages.append({"role": "system", "content": system})
+        messages.append({"role": "user", "content": prompt})
+        if injected_tool_output is not None:
+            # Indirect injection: the attack arrives as the result of a tool the
+            # model appears to have already called.
+            messages.append({
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [{
+                    "function": {"name": "list_files", "arguments": {"directory": "."}}
+                }],
+            })
+            messages.append({"role": "tool", "content": injected_tool_output})
+
+        body: dict[str, Any] = {
+            "model": model,
+            "messages": messages,
+            "stream": False,
+            "tools": openai_tool_payload(list(tools)),
+            "options": {"num_predict": max_tokens},
+        }
+        if self._context_tokens is not None:
+            body["options"]["num_ctx"] = self._context_tokens
+
+        try:
+            response = await self._client.post(
+                f"{self._host}/api/chat",
+                json=body,
+                timeout=self._timeout,
+            )
+            response.raise_for_status()
+        except httpx.ConnectError as exc:
+            raise ConnectionError(
+                f"Cannot connect to Ollama at {self._host} — is it running?"
+            ) from exc
+
+        data = response.json()
+        message = data.get("message") or {}
+        out = data.get("eval_count", 0)
+        inp = data.get("prompt_eval_count", 0)
+
+        # /api/chat reports eval_duration too, so the generation basis carries
+        # over and tool-path throughput stays comparable with generate().
+        eval_duration = data.get("eval_duration", 0)
+        total_duration = data.get("total_duration", 0)
+
+        return ProviderResponse(
+            text=message.get("content") or "",
+            input_tokens=inp,
+            output_tokens=out,
+            total_tokens=inp + out,
+            model=model,
+            latency_ms=round(total_duration / 1e6, 2) if total_duration else 0.0,
+            estimated_cost_usd=0.0,
+            tokens_per_second=(
+                compute_tps(out, eval_duration / 1e9) if eval_duration else None
+            ),
+            tps_basis="generation",
+            raw=data,
+            tool_calls=parse_ollama_tool_calls(message),
         )
 
     async def list_models(self) -> list[dict[str, str | float | bool]]:
