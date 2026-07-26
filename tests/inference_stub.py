@@ -80,8 +80,51 @@ class RecordedRequest:
     def is_judge_call(self) -> bool:
         return QUALITY_JUDGE_MARKER in self.system or SAFETY_JUDGE_MARKER in self.system
 
+    @property
+    def tools(self) -> list[dict[str, Any]]:
+        """Tool schemas attached to this request, in OpenAI envelope form."""
+        tools = self.body.get("tools")
+        return tools if isinstance(tools, list) else []
 
-Responder = Callable[[RecordedRequest], str]
+    @property
+    def tool_names(self) -> list[str]:
+        """The offered tool names, for asserting what the model was actually given."""
+        names: list[str] = []
+        for entry in self.tools:
+            function = entry.get("function") if isinstance(entry, dict) else None
+            if isinstance(function, dict) and function.get("name"):
+                names.append(str(function["name"]))
+        return names
+
+    @property
+    def tool_result_content(self) -> str:
+        """Content of the injected tool-result message, if the request carries one."""
+        messages = self.body.get("messages")
+        if not isinstance(messages, list):
+            return ""
+        for message in messages:
+            if isinstance(message, dict) and message.get("role") == "tool":
+                return str(message.get("content", ""))
+        return ""
+
+
+@dataclass
+class ToolReply:
+    """A reply that emits tool calls, optionally alongside text.
+
+    A responder may return this instead of a string. Arguments are serialized to
+    a JSON string here because that is what the OpenAI dialect puts on the wire —
+    a stub returning a parsed object would let a provider bug through.
+    """
+
+    calls: list[tuple[str, dict[str, Any]]]
+    text: str = ""
+    # Emit arguments that are not valid JSON, to exercise the malformed path
+    # against real I/O rather than only a hand-built dict.
+    malformed: bool = False
+
+
+Responder = Callable[[RecordedRequest], "str | ToolReply"]
 
 
 def default_responder(request: RecordedRequest) -> str:
@@ -196,7 +239,35 @@ class StubInferenceServer:
         return [r for r in self.requests if r.path == "/v1/chat/completions"]
 
     def chat_completion(self, request: RecordedRequest) -> dict[str, Any]:
-        text = self.responder(request)
+        reply = self.responder(request)
+        message: dict[str, Any] = {"role": "assistant"}
+        finish_reason = "stop"
+
+        if isinstance(reply, ToolReply):
+            text = reply.text
+            message["content"] = text or None
+            message["tool_calls"] = [
+                {
+                    "id": f"call_{index}",
+                    "type": "function",
+                    "function": {
+                        "name": name,
+                        # A JSON string, as the real dialect sends. Deliberately
+                        # broken when asked, so the malformed path is exercised
+                        # over real I/O.
+                        "arguments": (
+                            "{not valid json" if reply.malformed
+                            else json.dumps(arguments)
+                        ),
+                    },
+                }
+                for index, (name, arguments) in enumerate(reply.calls)
+            ]
+            finish_reason = "tool_calls"
+        else:
+            text = reply
+            message["content"] = text
+
         prompt_tokens = max(len(request.prompt.split()), 1)
         completion_tokens = max(len(text.split()), 1)
         return {
@@ -204,11 +275,7 @@ class StubInferenceServer:
             "object": "chat.completion",
             "model": str(request.body.get("model") or self.model),
             "choices": [
-                {
-                    "index": 0,
-                    "message": {"role": "assistant", "content": text},
-                    "finish_reason": "stop",
-                }
+                {"index": 0, "message": message, "finish_reason": finish_reason}
             ],
             "usage": {
                 "prompt_tokens": prompt_tokens,
