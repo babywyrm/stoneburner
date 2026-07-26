@@ -5,9 +5,12 @@ on:
     tags:
       - "v[0-9]*"
 
+# No id-token: write — that existed only for PyPI trusted publishing, and there
+# is no PyPI job. See "Distribution" in RELEASING.md before adding one: the name
+# `atomics` on PyPI belongs to an unrelated package, so a publish job cannot
+# succeed until the distribution is renamed.
 permissions:
   contents: write
-  id-token: write
 
 jobs:
   build:
@@ -27,23 +30,6 @@ jobs:
         with:
           name: dist
           path: dist/
-
-  publish-pypi:
-    name: Publish to PyPI
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: pypi
-      url: https://pypi.org/project/atomics/
-    steps:
-      - name: Download dist
-        uses: actions/download-artifact@v4
-        with:
-          name: dist
-          path: dist/
-
-      - name: Publish to PyPI (OIDC)
-        uses: pypa/gh-action-pypi-publish@release/v1
 
   release:
     name: GitHub Release
