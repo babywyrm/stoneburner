@@ -39,7 +39,11 @@ jobs:
     name: Tests
     runs-on: ubuntu-latest
     steps:
+      # Full history and tags, for the release-invariant tests. See ci.yml.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
 
       - uses: astral-sh/setup-uv@v4
         with:
