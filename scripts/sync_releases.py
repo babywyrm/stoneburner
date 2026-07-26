@@ -118,17 +118,28 @@ def main(argv: list[str] | None = None) -> int:
         if tag not in releases:
             changed += 1
             sha = tag_commit(tag)
+            on_remote = tag_on_remote(tag)
             print(f"{tag}: NO RELEASE — would create, titled {title!r}")
-            if not tag_on_remote(tag):
+            # --latest=false because GitHub flags whichever release was published
+            # most recently. Backfilling an old version would otherwise put
+            # "Latest" on it and present a superseded release as current.
+            argv = [
+                "gh", "release", "create", tag,
+                "--title", title, "--notes", body,
+                "--latest=false",
+            ]
+            if on_remote:
+                # The tag is authoritative; --verify-tag refuses to invent one.
+                argv.append("--verify-tag")
+            else:
                 # Without --target, gh creates the tag at the default branch's
-                # HEAD, which would put an old release on today's code.
+                # HEAD, which would put an old release on today's code. Passing
+                # it alongside an existing tag is what gh rejects, hence the
+                # either/or.
+                argv += ["--target", sha]
                 print(f"       tag is local-only; would create it at {sha[:12]}")
             if args.apply:
-                result = _run([
-                    "gh", "release", "create", tag,
-                    "--title", title, "--notes", body,
-                    "--target", sha,
-                ])
+                result = _run(argv)
                 print(f"       {'created' if result.returncode == 0 else result.stderr.strip()}")
             continue
 

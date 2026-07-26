@@ -108,7 +108,25 @@ It fills placeholder bodies and creates missing releases. Releases with
 hand-written notes — `v0.6.0`, `v0.7.0`, `v0.9.0`, `v0.10.0` — are left alone
 unless you pass `--overwrite-curated`, since in several cases those read better
 than the changelog section. `--retitle` normalizes their titles without touching
-the notes.
+the notes. It is idempotent: a second run reports no changes.
+
+Two hazards it accounts for, both hit while backfilling:
+
+- **Backfilling an old version steals the "Latest" badge.** GitHub flags
+  whichever release was published most recently, so creating `v0.11.0` today
+  marked a July version as current. New releases are created with
+  `--latest=false`; if it happens anyway, `gh release edit vX.Y.Z --latest`
+  puts it back.
+- **Pushing an old tag runs the workflow as it existed at that commit.** For
+  `v0.11.0` that meant the pre-fix `publish.yml`, which would have published an
+  empty release, force-moved the floating `v0` tag backwards, and added another
+  failed PyPI job. Disable the workflow around the push:
+
+  ```bash
+  gh workflow disable publish
+  git push origin refs/tags/vX.Y.Z
+  gh workflow enable publish
+  ```
 
 **Two legacy lightweight tags.** `v0.9.0` and `v0.10.0` are lightweight rather
 than annotated. Converting them means deleting and recreating the tags, which
