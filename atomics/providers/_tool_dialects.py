@@ -11,9 +11,22 @@ parameters — because six of the ten providers consume it directly.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Any
 
 from atomics.providers.toolcalls import ToolCall, parse_arguments
+
+
+def _field(block: Any, name: str, default: Any = None) -> Any:
+    """Read `name` from a dict or an SDK object.
+
+    The Anthropic SDK returns content blocks as objects with attributes, while
+    tests and raw JSON paths supply dicts. A dict-only reader passes unit tests
+    and silently returns nothing in production.
+    """
+    if isinstance(block, dict):
+        return block.get(name, default)
+    return getattr(block, name, default)
 
 
 def openai_tool_payload(schemas: list[dict]) -> list[dict]:
@@ -66,30 +79,36 @@ def anthropic_tool_payload(schemas: list[dict]) -> list[dict]:
     ]
 
 
-def parse_anthropic_tool_calls(content_blocks: list[dict]) -> tuple[ToolCall, ...]:
+def parse_anthropic_tool_calls(content_blocks: Sequence[Any]) -> tuple[ToolCall, ...]:
     """Extract tool calls from Anthropic's content-block list.
 
     Anthropic returns `tool_use` blocks whose `input` is already parsed, so
-    `parse_arguments` takes the dict branch here.
+    `parse_arguments` takes the dict branch here. Blocks may be dicts or SDK
+    objects; see `_field`.
     """
     calls: list[ToolCall] = []
     for block in content_blocks or []:
-        if block.get("type") != "tool_use":
+        if _field(block, "type") != "tool_use":
             continue
-        name = block.get("name") or ""
+        name = _field(block, "name") or ""
         if not name:
             continue
-        arguments, malformed = parse_arguments(block.get("input"))
+        arguments, malformed = parse_arguments(_field(block, "input"))
         calls.append(
-            ToolCall(name=name, arguments=arguments, malformed=malformed, raw=block)
+            ToolCall(
+                name=name,
+                arguments=arguments,
+                malformed=malformed,
+                raw=block if isinstance(block, dict) else None,
+            )
         )
     return tuple(calls)
 
 
-def anthropic_text(content_blocks: list[dict]) -> str:
+def anthropic_text(content_blocks: Sequence[Any]) -> str:
     """Join the text blocks of an Anthropic response, ignoring tool_use blocks."""
     return "".join(
-        block.get("text", "")
+        _field(block, "text", "") or ""
         for block in content_blocks or []
-        if block.get("type") == "text"
+        if _field(block, "type") == "text"
     )

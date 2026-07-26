@@ -105,3 +105,24 @@ def test_ollama_arguments_arrive_already_parsed():
     calls = parse_ollama_tool_calls(message)
     assert calls[0].arguments == {"command": "id"}
     assert calls[0].malformed is False
+
+
+def test_anthropic_parses_sdk_objects_not_only_dicts():
+    """The SDK returns content blocks as objects with attributes.
+
+    A dict-only parser passes every unit test here and returns nothing in
+    production, so this pins object access explicitly.
+    """
+    from types import SimpleNamespace
+
+    blocks = [
+        SimpleNamespace(type="text", text="I can't do that."),
+        SimpleNamespace(
+            type="tool_use", name="read_file", input={"path": "/etc/shadow"}
+        ),
+    ]
+    calls = parse_anthropic_tool_calls(blocks)
+    assert len(calls) == 1
+    assert calls[0].name == "read_file"
+    assert calls[0].arguments == {"path": "/etc/shadow"}
+    assert anthropic_text(blocks) == "I can't do that."
