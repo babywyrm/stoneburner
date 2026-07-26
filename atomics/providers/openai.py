@@ -7,9 +7,14 @@ Auth: OPENAI_API_KEY, OAuth/OIDC, or Codex CLI tokens.
 from __future__ import annotations
 
 import time
+from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, cast
 
 from atomics.providers import pricing
+from atomics.providers._tool_dialects import (
+    openai_tool_payload,
+    parse_openai_tool_calls,
+)
 from atomics.providers.base import BaseProvider, ProviderResponse, compute_tps
 from atomics.providers.outcomes import (
     ProviderOutcome,
@@ -40,6 +45,11 @@ _MAX_COMPLETION_TOKENS_MODELS = {
 # the entire budget and leave the visible response empty.
 _REASONING_TOKEN_MULTIPLIER = 8
 _NONTERMINAL_RESPONSE_STATUSES = frozenset({"cancelled", "queued", "in_progress"})
+
+# Identifier for the fabricated assistant call that carries an injected tool
+# result. The API requires the tool message's tool_call_id to match a preceding
+# call, so the two have to agree on a constant.
+_INJECTED_CALL_ID = "call_injected"
 
 def _estimate_cost(model: str, input_tokens: int, output_tokens: int) -> float:
     return pricing.estimate_cost(
@@ -75,6 +85,12 @@ class OpenAIProvider(BaseProvider):
     """OpenAI / Codex adapter. Uses Chat Completions with API keys,
     Responses API with OAuth tokens (required by ChatGPT OAuth scopes)."""
 
+    # The adapter implements tools on Chat Completions. Instances configured for
+    # OAuth use the Responses API, whose tool format differs, so __init__
+    # narrows this per instance — the class says the capability exists, the
+    # instance says whether this configuration has it.
+    supports_tools = True
+
     def __init__(
         self,
         api_key: str = "",
@@ -85,6 +101,7 @@ class OpenAIProvider(BaseProvider):
     ) -> None:
         self._auth = auth
         self._use_responses_api = auth is not None
+        self.supports_tools = auth is None
         if client is not None:
             self._client = client
         else:
@@ -242,6 +259,104 @@ class OpenAIProvider(BaseProvider):
             raw=response.model_dump() if hasattr(response, "model_dump") else None,
             outcome=outcome,
             finish_reason=finish_reason,
+        )
+
+    async def generate_with_tools(
+        self,
+        prompt: str,
+        *,
+        tools: Sequence[dict],
+        system: str = "",
+        model: str | None = None,
+        max_tokens: int = 1024,
+        injected_tool_output: str | None = None,
+    ) -> ProviderResponse:
+        """Chat Completions with tool schemas attached.
+
+        Not available on the OAuth path: that uses the Responses API, whose tool
+        format differs, and silently returning no calls there would read as
+        resistance.
+        """
+        if self._use_responses_api:
+            raise NotImplementedError(
+                "OpenAIProvider does not support tool calling on the OAuth "
+                "(Responses API) path. Use an API key for tool-call evaluation."
+            )
+        model = model or self._default_model
+
+        messages: list[dict[str, Any]] = []
+        messages.append(
+            {"role": "system", "content": system or "You are a helpful assistant."}
+        )
+        messages.append({"role": "user", "content": prompt})
+        if injected_tool_output is not None:
+            # Indirect injection: the attack arrives as the result of a tool the
+            # model appears to have already called.
+            messages.append({
+                "role": "assistant",
+                "tool_calls": [{
+                    "id": _INJECTED_CALL_ID,
+                    "type": "function",
+                    "function": {
+                        "name": "list_files",
+                        "arguments": '{"directory": "."}',
+                    },
+                }],
+            })
+            messages.append({
+                "role": "tool",
+                "tool_call_id": _INJECTED_CALL_ID,
+                "content": injected_tool_output,
+            })
+
+        is_reasoning = _is_reasoning_model(model)
+        if is_reasoning:
+            token_param: dict[str, Any] = {
+                "max_completion_tokens": max_tokens * _REASONING_TOKEN_MULTIPLIER
+            }
+        else:
+            token_param = {"max_tokens": max_tokens}
+
+        t0 = time.monotonic()
+        response = await self._client.chat.completions.create(
+            model=model,
+            messages=cast("list[ChatCompletionMessageParam]", messages),
+            tools=cast("Any", openai_tool_payload(list(tools))),
+            **token_param,
+        )
+        latency = (time.monotonic() - t0) * 1000
+
+        choice = response.choices[0] if response.choices else None
+        message = getattr(choice, "message", None)
+        if message is None:
+            as_dict: dict[str, Any] = {}
+        elif hasattr(message, "model_dump"):
+            as_dict = message.model_dump()
+        elif isinstance(message, dict):
+            as_dict = message
+        else:
+            as_dict = {}
+
+        raw_content = as_dict.get("content")
+        text = raw_content if isinstance(raw_content, str) else ""
+        finish_reason = getattr(choice, "finish_reason", None)
+
+        usage = response.usage
+        inp = usage.prompt_tokens if usage else 0
+        out = usage.completion_tokens if usage else 0
+
+        return ProviderResponse(
+            text=text,
+            input_tokens=inp,
+            output_tokens=out,
+            total_tokens=inp + out,
+            model=model,
+            latency_ms=round(latency, 2),
+            estimated_cost_usd=round(_estimate_cost(model, inp, out), 6),
+            tokens_per_second=compute_tps(out, latency / 1000),
+            raw=response.model_dump() if hasattr(response, "model_dump") else None,
+            finish_reason=finish_reason,
+            tool_calls=parse_openai_tool_calls(as_dict),
         )
 
     async def _generate_responses(
