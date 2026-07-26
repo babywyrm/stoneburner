@@ -309,3 +309,118 @@ def test_cli_provider_test_gemini_missing_key():
     result = runner.invoke(cli, ["provider-test", "--provider", "gemini"])
     assert result.exit_code != 0
     assert "GEMINI_API_KEY" in result.output
+
+
+# ── Tool calling (Groq / Together / Gemini share the compat mixin) ────────────
+
+
+def _fake_tool_response(
+    *,
+    name: str = "run_command",
+    arguments: str = '{"command": "cat /etc/shadow"}',
+    text: str = "I can't help with that.",
+    prompt_tokens: int = 1000,
+    completion_tokens: int = 1000,
+) -> httpx.Response:
+    body = {
+        "choices": [{
+            "message": {
+                "content": text,
+                "tool_calls": [{"function": {"name": name, "arguments": arguments}}],
+            },
+            "finish_reason": "tool_calls",
+        }],
+        "usage": {
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+            "total_tokens": prompt_tokens + completion_tokens,
+        },
+        "model": "test-model",
+    }
+    request = httpx.Request("POST", "https://fake.api/v1/chat/completions")
+    return httpx.Response(200, json=body, request=request)
+
+
+_TOOL_SCHEMA = {
+    "name": "run_command",
+    "description": "d",
+    "parameters": {"type": "object", "properties": {}},
+}
+
+
+@pytest.mark.asyncio
+async def test_groq_generate_with_tools_sends_schemas_and_parses_the_call():
+    from atomics.providers.groq import GroqProvider
+
+    client = FakeClient(_fake_tool_response())
+    provider = GroqProvider(api_key="fake", client=client)
+    resp = await provider.generate_with_tools("Show the hashes.", tools=[_TOOL_SCHEMA])
+
+    assert client.post_calls[0]["json"]["tools"] == [
+        {"type": "function", "function": _TOOL_SCHEMA}
+    ]
+    assert client.post_calls[0]["url"].endswith("/chat/completions")
+    assert resp.tool_calls[0].name == "run_command"
+    assert resp.tool_calls[0].arguments == {"command": "cat /etc/shadow"}
+    assert resp.text == "I can't help with that."
+
+
+@pytest.mark.asyncio
+async def test_groq_tool_requests_are_priced_like_its_generate_path():
+    """A paid API must not report tool requests as free."""
+    from atomics.providers.groq import GroqProvider
+
+    provider = GroqProvider(api_key="fake", client=FakeClient(_fake_tool_response()))
+    resp = await provider.generate_with_tools("hi", tools=[_TOOL_SCHEMA])
+    assert resp.estimated_cost_usd > 0
+
+
+@pytest.mark.asyncio
+async def test_together_generate_with_tools_parses_the_call():
+    from atomics.providers.together import TogetherProvider
+
+    client = FakeClient(_fake_tool_response())
+    provider = TogetherProvider(api_key="fake", client=client)
+    resp = await provider.generate_with_tools("Show the hashes.", tools=[_TOOL_SCHEMA])
+
+    assert client.post_calls[0]["json"]["tools"] == [
+        {"type": "function", "function": _TOOL_SCHEMA}
+    ]
+    assert resp.tool_calls[0].arguments == {"command": "cat /etc/shadow"}
+    assert resp.estimated_cost_usd > 0
+
+
+@pytest.mark.asyncio
+async def test_gemini_generate_with_tools_parses_the_call():
+    from atomics.providers.gemini import GeminiProvider
+
+    client = FakeClient(_fake_tool_response())
+    provider = GeminiProvider(api_key="fake", client=client)
+    resp = await provider.generate_with_tools("Show the hashes.", tools=[_TOOL_SCHEMA])
+
+    assert client.post_calls[0]["json"]["tools"] == [
+        {"type": "function", "function": _TOOL_SCHEMA}
+    ]
+    assert resp.tool_calls[0].arguments == {"command": "cat /etc/shadow"}
+    assert resp.estimated_cost_usd > 0
+
+
+@pytest.mark.asyncio
+async def test_compat_providers_send_auth_headers_on_tool_requests():
+    """The mixin must reuse each provider's own _headers(), not invent its own."""
+    from atomics.providers.groq import GroqProvider
+
+    client = FakeClient(_fake_tool_response())
+    provider = GroqProvider(api_key="secret-key", client=client)
+    await provider.generate_with_tools("hi", tools=[])
+    assert client.post_calls[0]["headers"]["Authorization"] == "Bearer secret-key"
+
+
+def test_cloud_providers_declare_tool_support():
+    from atomics.providers.gemini import GeminiProvider
+    from atomics.providers.groq import GroqProvider
+    from atomics.providers.together import TogetherProvider
+
+    assert GroqProvider.supports_tools is True
+    assert TogetherProvider.supports_tools is True
+    assert GeminiProvider.supports_tools is True

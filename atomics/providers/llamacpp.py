@@ -13,11 +13,16 @@ import time
 
 import httpx
 
+from atomics.providers._openai_compat import OpenAICompatibleTools
 from atomics.providers.base import BaseProvider, ProviderResponse, compute_tps
 
 
-class LlamaCppProvider(BaseProvider):
+class LlamaCppProvider(OpenAICompatibleTools, BaseProvider):
     """llama.cpp server adapter via OpenAI-compatible Chat Completions API."""
+
+    # llama.cpp mounts the OpenAI surface under /v1; the other compatible
+    # providers fold that into their base URL.
+    _tool_path = "/v1/chat/completions"
 
     def __init__(
         self,
