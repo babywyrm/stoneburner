@@ -350,3 +350,37 @@ async def test_ollama_list_models_connection_error():
     provider = OllamaProvider(host="http://fake:11434", client=mock_client)
     with pytest.raises(ConnectionError, match="fake:11434"):
         await provider.list_models()
+
+
+@pytest.mark.asyncio
+async def test_ollama_generate_still_posts_to_api_generate():
+    """Pins the endpoint and the throughput basis together.
+
+    Tool support requires /api/chat, whose response shape differs. Unifying both
+    paths onto it would change tps_basis from "generation" to wall-clock, alter
+    the token counts, and break <think> extraction — for every Ollama figure in
+    the project, silently. generate() owns /api/generate; tools get their own
+    method.
+    """
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.raise_for_status = MagicMock()
+    mock_response.json.return_value = {
+        "response": "ok",
+        "eval_count": 10,
+        "prompt_eval_count": 5,
+        "eval_duration": 500_000_000,
+    }
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock(return_value=mock_response)
+
+    provider = OllamaProvider(host="http://fake:11434", client=mock_client)
+    resp = await provider.generate("hi")
+
+    url = mock_client.post.call_args[0][0]
+    assert url.endswith("/api/generate"), (
+        f"generate() must not move off /api/generate, got {url}"
+    )
+    assert "tools" not in mock_client.post.call_args.kwargs["json"]
+    assert resp.tps_basis == "generation"
+    assert resp.output_tokens == 10
