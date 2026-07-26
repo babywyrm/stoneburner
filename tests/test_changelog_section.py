@@ -110,12 +110,32 @@ def _released_tags() -> list[str]:
     return sorted(t for t in out.stdout.split() if t)
 
 
+def _require_full_history() -> None:
+    """Skip when the checkout cannot answer the question.
+
+    These invariants are about tags and the version history of pyproject.toml,
+    and `actions/checkout` clones shallow and tagless by default. That made this
+    module fail CI while passing locally, so the workflows now fetch history and
+    a checkout that still lacks it skips loudly instead of failing or, worse,
+    passing vacuously against an empty tag list.
+    """
+    if not _released_tags():
+        pytest.skip("no tags in this checkout; needs fetch-depth: 0 and fetch-tags")
+    shallow = subprocess.run(
+        ["git", "rev-parse", "--is-shallow-repository"],
+        cwd=REPO, capture_output=True, text=True, check=True,
+    )
+    if shallow.stdout.strip() == "true":
+        pytest.skip("shallow checkout; needs fetch-depth: 0")
+
+
 def test_every_released_tag_has_release_notes():
     """A tag with no changelog section publishes an empty GitHub release.
 
     That is exactly how v0.8.0, v0.12.0, v0.13.0 and v0.13.1 ended up with a bare
     compare link for a body.
     """
+    _require_full_history()
     missing = []
     for tag in _released_tags():
         try:
@@ -185,6 +205,7 @@ def test_no_version_ever_shipped_undocumented():
     from 0.3.0 to 0.6.0 with nothing explaining it. Either a section or an
     explicit note is enough — the point is that no version silently vanishes.
     """
+    _require_full_history()
     changelog_text = CHANGELOG_PATH.read_text(encoding="utf-8")
     documented = set(list_versions())
     unaccounted = [
@@ -200,6 +221,7 @@ def test_every_documented_version_is_tagged():
 
     0.11.0 was documented, bumped in pyproject, and never released.
     """
+    _require_full_history()
     tagged = {t.lstrip("v") for t in _released_tags()}
     documented = set(list_versions())
     # Pre-0.6.0 predates tagging in this repo.
