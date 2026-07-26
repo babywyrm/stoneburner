@@ -14,13 +14,20 @@ How a version of Atomics gets cut, and the conventions the tooling enforces.
 | Release title | `vX.Y.Z — <summary>`, derived from the changelog. Never a bare `vX.Y.Z`. |
 | Release body | The changelog section for that version, verbatim. |
 
-Two tests enforce the parts that can silently rot, both in
+Three tests enforce the parts that can silently rot, all in
 `tests/test_changelog_section.py`:
 
 - `test_every_released_tag_has_release_notes` — a tag with no changelog section
   would publish an empty release.
 - `test_every_documented_version_is_tagged` — a changelog entry nobody tagged.
   This is how `0.11.0` was documented, bumped, and never released.
+- `test_no_version_ever_shipped_undocumented` — a version that appeared in
+  `pyproject.toml` and never got written up at all. `0.4.0` and `0.5.0` went
+  undocumented this way, leaving an unexplained jump from 0.3.0 to 0.6.0.
+
+If a version was bumped but never actually released, say so in the changelog
+under a heading that does not parse as a version — see the 0.4.0 / 0.5.0 note.
+That satisfies the guard without inventing a release that never happened.
 
 ## Cutting a release
 

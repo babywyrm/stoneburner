@@ -11,6 +11,7 @@
 ### Fixed
 - **Release notes were published empty.** The workflow used `generate_release_notes`, which diffs against the previous tag — but it also force-moves a floating `v0` tag to each new release, so GitHub compared `v0` against the tag being released, found nothing between them, and published a body containing only a compare link. `v0.8.0`, `v0.12.0`, `v0.13.0` and `v0.13.1` each shipped with carefully written changelog entries and a blank release. Release titles came from the tag alone, so they read `v0.13.1` rather than naming what changed.
 - **`0.11.0` was documented but never tagged.** The version was bumped in `pyproject.toml` and written up here, and no tag or release was ever created, leaving no point in history you could check out for it. Now tagged on the commit that set the version, dated to match.
+- **The changelog jumped from 0.3.0 to 0.6.0 with nothing explaining it.** `0.4.0` and `0.5.0` both existed in `pyproject.toml` and had no entry. They turned out never to have been released — intermediate bumps during one day's work whose contents shipped under 0.6.0 — so the gap is now recorded as a note rather than backfilled with duplicate entries. A third guard asserts that every version ever declared in `pyproject.toml` is either documented or explicitly accounted for, which is the invariant that failed here and for 0.11.0.
 
 ## 0.13.1 (2026-07-25) — Fixes found by running it for real
 
@@ -433,6 +434,17 @@ provider, so none of these three defects were reachable from it.
 
 ### Fixed (mcpnuke)
 - `_raw_token` is now stripped from `auth_context` in all JSON output paths — tokens are never written to report files, PR comments, or CI artifacts
+
+---
+
+## Note on the 0.4.0 / 0.5.0 gap
+
+Both versions existed, briefly, as `pyproject.toml` bumps during a single day of
+work on 2026-05-23. Neither was tagged or released, and the work they carried —
+the adversarial and red/blue suites, the live ecosystem probe, the brain-gateway
+provider, and schema v6 — is documented under 0.6.0, where it first shipped.
+They are recorded here so the jump from 0.3.0 to 0.6.0 is not mistaken for a
+missing entry. This heading deliberately does not parse as a released version.
 
 ---
 
