@@ -79,16 +79,25 @@ That satisfies the guard without inventing a release that never happened.
   no changelog section fails the job rather than publishing an empty release.
 - **Update floating major tag** — force-moves `v0` to the new release, for
   anything that wants to follow the major line. It is deliberately mutable.
-- **Publish to PyPI** — currently fails, see below.
 
-## Known issues
+There is no PyPI step. See Distribution below.
 
-**PyPI publishing cannot succeed.** The `publish-pypi` job uses trusted
-publishing for a project named `atomics`, but that name on PyPI belongs to an
-unrelated package (`doodspav/atomics`, "Atomic lock-free primitives"). Every tag
-therefore shows one failed job. Resolving it means either renaming the
-distribution and configuring a trusted publisher, or dropping the job. Nothing
-else in the release is affected — the build and the GitHub release both succeed.
+## Distribution
+
+Atomics is installed from source — `uv sync`, or `pip install` from a clone or
+the wheel attached to each GitHub release. It is not on PyPI.
+
+There was a `publish-pypi` job, and it failed on every tag from the first
+release onward. It used trusted publishing for a distribution named `atomics`,
+but that name on PyPI belongs to an unrelated C++ package
+(`doodspav/atomics`, "Atomic lock-free primitives"), so it could never have
+succeeded. It was removed rather than left red: a job that cannot pass is not a
+known issue, it is noise, and it made every release look half-broken.
+
+Publishing to PyPI would need a distribution rename — `stoneburner-atomics` or
+similar — which changes `pip install` for every consumer while leaving the
+importable package as `atomics`. Worth doing when there are consumers who want
+it. Until then the wheel on each release is the artifact.
 
 **Release notes did not always come from the changelog.** Releases through
 v0.13.1 were created with `generate_release_notes`, which diffs against the
