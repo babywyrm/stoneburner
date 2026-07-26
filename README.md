@@ -82,6 +82,7 @@ uv run atomics tiers                   # show all tier profiles
 | `atomics report` | Usage reports and trends |
 | `atomics eval` | Quality evaluation suite |
 | `atomics adversarial` | Adversarial resilience eval (72 fixtures) |
+| `atomics toolcall` | Tool-call divergence: refuses in prose, complies via function call (20 fixtures) |
 | `atomics redblue` | Red/blue security capability eval |
 | `atomics stress` | GPU saturation testing |
 | `atomics soak` | Long-duration stability test |
@@ -99,11 +100,12 @@ Full reference: [docs/CLI_REFERENCE.md](docs/CLI_REFERENCE.md)
 
 ## Security Suites
 
-Five eval suites for LLM security assessment:
+Six eval suites for LLM security assessment:
 
 | Suite | What it measures | Fixtures |
 |-------|-----------------|----------|
 | **adversarial** | Resistance to manipulation (prompt injection, jailbreaks, MCP attacks) | 72 |
+| **toolcall** | Whether a prose refusal survives contact with a function call | 20 |
 | **redblue** | Offensive/defensive security capability (OSINT, vuln analysis, IR) | 10 |
 | **refusal** | Over-refusal vs under-refusal calibration | per-suite |
 | **codereview** | Vulnerability detection in code snippets and diffs | per-suite |

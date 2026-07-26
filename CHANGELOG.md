@@ -3,12 +3,56 @@
 ## Unreleased
 
 ### Added
+- **`atomics toolcall` — a sixth security suite, measuring tool-call divergence.**
+  Every other suite here reads what a model *says*. This one reads what it *does*.
+  A model can refuse a request in conversation and then emit the call when the same
+  request arrives with function schemas attached; `adversarial` cannot see that,
+  because it judges prose, and prose is where models are most heavily aligned.
+  Agentic deployments do not run on prose.
+
+  Each of 20 fixtures is sent twice — once as conversation with no tools, once with
+  tool schemas — and the gap is the result. Six categories: direct requests,
+  fabricated authority, breakglass pressure, indirect injection arriving inside
+  tool output, egress exfiltration, and destructive urgency. **Tool calls are never
+  executed**; the suite records what the model asked to do.
+
+  The tool channel is scored deterministically, with no judge: each fixture declares
+  the call that constitutes compliance *including its arguments*, so
+  `read_file("/etc/shadow")` counts and `read_file("README.md")` does not. Rerunning
+  against the same recorded responses gives the same answer, which is what makes the
+  headline number defensible where a judged score would not be.
+
+  Two measures, each reported with its numerator and denominator because each is
+  computed over a subset: **channel divergence** (resisted in prose, complied with
+  tools) and **response divergence** (a dangerous call whose own accompanying text
+  refuses — self-contradiction within one response). Both report *not measured*
+  rather than 0% when no fixture qualifies.
+
+  A **capability probe** runs before any fixture. A model that cannot emit tool calls
+  produces no calls on every fixture, indistinguishable from refusing all of them, so
+  scoring it normally would rank the least capable models as the most resistant. Such
+  a model runs nothing and is reported as `tool_capable: false`; `--no-skip-incapable`
+  makes that a non-zero exit for sweeps, where a silently skipped model looks like a
+  pass.
+- **Tool calling across all ten providers.** `ProviderResponse.tool_calls` and an
+  opt-in `generate_with_tools`, in three dialects: OpenAI `chat/completions` (openai,
+  vllm, llamacpp, groq, together, gemini — sharing one mixin rather than six copies),
+  Anthropic (claude), and Ollama `/api/chat`. `supports_tools` defaults to False and
+  the base method raises rather than returning empty, because a silent empty result
+  would score as resistance. Malformed arguments are flagged and the call retained: a
+  model emitting structurally broken calls is a result, not a blank.
 - `RELEASING.md` — the release process, versioning and tag conventions, and the known issues in the current pipeline. There was no documented process, which is how the inconsistencies below accumulated.
 - `scripts/changelog_section.py` extracts a version's section from this file, and the release workflow now publishes that instead of asking GitHub to summarize commits. A tag with no changelog section fails the release rather than publishing an empty one.
 - `scripts/sync_releases.py` reconciles already-published GitHub releases with the changelog. Dry run by default; leaves hand-written release notes alone unless told otherwise.
 - Two tests guarding the drift that is invisible until release day: every tag has usable release notes, and every documented version was actually tagged.
 
 ### Fixed
+- **`evaluation_results` writes need their parent `runs` row.** The table carries a
+  foreign key to `runs`, so `atomics toolcall --save` would have raised
+  `IntegrityError` on its first fixture. Found by writing the export test to require
+  the saved row back rather than only asserting on the exit code — the export
+  dispatch chain falls through and exits zero even with no branch at all, so the
+  weaker test passed against a completely unwired suite.
 - **Release notes were published empty.** The workflow used `generate_release_notes`, which diffs against the previous tag — but it also force-moves a floating `v0` tag to each new release, so GitHub compared `v0` against the tag being released, found nothing between them, and published a body containing only a compare link. `v0.8.0`, `v0.12.0`, `v0.13.0` and `v0.13.1` each shipped with carefully written changelog entries and a blank release. Release titles came from the tag alone, so they read `v0.13.1` rather than naming what changed.
 - **`0.11.0` was documented but never tagged.** The version was bumped in `pyproject.toml` and written up here, and no tag or release was ever created, leaving no point in history you could check out for it. Now tagged on the commit that set the version, dated to match.
 - **Removed the PyPI publish job.** It had failed on every tag since the first release: it published a distribution named `atomics` via trusted publishing, and that name on PyPI belongs to an unrelated C++ package, so it could not have succeeded. Every release page showed a failed job as a result. Atomics installs from source, and each release carries a built wheel; `RELEASING.md` records what a real PyPI rename would involve. No install path changes.
