@@ -16,6 +16,7 @@ import time
 import httpx
 
 from atomics.model_classes import classify_model, supports_thinking
+from atomics.providers._openai_compat import OpenAICompatibleTools
 from atomics.providers.base import BaseProvider, ProviderResponse, compute_tps
 
 _THINKING_MODEL_PREFIXES: tuple[str, ...] = ("qwen3", "deepseek-r1")
@@ -25,7 +26,7 @@ def _model_supports_thinking(model: str) -> bool:
     return any(model.startswith(p) for p in _THINKING_MODEL_PREFIXES)
 
 
-class VllmProvider(BaseProvider):
+class VllmProvider(OpenAICompatibleTools, BaseProvider):
     """Provider for vLLM / OpenAI-compatible inference endpoints.
 
     Targets any server that implements POST /v1/chat/completions and

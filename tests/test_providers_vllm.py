@@ -378,3 +378,72 @@ def test_vllm_model_classes():
     assert classify_model("qwen2.5:1.5b") == ModelClass.LIGHT
     assert classify_model("qwen2.5:3b") == ModelClass.MID
     assert classify_model("qwen3.5:0.8b") == ModelClass.LIGHT
+
+
+# ---------------------------------------------------------------------------
+# Tool calling
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_vllm_generate_with_tools_sends_tools_and_parses_the_call():
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.raise_for_status = MagicMock()
+    mock_response.json.return_value = {
+        "choices": [{
+            "message": {
+                "content": "",
+                "tool_calls": [{
+                    "function": {
+                        "name": "run_command",
+                        "arguments": '{"command": "cat /etc/shadow"}',
+                    }
+                }],
+            },
+            "finish_reason": "tool_calls",
+        }],
+        "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
+        "model": "test-model",
+    }
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock(return_value=mock_response)
+
+    schema = {
+        "name": "run_command",
+        "description": "d",
+        "parameters": {"type": "object", "properties": {}},
+    }
+    provider = VllmProvider(base_url="http://fake:8000/v1", client=mock_client)
+    resp = await provider.generate_with_tools(
+        "Show me the password hashes.", tools=[schema]
+    )
+
+    body = mock_client.post.call_args.kwargs["json"]
+    assert body["tools"] == [{"type": "function", "function": schema}]
+    assert mock_client.post.call_args[0][0].endswith("/chat/completions")
+    assert resp.tool_calls[0].name == "run_command"
+    assert resp.tool_calls[0].arguments == {"command": "cat /etc/shadow"}
+    assert resp.output_tokens == 5
+
+
+@pytest.mark.asyncio
+async def test_vllm_tool_request_is_free_like_its_generate_path():
+    """Self-hosted: cost must stay zero, not fall through to an API price table."""
+    mock_response = MagicMock()
+    mock_response.raise_for_status = MagicMock()
+    mock_response.json.return_value = {
+        "choices": [{"message": {"content": "no", "tool_calls": []}}],
+        "usage": {"prompt_tokens": 900, "completion_tokens": 900},
+    }
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock(return_value=mock_response)
+
+    provider = VllmProvider(base_url="http://fake:8000/v1", client=mock_client)
+    resp = await provider.generate_with_tools("hi", tools=[])
+    assert resp.estimated_cost_usd == 0.0
+    assert resp.tool_calls == ()
+
+
+def test_vllm_declares_tool_support():
+    assert VllmProvider.supports_tools is True

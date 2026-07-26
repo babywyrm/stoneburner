@@ -13,6 +13,7 @@ import time
 
 import httpx
 
+from atomics.providers._openai_compat import OpenAICompatibleTools
 from atomics.providers.base import BaseProvider, ProviderResponse, compute_tps
 
 MODEL_PRICING: dict[str, tuple[float, float]] = {
@@ -33,8 +34,11 @@ def _estimate_cost(model: str, input_tokens: int, output_tokens: int) -> float:
     return (input_tokens * inp_price + output_tokens * out_price) / 1_000_000
 
 
-class GeminiProvider(BaseProvider):
+class GeminiProvider(OpenAICompatibleTools, BaseProvider):
     """Google Gemini via OpenAI-compatible Chat Completions endpoint."""
+
+    def _tool_cost(self, model: str, input_tokens: int, output_tokens: int) -> float:
+        return _estimate_cost(model, input_tokens, output_tokens)
 
     def __init__(
         self,

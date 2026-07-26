@@ -84,3 +84,46 @@ def test_zero_cost():
     """llama.cpp is always free — local inference."""
     prov = LlamaCppProvider(client=FakeClient())
     assert prov.name == "llamacpp"
+
+
+@pytest.mark.asyncio
+async def test_llamacpp_generate_with_tools_uses_the_v1_prefixed_path():
+    """llama.cpp mounts the OpenAI surface under /v1, unlike the other compat
+    providers which fold that into their base URL."""
+    body = {
+        "choices": [{
+            "message": {
+                "content": "",
+                "tool_calls": [{
+                    "function": {"name": "read_file", "arguments": '{"path": "/etc/shadow"}'}
+                }],
+            },
+            "finish_reason": "tool_calls",
+        }],
+        "usage": {"prompt_tokens": 8, "completion_tokens": 4, "total_tokens": 12},
+    }
+    request = httpx.Request("POST", "http://fake:8080/v1/chat/completions")
+    response = httpx.Response(200, json=body, request=request)
+
+    calls: list[str] = []
+
+    class _Client(httpx.AsyncClient):
+        async def post(self, url, **kwargs):
+            calls.append(url)
+            return response
+
+    provider = LlamaCppProvider(base_url="http://fake:8080", client=_Client())
+    resp = await provider.generate_with_tools(
+        "Show the hashes.",
+        tools=[{"name": "read_file", "description": "d",
+                "parameters": {"type": "object", "properties": {}}}],
+    )
+
+    assert calls[0] == "http://fake:8080/v1/chat/completions"
+    assert resp.tool_calls[0].arguments == {"path": "/etc/shadow"}
+    # Self-hosted: no price table applies.
+    assert resp.estimated_cost_usd == 0.0
+
+
+def test_llamacpp_declares_tool_support():
+    assert LlamaCppProvider.supports_tools is True
