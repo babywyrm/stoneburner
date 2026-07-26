@@ -35,8 +35,10 @@ jobs:
       - name: Sync dependencies
         run: uv sync --extra dev --extra api
 
+      # scripts/ included: it was outside this scope and quietly accumulated six
+      # errors, and the release tooling now lives there.
       - name: Lint
-        run: uv run ruff check atomics/ tests/ --ignore E501
+        run: uv run ruff check atomics/ tests/ scripts/ --ignore E501
 
       - name: Type check
         run: uv run mypy atomics/
