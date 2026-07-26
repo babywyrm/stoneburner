@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.14.0 (2026-07-26) — Tool-call divergence suite, release pipeline repairs
 
 ### Added
 - **`atomics toolcall` — a sixth security suite, measuring tool-call divergence.**
@@ -53,6 +53,15 @@
   the saved row back rather than only asserting on the exit code — the export
   dispatch chain falls through and exits zero even with no branch at all, so the
   weaker test passed against a completely unwired suite.
+- **The untagged-version guard failed on every correct release.** `RELEASING.md` has
+  you write the changelog and bump the version, then run the suite, then tag — so the
+  version being released is always documented and untagged while the suite runs, and
+  the guard added for `0.11.0` fired on it every time. Found by cutting this release
+  and following the documented steps. It now exempts the newest entry when it is also
+  the version `pyproject.toml` declares and no tag exists yet, which lapses the moment
+  a later version is documented on top of an untagged one — the shape `0.11.0`
+  actually had. A guard that fails on correct use is one you learn to skip past, which
+  is how the drift it exists to catch gets through.
 - **Release notes were published empty.** The workflow used `generate_release_notes`, which diffs against the previous tag — but it also force-moves a floating `v0` tag to each new release, so GitHub compared `v0` against the tag being released, found nothing between them, and published a body containing only a compare link. `v0.8.0`, `v0.12.0`, `v0.13.0` and `v0.13.1` each shipped with carefully written changelog entries and a blank release. Release titles came from the tag alone, so they read `v0.13.1` rather than naming what changed.
 - **`0.11.0` was documented but never tagged.** The version was bumped in `pyproject.toml` and written up here, and no tag or release was ever created, leaving no point in history you could check out for it. Now tagged on the commit that set the version, dated to match.
 - **Removed the PyPI publish job.** It had failed on every tag since the first release: it published a distribution named `atomics` via trusted publishing, and that name on PyPI belongs to an unrelated C++ package, so it could not have succeeded. Every release page showed a failed job as a result. Atomics installs from source, and each release carries a built wheel; `RELEASING.md` records what a real PyPI rename would involve. No install path changes.
