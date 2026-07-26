@@ -17,6 +17,9 @@ REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "scripts"))
 
 from changelog_section import (  # noqa: E402
+    CHANGELOG as CHANGELOG_PATH,
+)
+from changelog_section import (
     VersionNotFoundError,
     list_versions,
     main,
@@ -160,6 +163,36 @@ class TestPlaceholderDetection:
             "**Full Changelog**: https://example.com/compare/v1...v2"
         )
         assert not self._is_placeholder(body)
+
+
+def _versions_ever_declared() -> set[str]:
+    """Every version that has appeared in pyproject.toml, from git history."""
+    out = subprocess.run(
+        ["git", "log", "-p", "--", "pyproject.toml"],
+        cwd=REPO, capture_output=True, text=True, check=True,
+    )
+    return {
+        line.split("=", 1)[1].strip().strip('"')
+        for line in out.stdout.splitlines()
+        if line.startswith("+version = ")
+    }
+
+
+def test_no_version_ever_shipped_undocumented():
+    """A version that existed in pyproject must be accounted for somewhere.
+
+    0.4.0 and 0.5.0 were bumped and never written up, so the changelog jumped
+    from 0.3.0 to 0.6.0 with nothing explaining it. Either a section or an
+    explicit note is enough — the point is that no version silently vanishes.
+    """
+    changelog_text = CHANGELOG_PATH.read_text(encoding="utf-8")
+    documented = set(list_versions())
+    unaccounted = [
+        v
+        for v in sorted(_versions_ever_declared())
+        if v not in documented and v not in changelog_text
+    ]
+    assert not unaccounted, f"versions with no changelog entry or note: {unaccounted}"
 
 
 def test_every_documented_version_is_tagged():

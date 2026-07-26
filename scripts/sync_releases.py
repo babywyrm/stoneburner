@@ -38,6 +38,18 @@ def local_tags() -> list[str]:
     return [t for t in out.stdout.split() if t]
 
 
+def tag_commit(tag: str) -> str:
+    """The commit a tag points at, dereferencing annotated tags."""
+    out = _run(["git", "rev-list", "-n", "1", tag])
+    out.check_returncode()
+    return out.stdout.strip()
+
+
+def tag_on_remote(tag: str) -> bool:
+    out = _run(["git", "ls-remote", "--tags", "origin", f"refs/tags/{tag}"])
+    return out.returncode == 0 and bool(out.stdout.strip())
+
+
 def published_releases() -> dict[str, dict]:
     """Map tag -> {name, body}. Empty when gh is unavailable or unauthenticated."""
     out = _run(["gh", "release", "list", "--limit", "100", "--json", "tagName"])
@@ -104,12 +116,18 @@ def main(argv: list[str] | None = None) -> int:
             continue
 
         if tag not in releases:
-            print(f"{tag}: NO RELEASE — would create, titled {title!r}")
             changed += 1
+            sha = tag_commit(tag)
+            print(f"{tag}: NO RELEASE — would create, titled {title!r}")
+            if not tag_on_remote(tag):
+                # Without --target, gh creates the tag at the default branch's
+                # HEAD, which would put an old release on today's code.
+                print(f"       tag is local-only; would create it at {sha[:12]}")
             if args.apply:
                 result = _run([
                     "gh", "release", "create", tag,
                     "--title", title, "--notes", body,
+                    "--target", sha,
                 ])
                 print(f"       {'created' if result.returncode == 0 else result.stderr.strip()}")
             continue
