@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased — Distributed full-mode benchmark runs
+## Unreleased — Distributed full-mode benchmark runs and npm worker bridge
 
 ### Added
 - **`atomics distributed run --mode full`** delegates an entire benchmark run to
@@ -14,6 +14,15 @@
   resolution honoring the worker's own flags and the run request's pinned values.
 - `atomics distributed status` renders a compact table for completed full-mode
   jobs, while split and pending jobs keep their existing outputs.
+- **`atomics worker-npm`** starts a Node.js worker that joins the distributed pool.
+  It registers with the coordinator, heartbeats, polls for assignments, and executes
+  them via a JSON-over-stdin bridge command. The bundled `task-runner.js` provides
+  a minimal example; production deployments can point `--worker-cmd` at their own
+  Node.js runner.
+- Capability-based assignment routing: workers advertise capabilities (e.g.
+  `python`, `node`) and the coordinator only assigns tasks whose `runtime` matches.
+  Python workers advertise `python` by default; npm workers advertise `node`. Use
+  `--runtime node` with `atomics distributed run` to generate node tasks.
 
 ## 0.14.0 (2026-07-26) — Tool-call divergence suite, release pipeline repairs
 

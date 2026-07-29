@@ -97,6 +97,8 @@ Spread benchmark work across multiple worker processes that poll a coordinator (
 
 Every worker endpoint, registration included, requires worker authentication via `X-API-Key` (pluggable `WorkerAuth`; uses the server API keys when auth is enabled). A worker has no id yet at registration, so the worker key is the only credential it can present.
 
+Workers register with `capabilities` (e.g., `["python"]` for the built-in Python worker, `["node"]` for the npm bridge). The coordinator uses capabilities to route assignments: a task with `runtime: "node"` is only claimed by workers that advertise the `node` capability. Python workers advertise `python` by default; the npm worker advertises `node` by default. A worker with no capabilities is treated as `python` for backwards compatibility.
+
 A worker that stops sending heartbeats for 120 seconds is marked offline. It is then excluded from new fleet runs, and its pinned work is failed rather than left for a host that is not coming back. The window is `atomics server --worker-absent-after SECONDS`; raise it above roughly four times your workers' `--heartbeat-interval`, or hosts that are heartbeating exactly as configured will be declared absent and lose their fleet slice.
 
 ### Distributed run endpoints
