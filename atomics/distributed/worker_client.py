@@ -11,7 +11,7 @@ from typing import Any
 import httpx
 
 from atomics.distributed.models import TaskAssignment, WorkerRegisterRequest
-from atomics.distributed.worker_runner import execute_assignment
+from atomics.distributed.worker_runner import execute_assignment, execute_full_run
 
 logger = logging.getLogger("atomics.distributed.worker_client")
 
@@ -77,12 +77,20 @@ class WorkerClient:
             return False
         assignment = TaskAssignment(**data)
         try:
-            result = await self._executor(
-                assignment,
-                provider_name=self._provider_name,
-                model=self._model,
-                host=self._host,
-            )
+            if assignment.task_spec.get("mode") == "full":
+                result = await execute_full_run(
+                    assignment,
+                    provider_name=self._provider_name,
+                    model=self._model,
+                    host=self._host,
+                )
+            else:
+                result = await self._executor(
+                    assignment,
+                    provider_name=self._provider_name,
+                    model=self._model,
+                    host=self._host,
+                )
             await self._client.post(
                 f"{self.coordinator_url}/api/v1/workers/{self._worker_id}/jobs/{assignment.assignment_id}/result",
                 json={"status": "completed", "result_json": json.dumps(result)},

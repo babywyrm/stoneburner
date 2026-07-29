@@ -1,3 +1,4 @@
+import json
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -694,3 +695,79 @@ def test_recover_jobs_requeues_stale_assigned_work(coordinator):
     a2 = coordinator.claim_assignment(w.worker_id)
     assert a2 is not None
     assert a2.assignment_id == a1.assignment_id
+
+
+# ── Full-mode tests ──────────────────────────────────────────────────────────
+
+
+def test_full_job_creates_one_assignment(coordinator):
+    req = DistributedRunRequest(mode=JobMode.FULL, run_request={"iterations": 5})
+    job = coordinator.create_full_job(req, [])
+    assert job.mode == JobMode.FULL
+    rows = coordinator._conn.execute(
+        "SELECT target_worker_id, task_spec FROM distributed_assignments WHERE job_id = ?",
+        (job.job_id,),
+    ).fetchall()
+    assert len(rows) == 1
+    assert rows[0][0] is None
+    spec = json.loads(rows[0][1])
+    assert spec["mode"] == "full"
+    assert spec["run_request"]["iterations"] == 5
+
+
+def test_full_job_with_selector_pins_to_first_matching_worker(coordinator):
+    w1 = coordinator.register_worker(WorkerRegisterRequest(labels={"box": "a"}))
+    coordinator.register_worker(WorkerRegisterRequest(labels={"box": "b"}))
+    req = DistributedRunRequest(mode=JobMode.FULL, run_request={"iterations": 1})
+    job = coordinator.create_full_job_from_selector(req, {"box": "a"})
+    rows = coordinator._conn.execute(
+        "SELECT target_worker_id FROM distributed_assignments WHERE job_id = ?",
+        (job.job_id,),
+    ).fetchall()
+    assert len(rows) == 1
+    assert rows[0][0] == w1.worker_id
+
+
+def test_full_job_with_zero_matches_raises(coordinator):
+    coordinator.register_worker(WorkerRegisterRequest(labels={"box": "a"}))
+    req = DistributedRunRequest(mode=JobMode.FULL, run_request={"iterations": 1})
+    with pytest.raises(ValueError, match="no online workers match"):
+        coordinator.create_full_job_from_selector(req, {"box": "missing"})
+
+
+def test_full_job_claimable_by_any_worker_when_no_selector(coordinator):
+    coordinator.register_worker(WorkerRegisterRequest())
+    w2 = coordinator.register_worker(WorkerRegisterRequest())
+    job = coordinator.create_full_job(
+        DistributedRunRequest(mode=JobMode.FULL, run_request={"iterations": 1}), []
+    )
+    a = coordinator.claim_assignment(w2.worker_id)
+    assert a is not None
+    assert a.job_id == job.job_id
+    assert a.worker_id == w2.worker_id
+
+
+def test_full_job_with_selector_only_claimable_by_target_worker(coordinator):
+    w1 = coordinator.register_worker(WorkerRegisterRequest(labels={"box": "a"}))
+    w2 = coordinator.register_worker(WorkerRegisterRequest(labels={"box": "b"}))
+    job = coordinator.create_full_job_from_selector(
+        DistributedRunRequest(mode=JobMode.FULL, run_request={"iterations": 1}),
+        {"box": "a"},
+    )
+    assert coordinator.claim_assignment(w2.worker_id) is None
+    a = coordinator.claim_assignment(w1.worker_id)
+    assert a is not None
+    assert a.job_id == job.job_id
+
+
+def test_full_job_reaches_completed_when_result_submitted(coordinator):
+    w = coordinator.register_worker(WorkerRegisterRequest())
+    job = coordinator.create_full_job(
+        DistributedRunRequest(mode=JobMode.FULL, run_request={"iterations": 1}), []
+    )
+    a = coordinator.claim_assignment(w.worker_id)
+    assert a is not None
+    coordinator.submit_assignment(a.assignment_id, '{"ok": true}')
+    completed = coordinator.get_job(job.job_id)
+    assert completed is not None
+    assert completed.status == JobStatus.COMPLETED

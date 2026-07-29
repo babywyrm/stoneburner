@@ -380,3 +380,74 @@ def test_worker_cli_passes_provider_model_host(monkeypatch):
     assert kwargs["provider_name"] == "brain-gateway"
     assert kwargs["host"] == "http://nuc:30080"
     assert kwargs["model"] == "qwen3:4b"
+
+
+def test_full_mode_sends_run_request_and_selector(monkeypatch):
+    """Full mode is accepted and can target a worker by label."""
+    from click.testing import CliRunner
+
+    from atomics.commands.distributed import distributed
+
+    captured = _capture_run_payload(monkeypatch)
+    result = CliRunner().invoke(distributed, [
+        "run",
+        "--api-key", "client-key",
+        "--mode", "full",
+        "--label", "box=239",
+        "--provider", "brain-gateway",
+        "--model", "qwen3:4b",
+    ])
+    assert result.exit_code == 0, result.output
+    assert captured["mode"] == "full"
+    assert captured["worker_selector"] == {"box": "239"}
+    assert captured["run_request"]["provider"] == "brain-gateway"
+    assert captured["run_request"]["model"] == "qwen3:4b"
+
+
+_FULL_STATUS = {
+    "job_id": "job-2",
+    "status": "completed",
+    "mode": "full",
+    "summary_json": json.dumps({
+        "summary": {
+            "total_tasks": 5,
+            "successful_tasks": 5,
+            "failed_tasks": 0,
+            "total_tokens": 1234,
+            "total_cost_usd": 0.012,
+            "avg_latency_ms": 145.5,
+        }
+    }),
+}
+
+
+def test_full_status_prints_a_summary_table(monkeypatch):
+    """Full mode status should render a compact summary rather than raw JSON."""
+    from click.testing import CliRunner
+
+    from atomics.commands.distributed import distributed
+
+    _stub_status_response(monkeypatch, _FULL_STATUS)
+    result = CliRunner().invoke(
+        distributed, ["status", "job-2", "--api-key", "client-key"]
+    )
+    assert result.exit_code == 0, result.output
+    assert "Full run" in result.output
+    assert "5" in result.output
+    assert "1234" in result.output
+    with pytest.raises(json.JSONDecodeError):
+        json.loads(result.output)
+
+
+def test_full_status_without_summary_prints_plain_json(monkeypatch):
+    """A full-mode job with no result yet should fall back to plain JSON."""
+    from click.testing import CliRunner
+
+    from atomics.commands.distributed import distributed
+
+    _stub_status_response(monkeypatch, {"job_id": "job-2", "status": "pending", "mode": "full"})
+    result = CliRunner().invoke(
+        distributed, ["status", "job-2", "--api-key", "client-key"]
+    )
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.output)["mode"] == "full"

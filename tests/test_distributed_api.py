@@ -214,13 +214,36 @@ def test_fleet_run_without_a_selector_uses_every_online_worker(client):
     assert {target for target, _ in rows} == {first, second}
 
 
-def test_full_mode_is_still_rejected(client):
-    """Only fleet was implemented; full must not silently behave like split."""
+def test_full_mode_is_accepted(client):
+    """Full mode creates a single assignment with the full run request."""
     resp = client.post(
         "/api/v1/distributed/runs",
-        json={"mode": "full", "run_request": {"iterations": 1}},
+        json={"mode": "full", "run_request": {"iterations": 3}},
+    )
+    assert resp.status_code == 202
+    job = resp.json()
+    rows = client.app.state.coordinator._conn.execute(
+        "SELECT task_spec FROM distributed_assignments WHERE job_id = ?",
+        (job["job_id"],),
+    ).fetchall()
+    assert len(rows) == 1
+    spec = json.loads(rows[0][0])
+    assert spec["mode"] == "full"
+    assert spec["run_request"]["iterations"] == 3
+
+
+def test_full_mode_with_selector_and_no_match_is_rejected(client):
+    """Full mode with a selector must reject when no worker matches."""
+    resp = client.post(
+        "/api/v1/distributed/runs",
+        json={
+            "mode": "full",
+            "run_request": {"iterations": 1},
+            "worker_selector": {"box": "missing"},
+        },
     )
     assert resp.status_code == 400
+    assert "selector" in resp.json()["detail"].lower()
 
 
 def _task_specs(client, job_id: str) -> list[dict]:

@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 import json
-from unittest.mock import patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
 
 from atomics.api.server import create_app
 from atomics.distributed.models import TaskAssignment
-from atomics.distributed.worker_runner import execute_assignment
+from atomics.distributed.worker_runner import execute_assignment, execute_full_run
 from atomics.providers.base import BaseProvider, ProviderResponse
 
 
@@ -165,3 +165,80 @@ async def test_end_to_end_split_run(client):
     status_resp = client.get(f"/api/v1/distributed/runs/{job_id}")
     assert status_resp.status_code == 200
     assert status_resp.json()["status"] == "completed"
+
+
+@pytest.mark.asyncio
+async def test_end_to_end_full_run(client):
+    """One worker receives the entire run request and executes it locally."""
+    reg = client.post("/api/v1/workers/register", json={"labels": {"provider": "fake"}})
+    assert reg.status_code == 200
+    worker_id = reg.json()["worker_id"]
+
+    run_resp = client.post(
+        "/api/v1/distributed/runs",
+        json={"mode": "full", "run_request": {"iterations": 3, "tier": "ez", "provider": "fake"}},
+    )
+    assert run_resp.status_code == 202
+    job_id = run_resp.json()["job_id"]
+
+    # Only one assignment is created and it is claimable.
+    poll = client.get(f"/api/v1/workers/{worker_id}/jobs/next")
+    assert poll.status_code == 200
+    body = poll.json()
+    assert body is not None
+    assignment = TaskAssignment(**body)
+    assert assignment.job_id == job_id
+    assert assignment.task_spec["mode"] == "full"
+    assert assignment.task_spec["run_request"]["iterations"] == 3
+
+    # Subsequent claims should return nothing for this job.
+    assert client.get(f"/api/v1/workers/{worker_id}/jobs/next").json() is None
+
+    fake_summary = MagicMock(
+        run_id="run-full",
+        total_tasks=3,
+        successful_tasks=3,
+        failed_tasks=0,
+        total_tokens=90,
+        total_cost_usd=0.0,
+        avg_latency_ms=100.0,
+    )
+    fake_summary.model_dump.return_value = {
+        "run_id": "run-full",
+        "total_tasks": 3,
+        "successful_tasks": 3,
+        "failed_tasks": 0,
+        "total_tokens": 90,
+        "total_cost_usd": 0.0,
+        "avg_latency_ms": 100.0,
+    }
+    fake_rows = [
+        ("t1", "run-full", "general_qa", "q1", "fake", "fake-model", "success", None, "p", "r", 10, 20, 30, 0, 0, 0, 100, 0.0, None, None, None, None),
+    ] * 3
+
+    with (
+        patch("atomics.distributed.worker_runner.LoopEngine") as engine_cls,
+        patch("atomics.distributed.worker_runner.MetricsRepository") as repo_cls,
+        patch("atomics.distributed.worker_runner.make_provider", return_value=FakeProvider()),
+    ):
+        fake_repo = MagicMock()
+        fake_cursor = MagicMock()
+        fake_cursor.description = [("task_id",)] + [("col",)] * 21
+        fake_cursor.fetchall.return_value = fake_rows
+        fake_repo._conn.execute.return_value = fake_cursor
+        fake_repo.close = MagicMock()
+        repo_cls.return_value = fake_repo
+        engine_cls.return_value.run = AsyncMock(return_value=fake_summary)
+        result = await execute_full_run(assignment, provider_name="fake", model="fake-model")
+
+    assert result["summary"]["total_tasks"] == 3
+    assert len(result["task_results"]) == 3
+
+    submit = client.post(
+        f"/api/v1/workers/{worker_id}/jobs/{assignment.assignment_id}/result",
+        json={"status": "completed", "result_json": json.dumps(result)},
+    )
+    assert submit.status_code == 200
+
+    finished = client.get(f"/api/v1/distributed/runs/{job_id}").json()
+    assert finished["status"] == "completed"
