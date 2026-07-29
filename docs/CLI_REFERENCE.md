@@ -147,6 +147,7 @@ Real retrieval (`rag-index`, `rag --index`, `rag-retrieval`) requires the option
 | `atomics server --log-level debug` | Verbose uvicorn logging |
 | `atomics server --worker-absent-after N` | Seconds of worker silence before it is marked offline (default: 120) |
 | `atomics worker` | Start a distributed worker (polls coordinator for tasks) |
+| `atomics worker-npm` | Start a Node.js worker bridge for distributed task execution |
 | `atomics distributed run` | Submit a distributed run (split, fleet, or full mode) |
 | `atomics distributed status JOB_ID` | Poll distributed run status |
 
@@ -181,14 +182,40 @@ uv run atomics worker --provider brain-gateway --host http://nuc:30080 --model q
 uv run atomics worker --provider vllm --host http://nuc:30080/v1 --label gpu=4090
 ```
 
+## atomics worker-npm
+
+Start a Node.js worker that joins the distributed pool via the JSON-over-stdin bridge protocol. The npm worker registers with the coordinator, heartbeats, polls for assignments, and executes them by spawning the command provided by `--worker-cmd`.
+
+| Option | Description |
+|--------|-------------|
+| `--coordinator URL` | Coordinator base URL (default: `http://127.0.0.1:8000`) |
+| `--api-key KEY` | Worker API key (or `ATOMICS_WORKER_API_KEY`) |
+| `--label KEY=VALUE` | Worker label, repeatable |
+| `--capability TEXT` | Worker capability, repeatable (default: `node`) |
+| `--endpoint URL` | Optional push endpoint URL for this worker |
+| `--worker-cmd CMD` | Command used to execute each task (default: `node task-runner.js`) |
+| `--heartbeat-interval N` | Heartbeat interval in seconds (default: 30) |
+| `--npm-dir PATH` | Path to the npm worker package |
+
+Use `--runtime node` on `atomics distributed run` to generate node-runtime tasks that only npm workers can claim.
+
+```bash
+# Terminal 1 — start the npm worker
+uv run atomics worker-npm --api-key worker-key --label box=239
+
+# Terminal 2 — submit node-runtime work
+uv run atomics distributed run --mode split --runtime node -n 10 --api-key client-key
+```
+
+The bundled `task-runner.js` is a minimal example that echoes the task name. Real deployments should point `--worker-cmd` at their own Node.js runner that implements the bridge protocol.
+
 ## atomics distributed
 
-Submit and inspect distributed benchmark runs. Two modes:
+Submit and inspect distributed benchmark runs. Three modes:
 
 - `split` divides the tasks across registered workers, to finish a run faster.
 - `fleet` gives every matching worker the identical task set, to compare hosts.
-
-`full` (one worker runs an entire run) is declared but unimplemented and rejected.
+- `full` delegates an entire run to one worker, which executes the full `LoopEngine` locally.
 
 ### `atomics distributed run`
 
@@ -202,6 +229,7 @@ Submit and inspect distributed benchmark runs. Two modes:
 | `-m, --model TEXT` | Model override for the executing provider |
 | `-n INTEGER` | Tasks per worker in fleet mode; tasks in total in split mode (default: 1) |
 | `--label KEY=VALUE` | Worker selector, repeatable. Fleet and full mode only; **rejected for `split`**, which assigns each task to the next available worker |
+| `--runtime [python\|node]` | Runtime for generated tasks. `node` routes tasks to npm workers via the bridge (default: `python`) |
 
 Reads the client key from `ATOMICS_API_KEY`; pass `--api-key` to override.
 

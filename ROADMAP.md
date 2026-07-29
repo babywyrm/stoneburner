@@ -5,6 +5,7 @@ Current priorities and future directions for Stoneburner / Atomics.
 ## Recently Shipped
 
 - **Distributed fleet and full modes (Phase 2)** — `atomics distributed run --mode fleet --label k=v` broadcasts an identical task set to every matching worker, and `--mode full` delegates a complete run to one worker that executes the full `LoopEngine` locally. Both include per-worker rollups, worker liveness detection, bounded retries, and client auth on the coordinator endpoints.
+- **npm worker bridge** — `atomics worker-npm` starts a Node.js worker that registers with the coordinator, polls for assignments, and executes them via a JSON-over-stdin bridge command. Capability-based routing (`runtime: node`) ensures npm workers only receive node tasks while Python workers continue to claim the default python tasks.
 - **Distributed runs (Phase 1 split mode)** — `atomics distributed run` / `atomics worker` with coordinator API for split-mode jobs across workers.
 - **RAG Pipeline Evaluation** — `atomics rag` with 20 fixtures (security + general technical), grounding/faithfulness/abstention judge rubric, hallucination detection
 - **README refactor** — 805 → 205 lines with TOC, anchors, and 5 linked focused docs
@@ -40,7 +41,7 @@ Current priorities and future directions for Stoneburner / Atomics.
 - [x] Local llama.cpp direct (without Ollama wrapper)
 
 ### Phase 3 (npm workers)
-- [ ] `atomics/workers/bridge.py` — Node.js worker integration for browser-based benchmarks
+- [x] `atomics/workers/bridge.py` — Node.js worker integration for browser-based benchmarks
 - [ ] npm worker pool for parallel fixture execution
 
 ## Design Principles
