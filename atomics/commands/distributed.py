@@ -25,9 +25,10 @@ def distributed() -> None:
     "--mode",
     default="split",
     show_default=True,
-    type=click.Choice(["split", "fleet"]),
+    type=click.Choice(["split", "fleet", "full"]),
     help="split: divide the tasks across workers. fleet: run every task on every "
-    "matching worker, for comparing hosts.",
+    "matching worker, for comparing hosts. full: delegate the entire run to one "
+    "worker so it executes the full LoopEngine locally.",
 )
 @click.option(
     "--provider",
@@ -58,11 +59,11 @@ def run(
     """Submit a distributed run to the coordinator."""
     if not api_key:
         raise click.UsageError("--api-key is required (or set ATOMICS_API_KEY)")
-    if labels and mode == "split":
+    if labels and mode not in ("fleet", "full"):
         raise click.UsageError(
-            "--label only applies to fleet mode: split assigns each task to the "
+            "--label only applies to fleet and full mode: split assigns each task to the "
             "next available worker, so a selector would be silently ignored. "
-            "Use --mode fleet to target workers by label."
+            "Use --mode fleet or --mode full to target workers by label."
         )
     selector: dict[str, str] = {}
     for label in labels:
@@ -153,6 +154,21 @@ def _render_fleet_table(job: dict, summary: dict) -> None:
     )
 
 
+def _render_full_table(job: dict, summary: dict) -> None:
+    """Print a compact summary of a single full-run delegation."""
+    run_summary = summary.get("summary", summary)
+    table = Table(title=f"Full run {job.get('job_id', '')} — {job.get('status', '')}")
+    table.add_column("Metric")
+    table.add_column("Value", justify="right")
+    table.add_row("Tasks", str(run_summary.get("total_tasks", 0)))
+    table.add_row("Success", str(run_summary.get("successful_tasks", 0)))
+    table.add_row("Failed", str(run_summary.get("failed_tasks", 0)))
+    table.add_row("Tokens", str(run_summary.get("total_tokens", 0)))
+    table.add_row("Cost", f"${run_summary.get('total_cost_usd', 0.0)}")
+    table.add_row("Avg ms", f"{run_summary.get('avg_latency_ms', 0.0):.1f}")
+    Console().print(table)
+
+
 @distributed.command()
 @click.option("--coordinator", default="http://127.0.0.1:8000", show_default=True)
 @click.option("--api-key", envvar="ATOMICS_API_KEY", help="Client API key")
@@ -190,5 +206,8 @@ def status(
     # well as nested JSON. Split runs keep the machine-readable output they had.
     if job.get("mode") == "fleet" and summary.get("workers"):
         _render_fleet_table(job, summary)
+        return
+    if job.get("mode") == "full" and summary:
+        _render_full_table(job, summary)
         return
     click.echo(json.dumps(job, indent=2))

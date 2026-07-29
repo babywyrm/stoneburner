@@ -231,6 +231,36 @@ class Coordinator:
         self._conn.commit()
         return job
 
+    def create_full_job(
+        self, request: DistributedRunRequest, workers: list[Worker]
+    ) -> DistributedJob:
+        """Delegate an entire run to one worker as a single assignment.
+
+        When `workers` is non-empty, pin to the first worker. When empty, leave
+        `target_worker_id` NULL so any worker can claim.
+        """
+        job = self._insert_job(request, JobMode.FULL)
+        target = workers[0].worker_id if workers else None
+        self._insert_assignment(
+            job.job_id,
+            {"mode": "full", "run_request": request.run_request},
+            target_worker_id=target,
+        )
+        self._conn.commit()
+        return job
+
+    def create_full_job_from_selector(
+        self, request: DistributedRunRequest, selector: dict[str, str] | None
+    ) -> DistributedJob:
+        """Resolve matching workers and create a full-mode job pinned to the first.
+
+        Raises ValueError when no online workers match the selector.
+        """
+        workers = self.matching_workers(selector)
+        if not workers:
+            raise ValueError("no online workers match the selector")
+        return self.create_full_job(request, workers)
+
     def claim_assignment(self, worker_id: str) -> TaskAssignment | None:
         self._requeue_stale_assignments()
         cursor = self._conn.execute(

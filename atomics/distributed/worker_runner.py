@@ -3,13 +3,18 @@
 from __future__ import annotations
 
 import logging
+import tempfile
+import uuid
+from pathlib import Path
 from typing import Any
 
 from atomics.config import AtomicsSettings, load_settings
+from atomics.core.engine import LoopEngine
 from atomics.core.runner import execute_task
 from atomics.distributed.models import TaskAssignment
-from atomics.models import TaskCategory, TaskComplexity, TaskDefinition
+from atomics.models import BurnTier, TaskCategory, TaskComplexity, TaskDefinition
 from atomics.providers.factory import make_provider
+from atomics.storage.repository import MetricsRepository
 from atomics.tasks.catalog import TASK_CATALOG
 
 logger = logging.getLogger("atomics.distributed.worker_runner")
@@ -130,3 +135,94 @@ async def execute_assignment(
         model=model,
     )
     return _serialize_result(result)
+
+
+def _parse_run_request_host(run_request: dict[str, Any], provider_name: str) -> str | None:
+    """Return the host override from the run request for the named provider."""
+    if provider_name == "ollama":
+        return run_request.get("ollama_host")
+    if provider_name == "vllm":
+        return run_request.get("vllm_host")
+    if provider_name == "brain-gateway":
+        return run_request.get("gateway_url")
+    return None
+
+
+async def execute_full_run(
+    assignment: TaskAssignment,
+    *,
+    provider_name: str = "ollama",
+    model: str | None = None,
+    host: str | None = None,
+    settings: AtomicsSettings | None = None,
+) -> dict[str, Any]:
+    """Execute a full benchmark run locally and return a serializable result."""
+    settings = settings or load_settings()
+    run_request = assignment.task_spec.get("run_request", {})
+    if not isinstance(run_request, dict):
+        raise TypeError("run_request must be a dict")
+
+    effective_provider = run_request.get("provider") or provider_name
+    effective_model = run_request.get("model") or model
+    effective_host = _parse_run_request_host(run_request, effective_provider) or host
+
+    provider = make_provider(
+        effective_provider,
+        effective_model,
+        effective_host,
+        settings,
+        vllm_host=effective_host if effective_provider == "vllm" else None,
+    )
+
+    tier_value = run_request.get("tier", "baseline")
+    try:
+        tier = BurnTier(str(tier_value))
+    except ValueError:
+        tier = BurnTier.BASELINE
+
+    iterations = int(run_request.get("iterations", 1))
+    budget = run_request.get("budget")
+    interval = run_request.get("interval")
+    thinking = run_request.get("thinking")
+    thinking_budget = run_request.get("thinking_budget")
+
+    db_path = Path(tempfile.gettempdir()) / f"atomics-full-{uuid.uuid4().hex}.db"
+    repo = MetricsRepository(db_path)
+    try:
+        engine = LoopEngine(
+            provider,
+            repo,
+            settings,
+            tier=tier,
+            budget_override=budget if isinstance(budget, float | int) else None,
+            interval_override=interval if isinstance(interval, int) else None,
+            model_override=effective_model,
+            trigger="distributed",
+            thinking=thinking if isinstance(thinking, bool) else None,
+            thinking_budget=thinking_budget if isinstance(thinking_budget, int) else None,
+        )
+        summary = await engine.run(max_iterations=iterations)
+        if summary is None:
+            raise RuntimeError("Full run produced no summary")
+
+        cursor = repo._conn.execute(
+            "SELECT task_id, run_id, category, task_name, provider, model, status, "
+            "suite, prompt, response, input_tokens, output_tokens, total_tokens, "
+            "thinking_tokens, cache_read_tokens, cache_write_tokens, latency_ms, "
+            "estimated_cost_usd, tokens_per_second, tps_basis, error_class, error_message "
+            "FROM task_results WHERE run_id = ?",
+            (summary.run_id,),
+        )
+        columns = [desc[0] for desc in cursor.description]
+        task_results = [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+        return {
+            "summary": summary.model_dump(mode="json"),
+            "task_results": task_results,
+        }
+    finally:
+        repo.close()
+        try:
+            db_path.unlink()
+        except FileNotFoundError:
+            pass

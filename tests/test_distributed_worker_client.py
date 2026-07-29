@@ -140,3 +140,41 @@ async def test_poll_and_execute_reports_failure(mock_httpx_client):
     assert post.kwargs["json"]["status"] == "failed"
     assert "boom" in post.kwargs["json"]["error"]
     await worker.close()
+
+
+@pytest.mark.asyncio
+async def test_poll_and_execute_dispatches_full_mode_to_execute_full_run(mock_httpx_client):
+    assignment = {
+        "assignment_id": "a-3",
+        "job_id": "j-3",
+        "task_spec": {"mode": "full", "run_request": {"tier": "ez", "iterations": 1}},
+    }
+    mock_httpx_client.get.return_value = _mock_response(assignment)
+    mock_httpx_client.post.return_value = _mock_response({"status": "completed"})
+
+    with patch(
+        "atomics.distributed.worker_client.execute_full_run",
+        new_callable=AsyncMock,
+        return_value={"summary": {"run_id": "r-3"}},
+    ) as full_runner:
+        worker = WorkerClient(
+            coordinator_url="http://coordinator:8000",
+            api_key="secret",
+            provider_name="ollama",
+            model="m",
+            host="http://box:30080",
+        )
+        worker._worker_id = "w-1"
+        worked = await worker.poll_and_execute()
+
+    assert worked is True
+    full_runner.assert_awaited_once()
+    assert full_runner.await_args.args[0].assignment_id == "a-3"
+    assert full_runner.await_args.kwargs["provider_name"] == "ollama"
+    assert full_runner.await_args.kwargs["model"] == "m"
+    assert full_runner.await_args.kwargs["host"] == "http://box:30080"
+
+    post = mock_httpx_client.post.await_args
+    assert post.kwargs["json"]["status"] == "completed"
+    assert json.loads(post.kwargs["json"]["result_json"]) == {"summary": {"run_id": "r-3"}}
+    await worker.close()

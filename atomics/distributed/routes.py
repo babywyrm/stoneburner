@@ -132,12 +132,13 @@ async def start_distributed_run(
     coordinator: Coordinator = Depends(get_coordinator),
     _: None = Depends(require_auth),
 ) -> DistributedJob:
-    if payload.mode not in (JobMode.SPLIT, JobMode.FLEET):
+    if payload.mode not in (JobMode.SPLIT, JobMode.FLEET, JobMode.FULL):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
                 f"Unsupported mode {payload.mode.value!r}. Use 'split' to divide "
-                "work across workers or 'fleet' to run it on every matching worker."
+                "work across workers, 'fleet' to run it on every matching worker, "
+                "or 'full' to delegate an entire run to one worker."
             ),
         )
     if payload.mode is JobMode.SPLIT and payload.worker_selector:
@@ -145,7 +146,7 @@ async def start_distributed_run(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
                 "worker_selector is not honored in split mode: each task goes to "
-                "the next available worker. Drop the selector, or use fleet mode "
+                "the next available worker. Drop the selector, or use fleet/full mode "
                 "to target workers by label."
             ),
         )
@@ -154,6 +155,18 @@ async def start_distributed_run(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="run_request is required",
         )
+    if payload.mode is JobMode.FULL:
+        if payload.worker_selector:
+            try:
+                return coordinator.create_full_job_from_selector(
+                    payload, payload.worker_selector
+                )
+            except ValueError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=str(exc),
+                ) from exc
+        return coordinator.create_full_job(payload, [])
     # Built once and shared across workers in fleet mode: each spec is sampled
     # randomly, so per-worker generation would give each host different prompts.
     task_specs = _build_task_specs(payload.run_request)

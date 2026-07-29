@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from atomics.distributed.models import TaskAssignment
-from atomics.distributed.worker_runner import execute_assignment
+from atomics.distributed.worker_runner import execute_assignment, execute_full_run
 from atomics.models import TaskCategory, TaskResult, TaskStatus
 
 
@@ -232,3 +232,94 @@ async def test_execute_assignment_builds_fallback_task():
     assert task_arg.prompt_template == "{prompt}"
     assert task_arg.max_output_tokens == 512
     assert result["task_name"] == "custom_task"
+
+
+@pytest.mark.asyncio
+async def test_execute_full_run_delegates_to_loop_engine():
+    """A full-mode assignment should run the full LoopEngine and return summary + results."""
+    assignment = TaskAssignment(
+        assignment_id="a5",
+        job_id="j5",
+        task_spec={"mode": "full", "run_request": {"tier": "ez", "iterations": 2}},
+    )
+    fake_summary = MagicMock(run_id="run-5", model_dump=MagicMock(return_value={"run_id": "run-5"}))
+    fake_rows = [
+        ("t1", "run-5", "general_qa", "q1", "ollama", "m", "success", None, "p", "r", 1, 2, 3, 0, 0, 0, 10, 0.0, None, None, None, None),
+    ]
+
+    fake_cursor = MagicMock()
+    fake_cursor.description = [("task_id",)] + [("col",)] * 21
+    fake_cursor.fetchall.return_value = fake_rows
+    fake_repo = MagicMock()
+    fake_repo._conn.execute.return_value = fake_cursor
+    fake_repo.close = MagicMock()
+
+    fake_engine = MagicMock()
+    fake_engine.run = AsyncMock(return_value=fake_summary)
+
+    with (
+        patch("atomics.distributed.worker_runner.LoopEngine", return_value=fake_engine) as engine_cls,
+        patch("atomics.distributed.worker_runner.MetricsRepository", return_value=fake_repo),
+        patch("atomics.distributed.worker_runner.make_provider", return_value=MagicMock(name="provider")),
+        patch("atomics.distributed.worker_runner.load_settings", return_value=MagicMock(name="settings")),
+    ):
+        result = await execute_full_run(assignment, provider_name="ollama", model="m")
+
+    engine_cls.assert_called_once()
+    assert result["summary"] == {"run_id": "run-5"}
+    assert len(result["task_results"]) == 1
+    assert result["task_results"][0]["task_id"] == "t1"
+    fake_repo.close.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_execute_full_run_uses_run_request_provider_and_model():
+    """Pinned provider/model in the run request should override worker defaults."""
+    assignment = TaskAssignment(
+        assignment_id="a6",
+        job_id="j6",
+        task_spec={
+            "mode": "full",
+            "run_request": {"provider": "vllm", "model": "vllm-model", "iterations": 1},
+        },
+    )
+
+    with (
+        patch("atomics.distributed.worker_runner.LoopEngine") as engine_cls,
+        patch("atomics.distributed.worker_runner.MetricsRepository", return_value=MagicMock()),
+        patch(
+            "atomics.distributed.worker_runner.make_provider",
+            return_value=MagicMock(name="provider"),
+        ) as make_provider,
+        patch("atomics.distributed.worker_runner.load_settings", return_value=MagicMock()),
+    ):
+        engine_cls.return_value.run = AsyncMock(return_value=MagicMock(run_id="r6", model_dump=MagicMock(return_value={"run_id": "r6"})))
+        await execute_full_run(assignment, provider_name="ollama", model="ollama-model", host="http://host")
+
+    assert make_provider.call_args.args[0] == "vllm"
+    assert make_provider.call_args.args[1] == "vllm-model"
+    assert make_provider.call_args.kwargs["vllm_host"] == "http://host"
+
+
+@pytest.mark.asyncio
+async def test_execute_full_run_cleans_up_temp_db_on_failure():
+    """A failed full run should still delete the temporary SQLite file."""
+    assignment = TaskAssignment(
+        assignment_id="a7",
+        job_id="j7",
+        task_spec={"mode": "full", "run_request": {"iterations": 1}},
+    )
+    fake_repo = MagicMock()
+    fake_repo.close = MagicMock()
+
+    with (
+        patch("atomics.distributed.worker_runner.MetricsRepository", return_value=fake_repo),
+        patch("atomics.distributed.worker_runner.LoopEngine") as engine_cls,
+        patch("atomics.distributed.worker_runner.make_provider", return_value=MagicMock()),
+        patch("atomics.distributed.worker_runner.load_settings", return_value=MagicMock()),
+    ):
+        engine_cls.return_value.run = AsyncMock(return_value=None)
+        with pytest.raises(RuntimeError, match="no summary"):
+            await execute_full_run(assignment, provider_name="ollama")
+
+    fake_repo.close.assert_called_once()
