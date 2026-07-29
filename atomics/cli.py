@@ -14,6 +14,7 @@ from atomics.commands import rag as rag_commands
 from atomics.commands import security as security_commands
 from atomics.commands import toolcall as toolcall_commands
 from atomics.commands import worker as worker_commands
+from atomics.commands import worker_npm as worker_npm_commands
 from atomics.commands.auth import login, logout, secrets_group, whoami
 from atomics.commands.common import setup_logging
 
@@ -82,4 +83,5 @@ codereview = security_commands.codereview
 
 cli.add_command(api_commands.server)
 cli.add_command(worker_commands.worker)
+cli.add_command(worker_npm_commands.worker_npm)
 cli.add_command(distributed_commands.distributed)

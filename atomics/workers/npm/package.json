@@ -1,0 +1,16 @@
+{
+  "name": "@atomics/npm-worker",
+  "version": "0.1.0",
+  "description": "Node.js worker bridge for Atomics distributed benchmark runs",
+  "main": "worker.js",
+  "bin": {
+    "atomics-npm-worker": "worker.js"
+  },
+  "scripts": {
+    "start": "node worker.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "license": "MIT"
+}

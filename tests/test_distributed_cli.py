@@ -451,3 +451,19 @@ def test_full_status_without_summary_prints_plain_json(monkeypatch):
     )
     assert result.exit_code == 0, result.output
     assert json.loads(result.output)["mode"] == "full"
+
+
+def test_distributed_run_sends_runtime_override(monkeypatch):
+    """The --runtime flag reaches the coordinator run request."""
+    from click.testing import CliRunner
+
+    from atomics.commands.distributed import distributed
+
+    captured = _capture_run_payload(monkeypatch)
+    result = CliRunner().invoke(distributed, [
+        "run",
+        "--api-key", "client-key",
+        "--runtime", "node",
+    ])
+    assert result.exit_code == 0, result.output
+    assert captured["run_request"]["runtime"] == "node"
