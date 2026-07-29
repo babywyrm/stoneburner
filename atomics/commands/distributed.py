@@ -46,6 +46,12 @@ def distributed() -> None:
     help="Worker selector key=value, repeatable. Fleet mode only; a worker must "
     "match every pair. Omit to broadcast to all online workers.",
 )
+@click.option(
+    "--runtime",
+    default="python",
+    show_default=True,
+    help="Runtime for generated tasks. Use 'node' to target npm workers via the bridge.",
+)
 def run(
     coordinator: str,
     api_key: str,
@@ -55,6 +61,7 @@ def run(
     model: str | None,
     iterations: int,
     labels: tuple[str, ...],
+    runtime: str,
 ) -> None:
     """Submit a distributed run to the coordinator."""
     if not api_key:
@@ -71,7 +78,7 @@ def run(
             raise click.BadParameter(f"Label must be key=value: {label!r}")
         key, value = label.split("=", 1)
         selector[key] = value
-    run_request: dict[str, object] = {"tier": tier, "iterations": iterations}
+    run_request: dict[str, object] = {"tier": tier, "iterations": iterations, "runtime": runtime}
     if provider:
         run_request["provider"] = provider
     if model:

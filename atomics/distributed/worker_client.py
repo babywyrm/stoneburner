@@ -49,7 +49,11 @@ class WorkerClient:
         )
 
     async def register(self) -> None:
-        payload = WorkerRegisterRequest(labels=self.labels, endpoint=self.endpoint)
+        payload = WorkerRegisterRequest(
+            labels=self.labels,
+            endpoint=self.endpoint,
+            capabilities=["python"],
+        )
         resp = await self._client.post(
             f"{self.coordinator_url}/api/v1/workers/register",
             json=payload.model_dump(mode="json"),

@@ -232,7 +232,10 @@ class Coordinator:
         return job
 
     def create_full_job(
-        self, request: DistributedRunRequest, workers: list[Worker]
+        self,
+        request: DistributedRunRequest,
+        workers: list[Worker],
+        task_spec: dict[str, Any] | None = None,
     ) -> DistributedJob:
         """Delegate an entire run to one worker as a single assignment.
 
@@ -241,16 +244,16 @@ class Coordinator:
         """
         job = self._insert_job(request, JobMode.FULL)
         target = workers[0].worker_id if workers else None
-        self._insert_assignment(
-            job.job_id,
-            {"mode": "full", "run_request": request.run_request},
-            target_worker_id=target,
-        )
+        spec = task_spec if task_spec is not None else {"mode": "full", "run_request": request.run_request}
+        self._insert_assignment(job.job_id, spec, target_worker_id=target)
         self._conn.commit()
         return job
 
     def create_full_job_from_selector(
-        self, request: DistributedRunRequest, selector: dict[str, str] | None
+        self,
+        request: DistributedRunRequest,
+        selector: dict[str, str] | None,
+        task_spec: dict[str, Any] | None = None,
     ) -> DistributedJob:
         """Resolve matching workers and create a full-mode job pinned to the first.
 
@@ -259,22 +262,64 @@ class Coordinator:
         workers = self.matching_workers(selector)
         if not workers:
             raise ValueError("no online workers match the selector")
-        return self.create_full_job(request, workers)
+        return self.create_full_job(request, workers, task_spec=task_spec)
+
+    def _worker_capabilities(self, worker_id: str) -> list[str]:
+        """Return the worker's capabilities, defaulting to python if empty."""
+        row = self._conn.execute(
+            "SELECT capabilities FROM workers WHERE worker_id = ?", (worker_id,)
+        ).fetchone()
+        if not row:
+            return ["python"]
+        raw = row[0]
+        if not raw:
+            return ["python"]
+        try:
+            caps = json.loads(raw)
+            if isinstance(caps, list) and caps:
+                return caps
+        except Exception:
+            pass
+        return ["python"]
+
+    def _required_runtime(self, task_spec: dict[str, Any]) -> str:
+        """Return the runtime a task requires, defaulting to python."""
+        runtime = task_spec.get("runtime")
+        if isinstance(runtime, str) and runtime:
+            return runtime
+        return "python"
 
     def claim_assignment(self, worker_id: str) -> TaskAssignment | None:
         self._requeue_stale_assignments()
+        capabilities = set(self._worker_capabilities(worker_id))
+        # Find the first pending assignment this worker can execute. We avoid a
+        # JSON subquery in SQLite by filtering in Python; the number of pending
+        # assignments per worker is small.
+        rows = self._conn.execute(
+            "SELECT assignment_id, task_spec FROM distributed_assignments "
+            "WHERE status = ? AND (target_worker_id IS NULL OR target_worker_id = ?) "
+            "ORDER BY assignment_id",
+            (AssignmentStatus.PENDING.value, worker_id),
+        ).fetchall()
+        candidate_id = None
+        for assignment_id, task_spec_raw in rows:
+            try:
+                spec = json.loads(task_spec_raw)
+            except Exception:
+                spec = {}
+            if self._required_runtime(spec) in capabilities:
+                candidate_id = assignment_id
+                break
+        if candidate_id is None:
+            self._conn.commit()
+            return None
+
         cursor = self._conn.execute(
             """
             UPDATE distributed_assignments
             SET status = ?, worker_id = ?, started_at = ?,
                 retry_count = retry_count + 1
-            WHERE assignment_id = (
-                SELECT assignment_id FROM distributed_assignments
-                WHERE status = ?
-                  AND (target_worker_id IS NULL OR target_worker_id = ?)
-                ORDER BY assignment_id
-                LIMIT 1
-            )
+            WHERE assignment_id = ?
             RETURNING assignment_id, job_id, worker_id, target_worker_id, status,
                       task_spec, result_json, retry_count, started_at,
                       completed_at
@@ -283,8 +328,7 @@ class Coordinator:
                 AssignmentStatus.ASSIGNED.value,
                 worker_id,
                 self._now(),
-                AssignmentStatus.PENDING.value,
-                worker_id,
+                candidate_id,
             ),
         )
         row = cursor.fetchone()

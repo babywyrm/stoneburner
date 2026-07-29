@@ -771,3 +771,43 @@ def test_full_job_reaches_completed_when_result_submitted(coordinator):
     completed = coordinator.get_job(job.job_id)
     assert completed is not None
     assert completed.status == JobStatus.COMPLETED
+
+
+# ── Capability-based assignment routing ───────────────────────────────────────
+
+
+def test_python_worker_claims_python_assignment(coordinator):
+    w = coordinator.register_worker(WorkerRegisterRequest(capabilities=["python"]))
+    coordinator.create_split_job(
+        DistributedRunRequest(mode=JobMode.SPLIT), [{"task_name": "t", "runtime": "python"}]
+    )
+    a = coordinator.claim_assignment(w.worker_id)
+    assert a is not None
+
+
+def test_node_worker_claims_node_assignment(coordinator):
+    node = coordinator.register_worker(WorkerRegisterRequest(capabilities=["node"]))
+    py = coordinator.register_worker(WorkerRegisterRequest(capabilities=["python"]))
+    coordinator.create_split_job(
+        DistributedRunRequest(mode=JobMode.SPLIT), [{"task_name": "t", "runtime": "node"}]
+    )
+    assert coordinator.claim_assignment(py.worker_id) is None
+    a = coordinator.claim_assignment(node.worker_id)
+    assert a is not None
+
+
+def test_worker_with_no_capabilities_defaults_to_python(coordinator):
+    w = coordinator.register_worker(WorkerRegisterRequest())
+    coordinator.create_split_job(
+        DistributedRunRequest(mode=JobMode.SPLIT), [{"task_name": "t"}]
+    )
+    a = coordinator.claim_assignment(w.worker_id)
+    assert a is not None
+
+
+def test_worker_without_runtime_capability_does_not_claim(coordinator):
+    w = coordinator.register_worker(WorkerRegisterRequest(capabilities=["python"]))
+    coordinator.create_split_job(
+        DistributedRunRequest(mode=JobMode.SPLIT), [{"task_name": "t", "runtime": "wasm"}]
+    )
+    assert coordinator.claim_assignment(w.worker_id) is None

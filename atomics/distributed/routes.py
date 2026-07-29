@@ -50,6 +50,7 @@ def _build_task_specs(run_request: dict[str, Any]) -> list[dict[str, Any]]:
     tier = _parse_tier(run_request.get("tier", "baseline"))
     iterations = int(run_request.get("iterations", 1))
     pinned = _pinned_execution(run_request)
+    runtime = str(run_request.get("runtime", "python"))
     specs: list[dict[str, Any]] = []
     for _ in range(max(iterations, 0)):
         task, prompt = get_weighted_task(tier)
@@ -60,6 +61,7 @@ def _build_task_specs(run_request: dict[str, Any]) -> list[dict[str, Any]]:
                 "category": task.category.value,
                 "complexity": task.complexity.value,
                 "max_output_tokens": task.max_output_tokens,
+                "runtime": runtime,
                 **pinned,
             }
         )
@@ -156,17 +158,18 @@ async def start_distributed_run(
             detail="run_request is required",
         )
     if payload.mode is JobMode.FULL:
+        task_spec = {"mode": "full", "run_request": payload.run_request, "runtime": "python"}
         if payload.worker_selector:
             try:
                 return coordinator.create_full_job_from_selector(
-                    payload, payload.worker_selector
+                    payload, payload.worker_selector, task_spec=task_spec
                 )
             except ValueError as exc:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=str(exc),
                 ) from exc
-        return coordinator.create_full_job(payload, [])
+        return coordinator.create_full_job(payload, [], task_spec=task_spec)
     # Built once and shared across workers in fleet mode: each spec is sampled
     # randomly, so per-worker generation would give each host different prompts.
     task_specs = _build_task_specs(payload.run_request)
