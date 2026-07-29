@@ -147,7 +147,7 @@ Real retrieval (`rag-index`, `rag --index`, `rag-retrieval`) requires the option
 | `atomics server --log-level debug` | Verbose uvicorn logging |
 | `atomics server --worker-absent-after N` | Seconds of worker silence before it is marked offline (default: 120) |
 | `atomics worker` | Start a distributed worker (polls coordinator for tasks) |
-| `atomics distributed run` | Submit a distributed run (split or fleet mode) |
+| `atomics distributed run` | Submit a distributed run (split, fleet, or full mode) |
 | `atomics distributed status JOB_ID` | Poll distributed run status |
 
 ## atomics worker
@@ -196,12 +196,12 @@ Submit and inspect distributed benchmark runs. Two modes:
 |--------|-------------|
 | `--coordinator URL` | Coordinator base URL (default: `http://127.0.0.1:8000`) |
 | `--api-key KEY` | Client API key (or `ATOMICS_API_KEY`) |
-| `--mode [split\|fleet]` | Job mode (default: `split`) |
+| `--mode [split\|fleet\|full]` | Job mode (default: `split`) |
 | `-p, --provider TEXT` | Pin every task to this provider (default: each worker's own) |
 | `-t, --tier TEXT` | Burn tier (default: `baseline`) |
 | `-m, --model TEXT` | Model override for the executing provider |
 | `-n INTEGER` | Tasks per worker in fleet mode; tasks in total in split mode (default: 1) |
-| `--label KEY=VALUE` | Worker selector, repeatable. Fleet mode only; **rejected for `split`**, which assigns each task to the next available worker |
+| `--label KEY=VALUE` | Worker selector, repeatable. Fleet and full mode only; **rejected for `split`**, which assigns each task to the next available worker |
 
 Reads the client key from `ATOMICS_API_KEY`; pass `--api-key` to override.
 
@@ -217,6 +217,12 @@ uv run atomics distributed run --mode fleet --label gpu=4090 --label site=lab -n
 
 # Fleet across every online worker
 uv run atomics distributed run --mode fleet -n 20
+
+# Full: delegate an entire run to one worker (first matching box=239)
+uv run atomics distributed run --mode full --label box=239 -t ez -n 5
+
+# Full without selector: first worker that claims it runs the whole run
+uv run atomics distributed run --mode full -t ez -n 5
 ```
 
 Fleet notes:
@@ -231,6 +237,18 @@ Fleet notes:
 - A host that stops heartbeating for 120s has its remaining tasks marked failed.
   They are never re-run on another host, since that would silently blend two
   machines into one result. The job then reports `partial`.
+
+Full mode notes:
+
+- One worker executes the entire `LoopEngine` locally. Use it when a worker is
+  faster than the coordinator machine or when you want a single host to own a
+  complete run end-to-end.
+- The worker uses its own `--provider`, `--model`, and `--host` unless the run
+  request pins them via `-p` / `-m`.
+- A selector pins the job to the first matching worker, but if no selector is
+  given any worker can claim the assignment.
+- The full run result is a `summary` plus `task_results`, which `atomics distributed status`
+  renders as a compact table.
 
 ### `atomics distributed status`
 

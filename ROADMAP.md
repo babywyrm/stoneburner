@@ -4,7 +4,7 @@ Current priorities and future directions for Stoneburner / Atomics.
 
 ## Recently Shipped
 
-- **Distributed fleet mode (Phase 2)** — `atomics distributed run --mode fleet --label k=v` broadcasts an identical task set to every matching worker, with per-worker rollups (latency, throughput, cost, failures) and a per-host `distributed status` table. Includes worker liveness detection, bounded retries, and client auth on the coordinator endpoints. `full` mode remains unimplemented.
+- **Distributed fleet and full modes (Phase 2)** — `atomics distributed run --mode fleet --label k=v` broadcasts an identical task set to every matching worker, and `--mode full` delegates a complete run to one worker that executes the full `LoopEngine` locally. Both include per-worker rollups, worker liveness detection, bounded retries, and client auth on the coordinator endpoints.
 - **Distributed runs (Phase 1 split mode)** — `atomics distributed run` / `atomics worker` with coordinator API for split-mode jobs across workers.
 - **RAG Pipeline Evaluation** — `atomics rag` with 20 fixtures (security + general technical), grounding/faithfulness/abstention judge rubric, hallucination detection
 - **README refactor** — 805 → 205 lines with TOC, anchors, and 5 linked focused docs
@@ -24,7 +24,7 @@ Current priorities and future directions for Stoneburner / Atomics.
 - [ ] Dashboard / web UI for results visualization
 - [x] Webhook/Slack notifications on scheduled run regression
 - [x] GitHub Actions workflow template for eval CI gates
-- [x] Distributed runs across multiple hosts with results aggregation (split and fleet modes shipped; `full` mode unimplemented)
+- [x] Distributed runs across multiple hosts with results aggregation (split, fleet, and full modes shipped)
 - [x] API server mode (run atomics as a service, query via REST)
 
 ### Eval Quality

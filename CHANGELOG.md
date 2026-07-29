@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased — Distributed full-mode benchmark runs
+
+### Added
+- **`atomics distributed run --mode full`** delegates an entire benchmark run to
+  a single worker. The worker executes the full `LoopEngine` locally and returns
+  the run summary plus per-task results, so a single host can own an end-to-end
+  run without the coordinator machine driving every task.
+- Coordinator support for full-mode jobs: one assignment per job, optionally
+  pinned to the first worker matching a label selector, or left unclaimed for
+  any worker to pick up.
+- Worker-side full-run execution via `execute_full_run`, with provider/model/host
+  resolution honoring the worker's own flags and the run request's pinned values.
+- `atomics distributed status` renders a compact table for completed full-mode
+  jobs, while split and pending jobs keep their existing outputs.
+
 ## 0.14.0 (2026-07-26) — Tool-call divergence suite, release pipeline repairs
 
 ### Added

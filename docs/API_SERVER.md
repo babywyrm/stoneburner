@@ -46,7 +46,7 @@ curl -H "X-API-Key: $ATOMICS_API_KEY" http://127.0.0.1:8000/api/v1/runs \
 | POST | `/api/v1/workers/{worker_id}/heartbeat` | Worker heartbeat |
 | GET | `/api/v1/workers/{worker_id}/jobs/next` | Claim next task assignment |
 | POST | `/api/v1/workers/{worker_id}/jobs/{assignment_id}/result` | Submit task result |
-| POST | `/api/v1/distributed/runs` | Start a distributed run (split or fleet) |
+| POST | `/api/v1/distributed/runs` | Start a distributed run (split, fleet, or full) |
 | GET | `/api/v1/distributed/runs/{job_id}` | Distributed run status |
 
 ## Example: start a run and poll
@@ -114,7 +114,7 @@ Both require client authentication via `X-API-Key`. Submitting a run spends GPU 
 |--------|----------|
 | `split` | One assignment per task, claimed by whichever worker asks first. `worker_selector` is **rejected with `400`**, since each task goes to the next available worker and a selector could not be honored. |
 | `fleet` | Every worker matching `worker_selector` receives the identical task set, for cross-host comparison. |
-| `full` | Declared but unimplemented; **rejected with `400`**. |
+| `full` | One assignment containing the whole `run_request` is pinned to the first matching worker (or left unclaimed if no selector is given). The chosen worker executes the full `LoopEngine` locally. |
 
 A `provider`/`model` in `run_request` pins every task to that provider; omit them and each worker uses its own configured provider.
 
@@ -130,6 +130,14 @@ curl -X POST "$COORDINATOR/api/v1/distributed/runs" \
   -d '{"mode": "fleet",
        "run_request": {"tier": "baseline", "iterations": 20},
        "worker_selector": {"gpu": "4090", "site": "lab"}}'
+
+# Full run: delegate a complete run to one box=239 worker
+curl -X POST "$COORDINATOR/api/v1/distributed/runs" \
+  -H "X-API-Key: $ATOMICS_API_KEY" \
+  -H 'Content-Type: application/json' \
+  -d '{"mode": "full",
+       "run_request": {"tier": "ez", "iterations": 5},
+       "worker_selector": {"box": "239"}}'
 ```
 
 ### Example: local three-terminal setup
