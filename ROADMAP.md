@@ -22,7 +22,7 @@ Current priorities and future directions for Stoneburner / Atomics.
 ## Planned
 
 ### Infrastructure
-- [ ] Dashboard / web UI for results visualization
+- [x] Dashboard / web UI for results visualization
 - [x] Webhook/Slack notifications on scheduled run regression
 - [x] GitHub Actions workflow template for eval CI gates
 - [x] Distributed runs across multiple hosts with results aggregation (split, fleet, and full modes shipped)
