@@ -23,6 +23,9 @@
   `python`, `node`) and the coordinator only assigns tasks whose `runtime` matches.
   Python workers advertise `python` by default; npm workers advertise `node`. Use
   `--runtime node` with `atomics distributed run` to generate node tasks.
+- **`--pool-size N`** on `atomics worker-npm` spawns N independent Node.js workers
+  on the same host, each registering separately with the coordinator. The pool
+  manager handles graceful shutdown on `SIGINT`/`SIGTERM`.
 
 ## 0.14.0 (2026-07-26) — Tool-call divergence suite, release pipeline repairs
 

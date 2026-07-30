@@ -195,13 +195,17 @@ Start a Node.js worker that joins the distributed pool via the JSON-over-stdin b
 | `--endpoint URL` | Optional push endpoint URL for this worker |
 | `--worker-cmd CMD` | Command used to execute each task (default: `node task-runner.js`) |
 | `--heartbeat-interval N` | Heartbeat interval in seconds (default: 30) |
+| `--pool-size N` | Number of independent npm workers to run on this host (default: 1) |
 | `--npm-dir PATH` | Path to the npm worker package |
 
 Use `--runtime node` on `atomics distributed run` to generate node-runtime tasks that only npm workers can claim.
 
 ```bash
-# Terminal 1 — start the npm worker
+# Terminal 1 — start a single npm worker
 uv run atomics worker-npm --api-key worker-key --label box=239
+
+# Terminal 1 — start four npm workers on the same host
+uv run atomics worker-npm --api-key worker-key --label box=239 --pool-size 4
 
 # Terminal 2 — submit node-runtime work
 uv run atomics distributed run --mode split --runtime node -n 10 --api-key client-key
