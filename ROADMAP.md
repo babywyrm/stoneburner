@@ -42,7 +42,7 @@ Current priorities and future directions for Stoneburner / Atomics.
 
 ### Phase 3 (npm workers)
 - [x] `atomics/workers/bridge.py` — Node.js worker integration for browser-based benchmarks
-- [ ] npm worker pool for parallel fixture execution
+- [x] npm worker pool for parallel fixture execution
 
 ## Design Principles
 

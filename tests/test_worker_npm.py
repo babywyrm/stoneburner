@@ -76,6 +76,8 @@ def coordinator_server(tmp_path):
         yield url
     finally:
         server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
 
 
 def test_npm_worker_registers_and_polls(coordinator_server):
@@ -104,6 +106,15 @@ def test_npm_worker_registers_and_polls(coordinator_server):
     except Exception:
         proc.kill()
         raise
+    finally:
+        if proc.stdout:
+            proc.stdout.close()
+        if proc.stderr:
+            proc.stderr.close()
+        try:
+            proc.wait(timeout=5)
+        except Exception:
+            pass
 
     calls = [c[0] for c in MockCoordinatorHandler.calls]
     assert "register" in calls
@@ -164,6 +175,15 @@ def test_npm_worker_executes_and_submits_assignment(coordinator_server):
     except Exception:
         proc.kill()
         raise
+    finally:
+        if proc.stdout:
+            proc.stdout.close()
+        if proc.stderr:
+            proc.stderr.close()
+        try:
+            proc.wait(timeout=5)
+        except Exception:
+            pass
 
     submit_calls = [c for c in MockCoordinatorHandler.calls if c[0] == "submit"]
     assert submit_calls, "worker should have submitted a result"
