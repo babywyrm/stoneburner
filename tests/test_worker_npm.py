@@ -11,6 +11,7 @@ import threading
 import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from click.testing import CliRunner
@@ -191,3 +192,78 @@ def test_npm_worker_executes_and_submits_assignment(coordinator_server):
     assert body["status"] == "completed"
     result = json.loads(body["result_json"])
     assert result["status"] == "ok"
+
+
+def test_worker_npm_cli_rejects_invalid_pool_size():
+    runner = CliRunner()
+    result = runner.invoke(worker_npm, ["--api-key", "k", "--pool-size", "0"])
+    assert result.exit_code != 0
+    assert "at least 1" in result.output
+
+
+def test_worker_npm_cli_rejects_missing_worker_script(monkeypatch, tmp_path):
+    monkeypatch.setattr("atomics.commands.worker_npm.shutil.which", lambda _: "node")
+    fake_npm_dir = tmp_path / "npm"
+    fake_npm_dir.mkdir()
+    runner = CliRunner()
+    result = runner.invoke(worker_npm, ["--api-key", "k", "--npm-dir", str(fake_npm_dir)])
+    assert result.exit_code != 0
+    assert "worker script not found" in result.output
+
+
+def test_worker_npm_single_worker_runs_node_process(monkeypatch):
+    monkeypatch.setattr("atomics.commands.worker_npm.shutil.which", lambda _: "node")
+    fake_proc = MagicMock()
+    fake_proc.returncode = 0
+    fake_proc.wait = AsyncMock(return_value=None)
+
+    async def fake_create(*args, **kwargs):
+        return fake_proc
+
+    monkeypatch.setattr(
+        "atomics.commands.worker_npm.asyncio.create_subprocess_exec",
+        fake_create,
+    )
+    runner = CliRunner()
+    result = runner.invoke(worker_npm, ["--api-key", "k"])
+    assert result.exit_code == 0, result.output
+    assert fake_proc.wait.awaited
+
+
+def test_worker_npm_single_worker_exits_with_node_exit_code(monkeypatch):
+    monkeypatch.setattr("atomics.commands.worker_npm.shutil.which", lambda _: "node")
+    fake_proc = MagicMock()
+    fake_proc.returncode = 7
+    fake_proc.wait = AsyncMock(return_value=None)
+
+    async def fake_create(*args, **kwargs):
+        return fake_proc
+
+    monkeypatch.setattr(
+        "atomics.commands.worker_npm.asyncio.create_subprocess_exec",
+        fake_create,
+    )
+    runner = CliRunner()
+    result = runner.invoke(worker_npm, ["--api-key", "k"])
+    assert result.exit_code == 7
+
+
+def test_worker_npm_pool_runs_multiple_workers(monkeypatch):
+    monkeypatch.setattr("atomics.commands.worker_npm.shutil.which", lambda _: "node")
+    started: list[int] = []
+    fake_pool = MagicMock()
+    fake_pool.start = AsyncMock()
+    fake_pool.run = AsyncMock(return_value=0)
+    fake_pool.stop = AsyncMock()
+
+    def fake_pool_constructor(size, factory):
+        started.append(size)
+        return fake_pool
+
+    monkeypatch.setattr("atomics.commands.worker_npm.WorkerPool", fake_pool_constructor)
+    runner = CliRunner()
+    result = runner.invoke(worker_npm, ["--api-key", "k", "--pool-size", "4"])
+    assert result.exit_code == 0, result.output
+    assert started == [4]
+    fake_pool.start.assert_awaited_once()
+    fake_pool.run.assert_awaited_once()
