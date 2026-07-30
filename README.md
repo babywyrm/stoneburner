@@ -58,7 +58,7 @@ Compare providers after running benchmarks: `uv run atomics compare` — see [do
 
 > **Optional extras:** Real RAG retrieval (`atomics rag-index`, `atomics rag-retrieval`, `atomics rag --index`) requires `uv sync --extra rag` to install `sqlite-vec` and `sentence-transformers`. Bedrock and OpenAI providers need `--extra bedrock` and `--extra openai` respectively.
 
-The API server mode requires `uv sync --extra api` to install FastAPI and uvicorn.
+The API server mode requires `uv sync --extra api` to install FastAPI and uvicorn. Add `--with-dashboard` to serve a read-only web UI at `/dashboard`.
 
 ## Burn Tiers
 
@@ -174,7 +174,7 @@ atomics secrets delete ANTHROPIC_API_KEY
 ```
 stoneburner/
 ├── atomics/              # Core Python package
-│   ├── api/              # HTTP API server (FastAPI) — runs, evals, reports, jobs
+│   ├── api/              # HTTP API server (FastAPI) — runs, evals, reports, jobs, dashboard
 │   ├── commands/         # Click command modules (auth, admin, benchmark, eval, security, load, api, worker, distributed)
 │   ├── distributed/      # Coordinator + worker for split and fleet runs
 │   │   ├── coordinator.py
@@ -194,7 +194,7 @@ stoneburner/
 │   └── cli.py            # Thin Click root — registers commands from commands/
 ├── profiles/             # Custom target profiles (local/ gitignored)
 ├── qa/                   # QA fixture suites (local/ gitignored)
-├── tests/                # 1830+ tests at 87% coverage
+├── tests/                # 2029+ tests at 88% coverage
 └── docs/                 # Detailed documentation
 ```
 

@@ -48,6 +48,9 @@ curl -H "X-API-Key: $ATOMICS_API_KEY" http://127.0.0.1:8000/api/v1/runs \
 | POST | `/api/v1/workers/{worker_id}/jobs/{assignment_id}/result` | Submit task result |
 | POST | `/api/v1/distributed/runs` | Start a distributed run (split, fleet, or full) |
 | GET | `/api/v1/distributed/runs/{job_id}` | Distributed run status |
+| GET | `/api/v1/distributed/runs` | List recent distributed runs |
+| GET | `/api/v1/workers` | List registered workers |
+| GET | `/dashboard` | Optional web dashboard (requires `--with-dashboard`) |
 
 ## Example: start a run and poll
 
@@ -59,6 +62,23 @@ JOB_ID=$(curl -s -H "X-API-Key: $ATOMICS_API_KEY" -H "Content-Type: application/
 sleep 2
 curl -s -H "X-API-Key: $ATOMICS_API_KEY" http://127.0.0.1:8000/api/v1/jobs/$JOB_ID | jq
 ```
+
+## Dashboard
+
+The server can serve an optional, read-only web dashboard at `/dashboard`. Enable it with `--with-dashboard`:
+
+```bash
+uv run atomics server --no-auth --with-dashboard
+```
+
+Open `http://127.0.0.1:8000/dashboard?api_key=YOUR_KEY` when authentication is enabled. The dashboard auto-refreshes every 10 seconds and shows:
+
+- Recent benchmark runs with status, tokens, and cost
+- Active distributed jobs and their mode
+- Registered workers and their capabilities/labels
+- Provider/model success-rate comparison bars
+
+The dashboard is purely visual: it only reads from the existing API endpoints and does not change any server behavior.
 
 ## Eval suites
 
@@ -76,8 +96,7 @@ Spread benchmark work across multiple worker processes that poll a coordinator (
 
 - **split** — the coordinator divides one run into task assignments and any worker takes the next. Use it to finish a run faster.
 - **fleet** — every worker matching a label selector receives the identical task set. Use it to compare hosts.
-
-`full` (one worker runs an entire run) is declared but unimplemented and rejected.
+- **full** — one worker runs an entire benchmark end-to-end. Use it to delegate a full run to a specific host or capability.
 
 ### Coordinator / worker model
 
@@ -107,6 +126,8 @@ A worker that stops sending heartbeats for 120 seconds is marked offline. It is 
 |--------|------|-------------|
 | POST | `/api/v1/distributed/runs` | Start a distributed run (`202` + job body) |
 | GET | `/api/v1/distributed/runs/{job_id}` | Job status, assignments, and aggregated progress |
+| GET | `/api/v1/distributed/runs` | List recent distributed runs |
+| GET | `/api/v1/workers` | List registered workers |
 
 Both require client authentication via `X-API-Key`. Submitting a run spends GPU time and cloud budget, so neither is anonymous.
 
