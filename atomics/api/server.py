@@ -12,6 +12,7 @@ from fastapi import FastAPI
 from atomics import __version__
 from atomics.api.auth import ApiKeyAuth, NoAuth
 from atomics.api.config import ServerSettings
+from atomics.api.dashboard import router as dashboard_router
 from atomics.api.jobs import JobManager
 from atomics.api.routes import router
 from atomics.distributed import routes as distributed_routes
@@ -65,4 +66,6 @@ def create_app(
     app.state.auth = NoAuth() if settings.no_auth else ApiKeyAuth(settings.api_keys)
     app.include_router(router)
     app.include_router(distributed_routes.router)
+    if settings.with_dashboard:
+        app.include_router(dashboard_router)
     return app

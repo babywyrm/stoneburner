@@ -107,6 +107,14 @@ class Coordinator:
             return None
         return self._row_to_worker(row)
 
+    def list_workers(self) -> list[Worker]:
+        """Return all registered workers, newest first."""
+        rows = self._conn.execute(
+            f"SELECT {self.WORKER_COLUMNS} FROM workers "
+            "ORDER BY registered_at DESC"
+        ).fetchall()
+        return [self._row_to_worker(row) for row in rows]
+
     def matching_workers(self, selector: dict[str, str] | None) -> list[Worker]:
         """Online workers whose labels satisfy every pair in the selector.
 
@@ -415,6 +423,28 @@ class Coordinator:
             created_at=datetime.fromisoformat(row[6]),
             completed_at=datetime.fromisoformat(row[7]) if row[7] else None,
         )
+
+    def list_jobs(self, limit: int = 20) -> list[DistributedJob]:
+        """Return recent distributed jobs, newest first."""
+        rows = self._conn.execute(
+            "SELECT job_id, mode, parent_run_id, status, request_json, "
+            "summary_json, created_at, completed_at "
+            "FROM distributed_jobs ORDER BY created_at DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+        return [
+            DistributedJob(
+                job_id=row[0],
+                mode=JobMode(row[1]),
+                parent_run_id=row[2],
+                status=JobStatus(row[3]),
+                request_json=row[4],
+                summary_json=row[5],
+                created_at=datetime.fromisoformat(row[6]),
+                completed_at=datetime.fromisoformat(row[7]) if row[7] else None,
+            )
+            for row in rows
+        ]
 
     def _update_job_status(self, job_id: str) -> None:
         rows = self._conn.execute(

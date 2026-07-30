@@ -24,3 +24,11 @@ def test_a_non_positive_absence_threshold_is_rejected():
     import pytest
     with pytest.raises(ValueError, match="must be positive"):
         ServerSettings(worker_absent_after_seconds=0)
+
+
+def test_dashboard_is_disabled_by_default():
+    assert ServerSettings().with_dashboard is False
+
+
+def test_dashboard_can_be_enabled():
+    assert ServerSettings(with_dashboard=True).with_dashboard is True
