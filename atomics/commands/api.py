@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import click
 from rich.console import Console
 
@@ -37,6 +39,11 @@ from rich.console import Console
     default=False,
     help="Serve an optional web dashboard at /dashboard (default: off)",
 )
+@click.option(
+    "--db-path",
+    type=click.Path(path_type=Path),
+    help="SQLite database path (default: atomics default state directory)",
+)
 def server(
     host: str,
     port: int,
@@ -45,6 +52,7 @@ def server(
     log_level: str,
     worker_absent_after: float,
     with_dashboard: bool,
+    db_path: Path | None,
 ) -> None:
     """Run the atomics API server."""
     console = Console()
@@ -71,6 +79,7 @@ def server(
         log_level=log_level,
         worker_absent_after_seconds=worker_absent_after,
         with_dashboard=with_dashboard,
+        db_path=db_path or ServerSettings().db_path,
     )
     app = create_app(settings)
     uvicorn.run(app, host=host, port=port, log_level=log_level)

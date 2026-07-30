@@ -147,6 +147,7 @@ Real retrieval (`rag-index`, `rag --index`, `rag-retrieval`) requires the option
 | `atomics server --log-level debug` | Verbose uvicorn logging |
 | `atomics server --worker-absent-after N` | Seconds of worker silence before it is marked offline (default: 120) |
 | `atomics server --with-dashboard` | Serve an optional web dashboard at `/dashboard` (default: off) |
+| `atomics server --db-path PATH` | SQLite database path (default: atomics state directory) |
 | `atomics worker` | Start a distributed worker (polls coordinator for tasks) |
 | `atomics worker-npm` | Start a Node.js worker bridge for distributed task execution |
 | `atomics distributed run` | Submit a distributed run (split, fleet, or full mode) |
