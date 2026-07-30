@@ -24,6 +24,7 @@ class ServerSettings:
     # worker declared absent, and its pinned fleet work failed, while behaving
     # exactly as configured.
     worker_absent_after_seconds: float = 120.0
+    with_dashboard: bool = False
 
     def __post_init__(self) -> None:
         if self.port < 1 or self.port > 65535:

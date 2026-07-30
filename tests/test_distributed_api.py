@@ -41,7 +41,9 @@ def _auth() -> dict[str, str]:
 DISTRIBUTED_ENDPOINTS = [
     ("post", "/api/v1/workers/register", {}),
     ("post", "/api/v1/distributed/runs", {"mode": "split", "run_request": {"iterations": 1}}),
+    ("get", "/api/v1/distributed/runs", None),
     ("get", "/api/v1/distributed/runs/any-job-id", None),
+    ("get", "/api/v1/workers", None),
 ]
 
 

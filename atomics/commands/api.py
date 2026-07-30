@@ -31,6 +31,12 @@ from rich.console import Console
     "offline and its pinned fleet work fails. Raise it above roughly four times "
     "your workers' --heartbeat-interval.",
 )
+@click.option(
+    "--with-dashboard",
+    is_flag=True,
+    default=False,
+    help="Serve an optional web dashboard at /dashboard (default: off)",
+)
 def server(
     host: str,
     port: int,
@@ -38,6 +44,7 @@ def server(
     no_auth: bool,
     log_level: str,
     worker_absent_after: float,
+    with_dashboard: bool,
 ) -> None:
     """Run the atomics API server."""
     console = Console()
@@ -63,6 +70,7 @@ def server(
         no_auth=no_auth,
         log_level=log_level,
         worker_absent_after_seconds=worker_absent_after,
+        with_dashboard=with_dashboard,
     )
     app = create_app(settings)
     uvicorn.run(app, host=host, port=port, log_level=log_level)

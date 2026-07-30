@@ -199,3 +199,24 @@ async def get_job(
     if job is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
     return job
+
+
+@router.get("/distributed/runs")
+async def list_jobs(
+    limit: int = 20,
+    coordinator: Coordinator = Depends(get_coordinator),
+    _: None = Depends(require_auth),
+) -> dict[str, list[DistributedJob]]:
+    """List recent distributed jobs, newest first."""
+    jobs = coordinator.list_jobs(limit=max(1, limit))
+    return {"jobs": jobs}
+
+
+@router.get("/workers")
+async def list_workers(
+    coordinator: Coordinator = Depends(get_coordinator),
+    _: None = Depends(require_auth),
+) -> dict[str, list[Any]]:
+    """List all registered workers."""
+    workers = coordinator.list_workers()
+    return {"workers": [w.model_dump(mode="json") for w in workers]}
