@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.15.1 (2026-07-30) — Web dashboard and server CLI improvements
+
 ### Added
 - Optional web dashboard served by `atomics server --with-dashboard`. It is
   read-only, disabled by default, and visualizes recent runs, distributed jobs,
@@ -9,6 +11,8 @@
   at `/dashboard?api_key=YOUR_KEY` when authentication is enabled.
 - `GET /api/v1/distributed/runs` to list recent distributed jobs.
 - `GET /api/v1/workers` to list registered workers.
+- `atomics server --db-path PATH` to explicitly set the SQLite database path
+  used by the API server and coordinator.
 
 ## 0.15.0 (2026-07-29) — Distributed full-mode runs and npm worker bridge
 
