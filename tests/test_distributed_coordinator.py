@@ -524,7 +524,9 @@ def test_job_reports_partial_when_one_host_drops_out(coordinator):
 
     finished = coordinator.claim_assignment(good.worker_id)
     assert finished is not None
-    coordinator.submit_assignment(finished.assignment_id, '{"ok": true}')
+    coordinator.submit_assignment(
+        finished.assignment_id, '{"ok": true}', worker_id=good.worker_id
+    )
 
     assert coordinator.claim_assignment(bad.worker_id) is not None
     _offline(coordinator, bad.worker_id)
@@ -561,6 +563,7 @@ def test_a_finished_fleet_job_records_a_per_worker_summary(coordinator):
                     "model": "qwen3:14b",
                 }
             ),
+            worker_id=worker.worker_id,
         )
 
     finished = coordinator.get_job(job.job_id)
@@ -585,7 +588,9 @@ def test_a_summary_records_the_host_that_failed(coordinator):
     )
     claimed = coordinator.claim_assignment(good.worker_id)
     assert claimed is not None
-    coordinator.submit_assignment(claimed.assignment_id, '{"latency_ms": 50}')
+    coordinator.submit_assignment(
+        claimed.assignment_id, '{"latency_ms": 50}', worker_id=good.worker_id
+    )
     _go_silent(coordinator, bad.worker_id)
     coordinator._requeue_stale_assignments()
 
@@ -606,7 +611,7 @@ def test_submit_assignment_completes_job(coordinator):
     )
     a = coordinator.claim_assignment(w.worker_id)
     assert a is not None
-    coordinator.submit_assignment(a.assignment_id, '{"ok": true}')
+    coordinator.submit_assignment(a.assignment_id, '{"ok": true}', worker_id=w.worker_id)
     job2 = coordinator.get_job(job.job_id)
     assert job2 is not None
     assert job2.status.value == "completed"
@@ -667,8 +672,12 @@ def test_partial_job_status_on_failure(coordinator):
     a2 = coordinator.claim_assignment(w.worker_id)
     assert a1 is not None and a2 is not None
 
-    coordinator.submit_assignment(a1.assignment_id, '{"ok": true}')
-    coordinator.submit_assignment(a2.assignment_id, None, error="boom")
+    coordinator.submit_assignment(
+        a1.assignment_id, '{"ok": true}', worker_id=w.worker_id
+    )
+    coordinator.submit_assignment(
+        a2.assignment_id, None, worker_id=w.worker_id, error="boom"
+    )
 
     job2 = coordinator.get_job(job.job_id)
     assert job2 is not None
@@ -767,7 +776,7 @@ def test_full_job_reaches_completed_when_result_submitted(coordinator):
     )
     a = coordinator.claim_assignment(w.worker_id)
     assert a is not None
-    coordinator.submit_assignment(a.assignment_id, '{"ok": true}')
+    coordinator.submit_assignment(a.assignment_id, '{"ok": true}', worker_id=w.worker_id)
     completed = coordinator.get_job(job.job_id)
     assert completed is not None
     assert completed.status == JobStatus.COMPLETED

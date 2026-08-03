@@ -18,10 +18,17 @@ from rich.console import Console
     help="API key(s) allowed (can be repeated). If none, --no-auth is required.",
 )
 @click.option(
+    "--worker-api-key",
+    "worker_api_keys",
+    multiple=True,
+    help="Key(s) accepted on worker endpoints only (can be repeated). Without "
+    "this, workers share --api-key and a worker credential can also submit evals.",
+)
+@click.option(
     "--no-auth",
     is_flag=True,
     default=False,
-    help="Disable API key authentication (local dev only)",
+    help="Disable API key authentication (loopback binds only)",
 )
 @click.option("--log-level", default="info", help="Uvicorn log level")
 @click.option(
@@ -48,6 +55,7 @@ def server(
     host: str,
     port: int,
     api_keys: tuple[str, ...],
+    worker_api_keys: tuple[str, ...],
     no_auth: bool,
     log_level: str,
     worker_absent_after: float,
@@ -71,15 +79,20 @@ def server(
         console.print("[red]Error: supply --api-key or --no-auth[/red]")
         raise SystemExit(1)
 
-    settings = ServerSettings(
-        host=host,
-        port=port,
-        api_keys=set(api_keys),
-        no_auth=no_auth,
-        log_level=log_level,
-        worker_absent_after_seconds=worker_absent_after,
-        with_dashboard=with_dashboard,
-        db_path=db_path or ServerSettings().db_path,
-    )
+    try:
+        settings = ServerSettings(
+            host=host,
+            port=port,
+            api_keys=set(api_keys),
+            worker_api_keys=set(worker_api_keys),
+            no_auth=no_auth,
+            log_level=log_level,
+            worker_absent_after_seconds=worker_absent_after,
+            with_dashboard=with_dashboard,
+            db_path=db_path or ServerSettings().db_path,
+        )
+    except ValueError as exc:
+        console.print(f"[red]Error:[/red] {exc}")
+        raise SystemExit(1) from exc
     app = create_app(settings)
     uvicorn.run(app, host=host, port=port, log_level=log_level)
