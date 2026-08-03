@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from contextlib import asynccontextmanager
 from dataclasses import replace
 from pathlib import Path
@@ -20,6 +21,8 @@ from atomics.distributed.auth import WorkerAuth
 from atomics.distributed.coordinator import Coordinator
 from atomics.storage.schema import init_db
 
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -28,7 +31,12 @@ async def lifespan(app: FastAPI):
     if settings.no_auth:
         app.state.worker_auth = NoAuth()
     else:
-        app.state.worker_auth = WorkerAuth(set(settings.api_keys))
+        if not settings.worker_api_keys and settings.api_keys:
+            logger.warning(
+                "No --worker-api-key set: workers share the submitter keys, so a "
+                "worker credential also authorizes run and eval submission."
+            )
+        app.state.worker_auth = WorkerAuth(set(settings.effective_worker_keys))
     app.state.coordinator = Coordinator(
         init_db(settings.db_path),
         worker_absent_after_seconds=settings.worker_absent_after_seconds,

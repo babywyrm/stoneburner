@@ -141,9 +141,10 @@ Real retrieval (`rag-index`, `rag --index`, `rag-retrieval`) requires the option
 | Command | Description |
 |---------|-------------|
 | `atomics server` | Run the atomics HTTP API server |
-| `atomics server --no-auth` | Disable API key authentication (local dev only) |
-| `atomics server --api-key KEY` | Allow one API key (repeatable) |
-| `atomics server --host 0.0.0.0 --port 8080` | Bind to all interfaces on port 8080 |
+| `atomics server --no-auth` | Disable API key authentication. Refused unless `--host` is loopback |
+| `atomics server --api-key KEY` | Allow one submitter API key (repeatable) |
+| `atomics server --worker-api-key KEY` | Allow one worker-only API key (repeatable). Without it, workers share `--api-key` |
+| `atomics server --host 0.0.0.0 --port 8080` | Bind to all interfaces on port 8080 (requires `--api-key`) |
 | `atomics server --log-level debug` | Verbose uvicorn logging |
 | `atomics server --worker-absent-after N` | Seconds of worker silence before it is marked offline (default: 120) |
 | `atomics server --with-dashboard` | Serve an optional web dashboard at `/dashboard` (default: off) |

@@ -2,6 +2,43 @@
 
 ## Unreleased
 
+### Security
+
+Findings from the 2026-08-02 project audit. The first three are reachable by
+anyone who can talk to a coordinator, so upgrade before exposing a server.
+
+- **Model-generated code no longer runs in the evaluating process.** The
+  `codegen` suite executed extracted snippets via `exec()` in-process, and armed
+  its timeout *after* that call, so module-level statements ran unguarded. It is
+  reachable remotely through `POST /api/v1/evals`. Execution moved to a child
+  interpreter with a scrubbed environment (provider API keys are no longer
+  visible to generated code), a scratch working directory, address-space and CPU
+  limits, blocked network calls, and a wall-clock kill of the whole process
+  group. New module: `atomics/eval/codegen/sandbox.py`.
+- **The dashboard no longer renders API data as markup.** Worker labels and
+  capabilities were concatenated into `innerHTML`, so anyone who could register
+  a worker could run script in an operator's browser. Rows are now built with
+  `createElement`/`textContent`.
+- **Assignment results are bound to the worker holding them.** The submit
+  endpoint accepted a `worker_id` in the path and never used it, and did not
+  check assignment state, so any authenticated worker could complete or
+  overwrite any assignment. Submission is now guarded on both the owning worker
+  and the `assigned` state, and returns `409` otherwise.
+- **Worker keys can be separated from submitter keys** via
+  `atomics server --worker-api-key`. Previously both were built from the same
+  set, so a worker credential also authorized run and eval submission. Left
+  unset the old behavior is kept for compatibility, with a warning at startup.
+- **`--no-auth` is refused on non-loopback binds.** `--no-auth --host 0.0.0.0`
+  exposed every endpoint, including eval submission, unauthenticated.
+- **API keys are compared with `hmac.compare_digest`** instead of set
+  membership, which short-circuited on hash.
+- The dashboard keeps its key in `sessionStorage` and strips `?api_key=` from
+  the URL, so it no longer persists in browser history or proxy logs.
+
+### Changed
+- `Coordinator.submit_assignment` now requires a `worker_id` keyword and raises
+  `AssignmentRejectedError` when the caller does not hold the assignment.
+
 ## 0.15.1 (2026-07-30) — Web dashboard and server CLI improvements
 
 ### Added

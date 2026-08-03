@@ -32,6 +32,28 @@ curl -H "X-API-Key: $ATOMICS_API_KEY" http://127.0.0.1:8000/api/v1/runs \
   -d '{"provider": "ollama", "iterations": 3}'
 ```
 
+### Separate worker keys
+
+Workers register, poll, and submit results with an `X-API-Key` too. Without
+`--worker-api-key` they share the submitter keys, which means a worker
+credential also authorizes run and eval submission. Give workers their own keys
+whenever they run on hosts you do not control:
+
+```bash
+uv run atomics server \
+  --api-key "$ATOMICS_API_KEY" \
+  --worker-api-key "$ATOMICS_WORKER_API_KEY"
+```
+
+A key passed only to `--worker-api-key` is rejected on `/api/v1/runs` and
+`/api/v1/evals`, and a submitter key is rejected on the worker endpoints.
+
+### `--no-auth` is loopback-only
+
+`--no-auth` disables authentication entirely, so the server refuses to start if
+it is combined with a non-loopback `--host`. Binding `0.0.0.0` without a key
+would expose eval submission to the network unauthenticated.
+
 ## Endpoints
 
 | Method | Path | Description |
@@ -71,7 +93,13 @@ The server can serve an optional, read-only web dashboard at `/dashboard`. Enabl
 uv run atomics server --no-auth --with-dashboard
 ```
 
-Open `http://127.0.0.1:8000/dashboard?api_key=YOUR_KEY` when authentication is enabled. The dashboard auto-refreshes every 10 seconds and shows:
+Open `http://127.0.0.1:8000/dashboard`. When authentication is enabled the page
+prompts for a key and keeps it in `sessionStorage`. You can still pass
+`?api_key=YOUR_KEY` to prefill it — the dashboard saves it and immediately
+strips it from the address bar so it does not linger in browser history,
+referrer headers, or proxy access logs.
+
+The dashboard auto-refreshes every 10 seconds and shows:
 
 - Recent benchmark runs with status, tokens, and cost
 - Active distributed jobs and their mode
@@ -80,9 +108,20 @@ Open `http://127.0.0.1:8000/dashboard?api_key=YOUR_KEY` when authentication is e
 
 The dashboard is purely visual: it only reads from the existing API endpoints and does not change any server behavior.
 
+All values are written to the page with `textContent`. Worker labels and
+capabilities are caller-supplied, so rendering them as markup would let anyone
+who can register a worker run script in an operator's browser.
+
 ## Eval suites
 
 POST `/api/v1/evals` accepts `"suite": "accuracy" | "rag" | "multiturn" | "adversarial" | "codegen"`.
+
+The `codegen` suite executes model-generated Python. It runs in a child
+interpreter with a scrubbed environment (no provider credentials), a scratch
+working directory, address-space and CPU limits, blocked network calls, and a
+wall-clock kill. See [`atomics/eval/codegen/sandbox.py`](../atomics/eval/codegen/sandbox.py).
+That boundary assumes a model producing wrong code, not an attacker with a
+kernel exploit — restrict who can reach this endpoint accordingly.
 
 ```bash
 curl -H "X-API-Key: $ATOMICS_API_KEY" -H "Content-Type: application/json" \

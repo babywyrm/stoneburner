@@ -2,10 +2,21 @@
 
 from __future__ import annotations
 
+import ipaddress
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from atomics.paths import default_db_path
+
+
+def is_loopback_host(host: str) -> bool:
+    """Return True if `host` can only be reached from this machine."""
+    if host == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(host.strip("[]")).is_loopback
+    except ValueError:
+        return False
 
 
 @dataclass
@@ -15,6 +26,10 @@ class ServerSettings:
     host: str = "127.0.0.1"
     port: int = 8000
     api_keys: set[str] = field(default_factory=set)
+    # Keys accepted on worker lifecycle endpoints only. Left empty, workers fall
+    # back to `api_keys`, which means a worker credential also authorizes run and
+    # eval submission. Set this whenever workers run on hosts you do not control.
+    worker_api_keys: set[str] = field(default_factory=set)
     no_auth: bool = False
     log_level: str = "info"
     db_path: Path = field(default_factory=default_db_path)
@@ -34,3 +49,14 @@ class ServerSettings:
                 "worker_absent_after_seconds must be positive, got "
                 f"{self.worker_absent_after_seconds}"
             )
+        if self.no_auth and not is_loopback_host(self.host):
+            raise ValueError(
+                f"no_auth cannot be combined with the non-loopback host {self.host!r}: "
+                "that exposes every endpoint, including eval submission, to the "
+                "network unauthenticated. Bind to 127.0.0.1 or supply an API key."
+            )
+
+    @property
+    def effective_worker_keys(self) -> set[str]:
+        """Keys accepted on worker endpoints, falling back to the submitter keys."""
+        return self.worker_api_keys or self.api_keys

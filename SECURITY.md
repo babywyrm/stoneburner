@@ -83,6 +83,41 @@ All `--ollama-host`, `--vllm-host`, `--judge-host`, and `--host` endpoints are
 validated to require `http://` or `https://` schemes. Embedded credentials,
 `file://` URIs, and path traversal are rejected.
 
+## API server exposure
+
+`atomics server` was designed for a trusted operator on a trusted network. Its
+authorization model is a shared key, not per-caller identity, so treat reaching
+the port as equivalent to holding the key.
+
+- `--no-auth` is refused on any non-loopback `--host`. It disables
+  authentication for every route, including eval submission.
+- Workers authenticate with `--worker-api-key` when supplied. Leave it unset and
+  workers share the submitter keys, which means a worker credential also
+  authorizes runs and evals. Set it whenever workers run on hosts you do not
+  control; the server warns at startup when they are shared.
+- A worker may only submit results for an assignment it currently holds and has
+  not already finished. Other submissions are rejected with `409`.
+- Keys are compared with `hmac.compare_digest`.
+- There is no per-request budget ceiling on API-triggered runs yet. An
+  authenticated caller can spend provider credit up to your account limits.
+
+## Generated code execution (codegen suite)
+
+The `codegen` suite executes code written by the model under test, and is
+reachable over HTTP via `POST /api/v1/evals`. Each snippet runs in a child
+interpreter with:
+
+- an environment stripped of provider credentials
+- a temporary working directory, discarded afterwards
+- address-space, CPU, and file-size limits
+- `socket` calls blocked
+- a wall-clock timeout that kills the whole process group, which also covers
+  module-level statements
+
+This is a real boundary but not a jail. It assumes a model producing incorrect
+or careless code, not an adversary with a sandbox escape. Do not expose the
+codegen suite to untrusted callers, and prefer running it in a container.
+
 ## LLM output rendering
 
 LLM responses and judge rationale are escaped before Rich terminal rendering

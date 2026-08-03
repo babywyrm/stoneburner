@@ -42,7 +42,10 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
 </head>
 <body>
   <h1>atomics dashboard <span class="refresh">refreshes every 10s</span></h1>
-  <p id="key-warning" style="display:none; color:#cf222e;">Pass <code>?api_key=YOUR_KEY</code> in the URL to load data from the API.</p>
+  <p id="key-warning" style="display:none;">
+    <label>API key <input id="key-input" type="password" autocomplete="off" placeholder="X-API-Key"></label>
+    <button id="key-save">Connect</button>
+  </p>
   <div class="grid">
     <div class="card">
       <h2>Recent runs</h2>
@@ -63,7 +66,23 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
   </div>
 
   <script>
-    const API_KEY = new URLSearchParams(window.location.search).get("api_key") || "";
+    // The key is held in sessionStorage rather than the URL so it does not leak
+    // into browser history, referrer headers, or reverse-proxy access logs.
+    function readKey() {
+      const params = new URLSearchParams(window.location.search);
+      const fromUrl = params.get("api_key");
+      if (fromUrl) {
+        sessionStorage.setItem("atomics_api_key", fromUrl);
+        params.delete("api_key");
+        const rest = params.toString();
+        history.replaceState(null, "", window.location.pathname + (rest ? "?" + rest : ""));
+        return fromUrl;
+      }
+      return sessionStorage.getItem("atomics_api_key") || "";
+    }
+
+    let API_KEY = readKey();
+
     async function get(path) {
       const headers = API_KEY ? { "X-API-Key": API_KEY } : {};
       const res = await fetch(path, { headers });
@@ -79,18 +98,44 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
       return "pending";
     }
 
+    // Every value below reaches the DOM through textContent. Worker labels and
+    // capabilities are caller-supplied, so string-concatenating them into
+    // innerHTML would let any registered worker script the operator's browser.
+    function emptyNote(container, message) {
+      container.textContent = "";
+      const p = document.createElement("p");
+      p.className = "empty";
+      p.textContent = message;
+      container.appendChild(p);
+    }
+
     function renderTable(id, rows, headers) {
-      const el = document.getElementById(id);
-      if (!rows || rows.length === 0) { el.innerHTML = "<p class=\"empty\">No data yet.</p>"; return; }
-      let html = "<table><tr>" + headers.map(h => "<th>" + h + "</th>").join("") + "</tr>";
-      for (const r of rows) {
-        html += "<tr>" + r.map(c => {
-          if (typeof c === "object" && c.class && c.text) return "<td class=\"" + c.class + "\">" + c.text + "</td>";
-          return "<td>" + (c == null ? "-" : c) + "</td>";
-        }).join("") + "</tr>";
+      const container = document.getElementById(id);
+      if (!rows || rows.length === 0) { emptyNote(container, "No data yet."); return; }
+      const table = document.createElement("table");
+      const headRow = document.createElement("tr");
+      for (const h of headers) {
+        const th = document.createElement("th");
+        th.textContent = h;
+        headRow.appendChild(th);
       }
-      html += "</table>";
-      el.innerHTML = html;
+      table.appendChild(headRow);
+      for (const r of rows) {
+        const tr = document.createElement("tr");
+        for (const c of r) {
+          const td = document.createElement("td");
+          if (c !== null && typeof c === "object") {
+            td.className = c.class;
+            td.textContent = c.text;
+          } else {
+            td.textContent = c == null ? "-" : String(c);
+          }
+          tr.appendChild(td);
+        }
+        table.appendChild(tr);
+      }
+      container.textContent = "";
+      container.appendChild(table);
     }
 
     async function loadRecentRuns() {
@@ -133,21 +178,35 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
     async function loadCompare() {
       const data = await get("/api/v1/compare?by=provider");
       const rows = (data?.rows || []).sort((a, b) => (b.success_rate || 0) - (a.success_rate || 0));
-      const el = document.getElementById("compare");
-      if (!rows || rows.length === 0) { el.innerHTML = "<p class=\"empty\">No comparison data yet.</p>"; return; }
-      let html = "";
+      const container = document.getElementById("compare");
+      if (!rows || rows.length === 0) { emptyNote(container, "No comparison data yet."); return; }
+      container.textContent = "";
       for (const r of rows) {
-        const pct = Math.round((r.success_rate || 0) * 100);
-        html += "<div class=\"row\"><span>" + (r.provider || r.model || "-") + "</span>" +
-                "<div class=\"bar\" style=\"width:" + pct + "%\"></div>" +
-                "<span>" + pct + "%</span></div>";
+        const pct = Math.max(0, Math.min(100, Math.round((r.success_rate || 0) * 100)));
+        const row = document.createElement("div");
+        row.className = "row";
+        const name = document.createElement("span");
+        name.textContent = r.provider || r.model || "-";
+        const bar = document.createElement("div");
+        bar.className = "bar";
+        bar.style.width = pct + "%";
+        const value = document.createElement("span");
+        value.textContent = pct + "%";
+        row.append(name, bar, value);
+        container.appendChild(row);
       }
-      el.innerHTML = html;
     }
 
     async function refresh() {
       await Promise.all([loadRecentRuns(), loadDistributedJobs(), loadWorkers(), loadCompare()]);
     }
+
+    document.getElementById("key-save").addEventListener("click", () => {
+      API_KEY = document.getElementById("key-input").value.trim();
+      sessionStorage.setItem("atomics_api_key", API_KEY);
+      document.getElementById("key-warning").style.display = "none";
+      refresh();
+    });
 
     if (!API_KEY) {
       document.getElementById("key-warning").style.display = "block";

@@ -22,6 +22,10 @@ from atomics.distributed.models import (
 from atomics.distributed.rollup import AssignmentRecord, build_rollup
 
 
+class AssignmentRejectedError(Exception):
+    """A worker tried to act on an assignment it does not currently hold."""
+
+
 class Coordinator:
     """Manage workers, jobs, and task assignments in SQLite."""
 
@@ -375,20 +379,44 @@ class Coordinator:
         assignment_id: str,
         result_json: str | None,
         *,
+        worker_id: str,
         error: str | None = None,
     ) -> TaskAssignment | None:
+        """Record a worker's result for an assignment it currently holds.
+
+        The update is guarded on both the submitting worker and the ASSIGNED
+        state, so one worker cannot report results for another's slice and a
+        late submission cannot overwrite an assignment that already finished or
+        was requeued to someone else.
+        """
         status = (
             AssignmentStatus.FAILED.value
             if error
             else AssignmentStatus.COMPLETED.value
         )
-        self._conn.execute(
+        cursor = self._conn.execute(
             "UPDATE distributed_assignments "
             "SET status = ?, result_json = ?, completed_at = ? "
-            "WHERE assignment_id = ?",
-            (status, result_json, self._now(), assignment_id),
+            "WHERE assignment_id = ? AND worker_id = ? AND status = ?",
+            (
+                status,
+                result_json,
+                self._now(),
+                assignment_id,
+                worker_id,
+                AssignmentStatus.ASSIGNED.value,
+            ),
         )
         self._conn.commit()
+        if cursor.rowcount == 0:
+            existing = self.get_assignment(assignment_id)
+            if existing is None:
+                return None
+            raise AssignmentRejectedError(
+                f"worker {worker_id} cannot submit assignment {assignment_id}: "
+                f"held by {existing.worker_id or 'nobody'} in state "
+                f"{existing.status.value}"
+            )
         assignment = self.get_assignment(assignment_id)
         if assignment:
             self._update_job_status(assignment.job_id)

@@ -5,7 +5,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from atomics.api.dependencies import require_auth, require_worker_auth
-from atomics.distributed.coordinator import Coordinator
+from atomics.distributed.coordinator import AssignmentRejectedError, Coordinator
 from atomics.distributed.models import (
     DistributedJob,
     DistributedRunRequest,
@@ -112,11 +112,17 @@ async def submit_result(
     coordinator: Coordinator = Depends(get_coordinator),
     _: None = Depends(require_worker_auth),
 ) -> dict:
-    assignment = coordinator.submit_assignment(
-        assignment_id,
-        payload.result_json,
-        error=payload.error,
-    )
+    try:
+        assignment = coordinator.submit_assignment(
+            assignment_id,
+            payload.result_json,
+            worker_id=worker_id,
+            error=payload.error,
+        )
+    except AssignmentRejectedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail=str(exc)
+        ) from exc
     if assignment is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found"
