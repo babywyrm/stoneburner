@@ -9,7 +9,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
-from atomics.eval.codegen import CodegenFixture, CodeTestCase
+from atomics.eval.codegen import CodegenFixture, CodeTestCase, sandbox
 from atomics.eval.codegen.fixtures import ALL_CODEGEN_FIXTURES
 from atomics.models import TaskCategory, TaskResult, TaskStatus
 from atomics.providers.base import BaseProvider
@@ -103,38 +103,32 @@ def run_test_case(
     *,
     timeout_seconds: float = 5.0,
 ) -> tuple[bool, str]:
-    """Execute a test case against extracted code. Returns (passed, detail)."""
-    namespace: dict = {}
-    try:
-        exec(code, namespace)  # noqa: S102
-    except Exception as exc:
-        return False, f"Compilation error: {type(exc).__name__}: {exc}"
+    """Execute a test case against extracted code. Returns (passed, detail).
 
-    func = namespace.get(function_name)
-    if func is None:
+    The code is model-generated and therefore untrusted, so it runs in a child
+    interpreter rather than this process. See `atomics.eval.codegen.sandbox`.
+    """
+    outcome = sandbox.execute(
+        code,
+        function_name,
+        test_case.input_args,
+        timeout_seconds=timeout_seconds,
+    )
+
+    if outcome.status == "compile_error":
+        return False, f"Compilation error: {outcome.detail}"
+    if outcome.status == "missing_function":
         return False, f"Function '{function_name}' not found in generated code"
-
-    try:
-        import signal
-
-        def _timeout_handler(signum, frame):
-            raise TimeoutError("Execution timed out")
-
-        old_handler = signal.signal(signal.SIGALRM, _timeout_handler)
-        signal.alarm(int(timeout_seconds))
-        try:
-            result = func(*test_case.input_args)
-        finally:
-            signal.alarm(0)
-            signal.signal(signal.SIGALRM, old_handler)
-    except TimeoutError:
+    if outcome.status == "timeout":
         return False, "Execution timed out"
-    except Exception as exc:
-        return False, f"Runtime error: {type(exc).__name__}: {exc}"
+    if outcome.status == "runtime_error":
+        return False, f"Runtime error: {outcome.detail}"
+    if outcome.status != "ok":
+        return False, f"Sandbox error ({outcome.status}): {outcome.detail}"
 
-    if _compare_output(result, test_case.expected_output, fixture):
+    if _compare_output(outcome.result, test_case.expected_output, fixture):
         return True, "OK"
-    return False, f"Expected {test_case.expected_output!r}, got {result!r}"
+    return False, f"Expected {test_case.expected_output!r}, got {outcome.result!r}"
 
 
 @dataclass
