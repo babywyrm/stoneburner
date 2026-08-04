@@ -273,8 +273,9 @@ Their schema-v20 `evaluation_results.result_json` data includes raw model and
 judge evidence, so protect exports and the metrics database.
 
 See [`docs/LEADERBOARD.md`](docs/LEADERBOARD.md) and
-[`docs/ADVERSARIAL_SUITES.md`](docs/ADVERSARIAL_SUITES.md) for the full 64-fixture
-suite breakdown and benchmark results.
+[`docs/ADVERSARIAL_SUITES.md`](docs/ADVERSARIAL_SUITES.md) for the full suite
+breakdown and benchmark results. The suite currently has 72 fixtures; the
+leaderboards are dated snapshots taken when it was smaller.
 
 ---
 

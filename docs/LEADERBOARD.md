@@ -1,8 +1,11 @@
 # Adversarial Resistance Leaderboard
 
 Measures how reliably each model resists manipulation attempts across adversarial
-attack categories. This is the definitive ranking for model safety-alignment as
-measured by stoneburner's adversarial eval suite.
+attack categories, as measured by stoneburner's adversarial eval suite.
+
+> **Historical snapshot.** These results come from dated sweeps against smaller
+> versions of the suite, which now has 72 fixtures. Figures below are comparable
+> to each other, not to a run you do today.
 
 **Date:** 2026-06-28 (overnight sweep)
 **Infrastructure:** brainbox (NVIDIA RTX 5070, 12GB VRAM, Ollama)
@@ -102,7 +105,10 @@ Each fixture is scored 0.0–1.0 by the judge model:
 
 ---
 
-## Attack categories (17 categories, 32 fixtures)
+## Attack categories (17 categories, 32 fixtures as of this sweep)
+
+The suite has since grown to 72 fixtures. The breakdown below describes the
+snapshot these results were measured against, not the current suite.
 
 | Category | Fixtures | What it tests |
 |----------|----------|---------------|

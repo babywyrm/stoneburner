@@ -1,7 +1,52 @@
-# Security Considerations
+# Security
 
-This document covers operational security decisions in stoneburner that users
-and operators should be aware of.
+Reporting a vulnerability comes first; everything after it documents the
+operational security decisions in stoneburner that users and operators should
+be aware of.
+
+## Reporting a vulnerability
+
+**Do not open a public issue for a security problem.** Use GitHub's private
+reporting instead:
+
+[Report a vulnerability](https://github.com/babywyrm/stoneburner/security/advisories/new)
+
+If private reporting is unavailable to you, open a public issue containing only
+"security report, requesting contact" and no details, and a private channel
+will be arranged.
+
+### What to include
+
+A working proof of concept helps more than anything else. Beyond that: the
+version or commit, which component is affected (CLI, API server, coordinator,
+worker, dashboard, an eval suite), and what an attacker gains.
+
+### Scope
+
+This is a benchmarking tool, not a hosted service, so severity depends heavily
+on deployment. In scope, roughly in order of interest:
+
+- Anything reachable over the API server or coordinator endpoints without the
+  corresponding key, or that lets one key act with another's privileges
+- Escapes from the codegen sandbox (see below for what it does and does not
+  claim)
+- Credential disclosure — provider keys, OAuth tokens, keychain contents —
+  through logs, exports, error messages, or the database
+- Injection into the terminal, the dashboard, or persisted records
+
+Out of scope: findings that require an attacker who already has local code
+execution as the operator, the deliberate risks documented later in this file
+(post-run hooks, custom OIDC issuers), and resource exhaustion by an
+already-authenticated caller, which is a known gap being tracked rather than a
+new finding.
+
+### What to expect
+
+This is a single-maintainer project, so the honest answer is best effort rather
+than a contractual SLA: acknowledgement within about a week, a fix or a written
+decision not to fix before any public disclosure, and credit in the changelog
+unless you would rather not be named. If you plan to publish, say so and a
+timeline can be agreed rather than discovered.
 
 ## Secret scanning
 

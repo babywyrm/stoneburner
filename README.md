@@ -229,13 +229,16 @@ no credentials and no model, and touches no real database.
 | Document | Description |
 |----------|-------------|
 | [QUICKSTART.md](QUICKSTART.md) | Recipe-first guide grouped by goal |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Setup, the checks CI runs, and project conventions |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Layer map, primitives, contributor guide |
-| [SECURITY.md](SECURITY.md) | Operational security considerations |
+| [SECURITY.md](SECURITY.md) | Vulnerability reporting and operational security considerations |
 | [CHANGELOG.md](CHANGELOG.md) | Version history |
 | [RELEASING.md](RELEASING.md) | Release process, versioning and tag conventions |
 | [ROADMAP.md](ROADMAP.md) | Priorities and future directions |
 | [docs/CLI_REFERENCE.md](docs/CLI_REFERENCE.md) | Full CLI command reference |
+| [docs/API_SERVER.md](docs/API_SERVER.md) | HTTP API server, authentication, distributed runs, dashboard |
 | [docs/SECURITY_SUITES.md](docs/SECURITY_SUITES.md) | Security evaluation suites |
+| [docs/ADVERSARIAL_SUITES.md](docs/ADVERSARIAL_SUITES.md) | Adversarial fixture flow, scoring, and categories |
 | [docs/LOAD_TESTING.md](docs/LOAD_TESTING.md) | Stress, soak, scenario, capacity testing |
 | [docs/COMPARING.md](docs/COMPARING.md) | Provider comparison, model classes, judge accuracy |
 | [docs/THINKING.md](docs/THINKING.md) | Thinking/reasoning mode internals |
@@ -246,4 +249,4 @@ no credentials and no model, and touches no real database.
 
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE).
