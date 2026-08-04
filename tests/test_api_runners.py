@@ -10,6 +10,7 @@ from fastapi import HTTPException
 
 from atomics.api import _runners as runners
 from atomics.api.models import EvalRequest, RunRequest
+from atomics.eval.budget import GuardedProvider
 from atomics.providers.factory import ProviderConfigError
 
 
@@ -208,9 +209,17 @@ async def test_run_eval_suite_dispatches(
         result = await runners.run_eval_suite(payload)
 
     mock_run.assert_awaited_once()
-    assert mock_run.await_args.args[0] is provider
+    # The API always meters eval spend, so the runner receives the provider
+    # wrapped in its budget guard rather than the bare provider.
+    passed_provider = mock_run.await_args.args[0]
+    assert isinstance(passed_provider, GuardedProvider)
+    assert passed_provider.inner is provider
     if suite != "codegen":
-        assert mock_run.await_args.kwargs["judge_provider"] is judge
+        passed_judge = mock_run.await_args.kwargs["judge_provider"]
+        assert isinstance(passed_judge, GuardedProvider)
+        assert passed_judge.inner is judge
+        # One ceiling across both, not one each.
+        assert passed_judge.guard is passed_provider.guard
         assert mock_run.await_args.kwargs["model"] == "m1"
         assert mock_run.await_args.kwargs["judge_model"] == "j1"
     else:

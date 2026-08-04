@@ -129,6 +129,27 @@ curl -H "X-API-Key: $ATOMICS_API_KEY" -H "Content-Type: application/json" \
   http://127.0.0.1:8000/api/v1/evals
 ```
 
+### Spend ceiling
+
+Every API-triggered eval is metered. `budget_usd` defaults to `10.0` and is a
+single ceiling shared by the model under test and every judge, so a run cannot
+quietly cost a multiple of what was asked for:
+
+```bash
+curl -H "X-API-Key: $ATOMICS_API_KEY" -H "Content-Type: application/json" \
+  -d '{"suite": "adversarial", "provider": "claude", "budget_usd": 2.50}' \
+  http://127.0.0.1:8000/api/v1/evals
+```
+
+You can lower the ceiling but not remove it. `0`, negative values, and anything
+above `1000` are rejected with `422`. A run that hits the ceiling stops rather
+than continuing to spend, and the job reports `EvalBudgetExceededError` with the
+amount spent — distinct from a `400`, which means the request itself was bad.
+
+The CLI defaults the other way: no ceiling unless you pass `--budget`, because
+a local operator is spending their own money on a run they chose to start. See
+[SECURITY.md](../SECURITY.md#spend-ceilings-on-eval-suites).
+
 ## Distributed Runs
 
 Spread benchmark work across multiple worker processes that poll a coordinator (the atomics API server). Workers claim, execute, and report assignments; two modes decide how the work is divided:

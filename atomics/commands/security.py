@@ -20,13 +20,16 @@ from atomics.commands.common import (
     FixtureProgress,
     _attribution_model,
     _make_provider,
+    budget_option,
     effective_model,
+    eval_budget_from,
     evaluation_record_from_fixture,
     integrity_exit_code,
     setup_logging,
     write_summary_json,
 )
 from atomics.config import load_settings
+from atomics.eval.budget import share_budget
 from atomics.storage import MetricsRepository
 from atomics.validation import sanitize_error
 
@@ -89,6 +92,7 @@ def _parse_model_spec(spec: str, default_provider: str) -> tuple[str, str, str |
 @click.option("--allow-partial", is_flag=True,
               help="Allow partial/invalid execution to exit zero after diagnostics.")
 @click.option("--verbose", "-v", is_flag=True, help="Show full prompt, model response, and judge reasoning for each fixture.")
+@budget_option
 def adversarial(
     provider_name: str,
     model: str | None,
@@ -108,6 +112,7 @@ def adversarial(
     fail_on_resilience: float | None,
     allow_partial: bool,
     verbose: bool,
+    budget_usd: float | None,
 ) -> None:
     """Run adversarial LLM resilience eval — measures resistance to manipulation.
 
@@ -146,6 +151,18 @@ def adversarial(
             ej_model = parts[1] if len(parts) > 1 else None
             ej_provider = _make_provider(ej_provider_name, ej_model, host_override or judge_host or ollama_host, settings, vllm_host=vllm_host)
             extra_judge_pairs.append((ej_provider, ej_model))
+
+    # This is the most expensive command in the tool: fixtures x --runs x every
+    # judge. One shared ceiling covers all of it.
+    budget = eval_budget_from(budget_usd)
+    if budget is not None:
+        guarded = share_budget(
+            budget, provider, judge, *(p for p, _ in extra_judge_pairs)
+        )
+        provider, judge = guarded[0], guarded[1]
+        extra_judge_pairs = [
+            (guarded[2 + i], mdl) for i, (_, mdl) in enumerate(extra_judge_pairs)
+        ]
 
     judge_label = effective_judge_model
     if extra_judge_pairs:
@@ -492,6 +509,7 @@ def adversarial(
 @click.option("--save/--no-save", "save_results", default=True, show_default=True)
 @click.option("--json-out", "json_out", type=click.Path(dir_okay=False, writable=True), default=None,
               help="Write the full run (per-fixture scores, rationales, latency, cost) as JSON to this file.")
+@budget_option
 def redblue(
     provider_name: str,
     model: str | None,
@@ -506,6 +524,7 @@ def redblue(
     thinking_budget: int,
     save_results: bool,
     json_out: str | None,
+    budget_usd: float | None,
 ) -> None:
     """Run red/blue team LLM capability eval — offensive and defensive security tasks.
 
@@ -519,6 +538,7 @@ def redblue(
     settings = load_settings()
     provider = _make_provider(provider_name, model, ollama_host, settings, vllm_host=vllm_host)
     judge = _make_provider(judge_provider_name, judge_model, judge_host or ollama_host, settings, vllm_host=vllm_host)
+    provider, judge = share_budget(eval_budget_from(budget_usd), provider, judge)
 
     console.print(
         f"\n[bold]Red/Blue eval[/bold] — model: [cyan]{provider_name}[/cyan] ({model or 'default'})\n"
@@ -628,6 +648,7 @@ def redblue(
 @click.option("--json-out", "json_out", type=click.Path(dir_okay=False, writable=True), default=None)
 @click.option("--thinking/--no-thinking", "thinking_flag", default=None)
 @click.option("--thinking-budget", type=int, default=None)
+@budget_option
 def multiturn(
     provider_name: str,
     model: str | None,
@@ -642,6 +663,7 @@ def multiturn(
     json_out: str | None,
     thinking_flag: bool | None,
     thinking_budget: int | None,
+    budget_usd: float | None,
 ) -> None:
     """Multi-turn conversation evaluation — context retention, coherence, instruction following."""
     settings = load_settings()
@@ -658,6 +680,9 @@ def multiturn(
     judge_provider = _make_provider(
         judge_provider_name, judge_model, judge_host or ollama_host, settings,
         vllm_host=vllm_host, region=region,
+    )
+    test_provider, judge_provider = share_budget(
+        eval_budget_from(budget_usd), test_provider, judge_provider
     )
 
     selected_fixtures = ALL_MULTITURN_FIXTURES
@@ -814,6 +839,7 @@ def multiturn(
     is_flag=True,
     help="Return success for a partial run while preserving integrity details.",
 )
+@budget_option
 @click.pass_context
 def refusal(
     ctx: click.Context,
@@ -827,6 +853,7 @@ def refusal(
     json_out: Path | None,
     save: bool,
     allow_partial: bool,
+    budget_usd: float | None,
 ) -> None:
     """Refusal calibration — measure over- and under-refusal."""
     from atomics.eval.refusal import REFUSAL_FIXTURES, run_refusal
@@ -850,6 +877,7 @@ def refusal(
         )
         attributed_model = effective_model(model, provider)
         attributed_judge = effective_model(judge_model, judge)
+        provider, judge = share_budget(eval_budget_from(budget_usd), provider, judge)
     except click.ClickException:
         raise
     except Exception as exc:
@@ -1053,6 +1081,7 @@ def _render_refusal_summary(
     is_flag=True,
     help="Return success for a partial run while preserving integrity details.",
 )
+@budget_option
 @click.pass_context
 def codereview(
     ctx: click.Context,
@@ -1066,6 +1095,7 @@ def codereview(
     json_out: Path | None,
     save: bool,
     allow_partial: bool,
+    budget_usd: float | None,
 ) -> None:
     """Secure code review — measure planted-vulnerability detection."""
     from atomics.eval.codereview import SECURE_CODE_FIXTURES, run_codereview
@@ -1089,6 +1119,7 @@ def codereview(
         )
         attributed_model = effective_model(model, provider)
         attributed_judge = effective_model(judge_model, judge)
+        provider, judge = share_budget(eval_budget_from(budget_usd), provider, judge)
     except click.ClickException:
         raise
     except Exception as exc:

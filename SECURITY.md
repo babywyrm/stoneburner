@@ -156,10 +156,39 @@ Resource bounds, all configurable on `ServerSettings`:
 | `iterations` | 1000 | A single request running indefinitely |
 | `interval` | 3600s | The same, via a long sleep between tasks |
 | `fixtures` | 500 | An oversized eval request |
+| `budget_usd` | 10.0 | One eval spending without limit; capped at 1000 |
 
-These cap how much *one server* will do at once. They are not a budget: an
-authenticated caller can still submit repeatedly and spend provider credit up
-to your account limits. Per-caller budget accounting is not implemented.
+These cap how much *one server* will do at once.
+
+## Spend ceilings on eval suites
+
+Benchmark runs have always been metered: `LoopEngine` builds a `RateBudgetGuard`
+from the tier profile. Eval suites had no equivalent, which mattered because
+`POST /api/v1/evals` is reachable by any holder of an API key and an adversarial
+run with extra judges is the most expensive operation this tool performs.
+
+Every eval provider is now wrapped in a guard that meters spend, hourly tokens,
+requests per minute, and consecutive failures. The model under test and every
+judge share **one** ceiling, so a run with `--extra-judges` cannot quietly cost
+a multiple of what was asked for. Judge traffic is metered too — that is where
+consensus scoring actually spends.
+
+The two surfaces default differently, deliberately:
+
+| Surface | Default | Why |
+|---------|---------|-----|
+| `POST /api/v1/evals` | Always metered, `$10` | The caller is remote and holds a shared key |
+| `atomics <suite>` | No ceiling unless `--budget` | A local operator is spending their own money on a run they started |
+
+An API caller may lower `budget_usd` but cannot remove it; `0` and negative
+values are rejected with `422`, and the ceiling itself is capped at `$1000`.
+When a run hits a ceiling it stops with `EvalBudgetExceededError` rather than
+continuing to spend, and the job records that as the failure reason. Per-minute
+request pressure is waited out instead, since it clears on its own.
+
+This bounds a single run. It is **not** per-caller accounting across runs: an
+authenticated caller can still submit repeatedly, and each submission gets its
+own ceiling. Per-caller budget accounting remains unimplemented.
 
 ## Generated code execution (codegen suite)
 

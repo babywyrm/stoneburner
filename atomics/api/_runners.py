@@ -9,6 +9,7 @@ from fastapi import HTTPException
 from atomics.api.models import EvalRequest, RunRequest
 from atomics.config import load_settings
 from atomics.eval.adversarial.runner import run_adversarial
+from atomics.eval.budget import EvalBudget, EvalBudgetExceededError, share_budget
 from atomics.eval.codegen.runner import run_codegen
 from atomics.eval.multiturn.runner import run_multiturn
 from atomics.eval.rag.runner import run_rag
@@ -38,6 +39,22 @@ def _provider_for(name: str, model: str | None) -> BaseProvider:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except (ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+def _guarded_providers(
+    payload: EvalRequest,
+) -> tuple[BaseProvider, BaseProvider]:
+    """Build the model and judge for an eval request, sharing one budget.
+
+    Always metered, unlike the CLI. A local operator spends their own money
+    deliberately; an API caller is remote and authenticated by a shared key, so
+    the ceiling is the only thing between them and the account limit.
+    """
+    provider = _provider_for(payload.provider, payload.model)
+    judge_provider = _provider_for("ollama", payload.judge_model)
+    budget = EvalBudget(budget_limit_usd=payload.budget_usd)
+    guarded = share_budget(budget, provider, judge_provider)
+    return guarded[0], guarded[1]
 
 
 def _summary_totals(summary: Any) -> tuple[int, float]:
@@ -125,8 +142,7 @@ async def run_benchmark_from_request(payload: RunRequest) -> dict[str, Any]:
 async def run_eval_from_request(payload: EvalRequest) -> dict[str, Any]:
     """Run the accuracy eval suite for an API request."""
     try:
-        provider = _provider_for(payload.provider, payload.model)
-        judge_provider = _provider_for("ollama", payload.judge_model)
+        provider, judge_provider = _guarded_providers(payload)
         summary = await run_eval(
             provider,
             judge_provider=judge_provider,
@@ -135,6 +151,11 @@ async def run_eval_from_request(payload: EvalRequest) -> dict[str, Any]:
             run_id=None,
         )
     except HTTPException:
+        raise
+    # Surfaces on the job as EvalBudgetExceededError rather than being flattened
+    # into a 400. The request was valid; the run stopped on a ceiling, and the
+    # caller needs to tell those apart.
+    except EvalBudgetExceededError:
         raise
     except (ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -158,8 +179,7 @@ async def run_eval_suite(payload: EvalRequest) -> dict[str, Any]:
         result = await run_eval_from_request(payload)
         return {"suite": suite, **result}
 
-    provider = _provider_for(payload.provider, payload.model)
-    judge_provider = _provider_for("ollama", payload.judge_model)
+    provider, judge_provider = _guarded_providers(payload)
 
     summary: Any
     try:
@@ -196,6 +216,8 @@ async def run_eval_suite(payload: EvalRequest) -> dict[str, Any]:
         else:  # pragma: no cover - guarded by validate_eval_suite
             raise ValueError(f"Unsupported eval suite: {suite}")
     except HTTPException:
+        raise
+    except EvalBudgetExceededError:
         raise
     except (ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

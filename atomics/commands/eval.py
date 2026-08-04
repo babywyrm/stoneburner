@@ -9,8 +9,15 @@ import click
 from rich.console import Console
 from rich.table import Table
 
-from atomics.commands.common import PROVIDER_CHOICES, _make_provider, setup_logging
+from atomics.commands.common import (
+    PROVIDER_CHOICES,
+    _make_provider,
+    budget_option,
+    eval_budget_from,
+    setup_logging,
+)
 from atomics.config import load_settings
+from atomics.eval.budget import share_budget
 
 
 @click.command()
@@ -44,6 +51,7 @@ from atomics.config import load_settings
               help="Write the full run (per-fixture scores, rationales, latency, cost) as JSON to this file.")
 @click.option("--thinking/--no-thinking", "thinking_flag", default=None, help="Enable/disable thinking for capable models")
 @click.option("--thinking-budget", type=int, default=None, help="Max thinking tokens")
+@budget_option
 def eval(
     provider_name: str,
     model: str | None,
@@ -59,6 +67,7 @@ def eval(
     json_out: str | None,
     thinking_flag: bool | None,
     thinking_budget: int | None,
+    budget_usd: float | None,
 ) -> None:
     """Run the fixed eval fixture set and score quality with an LLM judge.
 
@@ -109,6 +118,22 @@ def eval(
                 ej_host or judge_host or ollama_host or settings.ollama_host,
             )
             extra_judge_pairs.append((ej_provider, ej_model))
+
+    # One ceiling across the model, the judge, and every consensus judge. Each
+    # extra judge is another full pass over the fixture set, so metering them
+    # separately would let the run cost a multiple of what was asked for.
+    budget = eval_budget_from(budget_usd)
+    if budget is not None:
+        guarded = share_budget(
+            budget,
+            test_provider,
+            judge_provider,
+            *(p for p, _ in extra_judge_pairs),
+        )
+        test_provider, judge_provider = guarded[0], guarded[1]
+        extra_judge_pairs = [
+            (guarded[2 + i], mdl) for i, (_, mdl) in enumerate(extra_judge_pairs)
+        ]
 
     from atomics.eval.fixtures import EVAL_FIXTURES
     from atomics.eval.multilingual import ALL_MULTILINGUAL_FIXTURES

@@ -18,8 +18,12 @@ Making the server safe to leave running unattended.
 - [x] Upper bounds on `iterations`, `interval`, and eval fixture lists
 - [x] Security headers on every response; nonce-based CSP for the dashboard
 - [x] Dependency auditing and secret scanning in CI, on a schedule
-- [ ] Apply the existing budget/rate `Guard` to API-triggered runs — the CLI
-      enforces spend ceilings that the API currently bypasses entirely
+- [x] Spend ceilings on eval suites. The original item here claimed the CLI
+      enforced ceilings the API bypassed; that was wrong in a way worth
+      recording. Benchmark *runs* were guarded on both paths via the tier
+      profile, and eval *suites* were guarded on neither. Evals now wrap every
+      provider — model and judges sharing one ceiling — always metered over
+      HTTP, opt-in via `--budget` on the CLI
 - [ ] Per-caller request accounting, so one key cannot monopolize capacity
 - [ ] Structured request logging with correlation IDs
 - [ ] Split readiness from liveness so `/health` stops answering `ok` while the

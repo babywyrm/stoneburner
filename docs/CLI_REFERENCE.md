@@ -87,6 +87,27 @@ Full command reference for `atomics`. See also [QUICKSTART.md](../QUICKSTART.md)
 Real retrieval (`rag-index`, `rag --index`, `rag-retrieval`) requires the optional extra: `uv pip install "atomics[rag]"`.
 | `atomics sweep` | Multi-model eval sweep with ranked comparison |
 
+### Capping eval spend
+
+Every eval command accepts `--budget`, a dollar ceiling for the whole run:
+
+| Command | Description |
+|---------|-------------|
+| `atomics adversarial --budget 5.00` | Stop once the run has spent $5 |
+| `atomics eval --extra-judges claude:claude-sonnet-4-6 --budget 2.50` | One ceiling covering the model *and* every judge |
+
+The ceiling is shared, not per-provider: the model under test and each judge
+draw from the same $5. This matters most with `--runs` and `--extra-judges`,
+where each addition is another full pass over the fixture set.
+
+There is no default ceiling on the CLI — omit `--budget` and nothing changes
+about how your runs behave today. The API server takes the opposite default and
+always meters, since its callers are remote; see
+[API_SERVER.md](API_SERVER.md#spend-ceiling).
+
+A run that reaches the ceiling stops and reports what it spent. Hitting a
+per-minute rate limit is waited out instead, since that clears on its own.
+
 ## Load Testing
 
 | Command | Description |

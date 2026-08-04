@@ -13,6 +13,12 @@ MAX_ITERATIONS = 1000
 MAX_INTERVAL_SECONDS = 3600
 MAX_FIXTURES = 500
 
+# Dollar ceiling for one API-triggered eval, shared by the model and its judge.
+# Eval suites are the only remotely reachable path that spends without a tier
+# profile behind it, so unlike the CLI this is always applied.
+DEFAULT_EVAL_BUDGET_USD = 10.0
+MAX_EVAL_BUDGET_USD = 1000.0
+
 
 class RunRequest(BaseModel):
     """Request body to start a benchmark run."""
@@ -34,6 +40,9 @@ class EvalRequest(BaseModel):
     judge_model: str | None = None
     fixtures: list[str] | None = Field(default=None, max_length=MAX_FIXTURES)
     save: bool = True
+    budget_usd: float = Field(
+        default=DEFAULT_EVAL_BUDGET_USD, gt=0, le=MAX_EVAL_BUDGET_USD
+    )
 
 
 class JobResponse(BaseModel):
