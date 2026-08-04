@@ -1,0 +1,64 @@
+name: security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # Dependencies do not change when the code does — a CVE lands against a
+  # version already pinned in uv.lock. The weekly run is what actually catches
+  # those; the push/PR runs only stop a known-vulnerable pin being introduced.
+  schedule:
+    - cron: "0 6 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.13"
+
+      # --frozen so the audit reflects the committed lockfile rather than a
+      # fresh resolution that might silently pick up an unpinned fix.
+      - name: Sync dependencies
+        run: uv sync --extra dev --extra api --frozen
+
+      # Audits the resolved environment. Running pip-audit against an exported
+      # requirements file instead makes it build its own resolution venv, which
+      # is slower and can fail for reasons unrelated to the project.
+      - name: Audit dependencies
+        run: uv run --with pip-audit pip-audit
+
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      # Full history: the point is what has ever been committed, not what the
+      # tip happens to contain.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # The binary rather than gitleaks-action, whose licensing differs for
+      # organization-owned repositories.
+      - name: Install gitleaks
+        env:
+          GITLEAKS_VERSION: "8.24.3"
+        run: |
+          curl -sSfL \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            -o gitleaks.tar.gz
+          tar -xzf gitleaks.tar.gz gitleaks
+          sudo mv gitleaks /usr/local/bin/
+          gitleaks version
+
+      - name: Scan committed history
+        run: gitleaks git --no-banner --config .gitleaks.toml --redact
+
+      - name: Scan working tree
+        run: gitleaks dir --no-banner --config .gitleaks.toml --redact
