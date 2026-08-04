@@ -24,10 +24,13 @@ Making the server safe to leave running unattended.
       profile, and eval *suites* were guarded on neither. Evals now wrap every
       provider — model and judges sharing one ceiling — always metered over
       HTTP, opt-in via `--budget` on the CLI
-- [ ] Per-caller request accounting, so one key cannot monopolize capacity
-- [ ] Structured request logging with correlation IDs
-- [ ] Split readiness from liveness so `/health` stops answering `ok` while the
-      coordinator's database is unreachable
+- [x] Per-caller request accounting, so one key cannot monopolize capacity
+- [x] Structured request logging with correlation IDs that survive into the
+      async job a request starts
+- [x] Split readiness from liveness. `/health` stays liveness-only and `/ready`
+      reports `503` on an unreachable coordinator database. Wiring the database
+      into liveness would have an orchestrator restart a working process during
+      a database outage, which repairs nothing
 
 ## v0.17.0 — Structural consolidation
 

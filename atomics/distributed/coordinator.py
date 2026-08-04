@@ -53,6 +53,20 @@ class Coordinator:
     def _now(self) -> str:
         return datetime.now(UTC).isoformat()
 
+    def check_database(self) -> str | None:
+        """Verify the backing database answers. Returns an error, or None if well.
+
+        Used by the readiness probe. A trivial read rather than a cached flag,
+        because the failures worth catching — the file deleted out from under a
+        long-lived connection, a full or read-only disk — only surface when
+        something actually touches it.
+        """
+        try:
+            self._conn.execute("SELECT 1").fetchone()
+        except Exception as exc:
+            return f"{type(exc).__name__}: {exc}"
+        return None
+
     def register_worker(
         self, req: WorkerRegisterRequest, *, api_key_hint: str | None = None
     ) -> Worker:
