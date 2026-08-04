@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+### Security
+- **Job state is now bounded.** `JobManager` kept every job it had ever run in
+  an in-memory dict, each holding a full run summary, so a caller submitting in
+  a loop grew it until the process died. At most `max_active_jobs` (16) run
+  concurrently — further submissions get `429` — and at most
+  `max_retained_jobs` (256) finished jobs are retained for polling, evicted
+  oldest-first. Running jobs are never evicted.
+- **Request sizes are capped.** `iterations` (1000), `interval` (3600s), and
+  the `fixtures` list (500) previously had lower bounds but no upper ones, so a
+  single API call could run indefinitely and spend without limit. The CLI is
+  unaffected and remains the path for long campaigns.
+- **Security headers on every response** — `nosniff`, `X-Frame-Options: DENY`,
+  `Referrer-Policy: no-referrer`, `Cross-Origin-Opener-Policy`, `no-store`, and
+  a `default-src 'none'` CSP for JSON routes. The dashboard gets a per-response
+  nonce-based CSP rather than `unsafe-inline`, so an injected tag cannot
+  execute even if something did reach the page as markup.
+
 ## 0.15.2 (2026-08-03) — Security hardening: sandboxed codegen and API authorization
 
 Upgrade before exposing an API server. Every finding below came from the

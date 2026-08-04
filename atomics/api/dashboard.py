@@ -9,6 +9,8 @@ from __future__ import annotations
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 
+from atomics.api.headers import dashboard_csp, new_nonce
+
 router = APIRouter()
 
 _DASHBOARD_HTML = """<!DOCTYPE html>
@@ -220,6 +222,13 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
 
 
 @router.get("/dashboard", response_class=HTMLResponse)
-async def dashboard_index(request: Request) -> str:
-    """Serve the dashboard HTML."""
-    return _DASHBOARD_HTML
+async def dashboard_index(request: Request) -> HTMLResponse:
+    """Serve the dashboard HTML under a per-response CSP nonce."""
+    nonce = new_nonce()
+    html = _DASHBOARD_HTML.replace("<style>", f'<style nonce="{nonce}">').replace(
+        "<script>", f'<script nonce="{nonce}">'
+    )
+    return HTMLResponse(
+        content=html,
+        headers={"Content-Security-Policy": dashboard_csp(nonce)},
+    )

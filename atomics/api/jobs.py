@@ -31,17 +31,53 @@ class Job:
     _task: asyncio.Task[None] | None = field(default=None, repr=False)
 
 
-class JobManager:
-    """In-memory async job manager."""
+class TooManyActiveJobsError(RuntimeError):
+    """The server is already running its configured maximum of concurrent jobs."""
 
-    def __init__(self) -> None:
+
+class JobManager:
+    """In-memory async job manager.
+
+    Job state lives in this process, so it is bounded in two directions: how
+    many jobs may run at once, and how many finished jobs are kept for polling
+    afterwards. Without both, a caller who submits in a loop grows the dict
+    until the server dies, and every retained result holds a full run summary.
+    """
+
+    DEFAULT_MAX_ACTIVE = 16
+    DEFAULT_MAX_RETAINED = 256
+
+    def __init__(
+        self,
+        *,
+        max_active: int = DEFAULT_MAX_ACTIVE,
+        max_retained: int = DEFAULT_MAX_RETAINED,
+    ) -> None:
+        if max_active < 1:
+            raise ValueError(f"max_active must be positive, got {max_active}")
+        if max_retained < 1:
+            raise ValueError(f"max_retained must be positive, got {max_retained}")
         self.jobs: dict[str, Job] = {}
+        self.max_active = max_active
+        self.max_retained = max_retained
+
+    @property
+    def active_count(self) -> int:
+        return sum(
+            1
+            for job in self.jobs.values()
+            if job.status in (JobStatus.PENDING, JobStatus.RUNNING)
+        )
 
     async def submit(
         self,
         kind: str,
         work: Callable[[str], Awaitable[Any]],
     ) -> str:
+        if self.active_count >= self.max_active:
+            raise TooManyActiveJobsError(
+                f"{self.active_count} jobs already running (limit {self.max_active})"
+            )
         job_id = uuid.uuid4().hex
         job = Job(
             job_id=job_id,
@@ -52,6 +88,24 @@ class JobManager:
         self.jobs[job_id] = job
         job._task = asyncio.create_task(self._run(job, work))
         return job_id
+
+    def _evict_finished(self) -> None:
+        """Drop the oldest finished jobs once retention is exceeded.
+
+        Only finished jobs are eligible, so a burst of submissions can never
+        evict work that is still running.
+        """
+        finished = [
+            job
+            for job in self.jobs.values()
+            if job.status in (JobStatus.COMPLETED, JobStatus.FAILED)
+        ]
+        excess = len(finished) - self.max_retained
+        if excess <= 0:
+            return
+        finished.sort(key=lambda job: job.completed_at or job.created_at)
+        for job in finished[:excess]:
+            del self.jobs[job.job_id]
 
     async def _run(
         self,
@@ -72,6 +126,9 @@ class JobManager:
             job.status = JobStatus.FAILED
         finally:
             job.completed_at = time.time()
+            # Pruning on completion rather than on submit keeps the bound exact
+            # and still applies once submissions stop.
+            self._evict_finished()
 
     async def wait_for(self, job_id: str, timeout: float | None = None) -> Job:
         job = self.jobs.get(job_id)

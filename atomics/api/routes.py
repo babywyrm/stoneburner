@@ -10,7 +10,7 @@ from atomics.api._runners import (
     validate_eval_suite,
 )
 from atomics.api.dependencies import require_auth
-from atomics.api.jobs import Job, JobManager
+from atomics.api.jobs import Job, JobManager, TooManyActiveJobsError
 from atomics.api.models import (
     CompareResponse,
     EvalRequest,
@@ -40,9 +40,14 @@ async def start_run(
     job_manager: JobManager = Depends(get_job_manager),
     _: None = Depends(require_auth),
 ) -> JobResponse:
-    job_id = await job_manager.submit(
-        "run", lambda _jid: run_benchmark_from_request(payload)
-    )
+    try:
+        job_id = await job_manager.submit(
+            "run", lambda _jid: run_benchmark_from_request(payload)
+        )
+    except TooManyActiveJobsError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)
+        ) from exc
     job = job_manager.jobs[job_id]
     return _job_to_response(job)
 
@@ -61,9 +66,14 @@ async def start_eval(
             detail=str(exc),
         ) from exc
 
-    job_id = await job_manager.submit(
-        "eval", lambda _jid: run_eval_suite(payload)
-    )
+    try:
+        job_id = await job_manager.submit(
+            "eval", lambda _jid: run_eval_suite(payload)
+        )
+    except TooManyActiveJobsError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)
+        ) from exc
     job = job_manager.jobs[job_id]
     return _job_to_response(job)
 
