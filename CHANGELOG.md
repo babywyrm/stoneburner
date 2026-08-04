@@ -18,6 +18,19 @@
   a `default-src 'none'` CSP for JSON routes. The dashboard gets a per-response
   nonce-based CSP rather than `unsafe-inline`, so an injected tag cannot
   execute even if something did reach the page as markup.
+- **Upgraded 5 dependencies carrying 8 known advisories** — `click`, `idna`,
+  `pydantic-settings`, `pytest`, and `urllib3`. Found by the new dependency
+  audit on its first run.
+
+### Added
+- **`security` CI workflow** running `pip-audit` against the frozen lockfile
+  and gitleaks over both committed history and the working tree. It runs on
+  push and pull request, and weekly — the schedule is the part that matters,
+  since an advisory lands against a version already pinned rather than when
+  the code changes.
+- **Dependabot** for Python dependencies and GitHub Actions, with routine
+  minor and patch updates grouped so a normal week is one reviewable pull
+  request.
 
 ## 0.15.2 (2026-08-03) — Security hardening: sandboxed codegen and API authorization
 
