@@ -1,52 +1,70 @@
 # Roadmap
 
-Current priorities and future directions for Stoneburner / Atomics.
+Where Stoneburner / Atomics is going next. Shipped work lives in
+[CHANGELOG.md](CHANGELOG.md); this file is only about what is not done yet.
 
-## Recently Shipped
+The 2026-08-02 project audit found no critical architectural problems and one
+critical security finding, since fixed in v0.15.2. What it did surface was
+concentration: a few modules doing too much, and a server whose authorization
+model was built for a single trusted operator and then exposed over HTTP. The
+next two milestones work through that.
 
-- **Distributed fleet and full modes (Phase 2)** — `atomics distributed run --mode fleet --label k=v` broadcasts an identical task set to every matching worker, and `--mode full` delegates a complete run to one worker that executes the full `LoopEngine` locally. Both include per-worker rollups, worker liveness detection, bounded retries, and client auth on the coordinator endpoints.
-- **npm worker bridge** — `atomics worker-npm` starts a Node.js worker that registers with the coordinator, polls for assignments, and executes them via a JSON-over-stdin bridge command. Capability-based routing (`runtime: node`) ensures npm workers only receive node tasks while Python workers continue to claim the default python tasks.
-- **Distributed runs (Phase 1 split mode)** — `atomics distributed run` / `atomics worker` with coordinator API for split-mode jobs across workers.
-- **RAG Pipeline Evaluation** — `atomics rag` with 20 fixtures (security + general technical), grounding/faithfulness/abstention judge rubric, hallucination detection
-- **README refactor** — 805 → 205 lines with TOC, anchors, and 5 linked focused docs
-- **Compare improvements** — P50/P95 latency percentiles, $/1K tokens, model class taxonomy with mixed-class warnings
-- **Schedule status** — `atomics schedule-status` with OS health checks, install/uninstall registry
-- **Schema v20** — run metadata (tier, provider, model, trigger), schedules table, evaluation results ledger
+## v0.16.0 — Bounded and observable
 
-## In Progress
+Making the server safe to leave running unattended.
 
-### Eval Depth
-- [x] **Multi-turn conversation benchmarks** — test context retention, coherence drift, and instruction following across multiple exchanges. Requires extending the `generate()` contract or building a turn-accumulating runner.
-- [x] **Cost optimization advisor** — `atomics advisor` that analyzes historical runs and recommends cheaper models meeting a quality threshold. Pure SQL aggregation on existing data, no new API calls.
+- [x] Cap concurrent and retained jobs so the in-memory job dict cannot grow
+      without limit
+- [x] Upper bounds on `iterations`, `interval`, and eval fixture lists
+- [x] Security headers on every response; nonce-based CSP for the dashboard
+- [x] Dependency auditing and secret scanning in CI, on a schedule
+- [ ] Apply the existing budget/rate `Guard` to API-triggered runs — the CLI
+      enforces spend ceilings that the API currently bypasses entirely
+- [ ] Per-caller request accounting, so one key cannot monopolize capacity
+- [ ] Structured request logging with correlation IDs
+- [ ] Split readiness from liveness so `/health` stops answering `ok` while the
+      coordinator's database is unreachable
 
-## Planned
+## v0.17.0 — Structural consolidation
 
-### Infrastructure
-- [x] Dashboard / web UI for results visualization
-- [x] Webhook/Slack notifications on scheduled run regression
-- [x] GitHub Actions workflow template for eval CI gates
-- [x] Distributed runs across multiple hosts with results aggregation (split, fleet, and full modes shipped)
-- [x] API server mode (run atomics as a service, query via REST)
+Paying down concentration before it compounds. No user-visible behavior change;
+every item here is a refactor with the test suite as the contract.
 
-### Eval Quality
-- [x] RAG pipeline with real retrieval (vector DB integration, not just fixture chunks)
-- [x] Multi-turn conversation eval fixtures (context retention, contradiction detection)
-- [x] Code generation benchmarks (functional correctness, not just quality judging)
-- [x] Multilingual evaluation fixtures
+- [ ] Split `MetricsRepository` (1132 lines, ~35 methods spanning runs, eight
+      suite tables, analytics, and schedules) along domain seams
+- [ ] Route `commands/benchmark.py` and `commands/admin.py` through
+      `providers/factory.py` instead of hand-rolling the ten-provider branch
+      that the factory exists to own
+- [ ] Extract a shared eval runner base — the eight suite runners reimplement
+      the same attempt/integrity serialization, and CLI persistence boilerplate
+      repeats about eight times
+- [ ] Group the 30 flat top-level modules into `load/`, `benchmark/`, and
+      `reporting/` packages
+- [ ] Enforce the configured line length instead of `--ignore E501`, which
+      currently suppresses ~386 violations and makes the setting inert
+- [ ] Decide the fate of `inference.py` and `workers/bridge.py` — both are
+      documented but reachable only from tests
 
-### Provider Coverage
-- [x] Google Gemini provider
-- [x] Groq provider (fast inference)
-- [x] Together AI provider
-- [x] Local llama.cpp direct (without Ollama wrapper)
+## Beyond
 
-### Phase 3 (npm workers)
-- [x] `atomics/workers/bridge.py` — Node.js worker integration for browser-based benchmarks
-- [x] npm worker pool for parallel fixture execution
+Not scheduled, roughly in order of how often they come up.
+
+- **Non-destructive migrations.** Only nullable column adds are safe today; a
+  type or constraint change resets the table. Fine pre-1.0, a blocker for
+  anyone treating the database as durable.
+- **Dashboard depth.** Currently four read-only cards. Historical trends, drill
+  into a single run, and live job progress are the obvious next steps.
+- **PyPI distribution.** Needs a rename — `atomics` is taken by an unrelated
+  package — which changes `pip install` for every consumer. See
+  [RELEASING.md](RELEASING.md).
+- **Judge quality.** Multi-judge consensus exists for accuracy; extending it to
+  the security suites would reduce single-judge variance.
 
 ## Design Principles
 
 - **No breaking changes** to existing CLI commands or persistence
 - **Additive schema migrations** with fresh-start policy pre-1.0
-- **Every eval suite** gets: fixtures, judge rubric, runner, CLI command, `--json-out`, `--save/--no-save`, tests
-- **Security by default** — sanitize errors, validate URLs, no self-judging, secrets in keychain
+- **Every eval suite** gets: fixtures, judge rubric, runner, CLI command,
+  `--json-out`, `--save/--no-save`, tests
+- **Security by default** — sanitize errors, validate URLs, no self-judging,
+  secrets in keychain, untrusted code in a sandbox
