@@ -14,9 +14,12 @@ from rich.table import Table
 from atomics.commands.common import (
     PROVIDER_CHOICES,
     _make_provider,
+    budget_option,
+    eval_budget_from,
     setup_logging,
 )
 from atomics.config import load_settings
+from atomics.eval.budget import share_budget
 
 
 @click.command("rag")
@@ -40,6 +43,7 @@ from atomics.config import load_settings
               help="Write the full run as JSON to this file.")
 @click.option("--thinking/--no-thinking", "thinking_flag", default=None, help="Enable/disable thinking.")
 @click.option("--thinking-budget", type=int, default=None, help="Max thinking tokens.")
+@budget_option
 def rag(
     provider_name: str,
     model: str | None,
@@ -56,6 +60,7 @@ def rag(
     thinking_budget: int | None,
     index_path: Path | None,
     top_k: int,
+    budget_usd: float | None,
 ) -> None:
     """RAG pipeline evaluation — grounding, faithfulness, and abstention scoring."""
     settings = load_settings()
@@ -72,6 +77,9 @@ def rag(
     judge_provider = _make_provider(
         judge_provider_name, judge_model, judge_host or ollama_host, settings,
         vllm_host=vllm_host, region=region,
+    )
+    test_provider, judge_provider = share_budget(
+        eval_budget_from(budget_usd), test_provider, judge_provider
     )
 
     selected_fixtures = ALL_RAG_FIXTURES
@@ -421,6 +429,7 @@ def rag_retrieval(
 @click.option("--json-out", "json_out", type=click.Path(dir_okay=False, writable=True), default=None)
 @click.option("--thinking/--no-thinking", "thinking_flag", default=None)
 @click.option("--thinking-budget", type=int, default=None)
+@budget_option
 def codegen(
     provider_name: str,
     model: str | None,
@@ -432,6 +441,7 @@ def codegen(
     json_out: str | None,
     thinking_flag: bool | None,
     thinking_budget: int | None,
+    budget_usd: float | None,
 ) -> None:
     """Code generation evaluation — functional correctness via test execution."""
     settings = load_settings()
@@ -445,6 +455,9 @@ def codegen(
         provider_name, model, ollama_host, settings,
         vllm_host=vllm_host, region=region,
     )
+    # Codegen scores by executing tests, not by judging, so the model under
+    # test is the only thing that spends here.
+    (test_provider,) = share_budget(eval_budget_from(budget_usd), test_provider)
 
     selected_fixtures = ALL_CODEGEN_FIXTURES
     if fixtures_filter:

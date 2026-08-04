@@ -3,6 +3,26 @@
 ## Unreleased
 
 ### Security
+- **Eval suites now have spend ceilings.** Benchmark runs were always metered
+  by a `RateBudgetGuard` from the tier profile; eval suites were metered on no
+  path at all, so `POST /api/v1/evals` let any API-key holder spend against
+  provider accounts until the accounts themselves objected. An adversarial run
+  with `--runs` and extra judges is the most expensive thing this tool does.
+
+  Rather than thread a guard through the eighteen `provider.generate` call
+  sites across runners, judges, and scorers, the provider is wrapped
+  (`GuardedProvider`). Every suite is covered by construction, including suites
+  not written yet, and judge traffic is covered too — which is where consensus
+  scoring actually spends. The model and all judges share **one** ceiling, so a
+  run with `--extra-judges` cannot cost a multiple of what was requested.
+
+  The two surfaces default differently on purpose. The API is **always**
+  metered (`budget_usd`, default `$10`, capped at `$1000`); a caller may lower
+  it but not remove it, and `0` or negative is a `422`. The CLI is **opt-in**
+  via `--budget` on all nine eval commands, so no existing invocation changes
+  behavior. A run that hits a ceiling raises `EvalBudgetExceededError` with the
+  amount spent, distinct from a `400` meaning a bad request; per-minute rate
+  pressure is waited out instead, since it clears on its own.
 - **Job state is now bounded.** `JobManager` kept every job it had ever run in
   an in-memory dict, each holding a full run summary, so a caller submitting in
   a loop grew it until the process died. At most `max_active_jobs` (16) run

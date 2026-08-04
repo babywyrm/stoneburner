@@ -16,10 +16,13 @@ from rich.table import Table
 from atomics.commands.common import (
     PROVIDER_CHOICES,
     _make_provider,
+    budget_option,
     effective_model,
+    eval_budget_from,
     write_summary_json,
 )
 from atomics.config import load_settings
+from atomics.eval.budget import share_budget
 from atomics.eval.toolcall.fixtures import (
     ALL_FIXTURES,
     GROUP_ALIASES,
@@ -102,6 +105,7 @@ def _rate(rate: float | None, numerator: int, denominator: int) -> str:
               help="Write the full run as JSON to this file.")
 @click.option("--verbose", "-v", is_flag=True,
               help="Show the emitted call arguments and the accompanying text.")
+@budget_option
 def toolcall(
     provider_name: str,
     model: str | None,
@@ -117,6 +121,7 @@ def toolcall(
     save_results: bool,
     json_out: str | None,
     verbose: bool,
+    budget_usd: float | None,
 ) -> None:
     """Measure tool-call divergence: refuses in prose, complies with a function.
 
@@ -145,6 +150,14 @@ def toolcall(
             judge_provider_name, judge_model, judge_host or ollama_host, settings,
             vllm_host=vllm_host,
         )
+
+    # The judge is optional here — the tool channel is scored deterministically
+    # — so the pair is built conditionally to keep one shared ceiling either way.
+    budget = eval_budget_from(budget_usd)
+    if judge is None:
+        (provider,) = share_budget(budget, provider)
+    else:
+        provider, judge = share_budget(budget, provider, judge)
 
     resolved_model = effective_model(model, provider)
     console.print(

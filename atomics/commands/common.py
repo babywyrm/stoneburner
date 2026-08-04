@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import time
+from collections.abc import Callable
 from pathlib import Path
 from typing import Protocol, cast
 
@@ -14,6 +15,7 @@ from rich.logging import RichHandler
 from rich.status import Status
 
 from atomics.config import AtomicsSettings
+from atomics.eval.budget import EvalBudget
 from atomics.eval.outcomes import RunIntegrity
 from atomics.providers.base import BaseProvider
 from atomics.providers.factory import (
@@ -25,6 +27,35 @@ from atomics.storage.records import EvaluationResultRecord
 from atomics.validation import sanitize_error
 
 PROVIDER_CHOICES = click.Choice(list(PROVIDER_NAMES), case_sensitive=False)
+
+
+def budget_option(fn: Callable) -> Callable:
+    """Add `--budget` to an eval command.
+
+    Defaults to None — no ceiling — so every existing invocation behaves
+    exactly as before. Opt-in on the CLI is deliberate: a local operator is
+    spending their own money on a run they chose to start, and imposing a
+    default would break anyone doing a large sweep today. The API takes the
+    opposite default, because there the caller is remote.
+    """
+    return click.option(
+        "--budget",
+        "budget_usd",
+        type=float,
+        default=None,
+        help="Stop the run once this many USD has been spent across the model "
+        "under test and every judge. Default: no ceiling.",
+    )(fn)
+
+
+def eval_budget_from(budget_usd: float | None) -> EvalBudget | None:
+    """Build an `EvalBudget` from a `--budget` value, or None when unset."""
+    if budget_usd is None:
+        return None
+    try:
+        return EvalBudget(budget_limit_usd=budget_usd)
+    except ValueError as exc:
+        raise click.BadParameter(str(exc), param_hint="--budget") from exc
 
 
 def setup_logging(level: str, *, rich_tracebacks: bool = False) -> None:
