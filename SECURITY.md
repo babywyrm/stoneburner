@@ -186,9 +186,16 @@ When a run hits a ceiling it stops with `EvalBudgetExceededError` rather than
 continuing to spend, and the job records that as the failure reason. Per-minute
 request pressure is waited out instead, since it clears on its own.
 
-This bounds a single run. It is **not** per-caller accounting across runs: an
-authenticated caller can still submit repeatedly, and each submission gets its
-own ceiling. Per-caller budget accounting remains unimplemented.
+Two limits worth stating plainly:
+
+- This bounds a **single run**. It is not per-caller accounting across runs: an
+  authenticated caller can still submit repeatedly, and each submission gets its
+  own ceiling. Per-caller budget accounting remains unimplemented.
+- A dollar ceiling only binds where calls cost money. Local providers (Ollama,
+  vLLM, llama.cpp) report `$0.00`, so `budget_usd` never trips for them. The
+  guard's request-rate and hourly-token limits still apply, but if your threat
+  model is "someone pins the GPU on a local endpoint", the spend ceiling is not
+  the control that stops it.
 
 ## Generated code execution (codegen suite)
 

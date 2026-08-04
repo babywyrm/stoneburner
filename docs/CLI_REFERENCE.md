@@ -89,16 +89,19 @@ Real retrieval (`rag-index`, `rag --index`, `rag-retrieval`) requires the option
 
 ### Capping eval spend
 
-Every eval command accepts `--budget`, a dollar ceiling for the whole run:
+Every command that runs an eval suite accepts `--budget`, a dollar ceiling for
+the whole run — the nine suite commands plus `sweep`, `archreview`, and `probe`:
 
 | Command | Description |
 |---------|-------------|
 | `atomics adversarial --budget 5.00` | Stop once the run has spent $5 |
 | `atomics eval --extra-judges claude:claude-sonnet-4-6 --budget 2.50` | One ceiling covering the model *and* every judge |
+| `atomics sweep --models a,b,c --budget 10.00` | $10 for the whole sweep, not $10 per model |
 
 The ceiling is shared, not per-provider: the model under test and each judge
-draw from the same $5. This matters most with `--runs` and `--extra-judges`,
-where each addition is another full pass over the fixture set.
+draw from the same $5. This matters most with `--runs`, `--extra-judges`, and
+`sweep`/`archreview`, where each addition is another full pass over the
+fixtures.
 
 There is no default ceiling on the CLI — omit `--budget` and nothing changes
 about how your runs behave today. The API server takes the opposite default and
@@ -107,6 +110,13 @@ always meters, since its callers are remote; see
 
 A run that reaches the ceiling stops and reports what it spent. Hitting a
 per-minute rate limit is waited out instead, since that clears on its own.
+
+**`--budget` does nothing for free providers.** Ollama, vLLM, and llama.cpp
+report `$0.00` per call, so a dollar ceiling is never reached no matter how long
+the run goes — there is nothing to bill. `--budget 0.01` against a local model
+gives you a complete run, not an immediate stop. The flag is meaningful for
+paid providers (Claude, OpenAI, Bedrock, Gemini, Groq, Together) and for mixed
+runs such as a local model judged by a paid one.
 
 ## Load Testing
 

@@ -19,10 +19,19 @@
   The two surfaces default differently on purpose. The API is **always**
   metered (`budget_usd`, default `$10`, capped at `$1000`); a caller may lower
   it but not remove it, and `0` or negative is a `422`. The CLI is **opt-in**
-  via `--budget` on all nine eval commands, so no existing invocation changes
-  behavior. A run that hits a ceiling raises `EvalBudgetExceededError` with the
-  amount spent, distinct from a `400` meaning a bad request; per-minute rate
-  pressure is waited out instead, since it clears on its own.
+  via `--budget` on all twelve commands that run an eval suite — the nine suite
+  commands plus `sweep`, `archreview`, and `probe` — so no existing invocation
+  changes behavior. A run that hits a ceiling raises `EvalBudgetExceededError`
+  with the amount spent, distinct from a `400` meaning a bad request;
+  per-minute rate pressure is waited out instead, since it clears on its own.
+
+  `sweep` and `archreview` build a provider per model inside their run loop, so
+  they hold the ceiling in a `BudgetMeter` that outlives any single provider.
+  Metering per model would have made an N-model sweep cost N times the stated
+  ceiling.
+
+  Note that a dollar ceiling only binds where calls cost money: Ollama, vLLM,
+  and llama.cpp report `$0.00`, so `--budget` is inherently a no-op for them.
 - **Job state is now bounded.** `JobManager` kept every job it had ever run in
   an in-memory dict, each holding a full run summary, so a caller submitting in
   a loop grew it until the process died. At most `max_active_jobs` (16) run

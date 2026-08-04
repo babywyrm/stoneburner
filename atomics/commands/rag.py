@@ -19,7 +19,7 @@ from atomics.commands.common import (
     setup_logging,
 )
 from atomics.config import load_settings
-from atomics.eval.budget import share_budget
+from atomics.eval.budget import BudgetMeter, share_budget
 
 
 @click.command("rag")
@@ -587,6 +587,7 @@ def codegen(
 @click.option("--save/--no-save", "save_results", default=True, show_default=True)
 @click.option("--json-out", "json_out", type=click.Path(dir_okay=False, writable=True), default=None,
               help="Write the full run (per-target scores, rationales, regressions) as JSON to this file.")
+@budget_option
 def probe(
     provider_name: str,
     model: str | None,
@@ -603,6 +604,7 @@ def probe(
     alert_on_regression: bool,
     save_results: bool,
     json_out: str | None,
+    budget_usd: float | None,
 ) -> None:
     """Run LLM-evaluated live ecosystem health probes against configured artifact targets."""
     from pathlib import Path
@@ -614,6 +616,7 @@ def probe(
     settings = load_settings()
     provider = _make_provider(provider_name, model, ollama_host, settings, vllm_host=vllm_host)
     judge = _make_provider(judge_provider_name, judge_model, judge_host or ollama_host, settings, vllm_host=vllm_host)
+    provider, judge = share_budget(eval_budget_from(budget_usd), provider, judge)
 
     targets = []
     if probes_file:
@@ -719,10 +722,11 @@ def probe(
 @click.option("--save/--no-save", "save_results", default=True)
 @click.option("--json-out", "json_out", type=click.Path(dir_okay=False, writable=True), default=None,
               help="Write the full run (per-round findings, scores, cost) as JSON to this file.")
+@budget_option
 def archreview(repo_name, models_csv, provider_name, ollama_host, vllm_host,
                region, judge_provider_name, judge_model, judge_host, tier, rounds,
                max_output_tokens, inference_timeout, judge_only, verbose, save_results,
-               json_out):
+               json_out, budget_usd):
     """Benchmark models on a security-architecture review of a repo."""
     import asyncio
     import os
@@ -738,16 +742,22 @@ def archreview(repo_name, models_csv, provider_name, ollama_host, vllm_host,
     setup_logging(settings.log_level)
     console = Console()
 
+    # Like sweep, this builds a provider per model inside the run loop, so the
+    # ceiling is held by the meter rather than by any one provider.
+    meter = BudgetMeter(eval_budget_from(budget_usd))
+
     def _build_provider(
         name: str,
         mdl: str | None,
         host: str | None,
         context_tokens: int | None = None,
     ):
-        return _make_provider(
-            name, mdl, host, settings,
-            vllm_host=vllm_host, region=region,
-            context_tokens=context_tokens, inference_timeout=inference_timeout,
+        return meter.wrap(
+            _make_provider(
+                name, mdl, host, settings,
+                vllm_host=vllm_host, region=region,
+                context_tokens=context_tokens, inference_timeout=inference_timeout,
+            )
         )
 
     repos_dir = Path(__file__).resolve().parent.parent / "archreview" / "repos"

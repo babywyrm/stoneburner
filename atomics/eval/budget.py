@@ -120,6 +120,22 @@ class GuardedProvider(BaseProvider):
     def inner(self) -> BaseProvider:
         return self._inner
 
+    def __getattr__(self, name: str) -> object:
+        """Delegate anything not overridden to the wrapped provider.
+
+        Only invoked when normal lookup fails, so the explicit members above
+        still win. This exists because callers reach past the `BaseProvider`
+        interface in practice — `sweep` reads `provider._host` to point a judge
+        at the same Ollama instance — and a decorator that silently breaks
+        those is worse than no decorator. Forwarding keeps the wrapper
+        substitutable for the thing it wraps.
+        """
+        # Guards the recursive case where _inner is absent (e.g. during
+        # unpickling), which would otherwise loop until the stack gives out.
+        if name == "_inner":
+            raise AttributeError(name)
+        return getattr(self._inner, name)
+
     async def health_check(self) -> bool:
         # Not metered: a health check is not model traffic and costs nothing.
         return await self._inner.health_check()
@@ -215,6 +231,34 @@ class GuardedProvider(BaseProvider):
     def _is_transient(reason: str) -> bool:
         """Only per-minute request pressure clears on its own quickly."""
         return reason.startswith("rate limit")
+
+
+class BudgetMeter:
+    """One ceiling that can wrap providers created at different times.
+
+    `share_budget` covers the common case where every provider exists up front.
+    Sweeps do not work that way: they build a provider per model inside a loop,
+    so the guard has to outlive any single one of them. Metering each model
+    separately would mean an N-model sweep costs N times the stated ceiling,
+    which is the opposite of what someone passing `--budget` is asking for.
+    """
+
+    def __init__(self, budget: EvalBudget | None) -> None:
+        self._guard = budget.new_guard() if budget is not None else None
+
+    @property
+    def active(self) -> bool:
+        return self._guard is not None
+
+    @property
+    def guard(self) -> RateBudgetGuard | None:
+        return self._guard
+
+    def wrap(self, provider: BaseProvider) -> BaseProvider:
+        """Meter a provider, or return it untouched when there is no budget."""
+        if self._guard is None:
+            return provider
+        return GuardedProvider(provider, self._guard)
 
 
 def share_budget(
