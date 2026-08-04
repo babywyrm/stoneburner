@@ -31,7 +31,13 @@ async def lifespan(app: FastAPI):
     app.state.job_manager = JobManager(
         max_active=settings.max_active_jobs,
         max_retained=settings.max_retained_jobs,
+        max_active_per_caller=settings.max_active_jobs_per_caller,
     )
+    if settings.no_auth:
+        logger.warning(
+            "Running with --no-auth: every request is the same anonymous caller, "
+            "so per-caller job quotas cannot partition capacity."
+        )
     if settings.no_auth:
         app.state.worker_auth = NoAuth()
     else:

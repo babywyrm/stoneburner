@@ -9,7 +9,8 @@ from __future__ import annotations
 
 from fastapi import Request
 
-from atomics.api.auth import AuthBackend, key_matches
+from atomics.api.auth import AuthBackend, key_matches, matched_key
+from atomics.api.callers import ANONYMOUS_CALLER, caller_id_from_key
 
 
 class WorkerAuth(AuthBackend):
@@ -21,3 +22,7 @@ class WorkerAuth(AuthBackend):
     async def authenticate(self, request: Request) -> bool:
         key = request.headers.get("x-api-key", "")
         return key_matches(key, self._keys)
+
+    def identify(self, request: Request) -> str:
+        key = matched_key(request.headers.get("x-api-key", ""), self._keys)
+        return caller_id_from_key(key) if key is not None else ANONYMOUS_CALLER

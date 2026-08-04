@@ -22,13 +22,23 @@ def get_auth(request: Request) -> AuthBackend:
     return request.app.state.auth
 
 
-async def require_auth(request: Request, auth: AuthBackend = Depends(get_auth)) -> None:
-    """Authenticate a submitter-facing request."""
+async def require_auth(request: Request, auth: AuthBackend = Depends(get_auth)) -> str:
+    """Authenticate a submitter-facing request and identify the caller.
+
+    Returns the caller identifier so routes can attribute work without
+    repeating the lookup, and so quota accounting and request logs agree on who
+    the caller was. The identifier is a digest, never the key.
+    """
     if not await auth.authenticate(request):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or missing API key",
         )
+    caller = auth.identify(request)
+    # The logging middleware runs outside the dependency graph, so it reads the
+    # caller from request state rather than from this return value.
+    request.state.caller_id = caller
+    return caller
 
 
 def get_worker_auth(request: Request) -> AuthBackend:
@@ -37,10 +47,13 @@ def get_worker_auth(request: Request) -> AuthBackend:
 
 async def require_worker_auth(
     request: Request, auth: AuthBackend = Depends(get_worker_auth)
-) -> None:
+) -> str:
     """Authenticate a request from a worker process."""
     if not await auth.authenticate(request):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid worker API key",
         )
+    caller = auth.identify(request)
+    request.state.caller_id = caller
+    return caller
