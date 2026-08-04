@@ -42,8 +42,11 @@ That satisfies the guard without inventing a release that never happened.
    have to do about it. Put anything breaking or migration-related under an
    `### Upgrade notes` heading at the top.
 
-2. **Bump the version** in `pyproject.toml`, then `uv sync --extra dev --extra api`
-   so the lockfile and installed metadata follow.
+2. **Bump the version** in `pyproject.toml`, then `uv sync --all-extras` so the
+   lockfile and installed metadata follow. Use `--all-extras` rather than
+   naming a subset: syncing only `dev` and `api` uninstalls the RAG
+   dependencies, and the suite then *skips* those tests rather than failing, so
+   verification passes while covering twenty fewer tests than it appears to.
 
 3. **Verify.** All of these, not a subset:
 

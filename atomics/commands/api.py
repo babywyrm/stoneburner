@@ -74,6 +74,7 @@ def server(
 
     from atomics.api.config import ServerSettings
     from atomics.api.server import create_app
+    from atomics.commands.common import setup_logging
 
     if not api_keys and not no_auth:
         console.print("[red]Error: supply --api-key or --no-auth[/red]")
@@ -95,4 +96,14 @@ def server(
         console.print(f"[red]Error:[/red] {exc}")
         raise SystemExit(1) from exc
     app = create_app(settings)
-    uvicorn.run(app, host=host, port=port, log_level=log_level)
+    # Without this the atomics loggers never reach a handler at INFO, so the
+    # access log and every job_submitted/job_finished line silently vanish and
+    # a correlation ID correlates nothing.
+    setup_logging(log_level, plain=True)
+    # Uvicorn's own access log writes the raw request line, query string
+    # included, which defeats the middleware's deliberate omission of it: a key
+    # passed as ?api_key= would land in the log anyway. Ours replaces it and
+    # carries the correlation ID and caller besides.
+    uvicorn.run(
+        app, host=host, port=port, log_level=log_level, access_log=False
+    )

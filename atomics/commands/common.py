@@ -58,14 +58,35 @@ def eval_budget_from(budget_usd: float | None) -> EvalBudget | None:
         raise click.BadParameter(str(exc), param_hint="--budget") from exc
 
 
-def setup_logging(level: str, *, rich_tracebacks: bool = False) -> None:
-    """Configure Rich logging for the atomics logger."""
+def setup_logging(
+    level: str, *, rich_tracebacks: bool = False, plain: bool = False
+) -> None:
+    """Configure logging for the atomics logger.
+
+    `plain` swaps Rich for one unwrapped line per record, and is what long-lived
+    processes want. Rich wraps to the console width — 80 columns when output is
+    redirected to a file — which splits a structured access log entry across
+    four lines and leaves it unparseable by grep, journald, or any aggregator.
+    That is fine for an interactive run someone is watching and wrong for a
+    server whose logs are read by machines.
+    """
     numeric = getattr(logging, level.upper(), logging.INFO)
+    handler: logging.Handler
+    if plain:
+        handler = logging.StreamHandler()
+        handler.setFormatter(
+            logging.Formatter(
+                "%(asctime)s %(levelname)s %(name)s %(message)s",
+                datefmt="%Y-%m-%dT%H:%M:%S%z",
+            )
+        )
+    else:
+        handler = RichHandler(rich_tracebacks=rich_tracebacks, markup=True)
     logging.basicConfig(
         level=logging.WARNING,
         format="%(message)s",
         datefmt="[%X]",
-        handlers=[RichHandler(rich_tracebacks=rich_tracebacks, markup=True)],
+        handlers=[handler],
         force=True,
     )
     # Only our own loggers get the requested level; third-party stays quiet.

@@ -123,6 +123,10 @@ it. Query strings and request bodies are never logged.
 
 `caller` is a twelve-character digest of the API key, never the key itself.
 
+Server logs are one plain line per record — no Rich wrapping — so `grep`,
+journald, and log aggregators can parse them. Uvicorn's own access log is
+disabled, since it writes the raw request line including the query string.
+
 ### Per-caller capacity
 
 `max_active_jobs` bounds the whole server; `max_active_jobs_per_caller`

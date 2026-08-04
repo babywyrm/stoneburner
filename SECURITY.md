@@ -169,7 +169,9 @@ callers, so the per-caller bound collapses into the global one.
 
 Access logs record the correlation ID, a caller digest, method, path, status,
 and duration. They deliberately omit query strings and request bodies, both of
-which have carried API keys.
+which have carried API keys. Uvicorn's built-in access log is disabled for the
+same reason — it writes the raw request line, query string included, which
+would reintroduce the leak the middleware avoids.
 
 Callers appear as a twelve-character SHA-256 prefix of their key, never the key.
 Logs are read, shipped, and retained far more casually than credentials are, so

@@ -2,7 +2,55 @@
 
 ## Unreleased
 
+## 0.16.0 (2026-08-04) — Bounded and observable: spend ceilings, per-caller quotas, correlation IDs
+
+The theme is making a server safe to leave running unattended. Every limit that
+existed bounded the *whole* server; nothing bounded any single caller, nothing
+bounded eval spend at all, and nothing connected a failure back to the request
+that caused it.
+
+No breaking changes. Every new CLI behavior is behind a flag that defaults off,
+and `/health` keeps its existing shape.
+
+### Upgrade notes
+
+- **API-triggered evals are now metered by default**, at `$10` per run. If you
+  drive `POST /api/v1/evals` for runs costing more than that, pass an explicit
+  `budget_usd` (up to `$1000`). CLI evals are unaffected unless you pass
+  `--budget`.
+- **One API key is now limited to 4 concurrent jobs** (`max_active_jobs_per_caller`).
+  A client that deliberately submits more in parallel will start seeing `429`.
+  Raise the setting if that is intentional.
+- **Point readiness probes at `/ready`, not `/health`.** `/health` is unchanged
+  and still answers `200 {"status": "ok"}`, but it is liveness only. `/ready` is
+  the one that reports `503` on an unreachable database.
+
 ### Security
+- **Per-caller job accounting.** The global concurrency cap was
+  first-come-first-served: whoever submitted first held all sixteen slots, and
+  every other key got `429` until that work drained — a denial of service
+  needing no malice, just one impatient script. Jobs now carry an owner and
+  `max_active_jobs_per_caller` (default 4) bounds any single key. The global
+  check runs first, so a busy server reports its own load rather than blaming a
+  caller for someone else's.
+
+  Callers are identified by a twelve-character SHA-256 prefix of their key,
+  never the key itself, because that identifier goes into log files. Under
+  `--no-auth` there is no credential distinguishing callers, so quotas collapse
+  to the global limit and the server now warns about it at startup.
+- **Log injection is not possible through `X-Request-ID`.** A caller-supplied
+  correlation ID is honored only as `[A-Za-z0-9._-]{1,64}`; anything containing
+  newlines or control characters is replaced with a generated ID rather than
+  written into the access log.
+- **Access logs omit query strings and request bodies.** Both have carried API
+  keys — the dashboard once passed one as `?api_key=` — and an access log is the
+  wrong place to discover that.
+- **Uvicorn's built-in access log is disabled**, because it wrote the raw
+  request line including the query string, which defeated the omission above:
+  a request to `?api_key=...` had the key written to the log anyway. Found by
+  reading the log file of a real server; `TestClient` never starts uvicorn, so
+  no test could have caught it. Our middleware replaces it and carries the
+  correlation ID and caller besides.
 - **Eval suites now have spend ceilings.** Benchmark runs were always metered
   by a `RateBudgetGuard` from the tier profile; eval suites were metered on no
   path at all, so `POST /api/v1/evals` let any API-key holder spend against
@@ -60,6 +108,46 @@
 - **Dependabot** for Python dependencies and GitHub Actions, with routine
   minor and patch updates grouped so a normal week is one reviewable pull
   request.
+- **Correlation IDs across the async boundary.** Runs and evals are async jobs,
+  so the submitting request returns long before the work finishes and a failure
+  hours later had nothing tying it back to who asked for it. Every response now
+  carries `X-Request-ID`, and the ID propagates into job tasks through a context
+  variable, so `job_submitted` and `job_finished` log lines carry the same ID as
+  the request that started them. Send your own ID to thread an existing trace
+  through.
+- **Structured access logging** — one line per request with correlation ID,
+  caller digest, method, path, status, and duration.
+- **`GET /api/v1/ready`** — readiness, separate from liveness. Returns `503`
+  with a per-check breakdown when the coordinator's database does not answer.
+  Previously `/health` answered `ok` unconditionally, keeping a server in a load
+  balancer's rotation while every request it received was going to fail. The
+  check is a live query rather than a startup flag, since the failures worth
+  catching — a deleted file, a full or read-only disk — only surface when
+  something touches the database.
+- **`--budget` on all twelve eval-running commands** (see the spend ceiling
+  entry above).
+
+### Fixed
+- **The server now configures its own logging.** `atomics server` never called
+  `setup_logging`, so the `atomics` loggers had no handler at INFO and the new
+  access log — along with every `job_submitted` and `job_finished` line — was
+  written nowhere. A correlation ID that reaches no log file correlates nothing.
+- **Server logs are one line per record.** `setup_logging(plain=True)` swaps
+  Rich for a plain formatter in server mode. Rich wraps to the console width,
+  80 columns when redirected to a file, which split each access log entry across
+  four lines and left it unparseable by grep, journald, or any aggregator.
+  Interactive commands keep Rich.
+- **`mypy` works with the `[rag]` extra installed.** The numpy stubs use 3.12
+  `type` statements, a syntax error under `python_version = "3.11"`, and
+  `follow_imports = "skip"` does not prevent mypy parsing a stub it can find.
+  `follow_imports_for_stubs` does. CI installs only `dev` and `api`, so the
+  documented release check failed the first time it ran against a full install.
+- **CI lint gate no longer diverges from local.** `ruff check` in CI omitted
+  `scripts/`, so unsorted imports in `scripts/test_dashboard_live.py` had been
+  failing `main` unnoticed since late July.
+- **Two flaky worker tests** replaced fixed `time.sleep` windows with polling,
+  which were failing on loaded CI runners that spent the whole window starting
+  node.
 
 ## 0.15.2 (2026-08-03) — Security hardening: sandboxed codegen and API authorization
 

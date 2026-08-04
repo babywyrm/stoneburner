@@ -194,7 +194,7 @@ stoneburner/
 │   └── cli.py            # Thin Click root — registers commands from commands/
 ├── profiles/             # Custom target profiles (local/ gitignored)
 ├── qa/                   # QA fixture suites (local/ gitignored)
-├── tests/                # 2116 tests at 88% coverage
+├── tests/                # 2267 tests at 89% coverage
 └── docs/                 # Detailed documentation
 ```
 
