@@ -2,10 +2,26 @@
 
 ## Unreleased
 
-### Security
+## 0.15.2 (2026-08-03) — Security hardening: sandboxed codegen and API authorization
 
-Findings from the 2026-08-02 project audit. The first three are reachable by
-anyone who can talk to a coordinator, so upgrade before exposing a server.
+Upgrade before exposing an API server. Every finding below came from the
+2026-08-02 project audit, and the first three are reachable by anyone who can
+reach a coordinator.
+
+### Upgrade notes
+
+- **`--no-auth` now refuses to start on a non-loopback `--host`.** If you run
+  `atomics server --no-auth --host 0.0.0.0`, that command will now exit with an
+  error. Supply `--api-key` instead, or bind to `127.0.0.1`.
+- **`Coordinator.submit_assignment` requires a `worker_id` keyword** and raises
+  `AssignmentRejectedError` when the caller does not hold the assignment. This
+  only affects code calling the coordinator directly; the HTTP API is
+  unchanged apart from returning `409` where it previously accepted a forged
+  submission.
+- **Consider setting `--worker-api-key`.** Left unset, workers keep sharing the
+  submitter keys as before and the server warns at startup.
+
+### Security
 
 - **Model-generated code no longer runs in the evaluating process.** The
   `codegen` suite executed extracted snippets via `exec()` in-process, and armed
@@ -38,6 +54,14 @@ anyone who can talk to a coordinator, so upgrade before exposing a server.
 ### Changed
 - `Coordinator.submit_assignment` now requires a `worker_id` keyword and raises
   `AssignmentRejectedError` when the caller does not hold the assignment.
+- `uv.lock` catches up to the 0.15.1 version bump, which the previous release
+  left behind.
+
+### Documentation
+- `SECURITY.md` gains sections on API server exposure and on what the codegen
+  sandbox does and does not protect against.
+- `docs/API_SERVER.md` documents separate worker keys, the loopback-only
+  `--no-auth` rule, and the dashboard's key handling.
 
 ## 0.15.1 (2026-07-30) — Web dashboard and server CLI improvements
 
