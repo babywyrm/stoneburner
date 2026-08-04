@@ -81,6 +81,39 @@ def coordinator_server(tmp_path):
         thread.join(timeout=2)
 
 
+def _run_worker_until(proc, done, *, timeout=30.0):
+    """Let a worker subprocess run until `done()` holds, then stop it.
+
+    Both worker tests used to sleep a flat 2.5s, which had to cover node
+    startup plus at least one 1s heartbeat. A loaded CI runner spent the whole
+    window starting node, so the worker was killed having only registered and
+    the assertions failed on timing rather than behavior. Polling returns as
+    soon as the worker has actually done the thing, and tolerates a slow host.
+    """
+    try:
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            if done():
+                break
+            if proc.poll() is not None:
+                raise AssertionError(f"worker exited early with code {proc.returncode}")
+            time.sleep(0.1)
+        proc.send_signal(signal.SIGTERM)
+        proc.wait(timeout=5)
+    except Exception:
+        proc.kill()
+        raise
+    finally:
+        if proc.stdout:
+            proc.stdout.close()
+        if proc.stderr:
+            proc.stderr.close()
+        try:
+            proc.wait(timeout=5)
+        except Exception:
+            pass
+
+
 def test_npm_worker_registers_and_polls(coordinator_server):
     """The Node.js worker registers, heartbeats, and polls the coordinator."""
     if not shutil.which("node"):
@@ -100,22 +133,11 @@ def test_npm_worker_registers_and_polls(coordinator_server):
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
-    try:
-        time.sleep(2.5)
-        proc.send_signal(signal.SIGTERM)
-        proc.wait(timeout=5)
-    except Exception:
-        proc.kill()
-        raise
-    finally:
-        if proc.stdout:
-            proc.stdout.close()
-        if proc.stderr:
-            proc.stderr.close()
-        try:
-            proc.wait(timeout=5)
-        except Exception:
-            pass
+    wanted = {"register", "heartbeat", "poll"}
+    _run_worker_until(
+        proc,
+        lambda: wanted <= {call[0] for call in MockCoordinatorHandler.calls},
+    )
 
     calls = [c[0] for c in MockCoordinatorHandler.calls]
     assert "register" in calls
@@ -169,22 +191,10 @@ def test_npm_worker_executes_and_submits_assignment(coordinator_server):
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
-    try:
-        time.sleep(2.5)
-        proc.send_signal(signal.SIGTERM)
-        proc.wait(timeout=5)
-    except Exception:
-        proc.kill()
-        raise
-    finally:
-        if proc.stdout:
-            proc.stdout.close()
-        if proc.stderr:
-            proc.stderr.close()
-        try:
-            proc.wait(timeout=5)
-        except Exception:
-            pass
+    _run_worker_until(
+        proc,
+        lambda: any(call[0] == "submit" for call in MockCoordinatorHandler.calls),
+    )
 
     submit_calls = [c for c in MockCoordinatorHandler.calls if c[0] == "submit"]
     assert submit_calls, "worker should have submitted a result"

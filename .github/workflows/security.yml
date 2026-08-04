@@ -46,9 +46,17 @@ jobs:
 
       # The binary rather than gitleaks-action, whose licensing differs for
       # organization-owned repositories.
+      #
+      # Pinned to the version SECURITY.md tells you to run locally. This is not
+      # cosmetic: 8.24.3 ignores the top-level [[allowlists]] blocks that
+      # .gitleaks.toml is built on, so it reported nine findings — documented
+      # `curl -H "X-API-Key: $ATOMICS_API_KEY"` examples and a fixture named
+      # dummy-key-for-tests-not-a-secret — that the configured version does
+      # not. A scanner that disagrees with the one developers run is worse than
+      # no scanner, because the failures get waved through. Move both together.
       - name: Install gitleaks
         env:
-          GITLEAKS_VERSION: "8.24.3"
+          GITLEAKS_VERSION: "8.30.1"
         run: |
           curl -sSfL \
             "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \

@@ -42,4 +42,22 @@ regexes = [
   '''sk-abc123''',
   '''sk-xyz789''',
   '''sk-test-1234567890''',
+  '''dummy-key-for-tests-not-a-secret''',
+]
+
+[[allowlists]]
+description = """
+Shell variable references used as header and flag values in documentation.
+
+Anchored, so the whole matched value must be the reference — a real credential
+that merely contains a $VAR substring is still reported.
+
+The docs deliberately write `curl -H "X-API-Key: $ATOMICS_API_KEY"` rather than
+inlining a key. Some gitleaks releases flag the header shape without looking at
+whether the value is a variable, so the recommended practice trips the scanner.
+Recorded here rather than left to the scanner version, since which releases do
+this has changed more than once.
+"""
+regexes = [
+  '''^\$\{?[A-Za-z_][A-Za-z0-9_]*\}?$''',
 ]

@@ -986,13 +986,20 @@ async def test_openai_responses_accepts_official_sdk_response_model():
             "tool_choice": "auto",
             "tools": [],
             "status": "completed",
-            "usage": {
-                "input_tokens": 4,
-                "input_tokens_details": {"cached_tokens": 0},
-                "output_tokens": 3,
-                "output_tokens_details": {"reasoning_tokens": 0},
-                "total_tokens": 7,
-            },
+                # Mirrors the SDK's own required fields. This dict has to grow
+                # whenever OpenAI adds one — that churn is the price of
+                # validating against the real model instead of a stub, which is
+                # the entire point of this test.
+                "usage": {
+                    "input_tokens": 4,
+                    "input_tokens_details": {
+                        "cached_tokens": 0,
+                        "cache_write_tokens": 0,
+                    },
+                    "output_tokens": 3,
+                    "output_tokens_details": {"reasoning_tokens": 0},
+                    "total_tokens": 7,
+                },
         }
     )
     provider = OpenAIProvider(
