@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import time
 import uuid
 from collections.abc import Awaitable, Callable
@@ -11,6 +12,9 @@ from enum import Enum
 from typing import Any
 
 from atomics.api.callers import ANONYMOUS_CALLER
+from atomics.api.request_log import current_request_id
+
+logger = logging.getLogger(__name__)
 
 
 class JobStatus(Enum):
@@ -33,6 +37,10 @@ class Job:
     # Digest of the API key that submitted this, never the key itself. Used to
     # hold one caller to their share of capacity.
     owner: str = ANONYMOUS_CALLER
+    # Correlation ID of the request that submitted this job. The request has
+    # returned long before the work finishes, so this is the only thread back
+    # from a failure to who asked for it.
+    request_id: str = ""
     _task: asyncio.Task[None] | None = field(default=None, repr=False)
 
 
@@ -129,8 +137,16 @@ class JobManager:
             status=JobStatus.PENDING,
             created_at=time.time(),
             owner=owner,
+            request_id=current_request_id(),
         )
         self.jobs[job_id] = job
+        logger.info(
+            "job_submitted job_id=%s kind=%s caller=%s request_id=%s",
+            job_id,
+            kind,
+            owner,
+            job.request_id,
+        )
         job._task = asyncio.create_task(self._run(job, work))
         return job_id
 
@@ -171,6 +187,16 @@ class JobManager:
             job.status = JobStatus.FAILED
         finally:
             job.completed_at = time.time()
+            logger.info(
+                "job_finished job_id=%s kind=%s caller=%s request_id=%s "
+                "status=%s duration_ms=%.1f",
+                job.job_id,
+                job.kind,
+                job.owner,
+                job.request_id,
+                job.status.value,
+                (job.completed_at - (job.started_at or job.completed_at)) * 1000,
+            )
             # Pruning on completion rather than on submit keeps the bound exact
             # and still applies once submissions stop.
             self._evict_finished()
