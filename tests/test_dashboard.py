@@ -39,7 +39,8 @@ def test_dashboard_returns_html_when_enabled(client_with_dashboard):
 
 def test_dashboard_html_is_self_contained(client_with_dashboard):
     res = client_with_dashboard.get("/dashboard")
-    assert "<script>" in res.text
+    # The tag carries a per-response CSP nonce, so match the prefix.
+    assert "<script nonce=" in res.text
     assert "Recent runs" in res.text
     assert "Distributed jobs" in res.text
     assert "Workers" in res.text

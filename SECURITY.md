@@ -143,8 +143,23 @@ the port as equivalent to holding the key.
 - A worker may only submit results for an assignment it currently holds and has
   not already finished. Other submissions are rejected with `409`.
 - Keys are compared with `hmac.compare_digest`.
-- There is no per-request budget ceiling on API-triggered runs yet. An
-  authenticated caller can spend provider credit up to your account limits.
+- Every response carries `nosniff`, `X-Frame-Options: DENY`,
+  `Referrer-Policy: no-referrer`, and a restrictive CSP. The dashboard's CSP
+  uses a per-response nonce rather than `unsafe-inline`.
+
+Resource bounds, all configurable on `ServerSettings`:
+
+| Bound | Default | What it prevents |
+|-------|---------|------------------|
+| `max_active_jobs` | 16 | Unbounded concurrent runs; excess gets `429` |
+| `max_retained_jobs` | 256 | The job dict growing until the process dies |
+| `iterations` | 1000 | A single request running indefinitely |
+| `interval` | 3600s | The same, via a long sleep between tasks |
+| `fixtures` | 500 | An oversized eval request |
+
+These cap how much *one server* will do at once. They are not a budget: an
+authenticated caller can still submit repeatedly and spend provider credit up
+to your account limits. Per-caller budget accounting is not implemented.
 
 ## Generated code execution (codegen suite)
 

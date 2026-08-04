@@ -40,6 +40,11 @@ class ServerSettings:
     # exactly as configured.
     worker_absent_after_seconds: float = 120.0
     with_dashboard: bool = False
+    # Job state is in-process, so both of these are memory bounds. Active caps
+    # how much work runs at once; retained caps how many finished results stay
+    # pollable afterwards.
+    max_active_jobs: int = 16
+    max_retained_jobs: int = 256
 
     def __post_init__(self) -> None:
         if self.port < 1 or self.port > 65535:
@@ -48,6 +53,14 @@ class ServerSettings:
             raise ValueError(
                 "worker_absent_after_seconds must be positive, got "
                 f"{self.worker_absent_after_seconds}"
+            )
+        if self.max_active_jobs < 1:
+            raise ValueError(
+                f"max_active_jobs must be positive, got {self.max_active_jobs}"
+            )
+        if self.max_retained_jobs < 1:
+            raise ValueError(
+                f"max_retained_jobs must be positive, got {self.max_retained_jobs}"
             )
         if self.no_auth and not is_loopback_host(self.host):
             raise ValueError(

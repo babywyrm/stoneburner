@@ -14,6 +14,7 @@ from atomics import __version__
 from atomics.api.auth import ApiKeyAuth, NoAuth
 from atomics.api.config import ServerSettings
 from atomics.api.dashboard import router as dashboard_router
+from atomics.api.headers import security_headers_middleware
 from atomics.api.jobs import JobManager
 from atomics.api.routes import router
 from atomics.distributed import routes as distributed_routes
@@ -27,7 +28,10 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings: ServerSettings = app.state.settings
-    app.state.job_manager = JobManager()
+    app.state.job_manager = JobManager(
+        max_active=settings.max_active_jobs,
+        max_retained=settings.max_retained_jobs,
+    )
     if settings.no_auth:
         app.state.worker_auth = NoAuth()
     else:
@@ -72,6 +76,7 @@ def create_app(
     )
     app.state.settings = settings
     app.state.auth = NoAuth() if settings.no_auth else ApiKeyAuth(settings.api_keys)
+    app.middleware("http")(security_headers_middleware)
     app.include_router(router)
     app.include_router(distributed_routes.router)
     if settings.with_dashboard:

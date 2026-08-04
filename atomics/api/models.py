@@ -6,6 +6,13 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+# Upper bounds exist so one authenticated request cannot pin the server or run
+# up an unbounded provider bill. They are deliberately generous: the CLI is the
+# path for genuinely long campaigns and is not affected by these.
+MAX_ITERATIONS = 1000
+MAX_INTERVAL_SECONDS = 3600
+MAX_FIXTURES = 500
+
 
 class RunRequest(BaseModel):
     """Request body to start a benchmark run."""
@@ -13,8 +20,8 @@ class RunRequest(BaseModel):
     provider: str
     model: str | None = None
     tier: str = "ez"
-    iterations: int = Field(default=3, ge=1)
-    interval: int = Field(default=5, ge=0)
+    iterations: int = Field(default=3, ge=1, le=MAX_ITERATIONS)
+    interval: int = Field(default=5, ge=0, le=MAX_INTERVAL_SECONDS)
     save: bool = True
 
 
@@ -25,7 +32,7 @@ class EvalRequest(BaseModel):
     provider: str
     model: str | None = None
     judge_model: str | None = None
-    fixtures: list[str] | None = None
+    fixtures: list[str] | None = Field(default=None, max_length=MAX_FIXTURES)
     save: bool = True
 
 
