@@ -5,10 +5,9 @@ from __future__ import annotations
 import subprocess
 import sys
 import time
+import urllib.error
 from pathlib import Path
 from urllib.request import Request, urlopen
-
-import urllib.error
 
 PORT = 8765
 DB = Path(__file__).with_name("dash_live.db")
