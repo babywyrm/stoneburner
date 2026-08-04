@@ -157,8 +157,32 @@ Resource bounds, all configurable on `ServerSettings`:
 | `interval` | 3600s | The same, via a long sleep between tasks |
 | `fixtures` | 500 | An oversized eval request |
 | `budget_usd` | 10.0 | One eval spending without limit; capped at 1000 |
+| `max_active_jobs_per_caller` | 4 | One key taking every slot and starving the rest |
 
-These cap how much *one server* will do at once.
+These cap how much *one server* will do at once. The per-caller bound is the
+one that makes the others fair: a global limit alone is first-come-first-served,
+so whoever submits first holds all sixteen slots and every other key gets `429`
+until that work drains. Under `--no-auth` there is no credential distinguishing
+callers, so the per-caller bound collapses into the global one.
+
+## Logging
+
+Access logs record the correlation ID, a caller digest, method, path, status,
+and duration. They deliberately omit query strings and request bodies, both of
+which have carried API keys.
+
+Callers appear as a twelve-character SHA-256 prefix of their key, never the key.
+Logs are read, shipped, and retained far more casually than credentials are, so
+the identifier is stable enough to attribute activity and useless as a
+credential.
+
+A caller-supplied `X-Request-ID` is accepted only as `[A-Za-z0-9._-]{1,64}`.
+Anything else is replaced with a generated ID, since an identifier containing
+newlines or control characters can forge log entries.
+
+Note that prompts and responses are still persisted to SQLite unencrypted, and
+the eval runner logs prompt prefixes at INFO. Treat the results database and
+logs as sensitive.
 
 ## Spend ceilings on eval suites
 

@@ -58,7 +58,8 @@ would expose eval submission to the network unauthenticated.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/v1/health` | Health check (public) |
+| GET | `/api/v1/health` | Liveness — is this process serving (public) |
+| GET | `/api/v1/ready` | Readiness — can it serve real work (public) |
 | POST | `/api/v1/runs` | Start a benchmark run |
 | POST | `/api/v1/evals` | Start an eval suite |
 | GET | `/api/v1/jobs/{job_id}` | Poll job status/result |
@@ -73,6 +74,65 @@ would expose eval submission to the network unauthenticated.
 | GET | `/api/v1/distributed/runs` | List recent distributed runs |
 | GET | `/api/v1/workers` | List registered workers |
 | GET | `/dashboard` | Optional web dashboard (requires `--with-dashboard`) |
+
+### Liveness vs readiness
+
+Point liveness probes at `/health` and readiness probes at `/ready`. They
+answer different questions and conflating them causes the wrong repair.
+
+`/health` returns `200 {"status": "ok"}` whenever the process can serve a
+request, and checks nothing external. Liveness answers "should this process be
+restarted", and restarting the API server does not fix an unreachable
+database — it just kills in-flight jobs and removes the endpoint that could
+have told you what was wrong.
+
+`/ready` checks that the coordinator's database actually answers, returning
+`503` when it does not, with a per-check breakdown:
+
+```json
+{"status": "not_ready",
+ "checks": [{"name": "database", "ok": false, "detail": "OperationalError: disk I/O error"}]}
+```
+
+That is the signal a load balancer should use to take an instance out of
+rotation. Before this split, `/health` answered `ok` unconditionally, so a
+server stayed in rotation while every request it received was going to fail.
+
+Both endpoints are public and need no API key: a probe should not require a
+credential, and neither reveals run data.
+
+### Correlation IDs
+
+Every response carries an `X-Request-ID`. Send your own to thread a trace
+through — it is honored when it matches `[A-Za-z0-9._-]{1,64}`, and replaced
+with a generated ID otherwise, since an ID containing newlines can forge log
+lines.
+
+The ID appears in one access log line per request and, crucially, in the logs
+of any job that request started:
+
+```
+request_id=9f2c1a caller=7bafaa96aa23 method=POST path=/api/v1/evals status=202 duration_ms=41.2
+job_submitted job_id=3d8e... kind=eval caller=7bafaa96aa23 request_id=9f2c1a
+job_finished  job_id=3d8e... kind=eval caller=7bafaa96aa23 request_id=9f2c1a status=failed duration_ms=91847.0
+```
+
+Runs and evals are async, so the submitting request returns long before the
+work finishes. The shared ID is what connects a failure to whoever asked for
+it. Query strings and request bodies are never logged.
+
+`caller` is a twelve-character digest of the API key, never the key itself.
+
+### Per-caller capacity
+
+`max_active_jobs` bounds the whole server; `max_active_jobs_per_caller`
+(default `4`) bounds any one key. Without the second, the first is
+first-come-first-served — one impatient script takes every slot and every other
+key gets `429` until its work drains.
+
+Both limits return `429`; the message says which one you hit. Under `--no-auth`
+there is no credential to tell callers apart, so per-caller quotas collapse to
+the global limit and the server warns about it at startup.
 
 ## Example: start a run and poll
 

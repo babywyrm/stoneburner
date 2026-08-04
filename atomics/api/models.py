@@ -66,9 +66,30 @@ class ErrorResponse(BaseModel):
 
 
 class HealthResponse(BaseModel):
-    """Health check response."""
+    """Liveness response: this process is running and serving requests.
+
+    Deliberately checks nothing external. A liveness probe answers "should this
+    process be restarted", and restarting the API server does not repair an
+    unreachable database — it just removes the endpoint that could have told
+    you what was wrong. Dependency checks belong on `/ready`.
+    """
 
     status: str
+
+
+class ReadinessCheck(BaseModel):
+    """One dependency's contribution to readiness."""
+
+    name: str
+    ok: bool
+    detail: str | None = None
+
+
+class ReadinessResponse(BaseModel):
+    """Readiness: whether this server can currently serve real work."""
+
+    status: str
+    checks: list[ReadinessCheck]
 
 
 class CompareResponse(BaseModel):

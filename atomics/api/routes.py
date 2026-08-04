@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
 from atomics.api._runners import (
     run_benchmark_from_request,
@@ -16,6 +16,8 @@ from atomics.api.models import (
     EvalRequest,
     HealthResponse,
     JobResponse,
+    ReadinessCheck,
+    ReadinessResponse,
     ReportResponse,
     RunRequest,
 )
@@ -31,7 +33,45 @@ def get_job_manager(request: Request) -> JobManager:
 
 @router.get("/health", response_model=HealthResponse)
 async def health() -> HealthResponse:
+    """Liveness. Answers `ok` whenever this process can serve a request.
+
+    Intentionally free of dependency checks. Wiring the database into liveness
+    would have an orchestrator restart the API server during a database
+    outage — which repairs nothing and destroys the readiness signal and the
+    in-flight jobs along with it. Point liveness probes here and readiness
+    probes at `/ready`.
+    """
     return HealthResponse(status="ok")
+
+
+@router.get("/ready", response_model=ReadinessResponse)
+async def ready(request: Request, response: Response) -> ReadinessResponse:
+    """Readiness. Reports `503` when a dependency this server needs is down.
+
+    Split out from `/health`, which used to answer `ok` unconditionally and so
+    kept a server in a load balancer's rotation while every request it received
+    was going to fail on an unreachable coordinator database.
+    """
+    checks = [_database_check(request)]
+    ready_now = all(check.ok for check in checks)
+    if not ready_now:
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+    return ReadinessResponse(
+        status="ready" if ready_now else "not_ready",
+        checks=checks,
+    )
+
+
+def _database_check(request: Request) -> ReadinessCheck:
+    coordinator = getattr(request.app.state, "coordinator", None)
+    if coordinator is None:
+        # Reachable before startup completes, so report not-ready rather than
+        # raising: an unready server is exactly what this endpoint describes.
+        return ReadinessCheck(
+            name="database", ok=False, detail="coordinator not initialized"
+        )
+    error = coordinator.check_database()
+    return ReadinessCheck(name="database", ok=error is None, detail=error)
 
 
 @router.post("/runs", response_model=JobResponse, status_code=status.HTTP_202_ACCEPTED)
