@@ -15,6 +15,10 @@ from atomics.commands.common import eval_budget_from
 from atomics.eval.budget import EvalBudget, GuardedProvider
 from atomics.providers.base import BaseProvider
 
+# Every command that drives an eval runner and therefore spends. `sweep`,
+# `archreview`, and `probe` are easy to overlook because they live outside the
+# suite modules, but a sweep is an eval run per model and spends the most of
+# any of these.
 EVAL_COMMANDS = [
     "eval",
     "adversarial",
@@ -25,7 +29,40 @@ EVAL_COMMANDS = [
     "rag",
     "codegen",
     "toolcall",
+    "sweep",
+    "archreview",
+    "probe",
 ]
+
+
+def test_no_eval_running_command_is_missing_a_budget():
+    """Guards against a new suite command shipping without a ceiling.
+
+    Asserted by scanning source for eval runner imports rather than by listing
+    names, so adding a command that spends fails here instead of silently
+    joining the unmetered set.
+    """
+    import re
+    from pathlib import Path
+
+    runners = re.compile(
+        r"\b(run_eval|run_rag|run_codegen|run_multiturn|run_adversarial"
+        r"|run_redblue|run_refusal|run_codereview|run_toolcall"
+        r"|run_model_sweep|run_archreview|run_probe)\b"
+    )
+    commands_dir = Path(__file__).resolve().parent.parent / "atomics" / "commands"
+    spending_modules = {
+        path.stem for path in commands_dir.glob("*.py") if runners.search(path.read_text())
+    }
+
+    covered = {
+        path.stem
+        for path in commands_dir.glob("*.py")
+        if "budget_option" in path.read_text()
+    }
+    assert spending_modules <= covered, (
+        f"modules that run eval suites without a --budget: {spending_modules - covered}"
+    )
 
 
 @pytest.mark.parametrize("command", EVAL_COMMANDS)

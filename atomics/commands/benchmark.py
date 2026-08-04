@@ -11,8 +11,15 @@ from rich.console import Console
 from rich.markup import escape as _rich_escape
 from rich.table import Table
 
-from atomics.commands.common import PROVIDER_CHOICES, _make_provider, setup_logging
+from atomics.commands.common import (
+    PROVIDER_CHOICES,
+    _make_provider,
+    budget_option,
+    eval_budget_from,
+    setup_logging,
+)
 from atomics.config import load_settings
+from atomics.eval.budget import BudgetMeter
 from atomics.labcompare import (
     parity_verdict,
     parse_host_specs,
@@ -542,6 +549,7 @@ def tiers() -> None:
               help="Print each model's full reply alongside scores")
 @click.option("--save/--no-save", "save_results", default=False,
               help="Persist sweep results to database (default: off)")
+@budget_option
 def sweep(
     provider_name: str,
     models: str | None,
@@ -556,6 +564,7 @@ def sweep(
     thinking_budget: int | None,
     verbose: bool,
     save_results: bool,
+    budget_usd: float | None,
 ) -> None:
     """Sweep eval fixtures across multiple models and compare results.
 
@@ -601,15 +610,24 @@ def sweep(
 
     fixture_ids = [f.strip() for f in fixtures.split(",") if f.strip()] if fixtures else None
 
-    def provider_factory(model_name: str):
-        return _make_provider(provider_name, model_name, ollama_host, settings, vllm_host=vllm_host)
+    # A sweep builds one provider per model as it goes, so the ceiling has to
+    # outlive any single provider. Metering each model separately would make an
+    # N-model sweep cost N times what --budget asked for.
+    meter = BudgetMeter(eval_budget_from(budget_usd))
 
-    judge_provider = _make_provider(
-        judge_provider_name,
-        judge_model,
-        judge_host or effective_host,
-        settings,
-        vllm_host=vllm_host,
+    def provider_factory(model_name: str):
+        return meter.wrap(
+            _make_provider(provider_name, model_name, ollama_host, settings, vllm_host=vllm_host)
+        )
+
+    judge_provider = meter.wrap(
+        _make_provider(
+            judge_provider_name,
+            judge_model,
+            judge_host or effective_host,
+            settings,
+            vllm_host=vllm_host,
+        )
     )
 
     result_table = Table(title="Model Sweep Results", show_lines=True)

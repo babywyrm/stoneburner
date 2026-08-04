@@ -12,6 +12,7 @@ import asyncio
 import pytest
 
 from atomics.eval.budget import (
+    BudgetMeter,
     EvalBudget,
     EvalBudgetExceededError,
     GuardedProvider,
@@ -282,6 +283,68 @@ class TestTransparency:
     def test_the_wrapped_provider_stays_reachable(self):
         inner = StubProvider()
         assert GuardedProvider(inner, EvalBudget().new_guard()).inner is inner
+
+    def test_provider_specific_attributes_are_forwarded(self):
+        """Callers reach past BaseProvider in practice.
+
+        `sweep` reads `provider._host` to point a judge at the same Ollama
+        instance. A wrapper that only forwards the declared interface would
+        raise AttributeError there, which unit tests using a tidy stub would
+        never surface.
+        """
+        inner = StubProvider()
+        inner._host = "http://192.168.1.156:11434"
+        guarded = GuardedProvider(inner, EvalBudget().new_guard())
+
+        assert guarded._host == "http://192.168.1.156:11434"
+
+    def test_an_genuinely_missing_attribute_still_raises(self):
+        guarded = GuardedProvider(StubProvider(), EvalBudget().new_guard())
+        with pytest.raises(AttributeError):
+            guarded.no_such_attribute
+
+    def test_forwarding_does_not_recurse_when_inner_is_absent(self):
+        """__getattr__ reaching for _inner before it is set would loop forever."""
+        orphan = GuardedProvider.__new__(GuardedProvider)
+        with pytest.raises(AttributeError):
+            orphan._inner
+
+
+class TestBudgetMeter:
+    """Sweeps build providers as they go, so the ceiling outlives each one."""
+
+    def test_providers_built_at_different_times_share_one_ceiling(self):
+        meter = BudgetMeter(EvalBudget(budget_limit_usd=2.0))
+        first = meter.wrap(StubProvider(cost=1.0))
+        second = meter.wrap(StubProvider(cost=1.0))
+
+        assert first.guard is second.guard
+
+    @pytest.mark.asyncio
+    async def test_an_n_model_sweep_does_not_cost_n_ceilings(self):
+        meter = BudgetMeter(EvalBudget(budget_limit_usd=2.0))
+        models = [meter.wrap(StubProvider(cost=1.0)) for _ in range(5)]
+
+        await _call(models[0])
+        await _call(models[1])
+
+        # The ceiling is for the sweep, not for each model in it.
+        for model in models[2:]:
+            with pytest.raises(EvalBudgetExceededError):
+                await _call(model)
+
+    def test_no_budget_means_providers_pass_through(self):
+        meter = BudgetMeter(None)
+        inner = StubProvider()
+
+        assert meter.wrap(inner) is inner
+        assert meter.active is False
+        assert meter.guard is None
+
+    def test_an_active_meter_reports_itself(self):
+        meter = BudgetMeter(EvalBudget())
+        assert meter.active is True
+        assert meter.guard is not None
 
 
 class FakeClock:
