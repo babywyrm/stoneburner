@@ -1,6 +1,6 @@
 [project]
 name = "atomics"
-version = "0.15.2"
+version = "0.16.0"
 description = "Agentic token usage benchmarking platform"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -64,8 +64,12 @@ ignore_missing_imports = true
 # `ignore_missing_imports` stays on for optional/stub-less third-party deps.
 
 [[tool.mypy.overrides]]
-# Optional [rag] stack: installed numpy stubs use 3.12+ syntax that breaks under
-# python_version = "3.11". Skip following those imports when the extra is present.
+# Optional [rag] stack: installed numpy stubs use 3.12+ `type` statements, which
+# are a syntax error under python_version = "3.11". `follow_imports = "skip"`
+# alone is not enough — mypy still parses a stub it can find, and the failure is
+# at parse time. `follow_imports_for_stubs` extends the skip to the .pyi files.
+# Checking against 3.11 is deliberate: requires-python allows it, so the project
+# must not use syntax that only works on newer interpreters.
 module = [
     "numpy",
     "numpy.*",
@@ -77,6 +81,7 @@ module = [
     "torch.*",
 ]
 follow_imports = "skip"
+follow_imports_for_stubs = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
