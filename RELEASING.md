@@ -50,7 +50,7 @@ That satisfies the guard without inventing a release that never happened.
    ```bash
    uv run pytest -q --cov-fail-under=85
    uv run mypy atomics/
-   uv run ruff check atomics/ tests/ --ignore E501
+   uv run ruff check atomics/ tests/ scripts/ --ignore E501
    gitleaks detect --config .gitleaks.toml --no-banner --redact
    uv run python scripts/smoke_fleet.py       # real processes, not TestClient
    ```
