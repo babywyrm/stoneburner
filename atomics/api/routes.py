@@ -38,11 +38,11 @@ async def health() -> HealthResponse:
 async def start_run(
     payload: RunRequest,
     job_manager: JobManager = Depends(get_job_manager),
-    _: None = Depends(require_auth),
+    caller: str = Depends(require_auth),
 ) -> JobResponse:
     try:
         job_id = await job_manager.submit(
-            "run", lambda _jid: run_benchmark_from_request(payload)
+            "run", lambda _jid: run_benchmark_from_request(payload), owner=caller
         )
     except TooManyActiveJobsError as exc:
         raise HTTPException(
@@ -56,7 +56,7 @@ async def start_run(
 async def start_eval(
     payload: EvalRequest,
     job_manager: JobManager = Depends(get_job_manager),
-    _: None = Depends(require_auth),
+    caller: str = Depends(require_auth),
 ) -> JobResponse:
     try:
         validate_eval_suite(payload.suite)
@@ -68,7 +68,7 @@ async def start_eval(
 
     try:
         job_id = await job_manager.submit(
-            "eval", lambda _jid: run_eval_suite(payload)
+            "eval", lambda _jid: run_eval_suite(payload), owner=caller
         )
     except TooManyActiveJobsError as exc:
         raise HTTPException(
