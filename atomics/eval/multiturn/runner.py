@@ -8,6 +8,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
+from atomics.eval.attempt_serialization import integrity_to_dict
 from atomics.eval.multiturn import ConversationFixture
 from atomics.eval.multiturn.fixtures import ALL_MULTITURN_FIXTURES
 from atomics.eval.multiturn.judge import (
@@ -16,6 +17,8 @@ from atomics.eval.multiturn.judge import (
     score_conversation,
     score_turn,
 )
+from atomics.eval.outcomes import RunIntegrity
+from atomics.eval.suite_integrity import fixture_outcome, integrity_of
 from atomics.models import TaskCategory, TaskResult, TaskStatus
 from atomics.providers.base import BaseProvider
 from atomics.validation import sanitize_error
@@ -107,6 +110,34 @@ class MultiturnRunSummary:
     def total_turns(self) -> int:
         return sum(len(cr.turn_results) for cr in self.conversation_results)
 
+    @property
+    def integrity(self) -> RunIntegrity:
+        """Coverage and judge-failure rates behind the averages above.
+
+        Every score property here filters out judges that failed to parse, so
+        without this a run that scored one conversation out of thirty reports
+        that one score and looks healthy.
+
+        This suite judges at two levels, and a fixture counts as scored only if
+        both produced something. `overall_score` alone is not enough: it falls
+        back to the turn scores when the conversation judge fails, so a run
+        whose conversation judge failed on every fixture would report full
+        coverage while `avg_retention` and `avg_consistency` were empty.
+        """
+        return integrity_of(
+            [
+                fixture_outcome(
+                    generated=cr.task_result.status is not TaskStatus.FAILED,
+                    scored=(
+                        cr.overall_score is not None
+                        and cr.conversation_judge is not None
+                        and not cr.conversation_judge.parse_failed
+                    ),
+                )
+                for cr in self.conversation_results
+            ]
+        )
+
     def to_dict(self) -> dict:
         return {
             "run_id": self.run_id,
@@ -124,6 +155,7 @@ class MultiturnRunSummary:
             "total_turns": self.total_turns,
             "total_cost_usd": round(self.total_cost_usd, 6),
             "total_tokens": self.total_tokens,
+            "integrity": integrity_to_dict(self.integrity),
             "conversations": [
                 {
                     "id": cr.fixture.id,

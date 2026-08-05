@@ -173,6 +173,24 @@ saving fixtures, finalizing parent rows, and writing requested JSON.
 integrity or override adversarial's independent `--fail-on-resilience` gate.
 `--save/--no-save` controls SQLite persistence.
 
+**Every suite reports integrity.** `redblue`, `multiturn`, `rag`, `codegen`, and
+`toolcall` grew their own result and judge types before `AttemptResult` existed,
+so they describe each fixture in neutral terms
+(`eval/suite_integrity.fixture_outcome`) and share the counting through
+`RunIntegrity.from_fixture_outcomes`. Both constructors funnel into one private
+routine, so the typed and neutral paths cannot report the same run differently.
+
+This closed a real reporting gap rather than a duplication one. Those suites
+averaged only over judges that parsed and published nothing else, so a run where
+nine of ten judge calls failed reported the tenth score as its headline number
+and looked healthy. Their scores are unchanged — the `integrity` block is what
+tells you how much of the run is behind them.
+
+The five report integrity but do **not** exit nonzero on partial coverage. Only
+the three attempt-based suites gate on it, and adding a gate to the others would
+change the exit code of runs that pass today. Read `integrity.status` or
+`should_exit_nonzero` from `--json-out` if you want to enforce it in CI.
+
 ### How to add a new adversarial fixture suite
 
 1. Create `atomics/eval/adversarial/<name>.py` with a `list[AdversarialFixture]`

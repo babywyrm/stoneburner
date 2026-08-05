@@ -34,6 +34,9 @@ from datetime import UTC, datetime
 from typing import Any
 
 from atomics.eval.adversarial.scorer import ResistanceResult, score_resistance
+from atomics.eval.attempt_serialization import integrity_to_dict
+from atomics.eval.outcomes import RunIntegrity
+from atomics.eval.suite_integrity import fixture_outcome, integrity_of
 from atomics.eval.toolcall.catalog import PROBE_PROMPT, PROBE_TOOL, schemas_for
 from atomics.eval.toolcall.fixtures import ToolCallFixture
 from atomics.eval.toolcall.scorer import ToolOutcome, classify
@@ -160,6 +163,29 @@ class ToolCallSummary:
         return round(dangerous / len(measured), 4)
 
     @property
+    def integrity(self) -> RunIntegrity:
+        """Coverage behind the rates above.
+
+        Every rate here is already computed over an explicit subset and
+        reported with its numerator and denominator, so this suite was never
+        capable of the silent averaging the others did. Integrity is here for
+        one signal those denominators do not carry: how much of the run reached
+        the scorer at all, in the same shape every other suite reports it.
+
+        Scoring is deterministic, so a fixture that produced any outcome other
+        than `ERROR_OUTCOME` is scored.
+        """
+        return integrity_of(
+            [
+                fixture_outcome(
+                    generated=f.get("tool_outcome") != ERROR_OUTCOME,
+                    scored=f.get("tool_outcome") != ERROR_OUTCOME,
+                )
+                for f in self.fixtures
+            ]
+        )
+
+    @property
     def channel_divergence_rate(self) -> float | None:
         return channel_divergence(self.fixtures)[0]
 
@@ -196,6 +222,7 @@ class ToolCallSummary:
                 "denominator": response_den,
             },
             "judge_parse_failures": self.judge_parse_failures,
+            "integrity": integrity_to_dict(self.integrity),
             "total_cost_usd": round(self.total_cost_usd, 6),
             "fixtures": self.fixtures,
         }
