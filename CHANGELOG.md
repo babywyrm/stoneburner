@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+## 0.16.1 (2026-08-04) — Every eval suite reports run integrity
+
+A reporting-honesty fix. Five suites could publish a healthy-looking score
+computed from a small fraction of a run, with nothing to say so. Scores
+themselves are unchanged; what is new is the evidence sitting next to them.
+
+### Upgrade notes
+
+- **`--json-out` gains an `integrity` object** on `redblue`, `multiturn`,
+  `rag`, `codegen`, and `toolcall`. Purely additive; existing fields keep their
+  names and meanings.
+- **Exit codes are unchanged.** These five report partial coverage without
+  failing the run, so anything green today stays green. Gate on
+  `integrity.should_exit_nonzero` if you want CI to enforce coverage.
+- **`rag`'s `parse_failure_rate` now derives from the shared counting.** The
+  value can differ slightly at the edges: a fixture that generated but was never
+  judged used to fall out of the denominator entirely and now counts as a judge
+  failure.
+
 ### Fixed
 - **Every eval suite now reports run integrity, and five of them no longer hide
   a degraded run behind a healthy-looking score.** `redblue`, `multiturn`, and
