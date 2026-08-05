@@ -2,6 +2,43 @@
 
 ## Unreleased
 
+### Fixed
+- **Every eval suite now reports run integrity, and five of them no longer hide
+  a degraded run behind a healthy-looking score.** `redblue`, `multiturn`, and
+  `rag` averaged only over judges that returned a usable result and published
+  nothing else, so a run where nine of ten judge calls failed reported the tenth
+  score as its headline number with no indication that anything went wrong. For
+  an evaluation tool that is the worst available failure mode, because the
+  number looks fine.
+
+  Scores are unchanged. What is new is an `integrity` block in every suite's
+  `--json-out` — status, fixture and attempt coverage, and separate counts for
+  generation versus judge failures — matching what `adversarial`, `refusal`, and
+  `codereview` already reported.
+
+  The separation matters beyond the averaging. `codegen` records a fixture whose
+  generation raised as zero tests passed out of its full test count, so a run
+  where every provider call failed reported `overall_pass_rate: 0.0` — identical
+  to a model that simply cannot code. `generation_failures` now tells them
+  apart.
+
+  These five are **report-only**: they do not exit nonzero on partial coverage,
+  since that would change the exit code of runs that pass today. Gate on
+  `integrity.should_exit_nonzero` from `--json-out` to enforce it in CI. Only
+  the three attempt-based suites still gate automatically.
+
+  `rag`'s `parse_failure_rate` is retained and now derives from the shared
+  counting. It was the only integrity signal any of these suites had, and it was
+  narrower than it appeared: fixtures whose generation failed were never judged,
+  so they never entered its denominator.
+
+### Changed
+- **Run integrity is counted in one place.** `RunIntegrity` gains
+  `from_fixture_outcomes` for suites that never adopted `AttemptResult` —
+  rewriting them onto it would mean rewriting their judges too. Both it and
+  `from_fixture_attempts` funnel into a single private routine, so the typed and
+  neutral paths cannot drift into describing the same run differently.
+
 ## 0.16.0 (2026-08-04) — Bounded and observable: spend ceilings, per-caller quotas, correlation IDs
 
 The theme is making a server safe to leave running unattended. Every limit that

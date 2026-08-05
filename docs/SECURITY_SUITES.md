@@ -259,4 +259,32 @@ uv run atomics sweep --provider claude --models claude-sonnet-4-6,claude-haiku-4
 
 `refusal` and `codereview` report typed run integrity and save each fixture immediately. Partial or infrastructure-invalid runs still write JSON and finalize stored results, then exit nonzero. Use `--allow-partial` when incomplete coverage is acceptable.
 
+**Read the integrity block before trusting a score.** Every suite now emits one
+in `--json-out`:
+
+```json
+"integrity": {
+  "status": "partial",
+  "fixtures_total": 30, "fixtures_scored": 3,
+  "fixture_coverage": 0.1, "judge_failure_rate": 0.9,
+  "should_exit_nonzero": true
+}
+```
+
+This matters because scores are averaged only over judges that returned a usable
+result. A `status` of `partial` with a `fixture_coverage` of `0.1` means the
+headline number came from three fixtures out of thirty — a perfectly ordinary
+looking score standing on almost nothing. `redblue`, `multiturn`, `rag`,
+`codegen`, and `toolcall` previously reported the score with no such signal.
+
+`generation_failures` and `judge_failures` are counted separately, so a broken
+provider is distinguishable from a broken judge. For `codegen` this is the
+difference between a model that cannot code and a run where every request
+errored — both otherwise report `overall_pass_rate: 0.0`.
+
+Only `adversarial`, `refusal`, and `codereview` exit nonzero on partial
+coverage. The other five report it without changing their exit code, so runs
+that pass today keep passing; gate on `integrity.should_exit_nonzero` from
+`--json-out` if you want CI to enforce it.
+
 Saved fixture rows live in the schema-v20 `evaluation_results` ledger. Its `result_json` contains raw model and judge evidence — treat the database and JSON exports as potentially sensitive.

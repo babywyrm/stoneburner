@@ -42,9 +42,15 @@ every item here is a refactor with the test suite as the contract.
 - [ ] Route `commands/benchmark.py` and `commands/admin.py` through
       `providers/factory.py` instead of hand-rolling the ten-provider branch
       that the factory exists to own
-- [ ] Extract a shared eval runner base — the eight suite runners reimplement
-      the same attempt/integrity serialization, and CLI persistence boilerplate
-      repeats about eight times
+- [x] Share one run-integrity model across all eight suites. The premise of
+      this item was wrong: the three attempt-based suites already shared
+      `attempt_serialization.py`, and the other five were not duplicating that
+      code — they had no integrity accounting at all, and three of them averaged
+      only over judges that parsed, so a mostly-failed run reported a
+      healthy-looking score. Fixed by adding a suite-neutral constructor both
+      paths count through
+- [ ] Deduplicate CLI persistence boilerplate, which still repeats about eight
+      times across the suite commands
 - [ ] Group the 30 flat top-level modules into `load/`, `benchmark/`, and
       `reporting/` packages
 - [ ] Enforce the configured line length instead of `--ignore E501`, which

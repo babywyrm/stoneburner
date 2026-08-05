@@ -9,8 +9,11 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
+from atomics.eval.attempt_serialization import integrity_to_dict
 from atomics.eval.codegen import CodegenFixture, CodeTestCase, sandbox
 from atomics.eval.codegen.fixtures import ALL_CODEGEN_FIXTURES
+from atomics.eval.outcomes import RunIntegrity
+from atomics.eval.suite_integrity import fixture_outcome, integrity_of
 from atomics.models import TaskCategory, TaskResult, TaskStatus
 from atomics.providers.base import BaseProvider
 from atomics.validation import sanitize_error
@@ -174,6 +177,30 @@ class CodegenRunSummary:
     def total_tokens(self) -> int:
         return sum(r.task_result.total_tokens for r in self.fixture_results)
 
+    @property
+    def integrity(self) -> RunIntegrity:
+        """How much of this run actually reached the test harness.
+
+        A fixture whose generation raised is recorded with `tests_passed=0` over
+        its full test count, so it drags `overall_pass_rate` down exactly like
+        wrong code does. A run where every provider call failed therefore
+        reports `0.0` — indistinguishable from a model that cannot code at all
+        without these counts.
+
+        Scoring is deterministic here, so any generated response is scored: a
+        response with no extractable function is a real failure by the model,
+        not a failure of the harness.
+        """
+        return integrity_of(
+            [
+                fixture_outcome(
+                    generated=r.task_result.status is not TaskStatus.FAILED,
+                    scored=r.task_result.status is not TaskStatus.FAILED,
+                )
+                for r in self.fixture_results
+            ]
+        )
+
     def to_dict(self) -> dict:
         return {
             "run_id": self.run_id,
@@ -187,6 +214,7 @@ class CodegenRunSummary:
             "total_cost_usd": round(self.total_cost_usd, 6),
             "total_tokens": self.total_tokens,
             "avg_latency_ms": self.avg_latency_ms,
+            "integrity": integrity_to_dict(self.integrity),
             "fixtures": [
                 {
                     "id": r.fixture.id,

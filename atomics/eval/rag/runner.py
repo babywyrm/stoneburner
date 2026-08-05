@@ -9,10 +9,13 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
+from atomics.eval.attempt_serialization import integrity_to_dict
+from atomics.eval.outcomes import RunIntegrity
 from atomics.eval.rag import RAGFixture
 from atomics.eval.rag.fixtures import ALL_RAG_FIXTURES
 from atomics.eval.rag.judge import RAGJudgeResult, compute_hallucination, score_rag_response
 from atomics.eval.rag.retrieval import RAGIndex
+from atomics.eval.suite_integrity import fixture_outcome, integrity_of
 from atomics.models import TaskCategory, TaskResult, TaskStatus
 from atomics.providers.base import BaseProvider
 from atomics.validation import sanitize_error
@@ -109,12 +112,32 @@ class RAGRunSummary:
         return sum(r.task_result.total_tokens for r in self.fixture_results)
 
     @property
+    def integrity(self) -> RunIntegrity:
+        """Coverage and judge-failure rates behind the scores above.
+
+        Every score property here averages only over judges that parsed, so a
+        run that scored two fixtures out of forty reports those two and looks
+        healthy without this.
+        """
+        return integrity_of(
+            [
+                fixture_outcome(
+                    generated=r.task_result.status is not TaskStatus.FAILED,
+                    scored=r.judge is not None and not r.judge.parse_failed,
+                )
+                for r in self.fixture_results
+            ]
+        )
+
+    @property
     def parse_failure_rate(self) -> float:
-        judged = [r for r in self.fixture_results if r.judge is not None]
-        if not judged:
-            return 0.0
-        failed = sum(1 for r in judged if r.judge is not None and r.judge.parse_failed)
-        return round(failed / len(judged), 3)
+        """Retained for the existing JSON contract; now sourced from integrity.
+
+        This was the only integrity signal any of these suites had, and it was
+        narrower than it looked: fixtures whose generation failed were never
+        judged, so they were excluded from the denominator entirely.
+        """
+        return round(self.integrity.judge_failure_rate, 3)
 
     def to_dict(self) -> dict:
         return {
@@ -131,6 +154,7 @@ class RAGRunSummary:
             "abstention_accuracy": self.abstention_accuracy,
             "hallucination_rate": self.hallucination_rate,
             "parse_failure_rate": self.parse_failure_rate,
+            "integrity": integrity_to_dict(self.integrity),
             "total_fixtures": len(self.fixture_results),
             "total_cost_usd": round(self.total_cost_usd, 6),
             "total_tokens": self.total_tokens,

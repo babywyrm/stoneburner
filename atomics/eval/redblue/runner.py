@@ -14,13 +14,16 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
+from atomics.eval.attempt_serialization import integrity_to_dict
 from atomics.eval.judge import (
     JudgeResult,
     char_budget_for_tokens,
     detect_self_judge,
     score_response,
 )
+from atomics.eval.outcomes import RunIntegrity
 from atomics.eval.redblue.fixtures import ALL_FIXTURES, BLUE_FIXTURES, RED_FIXTURES, RedBlueFixture
+from atomics.eval.suite_integrity import fixture_outcome, integrity_of
 from atomics.model_classes import supports_thinking
 from atomics.models import TaskCategory, TaskResult, TaskStatus
 from atomics.providers.base import BaseProvider
@@ -107,6 +110,24 @@ class RedBlueSummary:
         return {cat: round(sum(s) / len(s), 3) for cat, s in cats.items()}
 
     @property
+    def integrity(self) -> RunIntegrity:
+        """Coverage and judge-failure rates behind the scores above.
+
+        `overall_quality` and `category_scores` average only over judges that
+        parsed, so without this a run that scored three fixtures out of ten
+        reports those three and looks healthy.
+        """
+        return integrity_of(
+            [
+                fixture_outcome(
+                    generated=r.task_result.status is not TaskStatus.FAILED,
+                    scored=r.judge is not None and not r.judge.parse_failed,
+                )
+                for r in self.results
+            ]
+        )
+
+    @property
     def avg_latency_ms(self) -> float:
         lats = [r.task_result.latency_ms for r in self.results]
         return round(sum(lats) / len(lats), 1) if lats else 0.0
@@ -131,6 +152,7 @@ class RedBlueSummary:
             "category_scores": self.category_scores,
             "avg_latency_ms": self.avg_latency_ms,
             "total_cost_usd": round(self.total_cost_usd, 6),
+            "integrity": integrity_to_dict(self.integrity),
             "fixtures": [
                 {
                     "id": r.fixture.id,
