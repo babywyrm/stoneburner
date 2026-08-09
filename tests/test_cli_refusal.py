@@ -124,13 +124,13 @@ def _patch_refusal(
         return summary
 
     monkeypatch.setattr(
-        "atomics.commands.security._make_provider",
+        "atomics.commands.security.cmd_refusal._make_provider",
         lambda *_args, **_kwargs: provider,
     )
     monkeypatch.setattr("atomics.eval.refusal.run_refusal", fake_run_refusal)
     if db_path is not None:
         monkeypatch.setattr(
-            "atomics.commands.security.load_settings",
+            "atomics.commands.security.cmd_refusal.load_settings",
             lambda: SimpleNamespace(db_path=db_path),
         )
 
@@ -324,7 +324,7 @@ def test_refusal_json_failure_keeps_persisted_fixture(monkeypatch, tmp_path) -> 
         raise OSError("Bearer secret-json-token")
 
     monkeypatch.setattr(
-        "atomics.commands.security.write_summary_json",
+        "atomics.commands.security.cmd_refusal.write_summary_json",
         fail_json,
     )
 
@@ -385,7 +385,7 @@ def test_refusal_progress_respects_root_toggle(monkeypatch) -> None:
             events.append("done")
 
     _patch_refusal(monkeypatch)
-    monkeypatch.setattr("atomics.commands.security.FixtureProgress", _Progress)
+    monkeypatch.setattr("atomics.commands.security.cmd_refusal.FixtureProgress", _Progress)
 
     enabled = CliRunner().invoke(cli, ["refusal", "--no-save"])
     assert enabled.exit_code == 0

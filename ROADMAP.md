@@ -39,13 +39,22 @@ every item here is a refactor with the test suite as the contract.
 
 - [ ] Split `MetricsRepository` (1132 lines, ~35 methods spanning runs, eight
       suite tables, analytics, and schedules) along domain seams
-- [ ] Split `commands/security.py` (1287 lines, the largest module in the repo)
-      into one module per command. It carries `adversarial`, `redblue`,
-      `multiturn`, `refusal`, and `codereview`, so it is where the persistence
-      boilerplate below repeats most densely
-- [ ] Route `commands/benchmark.py` and `commands/admin.py` through
+- [x] Split `commands/security.py` (1287 lines, the largest module in the repo)
+      into one module per command. It is now the `commands/security/` package:
+      one `cmd_<name>` module each for `adversarial`, `redblue`, `multiturn`,
+      `refusal`, and `codereview`, re-exported from `__init__` so `atomics.cli`
+      and importers see no change. The `cmd_` prefix keeps re-exporting a command
+      function from shadowing the module it lives in. The persistence boilerplate
+      below still repeats across these five — deduplicating it is the next step,
+      now that each copy sits in its own file
+- [x] Route `commands/benchmark.py` and `commands/admin.py` through
       `providers/factory.py` instead of hand-rolling the ten-provider branch
-      that the factory exists to own
+      that the factory exists to own. Both the benchmark `run` loop and
+      `provider-test` now call `_make_provider`; the only construction left at
+      the call site is what the factory deliberately does not own — the keyless
+      OpenAI auto-detect (a console-and-local-auth affordance) and the tier's
+      `preferred_model` fallback for `claude`/`brain-gateway`, pre-resolved
+      before the factory sees it
 - [x] Share one run-integrity model across all eight suites. The premise of
       this item was wrong: the three attempt-based suites already shared
       `attempt_serialization.py`, and the other five were not duplicating that

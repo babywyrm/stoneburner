@@ -1,6 +1,31 @@
 # Changelog
 
-## Unreleased
+## 0.17.0 (2026-08-09) — Structural consolidation: security command package and shared provider factory
+
+### Changed
+- **`commands/security.py` is now the `commands/security/` package**, one module
+  per command instead of a single 1287-line file — the largest module in the
+  repo. `adversarial`, `redblue`, `multiturn`, `refusal`, and `codereview` each
+  live in their own `cmd_<name>` submodule, re-exported from the package so
+  `atomics.cli` and `from atomics.commands.security import adversarial` keep
+  working unchanged. The `cmd_` prefix is deliberate: re-exporting a command
+  named `refusal` from a module also named `refusal` would shadow the module and
+  break patching it in tests. No behavior change — the full suite passes as
+  before; the only test edits repoint monkeypatch targets at the submodule that
+  now owns each command.
+- **`provider-test` and the benchmark `run` loop now build providers through the
+  shared `providers.factory`** instead of each carrying its own ten-branch
+  provider switch. The two branches had already drifted from the factory and
+  from each other — a divergence the architecture doc named — and every new
+  provider meant editing three copies. Behavior is unchanged: the factory
+  encodes the same per-provider model defaults, so the only logic that stayed at
+  the call site is the part the factory legitimately cannot own. The keyless
+  OpenAI path still auto-detects a local login and prints what it found, because
+  reaching into local auth and a console is a CLI affordance the factory keeps
+  out of so the API server and distributed workers stay headless. And
+  `provider-test`'s `brain-gateway` output still reads `(gateway default)` when
+  no model is given, since the gateway resolves its model server-side and there
+  is no name to echo. Around 180 lines of duplicated construction are gone.
 
 ### Fixed
 - **Provider tests no longer depend on how fast the machine is.** Three tests
