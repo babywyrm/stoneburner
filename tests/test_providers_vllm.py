@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from types import ModuleType
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from atomics.providers import vllm
 from atomics.providers.base import BaseProvider
 from atomics.providers.vllm import VllmProvider
 
@@ -78,7 +81,8 @@ def _mock_openai_response(content: str, inp: int = 15, out: int = 42) -> MagicMo
 
 
 @pytest.mark.asyncio
-async def test_vllm_generate_success():
+async def test_vllm_generate_success(scripted_clock: Callable[[ModuleType, float], None]):
+    scripted_clock(vllm, 0.5)
     mock_client = AsyncMock()
     mock_client.post = AsyncMock(return_value=_mock_openai_response("MCP is a protocol."))
 
@@ -91,7 +95,8 @@ async def test_vllm_generate_success():
     assert resp.total_tokens == 57
     assert resp.model == "qwen2.5:3b"
     assert resp.estimated_cost_usd == 0.0
-    assert resp.tokens_per_second is not None
+    assert resp.latency_ms == 500.0
+    assert resp.tokens_per_second == 84.0
 
 
 @pytest.mark.asyncio

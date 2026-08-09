@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import sqlite3
+import time
 from collections.abc import Callable, Iterator
 from pathlib import Path
+from types import ModuleType
 
 import pytest
 
@@ -81,6 +83,47 @@ def _close_sqlite_connections() -> Iterator[None]:
             conn.close()
         except Exception:
             pass
+
+
+class _ScriptedClock:
+    """Stands in for the ``time`` module with a scripted ``monotonic``.
+
+    Returns 0.0 on the first call and ``elapsed`` on every call after, so a
+    provider that brackets its HTTP call with two ``monotonic()`` reads
+    measures exactly ``elapsed`` seconds. Any other attribute falls through to
+    the real module.
+    """
+
+    def __init__(self, elapsed: float) -> None:
+        self._elapsed = elapsed
+        self._calls = 0
+
+    def monotonic(self) -> float:
+        tick = 0.0 if self._calls == 0 else self._elapsed
+        self._calls += 1
+        return tick
+
+    def __getattr__(self, name: str) -> object:
+        return getattr(time, name)
+
+
+@pytest.fixture
+def scripted_clock(
+    monkeypatch: pytest.MonkeyPatch,
+) -> Callable[[ModuleType, float], None]:
+    """Pin a provider module's measured elapsed time to a known value.
+
+    Providers time their own HTTP call with ``time.monotonic()``. Test doubles
+    return in microseconds, so real elapsed time rounds to zero and throughput
+    comes back undefined — making any assertion on latency or tokens/sec depend
+    on how fast the machine is. Only the provider module's ``time`` reference is
+    replaced, leaving the real module (which asyncio schedules against) intact.
+    """
+
+    def _apply(module: ModuleType, elapsed_seconds: float) -> None:
+        monkeypatch.setattr(module, "time", _ScriptedClock(elapsed_seconds))
+
+    return _apply
 
 
 @pytest.fixture
