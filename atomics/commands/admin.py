@@ -10,7 +10,12 @@ from rich.console import Console
 from rich.markup import escape as _rich_escape
 from rich.table import Table
 
-from atomics.commands.common import PROVIDER_CHOICES, setup_logging
+from atomics.commands.common import (
+    PROVIDER_CHOICES,
+    _make_provider,
+    effective_model,
+    setup_logging,
+)
 from atomics.config import load_settings
 from atomics.models import BurnTier
 from atomics.providers.base import BaseProvider
@@ -423,99 +428,35 @@ def provider_test(provider_name: str, model: str | None, region: str, ollama_hos
     console = Console()
 
     prov: BaseProvider
-    if provider_name == "claude":
-        if not settings.anthropic_api_key:
-            console.print("[red]ANTHROPIC_API_KEY not set.[/red]")
-            sys.exit(1)
-        from atomics.providers.claude import ClaudeProvider
-
-        prov = ClaudeProvider(
-            api_key=settings.anthropic_api_key,
-            default_model=model or settings.default_model,
-        )
-        model_label = model or settings.default_model
-    elif provider_name == "bedrock":
-        from atomics.providers.bedrock import BedrockProvider
-
-        bedrock_model = model or "us.anthropic.claude-sonnet-4-6"
-        prov = BedrockProvider(region=region, model_id=bedrock_model)
-        model_label = bedrock_model
-    elif provider_name == "openai":
+    if provider_name == "openai" and not settings.openai_api_key:
+        # The keyless OpenAI path auto-detects a local login (e.g. Codex) and
+        # prints which credential it found. That reach into local auth and the
+        # console is a CLI affordance the shared factory deliberately does not
+        # have: the API server and distributed workers must stay headless and
+        # get a ProviderConfigError instead. So this one branch stays here.
+        from atomics.auth import auto_detect_auth
         from atomics.providers.openai import OpenAIProvider
 
-        openai_model = model or "gpt-4o"
-        model_label = openai_model
-        if settings.openai_api_key:
-            prov = OpenAIProvider(api_key=settings.openai_api_key, default_model=openai_model)
-        else:
-            try:
-                from atomics.auth import auto_detect_auth
-
-                auth = auto_detect_auth()
-                console.print(f"[dim]Auth: {auth.description}[/dim]")
-                prov = OpenAIProvider(default_model=openai_model, auth=auth)
-            except RuntimeError as exc:
-                console.print(f"[red]{exc}[/red]")
-                sys.exit(1)
-    elif provider_name == "ollama":
-        from atomics.providers.ollama import OllamaProvider
-
-        host = ollama_host or settings.ollama_host
-        ollama_model_name = model or settings.ollama_model
-        prov = OllamaProvider(host=host, default_model=ollama_model_name)
-        model_label = ollama_model_name
-    elif provider_name == "vllm":
-        from atomics.providers.vllm import VllmProvider
-
-        base_url = vllm_host or settings.vllm_host
-        vllm_model_name = model or settings.vllm_model
-        prov = VllmProvider(base_url=base_url, default_model=vllm_model_name)
-        model_label = vllm_model_name
-    elif provider_name == "brain-gateway":
-        from atomics.providers.brain_gateway import BrainGatewayProvider
-
-        url = gateway_url or settings.brain_gateway_url
-        prov = BrainGatewayProvider(url=url, default_model=model)
-        model_label = model or "(gateway default)"
-    elif provider_name == "llamacpp":
-        from atomics.providers.llamacpp import LlamaCppProvider
-
-        llamacpp_model = model or "local"
-        prov = LlamaCppProvider(
-            base_url=ollama_host or settings.llamacpp_host,
-            default_model=llamacpp_model,
-        )
-        model_label = llamacpp_model
-    elif provider_name == "groq":
-        if not settings.groq_api_key:
-            console.print("[red]GROQ_API_KEY not set.[/red]")
+        try:
+            auth = auto_detect_auth()
+        except RuntimeError as exc:
+            console.print(f"[red]{exc}[/red]")
             sys.exit(1)
-        from atomics.providers.groq import GroqProvider
-
-        groq_model = model or "llama-3.3-70b-versatile"
-        prov = GroqProvider(api_key=settings.groq_api_key, default_model=groq_model)
-        model_label = groq_model
-    elif provider_name == "together":
-        if not settings.together_api_key:
-            console.print("[red]TOGETHER_API_KEY not set.[/red]")
-            sys.exit(1)
-        from atomics.providers.together import TogetherProvider
-
-        together_model = model or "meta-llama/Llama-3.3-70B-Instruct-Turbo"
-        prov = TogetherProvider(api_key=settings.together_api_key, default_model=together_model)
-        model_label = together_model
-    elif provider_name == "gemini":
-        if not settings.gemini_api_key:
-            console.print("[red]GEMINI_API_KEY not set.[/red]")
-            sys.exit(1)
-        from atomics.providers.gemini import GeminiProvider
-
-        gemini_model = model or "gemini-2.5-flash"
-        prov = GeminiProvider(api_key=settings.gemini_api_key, default_model=gemini_model)
-        model_label = gemini_model
+        console.print(f"[dim]Auth: {auth.description}[/dim]")
+        prov = OpenAIProvider(default_model=model or "gpt-4o", auth=auth)
     else:
-        console.print(f"[red]Unknown provider: {provider_name}[/red]")
-        sys.exit(1)
+        host = gateway_url if provider_name == "brain-gateway" else ollama_host
+        prov = _make_provider(
+            provider_name, model, host, settings, vllm_host=vllm_host, region=region
+        )
+
+    # The gateway resolves its own default server-side, so there is no model name
+    # to echo here; every other provider reports what it will actually send.
+    model_label = (
+        model or "(gateway default)"
+        if provider_name == "brain-gateway"
+        else effective_model(model, prov)
+    )
 
     # Auto-detect thinking if not explicitly set
     eff_thinking = thinking_flag

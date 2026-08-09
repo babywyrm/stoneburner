@@ -33,7 +33,7 @@ def _mock_adversarial_cli(monkeypatch, summaries):
     async def fake_run_adversarial(*_args, **_kwargs):
         return next(remaining)
 
-    monkeypatch.setattr("atomics.commands.security._make_provider", lambda *_args, **_kwargs: DummyProvider())
+    monkeypatch.setattr("atomics.commands.security.cmd_adversarial._make_provider", lambda *_args, **_kwargs: DummyProvider())
     monkeypatch.setattr("atomics.eval.adversarial.select_fixtures", lambda _categories: [])
     monkeypatch.setattr(
         "atomics.eval.adversarial.runner.run_adversarial",
@@ -1136,6 +1136,46 @@ def test_cli_provider_test_vllm_success(monkeypatch, tmp_path):
     ])
     assert result.exit_code == 0
     assert "vllm" in result.output.lower()
+
+
+def test_cli_provider_test_brain_gateway_default_label(monkeypatch):
+    """With no --model, the gateway echoes '(gateway default)', not a resolved name.
+
+    provider-test now builds every provider through the shared factory. The
+    gateway is the one provider that resolves its model server-side, so this
+    guards the label the factory cannot supply from surviving the migration.
+    """
+    captured: dict[str, object] = {}
+
+    class FakeGateway:
+        name = "brain-gateway"
+
+        def __init__(self, url, default_model):
+            captured["url"] = url
+            captured["default_model"] = default_model
+
+        async def health_check(self):
+            return True
+
+        async def generate(self, *_args, **_kwargs):
+            return SimpleNamespace(
+                text="4", input_tokens=1, output_tokens=1, total_tokens=2,
+                latency_ms=1.0, estimated_cost_usd=0.0, tokens_per_second=None,
+                tps_basis="wall_clock", thinking_tokens=0,
+                cache_read_tokens=0, cache_write_tokens=0,
+            )
+
+    monkeypatch.setattr(
+        "atomics.providers.brain_gateway.BrainGatewayProvider", FakeGateway
+    )
+    result = CliRunner().invoke(
+        cli,
+        ["provider-test", "--provider", "brain-gateway", "--gateway-url", "http://gw:8080"],
+    )
+    assert result.exit_code == 0
+    assert "(gateway default)" in result.output
+    assert captured["url"] == "http://gw:8080"
+    assert captured["default_model"] is None
 
 
 def test_cli_sweep_vllm_provider(monkeypatch, tmp_path):

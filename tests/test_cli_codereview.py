@@ -123,13 +123,13 @@ def _patch_codereview(
         return summary
 
     monkeypatch.setattr(
-        "atomics.commands.security._make_provider",
+        "atomics.commands.security.cmd_codereview._make_provider",
         lambda *_args, **_kwargs: provider,
     )
     monkeypatch.setattr("atomics.eval.codereview.run_codereview", fake_run_codereview)
     if db_path is not None:
         monkeypatch.setattr(
-            "atomics.commands.security.load_settings",
+            "atomics.commands.security.cmd_codereview.load_settings",
             lambda: SimpleNamespace(db_path=db_path),
         )
 
@@ -353,7 +353,7 @@ def test_codereview_progress_respects_root_toggle(monkeypatch) -> None:
             events.append("done")
 
     _patch_codereview(monkeypatch)
-    monkeypatch.setattr("atomics.commands.security.FixtureProgress", _Progress)
+    monkeypatch.setattr("atomics.commands.security.cmd_codereview.FixtureProgress", _Progress)
 
     enabled = CliRunner().invoke(cli, ["codereview", "--no-save"])
     assert enabled.exit_code == 0

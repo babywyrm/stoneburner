@@ -18,6 +18,7 @@ from atomics.commands.common import (
     eval_budget_from,
     setup_logging,
 )
+from atomics.commands.common import effective_model as resolve_effective_model
 from atomics.config import load_settings
 from atomics.eval.budget import BudgetMeter
 from atomics.labcompare import (
@@ -126,90 +127,34 @@ def run(
     profile = get_tier_profile(burn_tier)
 
     provider: BaseProvider
-    if provider_name == "claude":
-        if not settings.anthropic_api_key:
-            console.print("[red]ANTHROPIC_API_KEY not set. Export it or add to .env[/red]")
-            sys.exit(1)
-        from atomics.providers.claude import ClaudeProvider
-
-        effective_model = model or profile.preferred_model or settings.default_model
-        provider = ClaudeProvider(api_key=settings.anthropic_api_key, default_model=effective_model)
-    elif provider_name == "bedrock":
-        from atomics.providers.bedrock import BedrockProvider
-
-        effective_model = model or "us.anthropic.claude-sonnet-4-6"
-        provider = BedrockProvider(region=region, model_id=effective_model)
-    elif provider_name == "openai":
+    if provider_name == "openai" and not settings.openai_api_key:
+        # The keyless OpenAI path auto-detects a local login (e.g. Codex) and
+        # prints which credential it found. That reach into local auth and the
+        # console is a CLI affordance the shared factory deliberately lacks, so
+        # the API server and distributed workers stay headless. This branch stays.
+        from atomics.auth import auto_detect_auth
         from atomics.providers.openai import OpenAIProvider
 
-        effective_model = model or "gpt-4o"
-        if settings.openai_api_key:
-            provider = OpenAIProvider(
-                api_key=settings.openai_api_key, default_model=effective_model
-            )
-        else:
-            try:
-                from atomics.auth import auto_detect_auth
-
-                auth = auto_detect_auth()
-                console.print(f"[dim]Auth: {auth.description}[/dim]")
-                provider = OpenAIProvider(default_model=effective_model, auth=auth)
-            except RuntimeError as exc:
-                console.print(f"[red]{exc}[/red]")
-                sys.exit(1)
-    elif provider_name == "ollama":
-        from atomics.providers.ollama import OllamaProvider
-
-        host = ollama_host or settings.ollama_host
-        effective_model = model or settings.ollama_model
-        provider = OllamaProvider(host=host, default_model=effective_model)
-    elif provider_name == "vllm":
-        from atomics.providers.vllm import VllmProvider
-
-        base_url = vllm_host or settings.vllm_host
-        effective_model = model or settings.vllm_model
-        provider = VllmProvider(base_url=base_url, default_model=effective_model)
-    elif provider_name == "brain-gateway":
-        from atomics.providers.brain_gateway import BrainGatewayProvider
-
-        url = gateway_url or settings.brain_gateway_url
-        effective_model = model or profile.preferred_model or settings.default_model
-        provider = BrainGatewayProvider(url=url, default_model=effective_model)
-    elif provider_name == "llamacpp":
-        from atomics.providers.llamacpp import LlamaCppProvider
-
-        effective_model = model or "local"
-        provider = LlamaCppProvider(
-            base_url=ollama_host or settings.llamacpp_host,
-            default_model=effective_model,
-        )
-    elif provider_name == "groq":
-        if not settings.groq_api_key:
-            console.print("[red]GROQ_API_KEY not set. Get one at https://console.groq.com/keys[/red]")
+        try:
+            auth = auto_detect_auth()
+        except RuntimeError as exc:
+            console.print(f"[red]{exc}[/red]")
             sys.exit(1)
-        from atomics.providers.groq import GroqProvider
-
-        effective_model = model or "llama-3.3-70b-versatile"
-        provider = GroqProvider(api_key=settings.groq_api_key, default_model=effective_model)
-    elif provider_name == "together":
-        if not settings.together_api_key:
-            console.print("[red]TOGETHER_API_KEY not set.[/red]")
-            sys.exit(1)
-        from atomics.providers.together import TogetherProvider
-
-        effective_model = model or "meta-llama/Llama-3.3-70B-Instruct-Turbo"
-        provider = TogetherProvider(api_key=settings.together_api_key, default_model=effective_model)
-    elif provider_name == "gemini":
-        if not settings.gemini_api_key:
-            console.print("[red]GEMINI_API_KEY not set. Get one at https://aistudio.google.com/apikey[/red]")
-            sys.exit(1)
-        from atomics.providers.gemini import GeminiProvider
-
-        effective_model = model or "gemini-2.5-flash"
-        provider = GeminiProvider(api_key=settings.gemini_api_key, default_model=effective_model)
+        console.print(f"[dim]Auth: {auth.description}[/dim]")
+        provider = OpenAIProvider(default_model=model or "gpt-4o", auth=auth)
     else:
-        console.print(f"[red]Unknown provider: {provider_name}[/red]")
-        sys.exit(1)
+        # claude and brain-gateway fall back to the tier's preferred model before
+        # the account default; the factory only knows the account default, so
+        # pre-resolve that one step and let the factory own the rest.
+        requested_model = model
+        if provider_name in ("claude", "brain-gateway"):
+            requested_model = model or profile.preferred_model or settings.default_model
+        host = gateway_url if provider_name == "brain-gateway" else ollama_host
+        provider = _make_provider(
+            provider_name, requested_model, host, settings, vllm_host=vllm_host, region=region
+        )
+
+    effective_model = resolve_effective_model(model, provider)
 
     # Auto-detect thinking capability when not explicitly set
     if thinking_flag is None and effective_model:
