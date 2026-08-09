@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### Fixed
+- **Provider tests no longer depend on how fast the machine is.** Three tests
+  asserted on wall-clock timing that a test double never actually spends. The
+  providers round latency to two decimal places of a millisecond, so a stub
+  returning in under five microseconds recorded `0.0 ms`, `compute_tps` gave
+  back `None` for an undefined rate, and `assert resp.tokens_per_second > 0`
+  raised a `TypeError` — on a fast machine only. A new `scripted_clock` fixture
+  pins a provider module's measured elapsed time, so `llamacpp`, `vllm`, and
+  `brain-gateway` now assert the exact latency and throughput their inputs
+  imply. Product behavior is unchanged; reporting an undefined rate as `None`
+  when no time was measurable is correct.
+
 ## 0.16.1 (2026-08-04) — Every eval suite reports run integrity
 
 A reporting-honesty fix. Five suites could publish a healthy-looking score

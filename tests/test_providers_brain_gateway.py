@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
+from types import ModuleType
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from atomics.providers import brain_gateway
 from atomics.providers.base import BaseProvider, ProviderResponse
 from atomics.providers.brain_gateway import BrainGatewayProvider
 
@@ -37,7 +40,10 @@ def test_brain_gateway_strips_trailing_slash():
 
 
 @pytest.mark.asyncio
-async def test_brain_gateway_generate_success():
+async def test_brain_gateway_generate_success(
+    scripted_clock: Callable[[ModuleType, float], None],
+):
+    scripted_clock(brain_gateway, 0.5)
     inner_text = json.dumps({
         "answer": "4",
         "prompt_source": "default",
@@ -75,7 +81,8 @@ async def test_brain_gateway_generate_success():
     assert resp.total_tokens == 15
     assert resp.model == "claude-sonnet-4-6"
     assert resp.estimated_cost_usd == 0.000081
-    assert resp.latency_ms > 0
+    assert resp.latency_ms == 500.0
+    assert resp.tokens_per_second == 6.0
 
     call_args = mock_client.post.call_args
     payload = call_args.kwargs.get("json") or call_args[1].get("json")

@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from types import ModuleType
+
 import httpx
 import pytest
 
+from atomics.providers import llamacpp
 from atomics.providers.base import BaseProvider
 from atomics.providers.llamacpp import LlamaCppProvider
 
@@ -49,7 +53,8 @@ def test_default_model():
 
 
 @pytest.mark.asyncio
-async def test_generate():
+async def test_generate(scripted_clock: Callable[[ModuleType, float], None]):
+    scripted_clock(llamacpp, 0.5)
     client = FakeClient(_fake_response("hello from llama.cpp", 15, 8))
     prov = LlamaCppProvider(client=client)
     resp = await prov.generate("test")
@@ -57,7 +62,8 @@ async def test_generate():
     assert resp.input_tokens == 15
     assert resp.output_tokens == 8
     assert resp.estimated_cost_usd == 0.0
-    assert resp.tokens_per_second > 0
+    assert resp.latency_ms == 500.0
+    assert resp.tokens_per_second == 16.0
     assert len(client.post_calls) == 1
 
 
