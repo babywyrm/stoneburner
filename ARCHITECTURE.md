@@ -88,8 +88,13 @@ class BaseProvider(ABC):
 cost, and `tps_basis`. Adapters live in `providers/{claude,openai,bedrock,ollama,
 vllm,brain_gateway}.py`. Pricing is centralized in `providers/pricing.py`.
 
-Build providers through the single CLI factory
-`commands.common._make_provider()` — do not write a new provider-name switch.
+Build providers through the single factory `providers.factory.make_provider()` —
+do not write a new provider-name switch. It raises `ProviderConfigError`, which
+each caller renders in its own idiom. Command modules should go through
+`commands.common._make_provider()`, the thin wrapper that translates that error
+into a `ClickException` and labels endpoint failures with the flag the user
+typed; the API server and distributed workers call the factory directly so they
+never import the command layer.
 
 ### `commands/` — command boundary
 
@@ -221,11 +226,11 @@ New code should follow the target column, not copy whichever suite you opened fi
 |---------|-------------------|--------|
 | Item list field | `fixture_results` | adversarial/refusal/codereview use it; redblue/probe expose it as an alias for `results` |
 | Multi-pass arg | `runs` | archreview accepts `--runs` as an alias for `--rounds` |
-| JSON export | `Summary.to_dict()` + `--json-out` | done — all five suites |
+| JSON export | `Summary.to_dict()` + `--json-out` | done — every suite runner |
 | Parent run row | `create_run()` + `complete_*_run()` | done — all suites create + finalize a run row |
 | Stats helpers | one shared `stats` module | done — `atomics/stats.py` |
-| Provider build | `_make_provider()` | done — single factory |
-| CLI modules | one module per command under `commands/` | done — all commands extracted into `commands/<group>.py` |
+| Provider build | `providers.factory.make_provider()` | done — single factory, CLI wraps it |
+| CLI modules | one module per command under `commands/` | partial — everything is out of `cli.py`, but the larger `commands/<group>.py` modules still hold several commands each |
 | Repository modules | persistence grouped by domain | generic records extracted; `storage/repository.py` remains a split candidate |
 
 ---

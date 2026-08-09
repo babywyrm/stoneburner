@@ -39,6 +39,10 @@ every item here is a refactor with the test suite as the contract.
 
 - [ ] Split `MetricsRepository` (1132 lines, ~35 methods spanning runs, eight
       suite tables, analytics, and schedules) along domain seams
+- [ ] Split `commands/security.py` (1287 lines, the largest module in the repo)
+      into one module per command. It carries `adversarial`, `redblue`,
+      `multiturn`, `refusal`, and `codereview`, so it is where the persistence
+      boilerplate below repeats most densely
 - [ ] Route `commands/benchmark.py` and `commands/admin.py` through
       `providers/factory.py` instead of hand-rolling the ten-provider branch
       that the factory exists to own
