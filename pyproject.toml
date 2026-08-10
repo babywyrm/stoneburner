@@ -19,11 +19,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-bedrock = ["boto3>=1.35.0"]
+bedrock = ["boto3>=1.43.66"]
 openai = ["openai>=1.40.0"]
 rag = [
     "sqlite-vec>=0.1.0",
-    "sentence-transformers>=3.0.0",
+    "sentence-transformers>=5.7.0",
 ]
 api = [
     "fastapi>=0.100.0",
