@@ -185,6 +185,25 @@ runs such as a local model judged by a paid one.
 | `atomics distributed run` | Submit a distributed run (split, fleet, or full mode) |
 | `atomics distributed status JOB_ID` | Poll distributed run status |
 
+## MCP Server
+
+Exposes atomics to LLM agents over the Model Context Protocol, as a proxy over a
+running API server. Requires the `[mcp]` extra. See
+[MCP_SERVER.md](MCP_SERVER.md).
+
+| Command | Description |
+|---------|-------------|
+| `atomics mcp` | Serve atomics over MCP on stdio, proxying `http://127.0.0.1:8000` |
+| `atomics mcp --api-url URL` | API server to proxy (or `ATOMICS_API_URL`) |
+| `atomics mcp --api-key KEY` | Client API key, sent as `X-API-Key` (or `ATOMICS_API_KEY`) |
+
+Serves on stdio only: the process holds a spend-authorized API key and no
+MCP-layer credential would guard a listening port. To reach a remote atomics,
+point `--api-url` at its authenticated API server and run this locally.
+
+Tools: `health`, `get_job`, `compare`, `recent_runs` (read-only), plus
+`submit_run` and `submit_eval`, which spend tokens and return a job id to poll.
+
 ## atomics worker
 
 Start a worker process that registers with the coordinator, heartbeats, polls for task assignments, executes them, and submits results.

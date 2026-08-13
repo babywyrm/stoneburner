@@ -1,5 +1,35 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- **`atomics mcp` serves atomics to LLM agents over the Model Context
+  Protocol**, as a proxy over a running `atomics server`. Six tools: `health`,
+  `get_job`, `compare`, and `recent_runs` are annotated read-only, while
+  `submit_run` and `submit_eval` spend tokens and return a job id to poll, so no
+  tool call blocks on model work. Requires the new `[mcp]` extra; the client
+  needs no dependency beyond the `httpx` already in the core set.
+
+  The proxy shape is the design, not a shortcut. An MCP client is a remote,
+  automated caller — the API's trust position, not the CLI's, which assumes a
+  local operator spending their own money deliberately. Going through the API
+  means the agent inherits API-key authentication, the per-eval dollar ceiling,
+  and the bounds on iterations and fixtures, with no second copy of a spending
+  decision to keep in sync. The tool surface is therefore bounded by what the
+  API exposes: `models`, `provider-test`, `sweep`, `stress`, `soak`, and `probe`
+  are CLI-only and stay that way until they are endpoints with the auth and
+  bounds that implies.
+
+  It serves on stdio only. The HTTP transports would open a port that no
+  MCP-layer credential guards while the process holds an API key with spend
+  authority, which would hand that authority to anyone who could reach it — the
+  opposite of the guardrails the proxy exists to inherit. To reach a remote
+  atomics, point `--api-url` at its authenticated API server and run the MCP
+  server locally. And because stdout carries the JSON-RPC frames, the command
+  forces plain logging and pins its console to stderr: the CLI group's Rich
+  handler writes to stdout, and one warning through it would corrupt every
+  session. See `docs/MCP_SERVER.md`.
+
 ## 0.17.0 (2026-08-09) — Structural consolidation: security command package and shared provider factory
 
 ### Changed
