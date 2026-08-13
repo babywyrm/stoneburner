@@ -11,6 +11,10 @@ import json
 
 import pytest
 
+# The [mcp] extra is optional. Skip rather than error out collection when it is
+# missing; CI and CONTRIBUTING install it so these run there.
+pytest.importorskip("mcp")
+
 from atomics.mcp.client import AtomicsApiError
 from atomics.mcp.server import build_server
 

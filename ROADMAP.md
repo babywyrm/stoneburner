@@ -85,6 +85,16 @@ Not scheduled, roughly in order of how often they come up.
   [RELEASING.md](RELEASING.md).
 - **Judge quality.** Multi-judge consensus exists for accuracy; extending it to
   the security suites would reduce single-judge variance.
+- **Read-only API endpoints for `models` and `provider-test`.** `atomics mcp`
+  can only proxy what the API already exposes. Those two are the obvious next
+  tools for an agent (discover what's available, then check it answers) and
+  they are currently CLI-only. Add the endpoints first, with the auth the API
+  already applies, then the MCP tools come for free.
+- **Interactive REPL.** Tab-completion over the existing Click tree is cheap;
+  the useful part is session state (selected provider/model, last result set)
+  for exploratory work. Heavy ops (`soak`, `sweep`) should submit jobs, not
+  block the prompt. Lower priority than the MCP surface, which already has a
+  consumer.
 
 ## Design Principles
 

@@ -20,6 +20,7 @@ never imports eval; providers never import storage.
 ```
 CLI / entry          cli.py, commands/, __main__.py
 API / server         api/                # FastAPI, async jobs, optional auth
+MCP / agent          mcp/                # stdio proxy over a running API server
 Orchestration        sweep, scenario, qa_runner, labcompare
 Burn loop            core/, tasks/, tiers, hooks
 Eval / security      eval/, probe/, archreview/
@@ -32,8 +33,9 @@ Support / infra      config, paths, secrets, doctor, reporting, exporters,
 
 ```mermaid
 flowchart TB
-    CLI["CLI / entry\ncli.py, commands/"] --> Commands["commands/\nauth, admin, benchmark, eval, security, load, api, rag"]
+    CLI["CLI / entry\ncli.py, commands/"] --> Commands["commands/\nauth, admin, benchmark, eval, security, load, api, mcp, rag"]
     API["API / server\natomics/api/"] --> Commands
+    MCP["MCP / agent\natomics/mcp/"] --> API
     Commands --> Orchestration["Orchestration\nsweep, scenario, labcompare, qa_runner"]
     Commands --> Burn["Burn loop\ncore/ engine, runner, guard"]
     Commands --> Eval["Eval / security\neval/, probe/, archreview/"]
@@ -52,6 +54,7 @@ flowchart TB
 |-------|------|-------------|
 | CLI | Thin Click registration in `cli.py`; command modules in `commands/` handle argument parsing, wiring, and Rich output. No business logic that can't be reached another way. | `cli.py`, `commands/` |
 | API / server | FastAPI HTTP surface for runs, evals, reports, and async jobs; optional auth. | `api/` |
+| MCP / agent | Stdio MCP server that proxies a running API. Holds no provider, storage, or budget logic of its own — an agent inherits the API's authentication and spend ceilings. Tool surface is bounded by the API, not the CLI. | `mcp/`, `commands/mcp.py` |
 | Orchestration | Multi-run/multi-model coordination over the lower layers. | `sweep.py`, `scenario.py`, `qa_runner.py`, `labcompare.py` |
 | Burn loop | The continuous token-burn benchmark. | `core/engine.py`, `core/runner.py`, `core/guard.py`, `tasks/` |
 | Eval / security | LLM quality and security evaluation suites. | `eval/`, `probe/`, `archreview/` |
@@ -253,6 +256,10 @@ handles API keys and can send data to LLM providers. Rules for contributors:
   feature; keep it opt-in and documented.
 - **`archreview`/`probe` send local files/repos to LLM providers** by design;
   keep that behavior explicit and visible in output.
+- **`atomics mcp` is a remote automated caller**, same trust position as the
+  API, not the CLI. It must not grow a second copy of auth or spend ceilings;
+  new MCP tools mean new API endpoints first. Stdio only — an HTTP MCP
+  transport would expose a spend-authorized API key with no MCP-layer credential.
 
 ---
 
@@ -262,7 +269,9 @@ handles API keys and can send data to LLM providers. Rules for contributors:
   default. The one live test (`test_calibration.py`) is gated behind
   `ATOMICS_LIVE_JUDGE=1`.
 - CI (`.github/workflows/ci.yml`) runs ruff + pytest on Linux/macOS across
-  Python 3.11–3.13.
+  Python 3.11–3.13, with `--extra dev --extra api --extra mcp`. The `api` extra
+  is required for collection; the `mcp` extra is required for the MCP tests to
+  *run* rather than skip.
 - Run the suite before every commit: `uv run pytest -q`.
 
 ---

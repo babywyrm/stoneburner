@@ -53,7 +53,7 @@ jobs:
       # tests/test_distributed_*.py import fastapi at module scope, so without
       # it pytest errors during collection.
       - name: Install dependencies
-        run: uv sync --extra dev --extra api --extra openai --extra bedrock
+        run: uv sync --extra dev --extra api --extra mcp --extra openai --extra bedrock
 
       - name: Run tests
         run: uv run pytest -q --tb=short

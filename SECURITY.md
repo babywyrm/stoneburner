@@ -165,6 +165,25 @@ so whoever submits first holds all sixteen slots and every other key gets `429`
 until that work drains. Under `--no-auth` there is no credential distinguishing
 callers, so the per-caller bound collapses into the global one.
 
+## MCP server (`atomics mcp`)
+
+`atomics mcp` is a proxy over a running API server, not a second implementation
+of atomics. An MCP client is an LLM agent: a remote, automated caller. That is
+the API's trust position, not the CLI's, so the MCP process holds no provider,
+storage, or budget logic of its own. Every tool call is one authenticated HTTP
+request, and the agent inherits the API-key, per-eval dollar ceiling, and
+iteration/fixture bounds already documented above. See
+[docs/MCP_SERVER.md](docs/MCP_SERVER.md).
+
+- Serves on **stdio only**. The HTTP MCP transports would open a port that no
+  MCP-layer credential guards while this process holds an API key with spend
+  authority.
+- The tool surface is bounded by the API. `models`, `provider-test`, `sweep`,
+  `stress`, `soak`, and `probe` stay CLI-only until they are endpoints.
+- `submit_run` and `submit_eval` are annotated as not read-only. The four
+  remaining tools are annotated read-only.
+- On stdio, stdout is the JSON-RPC channel. Status and logs go to stderr.
+
 ## Logging
 
 Access logs record the correlation ID, a caller digest, method, path, status,

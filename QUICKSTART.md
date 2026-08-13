@@ -397,10 +397,12 @@ ATOMICS_OLLAMA_TIMEOUT=600   # big reasoning models on hard prompts
 ## 8. Running the test suite
 
 The `api` extra is required — the API and distributed test modules import
-FastAPI at module scope, so without it pytest errors during collection.
+FastAPI at module scope, so without it pytest errors during collection. The
+`mcp` extra is optional for collection (those tests skip without it) but CI
+installs it so the MCP surface is actually tested.
 
 ```bash
-uv sync --extra dev --extra api
+uv sync --extra dev --extra api --extra mcp
 uv run pytest -q                                   # full suite
 uv run pytest --cov=atomics --cov-report=term-missing
 ```
