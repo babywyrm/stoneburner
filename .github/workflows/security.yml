@@ -27,7 +27,7 @@ jobs:
       # --frozen so the audit reflects the committed lockfile rather than a
       # fresh resolution that might silently pick up an unpinned fix.
       - name: Sync dependencies
-        run: uv sync --extra dev --extra api --frozen
+        run: uv sync --extra dev --extra api --extra mcp --frozen
 
       # Audits the resolved environment. Running pip-audit against an exported
       # requirements file instead makes it build its own resolution venv, which

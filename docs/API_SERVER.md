@@ -1,6 +1,8 @@
 # API Server Mode
 
-Run atomics as a local HTTP service for CI/CD, dashboards, or remote scheduling.
+Run atomics as a local HTTP service for CI/CD, dashboards, remote scheduling,
+or as the backend for [`atomics mcp`](MCP_SERVER.md), which exposes the same
+authenticated surface to LLM agents.
 
 ## Install
 

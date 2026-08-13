@@ -58,7 +58,7 @@ Compare providers after running benchmarks: `uv run atomics compare` — see [do
 
 > **Optional extras:** Real RAG retrieval (`atomics rag-index`, `atomics rag-retrieval`, `atomics rag --index`) requires `uv sync --extra rag` to install `sqlite-vec` and `sentence-transformers`. Bedrock and OpenAI providers need `--extra bedrock` and `--extra openai` respectively.
 
-The API server mode requires `uv sync --extra api` to install FastAPI and uvicorn. Add `--with-dashboard` to serve a read-only web UI at `/dashboard`.
+The API server mode requires `uv sync --extra api` to install FastAPI and uvicorn. Add `--with-dashboard` to serve a read-only web UI at `/dashboard`. Serving atomics to LLM agents over MCP (`atomics mcp`) requires `uv sync --extra mcp`; it proxies a running API server and inherits that server's authentication and spend ceilings. See [docs/MCP_SERVER.md](docs/MCP_SERVER.md).
 
 ## Burn Tiers
 
@@ -205,10 +205,12 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the full layer map and contributor gu
 
 The `api` extra is required to run the suite: the API and distributed test
 modules import FastAPI at module scope, so without it pytest errors during
-collection instead of skipping.
+collection instead of skipping. The `mcp` extra is not required for collection
+— those tests skip if the SDK is missing — but CI installs it so the MCP
+surface is actually tested. Sync it locally too.
 
 ```bash
-uv sync --extra dev --extra api
+uv sync --extra dev --extra api --extra mcp
 uv run python -m pytest -v
 uv run python -m pytest --cov=atomics --cov-report=term-missing
 ```

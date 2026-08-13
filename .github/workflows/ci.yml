@@ -32,8 +32,12 @@ jobs:
       # tests/test_distributed_*.py import fastapi at module scope, so without
       # it collection errors out. The openai/bedrock/rag extras stay out — those
       # tests skip themselves cleanly and rag pulls the full torch stack.
+      #
+      # mcp is synced for the opposite reason to api: its tests *do* skip
+      # cleanly, so omitting it would be silently green while leaving the MCP
+      # tool surface and CLI untested. It is a small, pure-Python tree.
       - name: Sync dependencies
-        run: uv sync --extra dev --extra api
+        run: uv sync --extra dev --extra api --extra mcp
 
       # scripts/ included: it was outside this scope and quietly accumulated six
       # errors, and the release tooling now lives there.

@@ -30,6 +30,10 @@
   handler writes to stdout, and one warning through it would corrupt every
   session. See `docs/MCP_SERVER.md`.
 
+  CI and the contributor setup now sync `--extra mcp` so those tests run rather
+  than skip. Without the extra, the SDK-dependent tests skip cleanly instead of
+  erroring during collection.
+
 ## 0.17.0 (2026-08-09) — Structural consolidation: security command package and shared provider factory
 
 ### Changed

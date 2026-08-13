@@ -13,7 +13,7 @@ Requires **Python 3.11+** and [`uv`](https://docs.astral.sh/uv/getting-started/i
 ```bash
 git clone https://github.com/babywyrm/stoneburner.git
 cd stoneburner
-uv sync --extra dev --extra api
+uv sync --extra dev --extra api --extra mcp
 uv run atomics doctor      # checks providers, credentials, and state paths
 ```
 

@@ -27,6 +27,9 @@ class FakeServer:
 @pytest.fixture
 def started(monkeypatch):
     """Capture what the command builds without starting a real server."""
+    # The command imports the SDK lazily; this fixture is the first thing that
+    # needs it. Skip here so `--help` still runs without the extra.
+    pytest.importorskip("mcp")
     captured: dict = {}
 
     def build_server(client=None):
