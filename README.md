@@ -95,6 +95,7 @@ uv run atomics tiers                   # show all tier profiles
 | `atomics sweep` | Multi-model eval sweep |
 | `atomics doctor` | Installation health check |
 | `atomics server` | Run atomics as an HTTP API server |
+| `atomics mcp` | Expose atomics to LLM agents over MCP (proxies the API server) |
 
 Full reference: [docs/CLI_REFERENCE.md](docs/CLI_REFERENCE.md)
 
@@ -237,6 +238,7 @@ no credentials and no model, and touches no real database.
 | [ROADMAP.md](ROADMAP.md) | Priorities and future directions |
 | [docs/CLI_REFERENCE.md](docs/CLI_REFERENCE.md) | Full CLI command reference |
 | [docs/API_SERVER.md](docs/API_SERVER.md) | HTTP API server, authentication, distributed runs, dashboard |
+| [docs/MCP_SERVER.md](docs/MCP_SERVER.md) | MCP server for LLM agents, tool surface, trust model |
 | [docs/SECURITY_SUITES.md](docs/SECURITY_SUITES.md) | Security evaluation suites |
 | [docs/ADVERSARIAL_SUITES.md](docs/ADVERSARIAL_SUITES.md) | Adversarial fixture flow, scoring, and categories |
 | [docs/LOAD_TESTING.md](docs/LOAD_TESTING.md) | Stress, soak, scenario, capacity testing |

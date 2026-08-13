@@ -29,6 +29,11 @@ api = [
     "fastapi>=0.100.0",
     "uvicorn>=0.23.0",
 ]
+# The MCP server is a proxy over a running API server, so it needs no provider
+# or storage dependency of its own — httpx is already a core dependency.
+mcp = [
+    "mcp>=2.0.0",
+]
 dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.24.0",
