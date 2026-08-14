@@ -293,10 +293,10 @@ class TestTransparency:
         never surface.
         """
         inner = StubProvider()
-        inner._host = "http://192.168.1.156:11434"
+        inner._host = "http://203.0.113.12:11434"
         guarded = GuardedProvider(inner, EvalBudget().new_guard())
 
-        assert guarded._host == "http://192.168.1.156:11434"
+        assert guarded._host == "http://203.0.113.12:11434"
 
     def test_an_genuinely_missing_attribute_still_raises(self):
         guarded = GuardedProvider(StubProvider(), EvalBudget().new_guard())

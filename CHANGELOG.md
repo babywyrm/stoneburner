@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Changed
+- **The Qwen quickstart no longer hardcodes one machine's address.** Its curl and
+  `--ollama-host` examples pointed at a specific LAN IP, so nobody else could
+  paste them and have them work. They now read `$OLLAMA_HOST`, set once at the
+  top, matching how the other docs handle `$ATOMICS_API_KEY`. Test fixtures that
+  carried the same addresses moved to the RFC 5737 documentation range
+  (`203.0.113.0/24`), which reads unambiguously as an example. Invented addresses
+  inside eval fixtures — firewall-rule puzzles, incident-response scenarios, a C2
+  indicator — are deliberate content and unchanged.
+
 ### Added
 - **`atomics mcp` serves atomics to LLM agents over the Model Context
   Protocol**, as a proxy over a running `atomics server`. Six tools: `health`,

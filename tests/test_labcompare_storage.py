@@ -17,7 +17,7 @@ def test_save_and_get_labcompare_round_trip():
     repo.save_labcompare_result(
         comparison_run_id="cmp123",
         host_name="laptop",
-        host_url="http://192.168.1.205:11434",
+        host_url="http://203.0.113.11:11434",
         model="qwen3.6:27b",
         tokens_per_second=48.2,
         latency_ms=1200.0,
@@ -52,7 +52,7 @@ def test_save_labcompare_nullable_fields():
     repo.save_labcompare_result(
         comparison_run_id="cmp2",
         host_name="brainbox",
-        host_url="http://192.168.1.239:11434",
+        host_url="http://203.0.113.10:11434",
         model="qwen2.5:7b",
         tokens_per_second=120.0,
         latency_ms=300.0,

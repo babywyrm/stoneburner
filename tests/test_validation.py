@@ -9,7 +9,7 @@ from atomics.validation import sanitize_error, validate_endpoint_url
 
 class TestValidateEndpointUrl:
     def test_valid_http(self):
-        assert validate_endpoint_url("http://192.168.1.239:11434") == "http://192.168.1.239:11434"
+        assert validate_endpoint_url("http://203.0.113.10:11434") == "http://203.0.113.10:11434"
 
     def test_valid_https(self):
         assert validate_endpoint_url("https://api.example.com/v1/") == "https://api.example.com/v1"

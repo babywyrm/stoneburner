@@ -29,7 +29,7 @@ class TestNoAuthRequiresLoopback:
         assert is_loopback_host(host) is True
         ServerSettings(host=host, no_auth=True)
 
-    @pytest.mark.parametrize("host", ["0.0.0.0", "192.168.1.239", "::", "example.com"])
+    @pytest.mark.parametrize("host", ["0.0.0.0", "203.0.113.10", "::", "example.com"])
     def test_public_hosts_reject_no_auth(self, host):
         assert is_loopback_host(host) is False
         with pytest.raises(ValueError, match="no_auth cannot be combined"):

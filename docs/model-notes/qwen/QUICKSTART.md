@@ -61,9 +61,16 @@ short-context work. For long-form generation, use the dense 27B instead.
 
 ---
 
-## Getting started on brainbox
+## Getting started
 
-### Pull models (already done)
+Point `OLLAMA_HOST` at the machine running Ollama. Every command below reads it,
+so this is the only line to change:
+
+```bash
+export OLLAMA_HOST="http://your-ollama-host:11434"
+```
+
+### Pull models
 
 ```bash
 # Dense (slower, max quality)
@@ -77,7 +84,7 @@ ollama pull qwen3.6:35b-a3b
 
 ```bash
 # MoE — ~60 tok/s, response in seconds
-curl -s http://192.168.1.239:11434/api/generate -d '{
+curl -s "$OLLAMA_HOST/api/generate" -d '{
   "model": "qwen3.6:35b-a3b",
   "prompt": "Explain SSRF in 3 sentences.",
   "stream": false,
@@ -86,7 +93,7 @@ curl -s http://192.168.1.239:11434/api/generate -d '{
 }' | python3 -c "import sys,json; d=json.load(sys.stdin); print(f'{d[\"eval_count\"]} tok in {d[\"eval_duration\"]/1e9:.1f}s = {d[\"eval_count\"]/(d[\"eval_duration\"]/1e9):.0f} tok/s'); print(d['response'])"
 
 # Dense — ~7 tok/s, takes 30 seconds
-curl -s http://192.168.1.239:11434/api/generate -d '{
+curl -s "$OLLAMA_HOST/api/generate" -d '{
   "model": "qwen3.6:27b",
   "prompt": "Explain SSRF in 3 sentences.",
   "stream": false,
@@ -99,15 +106,15 @@ curl -s http://192.168.1.239:11434/api/generate -d '{
 
 ```bash
 # As the model under test (blue-team — where safety alignment helps)
-uv run atomics redblue -p ollama --ollama-host "http://192.168.1.239:11434" \
+uv run atomics redblue -p ollama --ollama-host "$OLLAMA_HOST" \
   -m qwen3.6:35b-a3b --judge-model qwen2.5:7b --mode blue
 
 # As the JUDGE (recommended — stricter, better differentiation)
-uv run atomics -v redblue -p ollama --ollama-host "http://192.168.1.239:11434" \
+uv run atomics -v redblue -p ollama --ollama-host "$OLLAMA_HOST" \
   -m qwen3:14b --judge-model qwen3.6:35b-a3b --mode red
 
 # Adversarial resistance test
-uv run atomics -v adversarial -p ollama --ollama-host "http://192.168.1.239:11434" \
+uv run atomics -v adversarial -p ollama --ollama-host "$OLLAMA_HOST" \
   -m qwen3.6:27b --judge-model qwen3.6:35b-a3b --category prompt_injection
 ```
 

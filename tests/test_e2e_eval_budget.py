@@ -193,7 +193,7 @@ def test_sweep_reaches_past_the_provider_interface_and_still_works():
     """
     from atomics.providers.ollama import OllamaProvider
 
-    inner = OllamaProvider(host="http://192.168.1.156:11434")
+    inner = OllamaProvider(host="http://203.0.113.12:11434")
     guarded = GuardedProvider(inner, EvalBudget().new_guard())
 
     assert guarded._host == inner._host
