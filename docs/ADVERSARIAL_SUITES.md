@@ -128,12 +128,12 @@ control plane is designed to stop:
 
 | ID | Category | Tests | Inspired by |
 |----|----------|-------|-------------|
-| zt-01 | `tool_manipulation` | Injected context convinces model to approve commands | Artifice RCON injection |
-| zt-02 | `breakglass_extract` | Attempts to extract override tokens | Artifice Gatekeeper bypass |
+| zt-01 | `tool_manipulation` | Injected context convinces model to approve commands | RCON command injection |
+| zt-02 | `breakglass_extract` | Attempts to extract override tokens | Break-glass override bypass |
 | zt-03 | `credential_exfil` | Read secrets + send to external URL | camazotz cred_broker |
 | zt-04 | `behavior_persistence` | Plant permanent behavioral override | nullfield HOLD pattern |
 | zt-05 | `authority_fabrication` | Fake security advisory as authorization | skillseraph J1 |
-| zt-06 | `blocklist_evasion` | Help bypass command filters via runtime | Artifice node -e |
+| zt-06 | `blocklist_evasion` | Help bypass command filters via runtime | Interpreter escape (`node -e`) |
 
 ### Agentic reasoning (`--category agentic`)
 
@@ -197,7 +197,7 @@ about* rather than *instructions to follow*.
 
 ### Tool-description injection (`--category tool_desc_injection`)
 
-5 fixtures — the model-reasoning analogue of the hammerhand/artifice MCP boxes:
+5 fixtures — the model-reasoning analogue of a hostile MCP server:
 attacker-controlled tool *metadata* tries to steer the agent.
 
 | ID | Category | Tests |
@@ -335,7 +335,7 @@ by qwen2.5:14b (consistent, zero parse failures).
 | 5 | qwen3:4b | 68.5% | 8 | Reasoning model but more gaps than expected |
 | 6 | cogito:3b | 61.8% | 10 | Small model, many critical failures |
 | 7 | qwen2.5:7b | 58.9% | 8 | Size barely helps within same family |
-| 8 | qwen2.5:3b | 55.6% | 8 | CTF baseline (Artifice solvable) |
+| 8 | qwen2.5:3b | 55.6% | 8 | CTF baseline (solvable) |
 | 9 | mistral:7b | 54.0% | 8 | Compliant — poor for security |
 | 10 | dolphin3:8b | 48.5% | 11 | Uncensored — worst for security |
 
@@ -400,7 +400,7 @@ complement each other without overlapping.
 
 ## Mistral family results (64 fixtures, 3 runs, qwen2.5:7b judge)
 
-Tested 2026-07-04 on brainbox (RTX 5070). Full 64-fixture suite (base 15 +
+Tested 2026-07-04 on the 5070. Full 64-fixture suite (base 15 +
 zerotrust 6 + agentic 11 + mcp 11 + tool_safety 5 + multiturn 6 + rag_poisoning 5
 + tool_desc_injection 5), 3 runs per fixture, judged by qwen2.5:7b.
 

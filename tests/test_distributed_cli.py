@@ -370,7 +370,7 @@ def test_worker_cli_passes_provider_model_host(monkeypatch):
         "--coordinator", "http://coordinator:8000",
         "--api-key", "worker-key",
         "--provider", "brain-gateway",
-        "--host", "http://nuc:30080",
+        "--host", "http://gpu-host:30080",
         "--model", "qwen3:4b",
         "--label", "box=239",
     ])
@@ -378,7 +378,7 @@ def test_worker_cli_passes_provider_model_host(monkeypatch):
     assert captured, "WorkerClient was not instantiated"
     kwargs = captured["kwargs"]
     assert kwargs["provider_name"] == "brain-gateway"
-    assert kwargs["host"] == "http://nuc:30080"
+    assert kwargs["host"] == "http://gpu-host:30080"
     assert kwargs["model"] == "qwen3:4b"
 
 

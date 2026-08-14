@@ -2,14 +2,14 @@
 
 ## Models tested
 
-| Variant | Params | Architecture | VRAM (Q4) | tok/s on brainbox | Notes |
+| Variant | Params | Architecture | VRAM (Q4) | tok/s on the 5070 | Notes |
 |---------|--------|-------------|-----------|-------------------|-------|
 | qwen3.6:27b | 27.8B | Dense | 11GB + 6GB CPU | 7 tok/s | CPU offload bottleneck |
 | qwen3.6:35b-a3b | 35B total / 3B active | MoE (256 experts) | ~11GB + CPU | **60 tok/s** | 8.5x faster than dense |
 
 ## Infrastructure
 
-- **Host:** brainbox (RTX 5070, 12GB VRAM, 48GB RAM, Ollama)
+- **Host:** local GPU host (RTX 5070, 12GB VRAM, 48GB RAM, Ollama)
 - **Quantization:** Q4_K_M (Ollama default)
 - **CPU offload:** Both variants exceed 12GB VRAM; layers spill to system RAM
 - **GPU utilization during inference:** ~18% (waiting on CPU)

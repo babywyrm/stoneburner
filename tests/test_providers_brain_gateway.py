@@ -28,15 +28,15 @@ def test_brain_gateway_defaults():
 
 def test_brain_gateway_custom_url():
     provider = BrainGatewayProvider(
-        url="http://nuc:30080", default_model="claude-haiku-4-5"
+        url="http://gpu-host:30080", default_model="claude-haiku-4-5"
     )
-    assert provider._url == "http://nuc:30080"
+    assert provider._url == "http://gpu-host:30080"
     assert provider._default_model == "claude-haiku-4-5"
 
 
 def test_brain_gateway_strips_trailing_slash():
-    provider = BrainGatewayProvider(url="http://nuc:30080/")
-    assert provider._url == "http://nuc:30080"
+    provider = BrainGatewayProvider(url="http://gpu-host:30080/")
+    assert provider._url == "http://gpu-host:30080"
 
 
 @pytest.mark.asyncio

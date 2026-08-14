@@ -18,7 +18,7 @@ from atomics.distributed.worker_client import WorkerClient
 @click.option("--heartbeat-interval", default=30, show_default=True, help="Heartbeat interval in seconds")
 @click.option("--provider", "-p", default="ollama", show_default=True, help="Provider used by this worker (ollama, brain-gateway, vllm, ...)")
 @click.option("--model", "-m", help="Model override for this worker")
-@click.option("--host", "-h", help="Provider host/URL override (e.g. http://nuc:30080)")
+@click.option("--host", "-h", help="Provider host/URL override (e.g. http://gpu-host:30080)")
 def worker(
     coordinator: str,
     api_key: str,

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# brain-swap — Hard-switch between Ollama and vLLM on a single-GPU brainbox.
+# brain-swap — Hard-switch between Ollama and vLLM on a single-GPU host.
 #
 # Handles the FULL lifecycle for ALL vLLM serving units (there are several —
 # one per box/model — plus the LiteLLM gateway), not a single hardcoded unit:

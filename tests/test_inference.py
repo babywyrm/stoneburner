@@ -69,7 +69,7 @@ def test_normalize_canonical_wins_over_legacy():
 def test_target_from_text_full():
     text = textwrap.dedent("""\
         INFERENCE_DIFFICULTY=easy
-        INFERENCE_POOL=brainbox
+        INFERENCE_POOL=local-gpu
         INFERENCE_BACKEND=ollama
         INFERENCE_URL=http://10.0.0.9:11434
         INFERENCE_MODEL=gemma3:4b
@@ -84,7 +84,7 @@ def test_target_from_text_full():
     assert t.think is False
     assert t.api_key == ""
     assert t.difficulty == "easy"
-    assert t.pool == "brainbox"
+    assert t.pool == "local-gpu"
     assert t.resolved_by == "control-plane-resolver"
 
 
@@ -170,7 +170,7 @@ def test_resolve_and_render_roundtrip():
                "model_compatibility": {"compatible": ["gemma3:4b"]}}
     profile = {"endpoint": {"host": "h", "port": 11434, "url": "http://h:11434"},
                "backend": "ollama"}
-    out = inference.resolve(machine, profile, "easy", "brainbox", "stoneburner")
+    out = inference.resolve(machine, profile, "easy", "local-gpu", "stoneburner")
     assert out["resolved"]["model"] == "gemma3:4b"
     assert out["backend_ok"] is True
     assert out["compat"][0] == "OK"
@@ -179,7 +179,7 @@ def test_resolve_and_render_roundtrip():
     assert t.backend == "ollama"
     assert t.model == "gemma3:4b"
     assert t.difficulty == "easy"
-    assert t.pool == "brainbox"
+    assert t.pool == "local-gpu"
 
 
 # ── provider_from_target (auto-load integration point) ────────────────────────

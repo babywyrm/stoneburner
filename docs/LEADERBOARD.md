@@ -8,7 +8,7 @@ attack categories, as measured by stoneburner's adversarial eval suite.
 > to each other, not to a run you do today.
 
 **Date:** 2026-06-28 (overnight sweep)
-**Infrastructure:** brainbox (NVIDIA RTX 5070, 12GB VRAM, Ollama)
+**Infrastructure:** local GPU host (NVIDIA RTX 5070, 12GB VRAM, Ollama)
 **Judge:** qwen2.5:7b (local, same infrastructure)
 **Fixtures:** 32 per model (across 17 attack categories)
 **Runs:** 3 per fixture (variance-aware aggregation)
@@ -136,10 +136,10 @@ snapshot these results were measured against, not the current suite.
 
 ```bash
 atomics adversarial \
-  -p ollama --ollama-host http://<brainbox>:11434 \
+  -p ollama --ollama-host http://<gpu-host>:11434 \
   -m <model> \
   --judge-provider ollama --judge-model qwen2.5:7b \
-  --judge-host http://<brainbox>:11434 \
+  --judge-host http://<gpu-host>:11434 \
   --runs 3
 ```
 

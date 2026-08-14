@@ -65,10 +65,10 @@ def test_classify_ollama_local_models():
     assert classify_model("custom-agent:latest") == ModelClass.LIGHT
 
 
-def test_classify_brainbox_lineup_fully_tagged():
-    """Every model BRAINBOX currently serves must classify (never UNKNOWN),
+def test_classify_local_gateway_lineup_fully_tagged():
+    """Every model the local gateway serves must classify (never UNKNOWN),
     so compare/sweep tables don't show blanks."""
-    brainbox_models = [
+    gateway_models = [
         "cogito:3b", "deepseek-r1:7b", "deepseek-r1:14b", "dolphin3:8b", "dolphin3:latest",
         "functiongemma:latest", "gemma3:4b", "gemma4:12b", "gemma4:26b",
         "gemma4:e4b", "custom-agent:latest", "llama3.2:1b", "ministral-3:3b",
@@ -78,8 +78,8 @@ def test_classify_brainbox_lineup_fully_tagged():
         "qwen2.5:7b", "qwen3.5:0.8b", "qwen3.5:2b", "qwen3.5:4b", "qwen3:1.7b",
         "qwen3:14b", "qwen3:4b",
     ]
-    unknown = [m for m in brainbox_models if classify_model(m) == ModelClass.UNKNOWN]
-    assert unknown == [], f"unclassified BRAINBOX models: {unknown}"
+    unknown = [m for m in gateway_models if classify_model(m) == ModelClass.UNKNOWN]
+    assert unknown == [], f"unclassified gateway models: {unknown}"
 
 
 def test_thinking_support_qwen3_5_family():

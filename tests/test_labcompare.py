@@ -14,10 +14,10 @@ def test_parse_single_host():
 def test_parse_multiple_hosts():
     specs = parse_host_specs([
         "laptop=http://203.0.113.11:11434",
-        "brainbox=http://203.0.113.10:11434",
+        "gpu-host=http://203.0.113.10:11434",
     ])
     assert len(specs) == 2
-    assert specs[1].name == "brainbox"
+    assert specs[1].name == "gpu-host"
 
 
 def test_parse_host_missing_equals_raises():
@@ -152,7 +152,7 @@ from atomics.labcompare import run_labcompare
 
 @pytest.mark.asyncio
 async def test_run_labcompare_two_hosts_throughput_and_quality():
-    hosts = [HostSpec("laptop", "http://a:11434"), HostSpec("brainbox", "http://b:11434")]
+    hosts = [HostSpec("laptop", "http://a:11434"), HostSpec("gpu-host", "http://b:11434")]
 
     def provider_factory(url):
         return _FakeProvider()
@@ -172,7 +172,7 @@ async def test_run_labcompare_two_hosts_throughput_and_quality():
         ps_fetcher_factory=ps_fetcher_factory,
     )
     assert len(cells) == 2
-    assert {c.host_name for c in cells} == {"laptop", "brainbox"}
+    assert {c.host_name for c in cells} == {"laptop", "gpu-host"}
     assert all(c.tokens_per_second == 80.0 for c in cells)
     assert all(c.quality_score == 0.9 for c in cells)
 

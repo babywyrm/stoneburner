@@ -13,7 +13,7 @@ Full command reference for `atomics`. See also [QUICKSTART.md](../QUICKSTART.md)
 | `atomics run --provider ollama` | Use local Ollama inference |
 | `atomics run --provider ollama --ollama-host http://gpu:11434` | Use remote Ollama |
 | `atomics run --provider brain-gateway` | Use camazotz brain-gateway |
-| `atomics run --provider brain-gateway --gateway-url http://nuc:30080` | Use remote brain-gateway |
+| `atomics run --provider brain-gateway --gateway-url http://gpu-host:30080` | Use remote brain-gateway |
 | `atomics run --thinking` | Enable thinking/reasoning mode for capable models |
 | `atomics run --no-thinking` | Force thinking off (A/B comparison) |
 | `atomics run --thinking-budget 20000` | Set max thinking tokens (provider-specific default otherwise) |
@@ -66,7 +66,7 @@ Full command reference for `atomics`. See also [QUICKSTART.md](../QUICKSTART.md)
 | `atomics redblue --runs 3 --json-out rb.json` | Variance-aware capability scoring + JSON export |
 | `atomics probe --probes-file probes.yaml` | Live ecosystem probe against real artifacts |
 | `atomics archreview --repo juice-shop --models qwen3.5:4b` | Security-architecture repo benchmark |
-| `atomics archreview --tier local --max-output-tokens 512` | Practical brainbox repo review |
+| `atomics archreview --tier local --max-output-tokens 512` | Practical local-GPU repo review |
 | `atomics archreview --tier wide --rounds 3` | Broader evidence pack with stability reporting |
 | `atomics archreview --tier expanded --rounds 3` | Largest pack for large-context/cloud backends |
 | `atomics multiturn` | Multi-turn conversation eval — context retention, coherence, contradiction detection, persona drift, long-context retention, tool-use chaining, and security scenarios |
@@ -217,7 +217,7 @@ Start a worker process that registers with the coordinator, heartbeats, polls fo
 | `--heartbeat-interval N` | Heartbeat interval in seconds (default: 30) |
 | `--provider`, `-p` | Provider used by this worker (default: `ollama`) |
 | `--model`, `-m` | Model override for this worker |
-| `--host`, `-h` | Provider host/URL override (e.g. `http://nuc:30080`) |
+| `--host`, `-h` | Provider host/URL override (e.g. `http://gpu-host:30080`) |
 
 `--host` applies to whichever provider the worker selected, including `vllm`.
 
@@ -231,8 +231,8 @@ rather than inlining it, keeping keys out of shell history.
 
 ```bash
 uv run atomics worker --label gpu=1
-uv run atomics worker --provider brain-gateway --host http://nuc:30080 --model qwen3:4b
-uv run atomics worker --provider vllm --host http://nuc:30080/v1 --label gpu=4090
+uv run atomics worker --provider brain-gateway --host http://gpu-host:30080 --model qwen3:4b
+uv run atomics worker --provider vllm --host http://gpu-host:30080/v1 --label gpu=4090
 ```
 
 ## atomics worker-npm

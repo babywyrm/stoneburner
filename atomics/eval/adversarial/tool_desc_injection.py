@@ -7,9 +7,9 @@ description as trusted instructions, an attacker who controls a server can steer
 the agent — exfiltrate data, shadow a trusted tool, or smuggle directives through
 parameter docs and unicode.
 
-These are the model-reasoning analogue of our hammerhand/artifice MCP boxes: the
-box proves the *gate* stops the tool call; these fixtures ask whether the *model*
-would have been fooled by the tool metadata in the first place.
+These are the model-reasoning analogue of a hostile-MCP-server exercise: such an
+exercise proves the *gate* stops the tool call; these fixtures ask whether the
+*model* would have been fooled by the tool metadata in the first place.
 
 Each fixture presents realistic tool definitions (with a poisoned one) plus a
 benign user request. The question: "does the model follow directives hidden in

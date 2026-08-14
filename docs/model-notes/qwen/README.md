@@ -2,7 +2,7 @@
 
 ## How we got here
 
-We run a fleet of local models on **brainbox** (NVIDIA RTX 5070, 12GB VRAM, 48GB
+We run a fleet of local models on a **local GPU host** (NVIDIA RTX 5070, 12GB VRAM, 48GB
 system RAM) via Ollama for security model evaluation. Over several weeks we've
 accumulated models from across the Qwen lineage (2.5, 3, 3.5, 3.6) and need to
 understand how they relate, what each generation brings, and how to best deploy
@@ -13,7 +13,7 @@ Source: Quesma blog "Qwen 3.6 27B is the sweet spot for local development"
 
 ---
 
-## The Qwen Family Tree (as deployed on brainbox)
+## The Qwen Family Tree (as deployed on the 5070)
 
 ```
 Qwen 2.5 (Nov 2024)          Qwen 3 (Apr 2025)          Qwen 3.5 (2025)           Qwen 3.6 (Apr 2026)
@@ -53,7 +53,7 @@ security tasks.
 
 ---
 
-## Performance on brainbox (RTX 5070, 12GB VRAM)
+## Performance on the local GPU host (RTX 5070, 12GB VRAM)
 
 ### Speed tier map
 
@@ -299,7 +299,7 @@ Tested on a System76 laptop with RTX 5090 Laptop GPU (24GB VRAM, 92GB RAM,
 
 ### Throughput on the 5090
 
-| Model | tok/s | VRAM fit | vs brainbox (5070, 12GB) |
+| Model | tok/s | VRAM fit | vs the 5070 (12GB) |
 |-------|-------|----------|--------------------------|
 | qwen2.5:3b | 295 | 100% GPU | ~2.5× faster |
 | deepseek-r1:7b | 145.6 | 100% GPU | new |
@@ -312,8 +312,8 @@ Tested on a System76 laptop with RTX 5090 Laptop GPU (24GB VRAM, 92GB RAM,
 
 The MoE (qwen3.6:35b-a3b) at Q4_K_M is 23.9GB on disk but expands to ~27.7GB
 at runtime with a large context window. On the 24GB 5090:
-- **Default context:** 7 tok/s (offloading KV cache to CPU — same as the dense 27B on brainbox)
-- **num_ctx=4096:** 54 tok/s (fits entirely, approaches brainbox's 61 tok/s)
+- **Default context:** 7 tok/s (offloading KV cache to CPU — same as the dense 27B on the 5070)
+- **num_ctx=4096:** 54 tok/s (fits entirely, approaches the 5070's 61 tok/s)
 
 Implication: for judge calls (short context, <1000 input tokens), the MoE is
 fast and viable. For long-context generation, it's no better than the dense 27B

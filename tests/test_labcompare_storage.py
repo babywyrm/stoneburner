@@ -51,7 +51,7 @@ def test_save_labcompare_nullable_fields():
     repo = _repo()
     repo.save_labcompare_result(
         comparison_run_id="cmp2",
-        host_name="brainbox",
+        host_name="gpu-host",
         host_url="http://203.0.113.10:11434",
         model="qwen2.5:7b",
         tokens_per_second=120.0,

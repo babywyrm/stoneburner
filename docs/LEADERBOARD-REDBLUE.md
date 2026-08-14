@@ -5,7 +5,7 @@ and defensive (blue) tasks. This complements the adversarial resistance
 leaderboard by answering: "Can this model actually do useful security reasoning?"
 
 **Date:** 2026-06-29 (overnight sweep)
-**Infrastructure:** brainbox (NVIDIA RTX 5070, 12GB VRAM, Ollama)
+**Infrastructure:** local GPU host (NVIDIA RTX 5070, 12GB VRAM, Ollama)
 **Judge:** qwen2.5:7b (local, same infrastructure)
 **Fixtures:** 10 per model (5 red + 5 blue)
 **Mode:** all (red + blue combined)
@@ -163,9 +163,9 @@ Tested on RTX 5090 Laptop GPU (24GB VRAM). Same eval fixtures, 6 models across
 
 ## Infrastructure notes
 
-- **Brainbox results (June 2026):** RTX 5070, 12GB VRAM, 48GB RAM, 20 models
+- **5070 results (June 2026):** RTX 5070, 12GB VRAM, 48GB RAM, 20 models
 - **5090 results (July 2026):** RTX 5090 Laptop, 24GB VRAM, 92GB RAM, 6 models
-- Models >12GB offload layers to CPU RAM on brainbox (slower but functional)
+- Models >12GB offload layers to CPU RAM on the 5070 (slower but functional)
 - Models up to 17GB fit in VRAM on the 5090 (qwen3.6:27b at 88% fit)
 - Judge (qwen2.5:7b) runs on same host — model-under-test unloaded before judge loads
 - Results stored in SQLite (`data/atomics.db`, table: `task_results`, suite: `redblue-*`)

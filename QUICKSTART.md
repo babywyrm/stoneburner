@@ -59,7 +59,7 @@ uv run atomics run --provider ollama -m qwen2.5:7b --ollama-host http://gpu:1143
 uv run atomics run --provider vllm --vllm-host http://gpu:8000/v1 -m qwen2.5:7b -n 5 -i 0
 
 # Internal brain-gateway
-uv run atomics run --provider brain-gateway --gateway-url http://nuc:30080 -n 5 -i 0
+uv run atomics run --provider brain-gateway --gateway-url http://gpu-host:30080 -n 5 -i 0
 ```
 
 > **Model-agnostic:** `-m`/`--model` accepts *any* model the backend serves —
