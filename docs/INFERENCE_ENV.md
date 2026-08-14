@@ -101,7 +101,7 @@ Canonical `INFERENCE_*` keys always win over legacy keys when both are present.
 ```sh
 # INTENT
 INFERENCE_DIFFICULTY=easy
-INFERENCE_POOL=gpu-host-b
+INFERENCE_POOL=local-gpu
 
 # RESOLVED
 INFERENCE_BACKEND=ollama
