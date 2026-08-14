@@ -23,6 +23,7 @@ from atomics.commands.common import (
     integrity_exit_code,
     write_summary_json,
 )
+from atomics.commands.suite_run import finalize_evaluation_run, suite_run
 from atomics.config import load_settings
 from atomics.eval.budget import share_budget
 from atomics.storage import MetricsRepository
@@ -127,7 +128,6 @@ def refusal(
     current_index = -1
     run_id = uuid.uuid4().hex[:12]
     repository: MetricsRepository | None = None
-    parent_created = False
 
     def on_start(fixture: RefusalFixture) -> None:
         nonlocal current_index
@@ -168,17 +168,15 @@ def refusal(
                 )
             )
 
-    failure: Exception | None = None
-    try:
-        if save:
-            repository = MetricsRepository(settings.db_path)
-            repository.create_run(
-                run_id,
-                tier="refusal",
-                provider=provider_name,
-                model=attributed_model,
-            )
-            parent_created = True
+    with suite_run(
+        suite="refusal",
+        db_path=settings.db_path,
+        save=save,
+        finalize=finalize_evaluation_run,
+        failure_prefix="Refusal evaluation failed",
+    ) as run:
+        run.begin(run_id, provider=provider_name, model=attributed_model)
+        repository = run.repository
         summary = asyncio.run(
             run_refusal(
                 provider,
@@ -207,28 +205,6 @@ def refusal(
 
         if integrity_exit_code(summary.integrity, allow_partial=allow_partial):
             raise click.exceptions.Exit(1)
-    except Exception as exc:
-        failure = exc
-    finally:
-        if repository is not None:
-            if parent_created:
-                try:
-                    repository.complete_evaluation_run(run_id)
-                except Exception as exc:
-                    if failure is None:
-                        failure = exc
-            try:
-                repository.close()
-            except Exception as exc:
-                if failure is None:
-                    failure = exc
-
-    if failure is not None:
-        if isinstance(failure, (click.ClickException, click.exceptions.Exit)):
-            raise failure
-        raise click.ClickException(
-            f"Refusal evaluation failed: {sanitize_error(failure)}"
-        ) from failure
 
 def _render_refusal_summary(
     console: Console,

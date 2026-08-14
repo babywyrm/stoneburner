@@ -2,6 +2,49 @@
 
 ## Unreleased
 
+### Fixed
+- **A failed run no longer leaks its database connection or leaves an
+  unfinishable row behind.** Seven commands — `redblue`, `multiturn`, `eval`,
+  `rag`, `codegen`, `probe`, and `archreview` — finalized the parent `runs` row
+  and closed the repository as the last statements of the happy path, so anything
+  that raised first (a provider timeout, a judge error, an interrupt) skipped
+  both. The row kept a null `completed_at` forever, which `atomics report` reads
+  as a run still in progress, and the SQLite connection was released only when the
+  process exited.
+
+  `toolcall` was a worse case: it never finalized its parent at all, on every
+  successful run rather than only on failures, so each of its runs read as
+  perpetually in progress and its parent aggregates stayed empty.
+
+  None of these symptoms is visible in a passing run, which is why the CLI
+  persistence paths carried no coverage beyond `--help`. They are now asserted
+  directly — the finalize and the close, rather than inferred from a successful
+  invocation — across all eleven recording commands.
+
+  The fix is `commands/suite_run.py`, one lifetime they all share. It had drifted
+  into three idioms: `refusal` and `codereview` used `try/finally`, `adversarial`
+  used `ctx.call_on_close` plus an explicit fail-closed finalize, and the rest
+  used nothing. The shared version keeps the best property of the `adversarial`
+  idiom — a cleanup problem that surfaces behind an existing failure is logged
+  rather than raised, so it cannot hide the failure that actually caused it — and
+  applies it everywhere. Cleanup failures now name the operation and the run
+  (`Failed to finalize refusal run a1b2c3: ...`) rather than restating the
+  command, so a finalize problem is distinguishable from the run itself failing.
+
+  Commands differ only in which table their parent aggregates from, expressed as
+  `finalize_task_run`, `finalize_evaluation_run`, `finalize_adversarial_run`,
+  `finalize_probe_run`, or `finalize_archreview_run`. These are functions rather
+  than unbound `MetricsRepository` methods on purpose: an unbound reference calls
+  the base class regardless of the instance, silently bypassing any subclass or
+  wrapper.
+
+- **`--json-out` failures are reported instead of crashing.** The commands above
+  hand-rolled their JSON export with a bare `json.dump`, in several cases after
+  the database connection had already been closed, so an unwritable path produced
+  a raw traceback. They now go through the existing `write_summary_json`, which
+  reports the problem as a sanitized CLI error, and they do it inside the managed
+  lifetime so the run is still finalized.
+
 ### Changed
 - **The Qwen quickstart no longer hardcodes one machine's address.** Its curl and
   `--ollama-host` examples pointed at a specific LAN IP, so nobody else could

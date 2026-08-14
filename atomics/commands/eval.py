@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import sys
+import uuid
+from pathlib import Path
 
 import click
 from rich.console import Console
@@ -15,7 +17,9 @@ from atomics.commands.common import (
     budget_option,
     eval_budget_from,
     setup_logging,
+    write_summary_json,
 )
+from atomics.commands.suite_run import finalize_task_run, suite_run
 from atomics.config import load_settings
 from atomics.eval.budget import share_budget
 
@@ -159,11 +163,6 @@ def eval(
         f"Fixtures: [bold]{fixture_count}[/bold] | Results saved: [bold]{'yes' if save_results else 'no'}[/bold]\n"
     )
 
-    repo = None
-    if save_results:
-        from atomics.storage.repository import MetricsRepository
-        repo = MetricsRepository(settings.db_path)
-
     from atomics.eval.runner import run_eval
 
     result_table = Table(title="Eval Results", show_lines=True)
@@ -176,101 +175,104 @@ def eval(
     result_table.add_column("Cost", justify="right", style="yellow")
     result_table.add_column("Rationale", no_wrap=False, max_width=40, style="dim")
 
-    # Pre-allocate a run_id and create the parent row so FK constraints are satisfied
-    import uuid as _uuid
-    eval_run_id = _uuid.uuid4().hex[:12]
+    eval_run_id = uuid.uuid4().hex[:12]
     if provider_name == "ollama":
         effective_model = model or settings.ollama_model
     elif provider_name == "vllm":
         effective_model = model or settings.vllm_model
     else:
         effective_model = model or settings.default_model
-    if repo:
-        repo.create_run(
+
+    with suite_run(
+        suite="eval",
+        db_path=settings.db_path,
+        save=save_results,
+        finalize=finalize_task_run,
+        failure_prefix="Eval run failed",
+    ) as run:
+        # The parent row has to exist before on_done writes its first fixture:
+        # task_results carries a foreign key to runs.
+        run.begin(
             eval_run_id,
-            tier="eval",
             provider=provider_name,
             model=effective_model,
             trigger="eval",
         )
+        repo = run.repository
 
-    def on_done(fr) -> None:
-        judge = fr.judge
-        tr = fr.task_result
-        if tr.status.value == "failed":
-            quality = "[red]FAIL[/red]"
-            rationale = tr.error_message[:80]
-        elif judge and not judge.parse_failed:
-            quality = f"{judge.score * 100:.0f}%"
-            rationale = judge.rationale[:80]
-        else:
-            quality = "[yellow]?[/yellow]"
-            rationale = "judge parse failed"
-        result_table.add_row(
-            fr.fixture.id,
-            fr.fixture.complexity.value,
-            fr.fixture.prompt[:60] + "…",
-            quality,
-            f"{tr.latency_ms:.0f}ms",
-            str(tr.total_tokens),
-            f"${tr.estimated_cost_usd:.6f}",
-            rationale,
-        )
+        def on_done(fr) -> None:
+            judge = fr.judge
+            tr = fr.task_result
+            if tr.status.value == "failed":
+                quality = "[red]FAIL[/red]"
+                rationale = tr.error_message[:80]
+            elif judge and not judge.parse_failed:
+                quality = f"{judge.score * 100:.0f}%"
+                rationale = judge.rationale[:80]
+            else:
+                quality = "[yellow]?[/yellow]"
+                rationale = "judge parse failed"
+            result_table.add_row(
+                fr.fixture.id,
+                fr.fixture.complexity.value,
+                fr.fixture.prompt[:60] + "…",
+                quality,
+                f"{tr.latency_ms:.0f}ms",
+                str(tr.total_tokens),
+                f"${tr.estimated_cost_usd:.6f}",
+                rationale,
+            )
+            if repo:
+                repo.save_task_result(tr)
+
+        # Auto-detect thinking if not explicitly set
+        eff_thinking = thinking_flag
+        if eff_thinking is None and model:
+            from atomics.model_classes import supports_thinking
+            if supports_thinking(model):
+                eff_thinking = True
+
+        summary = asyncio.run(run_eval(
+            test_provider,
+            judge_provider=judge_provider,
+            model=model,
+            judge_model=judge_model,
+            run_id=eval_run_id,
+            on_fixture_done=on_done,
+            thinking=eff_thinking,
+            thinking_budget=thinking_budget,
+            extra_judges=extra_judge_pairs,
+            fixtures=selected_fixtures,
+        ))
+
+        console.print(result_table)
+
+        overall = summary.overall_accuracy
+        quality_str = f"{overall * 100:.1f}%" if overall is not None else "—"
+        value_str = f"{summary.value_score:.1f}" if summary.value_score is not None else "—"
+
+        summary_table = Table(title="Eval Summary", show_lines=True)
+        summary_table.add_column("Metric", style="dim")
+        summary_table.add_column("Value", style="bold")
+        summary_table.add_row("Provider", provider_name)
+        summary_table.add_row("Model", model or "default")
+        summary_table.add_row("Overall Quality", f"[green]{quality_str}[/green]")
+        summary_table.add_row("Value Score", f"[cyan]{value_str}[/cyan]")
+        summary_table.add_row("Avg Latency", f"{summary.avg_latency_ms:.0f}ms")
+        summary_table.add_row("Total Tokens", f"{summary.total_tokens:,}")
+        summary_table.add_row("Total Cost", f"${summary.total_cost_usd:.6f}")
+        summary_table.add_row("Fixtures Run", str(len(summary.fixture_results)))
+        pf_rate = summary.parse_failure_rate
+        pf_style = "green" if pf_rate == 0 else "yellow" if pf_rate < 0.1 else "red"
+        summary_table.add_row("Judge Parse Failures", f"[{pf_style}]{pf_rate * 100:.1f}%[/{pf_style}]")
+        console.print(summary_table)
+
         if repo:
-            repo.save_task_result(tr)
+            console.print("\n[dim]Results saved to database. Run [bold]atomics compare --narrative[/bold] after evaluating multiple providers.[/dim]")
 
-    # Auto-detect thinking if not explicitly set
-    eff_thinking = thinking_flag
-    if eff_thinking is None and model:
-        from atomics.model_classes import supports_thinking
-        if supports_thinking(model):
-            eff_thinking = True
-
-    summary = asyncio.run(run_eval(
-        test_provider,
-        judge_provider=judge_provider,
-        model=model,
-        judge_model=judge_model,
-        run_id=eval_run_id,
-        on_fixture_done=on_done,
-        thinking=eff_thinking,
-        thinking_budget=thinking_budget,
-        extra_judges=extra_judge_pairs,
-        fixtures=selected_fixtures,
-    ))
-
-    console.print(result_table)
-
-    overall = summary.overall_accuracy
-    quality_str = f"{overall * 100:.1f}%" if overall is not None else "—"
-    value_str = f"{summary.value_score:.1f}" if summary.value_score is not None else "—"
-
-    summary_table = Table(title="Eval Summary", show_lines=True)
-    summary_table.add_column("Metric", style="dim")
-    summary_table.add_column("Value", style="bold")
-    summary_table.add_row("Provider", provider_name)
-    summary_table.add_row("Model", model or "default")
-    summary_table.add_row("Overall Quality", f"[green]{quality_str}[/green]")
-    summary_table.add_row("Value Score", f"[cyan]{value_str}[/cyan]")
-    summary_table.add_row("Avg Latency", f"{summary.avg_latency_ms:.0f}ms")
-    summary_table.add_row("Total Tokens", f"{summary.total_tokens:,}")
-    summary_table.add_row("Total Cost", f"${summary.total_cost_usd:.6f}")
-    summary_table.add_row("Fixtures Run", str(len(summary.fixture_results)))
-    pf_rate = summary.parse_failure_rate
-    pf_style = "green" if pf_rate == 0 else "yellow" if pf_rate < 0.1 else "red"
-    summary_table.add_row("Judge Parse Failures", f"[{pf_style}]{pf_rate * 100:.1f}%[/{pf_style}]")
-    console.print(summary_table)
-
-    if repo:
-        repo.complete_run(eval_run_id)
-        repo.close()
-        console.print("\n[dim]Results saved to database. Run [bold]atomics compare --narrative[/bold] after evaluating multiple providers.[/dim]")
-
-    if json_out:
-        import json as _json
-        with open(json_out, "w", encoding="utf-8") as fh:
-            _json.dump(summary.to_dict(), fh, indent=2)
-        console.print(f"[dim]Wrote JSON results to {json_out}[/dim]")
+        if json_out:
+            write_summary_json(summary, Path(json_out))
+            console.print(f"[dim]Wrote JSON results to {json_out}[/dim]")
 
 @click.command("advisor")
 @click.option("--min-quality", type=float, default=0.8, show_default=True,

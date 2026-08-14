@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import TYPE_CHECKING
+import uuid
 
 import click
 from rich.console import Console
@@ -19,11 +19,9 @@ from atomics.commands.common import (
     budget_option,
     eval_budget_from,
 )
+from atomics.commands.suite_run import SuiteRun, finalize_adversarial_run
 from atomics.config import load_settings
 from atomics.eval.budget import share_budget
-
-if TYPE_CHECKING:
-    pass
 
 _KNOWN_PROVIDERS = {"claude", "bedrock", "openai", "ollama", "vllm", "brain-gateway"}
 
@@ -164,57 +162,35 @@ def adversarial(
     )
 
     ctx = click.get_current_context()
-    created_run_ids: list[str] = []
-    repo = None
-    if save_results:
-        from atomics.storage.repository import MetricsRepository
-        from atomics.validation import sanitize_error
-
-        repository = MetricsRepository(settings.db_path)
-        repo = repository
-        repository_cleaned = False
-
-        def finalize_repository(*, fail_closed: bool = False) -> None:
-            nonlocal repository_cleaned
-            if repository_cleaned:
-                return
-            repository_cleaned = True
-            failures: list[str] = []
-            for created_run_id in created_run_ids:
-                try:
-                    repository.complete_adversarial_run(created_run_id)
-                except Exception as exc:
-                    failures.append(
-                        f"Failed to finalize adversarial run {created_run_id}: "
-                        f"{sanitize_error(exc)}"
-                    )
-            try:
-                repository.close()
-            except Exception as exc:
-                failures.append(
-                    "Failed to close adversarial repository: "
-                    f"{sanitize_error(exc)}"
-                )
-            if failures:
-                message = "; ".join(failures)
-                if fail_closed:
-                    raise click.ClickException(message)
-                logging.getLogger("atomics.cli").error(message)
-
-        ctx.call_on_close(finalize_repository)
-
-    run_id = __import__("uuid").uuid4().hex[:12]
+    # Not the `suite_run` context manager: this command's body is long enough that
+    # the explicit form reads better, and it wants the same two-stage cleanup it
+    # has always had. `call_on_close` is the safety net for an early exit and only
+    # logs, since raising while another exception unwinds would hide it; the
+    # explicit call at the end is what turns a cleanup problem into a failed run.
+    run = SuiteRun(
+        suite="adversarial",
+        db_path=settings.db_path,
+        save=save_results,
+        finalize=finalize_adversarial_run,
+    )
+    run.open()
+    repo = run.repository
     if repo:
-        # Parent run row so the adversarial run is listable/queryable alongside
-        # other suites; the results themselves land in adversarial_results.
-        repo.create_run(
-            run_id,
-            tier="adversarial",
-            provider=actual_provider_name,
-            model=effective_model,
-            trigger="manual",
-        )
-        created_run_ids.append(run_id)
+        def log_unfinished_cleanup() -> None:
+            failure = run.cleanup()
+            if failure is not None:
+                logging.getLogger("atomics.cli").error(str(failure))
+
+        ctx.call_on_close(log_unfinished_cleanup)
+
+    run_id = uuid.uuid4().hex[:12]
+    # Parent run row so the adversarial run is listable/queryable alongside
+    # other suites; the results themselves land in adversarial_results.
+    run.begin(
+        run_id,
+        provider=actual_provider_name,
+        model=effective_model,
+    )
 
     # Actual fixture count (may be filtered by --category) via the single source
     # of truth so header/progress/run all agree.
@@ -350,16 +326,12 @@ def adversarial(
             f"\n[bold]Compare run[/bold] — model B: "
             f"[cyan]{actual_cmp_provider_name}[/cyan] ({effective_cmp_model})\n"
         )
-        cmp_run_id = __import__("uuid").uuid4().hex[:12]
-        if repo:
-            repo.create_run(
-                cmp_run_id,
-                tier="adversarial",
-                provider=actual_cmp_provider_name,
-                model=effective_cmp_model,
-                trigger="manual",
-            )
-            created_run_ids.append(cmp_run_id)
+        cmp_run_id = uuid.uuid4().hex[:12]
+        run.begin(
+            cmp_run_id,
+            provider=actual_cmp_provider_name,
+            model=effective_cmp_model,
+        )
         def on_compare_done(fr):
             if repo:
                 repo.save_adversarial_result(
@@ -470,8 +442,9 @@ def adversarial(
             if not allow_partial:
                 exit_code = 1
 
-    if repo:
-        finalize_repository(fail_closed=True)
+    cleanup_failure = run.cleanup()
+    if cleanup_failure is not None:
+        raise cleanup_failure
 
     if exit_code:
         ctx.exit(exit_code)
