@@ -107,14 +107,10 @@ def test_export_toolcall_returns_saved_rows(tmp_path):
     assert "dangerous_call" in result.output
 
 
-def test_saving_creates_the_parent_run_row(tmp_path):
-    """evaluation_results has a foreign key to runs, so without the parent row
-    every --save run raises IntegrityError on its first fixture."""
-    from atomics.commands.toolcall import _save
+def _one_fixture_summary():
     from atomics.eval.toolcall.runner import ToolCallSummary
-    from atomics.storage.repository import MetricsRepository
 
-    summary = ToolCallSummary(
+    return ToolCallSummary(
         run_id="r-save",
         provider="ollama",
         model="test-model",
@@ -134,8 +130,15 @@ def test_saving_creates_the_parent_run_row(tmp_path):
         }],
     )
 
+
+def test_saving_creates_the_parent_run_row(tmp_path):
+    """evaluation_results has a foreign key to runs, so without the parent row
+    every --save run raises IntegrityError on its first fixture."""
+    from atomics.commands.toolcall import _save
+    from atomics.storage.repository import MetricsRepository
+
     db = tmp_path / "save.db"
-    _save(summary, db_path=db)
+    _save(_one_fixture_summary(), db_path=db)
 
     repo = MetricsRepository(db)
     rows = repo.get_evaluation_results(suite="toolcall")
@@ -144,3 +147,26 @@ def test_saving_creates_the_parent_run_row(tmp_path):
     # Compliance is recorded as 1.0: the tool channel is deterministic, so this
     # is the outcome rather than a judged score.
     assert rows[0]["score"] == 1.0
+
+
+def test_saving_finalizes_the_parent_run_row(tmp_path):
+    """Writing the fixture rows is only half the job.
+
+    A parent left without `completed_at` reads as a run still in progress for as
+    long as the database exists, and its rolled-up counts stay empty.
+    """
+    from atomics.commands.toolcall import _save
+    from atomics.storage.repository import MetricsRepository
+
+    db = tmp_path / "finalize.db"
+    _save(_one_fixture_summary(), db_path=db)
+
+    repo = MetricsRepository(db)
+    try:
+        parent = next(
+            run for run in repo.get_recent_runs() if run["run_id"] == "r-save"
+        )
+    finally:
+        repo.close()
+    assert parent["completed_at"] is not None
+    assert parent["total_tasks"] == 1

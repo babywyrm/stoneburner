@@ -230,7 +230,7 @@ New code should follow the target column, not copy whichever suite you opened fi
 | Item list field | `fixture_results` | adversarial/refusal/codereview use it; redblue/probe expose it as an alias for `results` |
 | Multi-pass arg | `runs` | archreview accepts `--runs` as an alias for `--rounds` |
 | JSON export | `Summary.to_dict()` + `--json-out` | done — every suite runner |
-| Parent run row | `create_run()` + `complete_*_run()` | done — all suites create + finalize a run row |
+| Parent run row | `commands/suite_run.py` | done — every recording command owns its repository through the shared lifetime, so the row is finalized and the connection closed even when the run raises |
 | Stats helpers | one shared `stats` module | done — `atomics/stats.py` |
 | Provider build | `providers.factory.make_provider()` | done — single factory, CLI wraps it |
 | CLI modules | one module per command under `commands/` | partial — everything is out of `cli.py`, but the larger `commands/<group>.py` modules still hold several commands each |

@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import sys
-from typing import TYPE_CHECKING
+import uuid
+from pathlib import Path
 
 import click
 from rich.console import Console
@@ -16,12 +17,12 @@ from atomics.commands.common import (
     budget_option,
     eval_budget_from,
     setup_logging,
+    write_summary_json,
 )
+from atomics.commands.suite_run import finalize_task_run, suite_run
 from atomics.config import load_settings
 from atomics.eval.budget import share_budget
 
-if TYPE_CHECKING:
-    pass
 
 @click.command("multiturn")
 @click.option("--provider", "-p", "provider_name", type=PROVIDER_CHOICES, default="ollama", show_default=True)
@@ -94,104 +95,102 @@ def multiturn(
         f"Total turns: [bold]{total_turns}[/bold]\n"
     )
 
-    repo = None
-    if save_results:
-        from atomics.storage.repository import MetricsRepository
-        repo = MetricsRepository(settings.db_path)
-
-    import uuid as _uuid
-    mt_run_id = _uuid.uuid4().hex[:12]
+    mt_run_id = uuid.uuid4().hex[:12]
     if provider_name == "ollama":
         effective_model = model or settings.ollama_model
     elif provider_name == "vllm":
         effective_model = model or settings.vllm_model
     else:
         effective_model = model or settings.default_model
-    if repo:
-        repo.create_run(
-            mt_run_id, tier="multiturn", provider=provider_name,
-            model=effective_model, trigger="eval",
+
+    with suite_run(
+        suite="multiturn",
+        db_path=settings.db_path,
+        save=save_results,
+        finalize=finalize_task_run,
+        failure_prefix="Multi-turn evaluation failed",
+    ) as run:
+        run.begin(
+            mt_run_id,
+            provider=provider_name,
+            model=effective_model,
+            trigger="eval",
         )
+        repo = run.repository
 
-    result_table = Table(title="Multi-Turn Eval Results", show_lines=True)
-    result_table.add_column("ID", style="dim")
-    result_table.add_column("Turns", justify="right")
-    result_table.add_column("Turn Avg", justify="right", style="green")
-    result_table.add_column("Retain", justify="right")
-    result_table.add_column("Consist", justify="right")
-    result_table.add_column("Instruct", justify="right")
-    result_table.add_column("Overall", justify="right", style="green bold")
-    result_table.add_column("Latency", justify="right")
-    result_table.add_column("Cost", justify="right", style="yellow")
+        result_table = Table(title="Multi-Turn Eval Results", show_lines=True)
+        result_table.add_column("ID", style="dim")
+        result_table.add_column("Turns", justify="right")
+        result_table.add_column("Turn Avg", justify="right", style="green")
+        result_table.add_column("Retain", justify="right")
+        result_table.add_column("Consist", justify="right")
+        result_table.add_column("Instruct", justify="right")
+        result_table.add_column("Overall", justify="right", style="green bold")
+        result_table.add_column("Latency", justify="right")
+        result_table.add_column("Cost", justify="right", style="yellow")
 
-    def on_done(cr: ConversationResult) -> None:
-        turn_scores = [t.judge.score for t in cr.turn_results if t.judge and not t.judge.parse_failed]
-        turn_avg = f"{sum(turn_scores)/len(turn_scores)*100:.0f}%" if turn_scores else "—"
-        cj = cr.conversation_judge
-        if cj and not cj.parse_failed:
-            ret = str(cj.retention)
-            con = str(cj.consistency)
-            ins = str(cj.instruction)
-        else:
-            ret = con = ins = "—"
-        overall = f"{cr.overall_score*100:.0f}%" if cr.overall_score is not None else "—"
+        def on_done(cr: ConversationResult) -> None:
+            turn_scores = [t.judge.score for t in cr.turn_results if t.judge and not t.judge.parse_failed]
+            turn_avg = f"{sum(turn_scores)/len(turn_scores)*100:.0f}%" if turn_scores else "—"
+            cj = cr.conversation_judge
+            if cj and not cj.parse_failed:
+                ret = str(cj.retention)
+                con = str(cj.consistency)
+                ins = str(cj.instruction)
+            else:
+                ret = con = ins = "—"
+            overall = f"{cr.overall_score*100:.0f}%" if cr.overall_score is not None else "—"
 
-        result_table.add_row(
-            cr.fixture.id, str(len(cr.turn_results)),
-            turn_avg, ret, con, ins, overall,
-            f"{cr.task_result.latency_ms:.0f}ms",
-            f"${cr.task_result.estimated_cost_usd:.6f}",
-        )
-        if repo:
-            repo.save_task_result(cr.task_result, suite="multiturn")
+            result_table.add_row(
+                cr.fixture.id, str(len(cr.turn_results)),
+                turn_avg, ret, con, ins, overall,
+                f"{cr.task_result.latency_ms:.0f}ms",
+                f"${cr.task_result.estimated_cost_usd:.6f}",
+            )
+            if repo:
+                repo.save_task_result(cr.task_result, suite="multiturn")
 
-    eff_thinking = thinking_flag
-    if eff_thinking is None and model:
-        from atomics.model_classes import supports_thinking
-        if supports_thinking(model):
-            eff_thinking = True
+        eff_thinking = thinking_flag
+        if eff_thinking is None and model:
+            from atomics.model_classes import supports_thinking
+            if supports_thinking(model):
+                eff_thinking = True
 
-    summary = asyncio.run(run_multiturn(
-        test_provider,
-        judge_provider=judge_provider,
-        model=model,
-        judge_model=judge_model,
-        run_id=mt_run_id,
-        on_conversation_done=on_done,
-        thinking=eff_thinking,
-        thinking_budget=thinking_budget,
-        fixtures=selected_fixtures,
-    ))
+        summary = asyncio.run(run_multiturn(
+            test_provider,
+            judge_provider=judge_provider,
+            model=model,
+            judge_model=judge_model,
+            run_id=mt_run_id,
+            on_conversation_done=on_done,
+            thinking=eff_thinking,
+            thinking_budget=thinking_budget,
+            fixtures=selected_fixtures,
+        ))
 
-    console.print(result_table)
+        console.print(result_table)
 
-    summary_table = Table(title="Multi-Turn Summary", show_lines=True)
-    summary_table.add_column("Metric", style="dim")
-    summary_table.add_column("Value", style="bold")
-    summary_table.add_row("Provider", provider_name)
-    summary_table.add_row("Model", model or "default")
-    ts = summary.avg_turn_score
-    summary_table.add_row("Avg Turn Score", f"[green]{ts*100:.1f}%[/green]" if ts else "—")
-    cs = summary.avg_conversation_score
-    summary_table.add_row("Avg Conversation Score", f"[green]{cs*100:.1f}%[/green]" if cs else "—")
-    ret = summary.avg_retention
-    summary_table.add_row("Avg Retention", f"{ret*100:.1f}%" if ret else "—")
-    con = summary.avg_consistency
-    summary_table.add_row("Avg Consistency", f"{con*100:.1f}%" if con else "—")
-    summary_table.add_row("Total Turns", str(summary.total_turns))
-    summary_table.add_row("Total Tokens", f"{summary.total_tokens:,}")
-    summary_table.add_row("Total Cost", f"${summary.total_cost_usd:.6f}")
-    console.print(summary_table)
+        summary_table = Table(title="Multi-Turn Summary", show_lines=True)
+        summary_table.add_column("Metric", style="dim")
+        summary_table.add_column("Value", style="bold")
+        summary_table.add_row("Provider", provider_name)
+        summary_table.add_row("Model", model or "default")
+        ts = summary.avg_turn_score
+        summary_table.add_row("Avg Turn Score", f"[green]{ts*100:.1f}%[/green]" if ts else "—")
+        cs = summary.avg_conversation_score
+        summary_table.add_row("Avg Conversation Score", f"[green]{cs*100:.1f}%[/green]" if cs else "—")
+        ret = summary.avg_retention
+        summary_table.add_row("Avg Retention", f"{ret*100:.1f}%" if ret else "—")
+        con = summary.avg_consistency
+        summary_table.add_row("Avg Consistency", f"{con*100:.1f}%" if con else "—")
+        summary_table.add_row("Total Turns", str(summary.total_turns))
+        summary_table.add_row("Total Tokens", f"{summary.total_tokens:,}")
+        summary_table.add_row("Total Cost", f"${summary.total_cost_usd:.6f}")
+        console.print(summary_table)
 
-    if repo:
-        repo.complete_run(mt_run_id)
-        repo.close()
-
-    if json_out:
-        import json as _json
-        with open(json_out, "w", encoding="utf-8") as fh:
-            _json.dump(summary.to_dict(), fh, indent=2)
-        console.print(f"[dim]Wrote JSON results to {json_out}[/dim]")
+        if json_out:
+            write_summary_json(summary, Path(json_out))
+            console.print(f"[dim]Wrote JSON results to {json_out}[/dim]")
 
 # ── atomics rag ───────────────────────────────────────────────────────────────
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import sys
+import uuid
 from pathlib import Path
 
 import click
@@ -17,6 +18,13 @@ from atomics.commands.common import (
     budget_option,
     eval_budget_from,
     setup_logging,
+    write_summary_json,
+)
+from atomics.commands.suite_run import (
+    finalize_archreview_run,
+    finalize_probe_run,
+    finalize_task_run,
+    suite_run,
 )
 from atomics.config import load_settings
 from atomics.eval.budget import BudgetMeter, share_budget
@@ -101,24 +109,13 @@ def rag(
         f"Results saved: [bold]{'yes' if save_results else 'no'}[/bold]\n"
     )
 
-    repo = None
-    if save_results:
-        from atomics.storage.repository import MetricsRepository
-        repo = MetricsRepository(settings.db_path)
-
-    import uuid as _uuid
-    rag_run_id = _uuid.uuid4().hex[:12]
+    rag_run_id = uuid.uuid4().hex[:12]
     if provider_name == "ollama":
         effective_model = model or settings.ollama_model
     elif provider_name == "vllm":
         effective_model = model or settings.vllm_model
     else:
         effective_model = model or settings.default_model
-    if repo:
-        repo.create_run(
-            rag_run_id, tier="rag", provider=provider_name,
-            model=effective_model, trigger="eval",
-        )
 
     result_table = Table(title="RAG Eval Results", show_lines=True)
     result_table.add_column("ID", style="dim")
@@ -132,116 +129,125 @@ def rag(
     result_table.add_column("Cost", justify="right", style="yellow")
     result_table.add_column("Rationale", no_wrap=False, max_width=35, style="dim")
 
-    def on_done(fr: RAGFixtureResult) -> None:
-        tr = fr.task_result
-        j = fr.judge
-        if tr.status.value == "failed":
-            score_str = "[red]FAIL[/red]"
-            rationale = tr.error_message[:60]
-            g_str = f_str = a_str = "—"
-        elif j and not j.parse_failed:
-            score_str = f"{j.score * 100:.0f}%"
-            rationale = j.rationale[:60]
-            g_str = str(j.grounding)
-            f_str = str(j.faithfulness)
-            a_str = str(j.abstention)
-        else:
-            score_str = "[yellow]?[/yellow]"
-            rationale = "judge parse failed"
-            g_str = f_str = a_str = "?"
-
-        ctx_type = "answer" if fr.fixture.context_contains_answer else "abstain"
-        result_table.add_row(
-            fr.fixture.id, ctx_type, g_str, f_str, a_str, score_str,
-            f"{tr.latency_ms:.0f}ms", str(tr.total_tokens),
-            f"${tr.estimated_cost_usd:.6f}", rationale,
+    with suite_run(
+        suite="rag",
+        db_path=settings.db_path,
+        save=save_results,
+        finalize=finalize_task_run,
+        failure_prefix="RAG eval failed",
+    ) as run:
+        run.begin(
+            rag_run_id,
+            provider=provider_name,
+            model=effective_model,
+            trigger="eval",
         )
-        if repo:
-            repo.save_task_result(tr, suite="rag")
+        repo = run.repository
 
-    eff_thinking = thinking_flag
-    if eff_thinking is None and model:
-        from atomics.model_classes import supports_thinking
-        if supports_thinking(model):
-            eff_thinking = True
+        def on_done(fr: RAGFixtureResult) -> None:
+            tr = fr.task_result
+            j = fr.judge
+            if tr.status.value == "failed":
+                score_str = "[red]FAIL[/red]"
+                rationale = tr.error_message[:60]
+                g_str = f_str = a_str = "—"
+            elif j and not j.parse_failed:
+                score_str = f"{j.score * 100:.0f}%"
+                rationale = j.rationale[:60]
+                g_str = str(j.grounding)
+                f_str = str(j.faithfulness)
+                a_str = str(j.abstention)
+            else:
+                score_str = "[yellow]?[/yellow]"
+                rationale = "judge parse failed"
+                g_str = f_str = a_str = "?"
 
-    index = None
-    if index_path is not None:
-        try:
-            import sentence_transformers  # noqa: F401
-            import sqlite_vec  # noqa: F401
-        except ImportError as exc:
-            console.print(
-                "[red]RAG indexing requires the [rag] extra:[/red] "
-                'uv pip install "atomics[rag]"'
+            ctx_type = "answer" if fr.fixture.context_contains_answer else "abstain"
+            result_table.add_row(
+                fr.fixture.id, ctx_type, g_str, f_str, a_str, score_str,
+                f"{tr.latency_ms:.0f}ms", str(tr.total_tokens),
+                f"${tr.estimated_cost_usd:.6f}", rationale,
             )
-            raise SystemExit(1) from exc
-        from atomics.eval.rag.retrieval import (
-            LocalSentenceTransformerEmbedder,
-            MockEmbedder,
-            RAGIndex,
-        )
-        index_meta = RAGIndex(index_path, embedder=MockEmbedder()).info()
-        embedding_model = index_meta.get("embedding_model") or "all-MiniLM-L6-v2"
-        embedder = LocalSentenceTransformerEmbedder(embedding_model)
-        index = RAGIndex(index_path, embedder=embedder)
+            if repo:
+                repo.save_task_result(tr, suite="rag")
 
-    summary = asyncio.run(run_rag(
-        test_provider,
-        judge_provider=judge_provider,
-        model=model,
-        judge_model=judge_model,
-        run_id=rag_run_id,
-        on_fixture_done=on_done,
-        thinking=eff_thinking,
-        thinking_budget=thinking_budget,
-        fixtures=selected_fixtures,
-        index=index,
-        top_k=top_k,
-    ))
+        eff_thinking = thinking_flag
+        if eff_thinking is None and model:
+            from atomics.model_classes import supports_thinking
+            if supports_thinking(model):
+                eff_thinking = True
 
-    console.print(result_table)
+        index = None
+        if index_path is not None:
+            try:
+                import sentence_transformers  # noqa: F401
+                import sqlite_vec  # noqa: F401
+            except ImportError as exc:
+                console.print(
+                    "[red]RAG indexing requires the [rag] extra:[/red] "
+                    'uv pip install "atomics[rag]"'
+                )
+                raise SystemExit(1) from exc
+            from atomics.eval.rag.retrieval import (
+                LocalSentenceTransformerEmbedder,
+                MockEmbedder,
+                RAGIndex,
+            )
+            index_meta = RAGIndex(index_path, embedder=MockEmbedder()).info()
+            embedding_model = index_meta.get("embedding_model") or "all-MiniLM-L6-v2"
+            embedder = LocalSentenceTransformerEmbedder(embedding_model)
+            index = RAGIndex(index_path, embedder=embedder)
 
-    summary_table = Table(title="RAG Eval Summary", show_lines=True)
-    summary_table.add_column("Metric", style="dim")
-    summary_table.add_column("Value", style="bold")
-    summary_table.add_row("Provider", provider_name)
-    summary_table.add_row("Model", model or "default")
+        summary = asyncio.run(run_rag(
+            test_provider,
+            judge_provider=judge_provider,
+            model=model,
+            judge_model=judge_model,
+            run_id=rag_run_id,
+            on_fixture_done=on_done,
+            thinking=eff_thinking,
+            thinking_budget=thinking_budget,
+            fixtures=selected_fixtures,
+            index=index,
+            top_k=top_k,
+        ))
 
-    rag_score = summary.overall_rag_score
-    summary_table.add_row("Overall RAG Score",
-                          f"[green]{rag_score * 100:.1f}%[/green]" if rag_score is not None else "—")
-    gs = summary.grounding_score
-    summary_table.add_row("Grounding",
-                          f"{gs * 100:.1f}%" if gs is not None else "—")
-    fs = summary.faithfulness_score
-    summary_table.add_row("Faithfulness",
-                          f"{fs * 100:.1f}%" if fs is not None else "—")
-    aa = summary.abstention_accuracy
-    summary_table.add_row("Abstention Accuracy",
-                          f"{aa * 100:.1f}%" if aa is not None else "—")
-    hr = summary.hallucination_rate
-    hr_style = "green" if hr is not None and hr < 0.1 else "yellow" if hr is not None and hr < 0.3 else "red"
-    summary_table.add_row("Hallucination Rate",
-                          f"[{hr_style}]{hr * 100:.1f}%[/{hr_style}]" if hr is not None else "—")
-    summary_table.add_row("Avg Latency", f"{summary.avg_latency_ms:.0f}ms")
-    summary_table.add_row("Total Tokens", f"{summary.total_tokens:,}")
-    summary_table.add_row("Total Cost", f"${summary.total_cost_usd:.6f}")
-    summary_table.add_row("Fixtures Run", str(len(summary.fixture_results)))
-    pf = summary.parse_failure_rate
-    pf_style = "green" if pf == 0 else "yellow" if pf < 0.1 else "red"
-    summary_table.add_row("Judge Parse Failures", f"[{pf_style}]{pf * 100:.1f}%[/{pf_style}]")
-    console.print(summary_table)
+        console.print(result_table)
 
-    if repo:
-        repo.complete_run(rag_run_id)
-        repo.close()
+        summary_table = Table(title="RAG Eval Summary", show_lines=True)
+        summary_table.add_column("Metric", style="dim")
+        summary_table.add_column("Value", style="bold")
+        summary_table.add_row("Provider", provider_name)
+        summary_table.add_row("Model", model or "default")
 
-    if json_out:
-        import json as _json
-        with open(json_out, "w", encoding="utf-8") as fh:
-            _json.dump(summary.to_dict(), fh, indent=2)
-        console.print(f"[dim]Wrote JSON results to {json_out}[/dim]")
+        rag_score = summary.overall_rag_score
+        summary_table.add_row("Overall RAG Score",
+                              f"[green]{rag_score * 100:.1f}%[/green]" if rag_score is not None else "—")
+        gs = summary.grounding_score
+        summary_table.add_row("Grounding",
+                              f"{gs * 100:.1f}%" if gs is not None else "—")
+        fs = summary.faithfulness_score
+        summary_table.add_row("Faithfulness",
+                              f"{fs * 100:.1f}%" if fs is not None else "—")
+        aa = summary.abstention_accuracy
+        summary_table.add_row("Abstention Accuracy",
+                              f"{aa * 100:.1f}%" if aa is not None else "—")
+        hr = summary.hallucination_rate
+        hr_style = "green" if hr is not None and hr < 0.1 else "yellow" if hr is not None and hr < 0.3 else "red"
+        summary_table.add_row("Hallucination Rate",
+                              f"[{hr_style}]{hr * 100:.1f}%[/{hr_style}]" if hr is not None else "—")
+        summary_table.add_row("Avg Latency", f"{summary.avg_latency_ms:.0f}ms")
+        summary_table.add_row("Total Tokens", f"{summary.total_tokens:,}")
+        summary_table.add_row("Total Cost", f"${summary.total_cost_usd:.6f}")
+        summary_table.add_row("Fixtures Run", str(len(summary.fixture_results)))
+        pf = summary.parse_failure_rate
+        pf_style = "green" if pf == 0 else "yellow" if pf < 0.1 else "red"
+        summary_table.add_row("Judge Parse Failures", f"[{pf_style}]{pf * 100:.1f}%[/{pf_style}]")
+        console.print(summary_table)
+
+        if json_out:
+            write_summary_json(summary, Path(json_out))
+            console.print(f"[dim]Wrote JSON results to {json_out}[/dim]")
 
 # ── atomics rag-index ─────────────────────────────────────────────────────────
 
@@ -482,18 +488,7 @@ def codegen(
         f"Fixtures: [bold]{len(selected_fixtures)}[/bold]\n"
     )
 
-    repo = None
-    if save_results:
-        from atomics.storage.repository import MetricsRepository
-        repo = MetricsRepository(settings.db_path)
-
-    import uuid as _uuid
-    cg_run_id = _uuid.uuid4().hex[:12]
-    if repo:
-        repo.create_run(
-            cg_run_id, tier="codegen", provider=provider_name,
-            model=effective_model, trigger="eval",
-        )
+    cg_run_id = uuid.uuid4().hex[:12]
 
     result_table = Table(title="Code Generation Results", show_lines=True)
     result_table.add_column("ID", style="dim")
@@ -505,62 +500,71 @@ def codegen(
     result_table.add_column("Tokens", justify="right")
     result_table.add_column("Cost", justify="right", style="yellow")
 
-    def on_done(fr: CodegenFixtureResult) -> None:
-        rate_style = "green" if fr.pass_rate == 1.0 else "yellow" if fr.pass_rate > 0 else "red"
-        result_table.add_row(
-            fr.fixture.id,
-            fr.fixture.function_name,
-            str(fr.tests_total),
-            str(fr.tests_passed),
-            f"[{rate_style}]{fr.pass_rate*100:.0f}%[/{rate_style}]",
-            f"{fr.task_result.latency_ms:.0f}ms",
-            str(fr.task_result.total_tokens),
-            f"${fr.task_result.estimated_cost_usd:.6f}",
+    with suite_run(
+        suite="codegen",
+        db_path=settings.db_path,
+        save=save_results,
+        finalize=finalize_task_run,
+        failure_prefix="Code generation eval failed",
+    ) as run:
+        run.begin(
+            cg_run_id,
+            provider=provider_name,
+            model=effective_model,
+            trigger="eval",
         )
-        if repo:
-            repo.save_task_result(fr.task_result, suite="codegen")
+        repo = run.repository
 
-    eff_thinking = thinking_flag
-    if eff_thinking is None and model:
-        from atomics.model_classes import supports_thinking
-        if supports_thinking(model):
-            eff_thinking = True
+        def on_done(fr: CodegenFixtureResult) -> None:
+            rate_style = "green" if fr.pass_rate == 1.0 else "yellow" if fr.pass_rate > 0 else "red"
+            result_table.add_row(
+                fr.fixture.id,
+                fr.fixture.function_name,
+                str(fr.tests_total),
+                str(fr.tests_passed),
+                f"[{rate_style}]{fr.pass_rate*100:.0f}%[/{rate_style}]",
+                f"{fr.task_result.latency_ms:.0f}ms",
+                str(fr.task_result.total_tokens),
+                f"${fr.task_result.estimated_cost_usd:.6f}",
+            )
+            if repo:
+                repo.save_task_result(fr.task_result, suite="codegen")
 
-    summary = asyncio.run(run_codegen(
-        test_provider,
-        model=model,
-        run_id=cg_run_id,
-        on_fixture_done=on_done,
-        thinking=eff_thinking,
-        thinking_budget=thinking_budget,
-        fixtures=selected_fixtures,
-    ))
+        eff_thinking = thinking_flag
+        if eff_thinking is None and model:
+            from atomics.model_classes import supports_thinking
+            if supports_thinking(model):
+                eff_thinking = True
 
-    console.print(result_table)
+        summary = asyncio.run(run_codegen(
+            test_provider,
+            model=model,
+            run_id=cg_run_id,
+            on_fixture_done=on_done,
+            thinking=eff_thinking,
+            thinking_budget=thinking_budget,
+            fixtures=selected_fixtures,
+        ))
 
-    summary_table = Table(title="Code Generation Summary", show_lines=True)
-    summary_table.add_column("Metric", style="dim")
-    summary_table.add_column("Value", style="bold")
-    summary_table.add_row("Provider", provider_name)
-    summary_table.add_row("Model", effective_model)
-    pr = summary.overall_pass_rate
-    pr_style = "green" if pr and pr >= 0.8 else "yellow" if pr and pr >= 0.5 else "red"
-    summary_table.add_row("Overall Pass Rate",
-                          f"[{pr_style}]{pr*100:.1f}%[/{pr_style}]" if pr is not None else "\u2014")
-    summary_table.add_row("Fully Correct", f"{summary.fixtures_fully_correct}/{len(summary.fixture_results)}")
-    summary_table.add_row("Total Tokens", f"{summary.total_tokens:,}")
-    summary_table.add_row("Total Cost", f"${summary.total_cost_usd:.6f}")
-    console.print(summary_table)
+        console.print(result_table)
 
-    if repo:
-        repo.complete_run(cg_run_id)
-        repo.close()
+        summary_table = Table(title="Code Generation Summary", show_lines=True)
+        summary_table.add_column("Metric", style="dim")
+        summary_table.add_column("Value", style="bold")
+        summary_table.add_row("Provider", provider_name)
+        summary_table.add_row("Model", effective_model)
+        pr = summary.overall_pass_rate
+        pr_style = "green" if pr and pr >= 0.8 else "yellow" if pr and pr >= 0.5 else "red"
+        summary_table.add_row("Overall Pass Rate",
+                              f"[{pr_style}]{pr*100:.1f}%[/{pr_style}]" if pr is not None else "\u2014")
+        summary_table.add_row("Fully Correct", f"{summary.fixtures_fully_correct}/{len(summary.fixture_results)}")
+        summary_table.add_row("Total Tokens", f"{summary.total_tokens:,}")
+        summary_table.add_row("Total Cost", f"${summary.total_cost_usd:.6f}")
+        console.print(summary_table)
 
-    if json_out:
-        import json as _json
-        with open(json_out, "w", encoding="utf-8") as fh:
-            _json.dump(summary.to_dict(), fh, indent=2)
-        console.print(f"[dim]Wrote JSON results to {json_out}[/dim]")
+        if json_out:
+            write_summary_json(summary, Path(json_out))
+            console.print(f"[dim]Wrote JSON results to {json_out}[/dim]")
 
 # ── atomics multiturn ──────────────────────────────────────────────────────────
 
@@ -637,58 +641,58 @@ def probe(
         f"Judge: [cyan]{judge_provider_name}[/cyan] | Targets: [bold]{len(targets)}[/bold]\n"
     )
 
-    repo = None
-    run_id = __import__("uuid").uuid4().hex[:12]
-    if save_results:
-        from atomics.storage.repository import MetricsRepository
-        repo = MetricsRepository(settings.db_path)
+    run_id = uuid.uuid4().hex[:12]
+
+    with suite_run(
+        suite="probe",
+        db_path=settings.db_path,
+        save=save_results,
+        finalize=finalize_probe_run,
+        failure_prefix="Probe run failed",
+    ) as run:
         # Parent run row so probe runs are listable/queryable like other suites.
-        repo.create_run(
-            run_id, tier="probe", provider=provider_name,
-            model=model or "default", trigger="manual",
+        run.begin(
+            run_id,
+            provider=provider_name,
+            model=model or "default",
         )
+        repo = run.repository
 
-    def on_result(r):
-        color = "green" if (r.score or 0) >= 0.8 else ("yellow" if (r.score or 0) >= 0.6 else "red")
-        reg_tag = " [bold red][REGRESSION][/bold red]" if r.regressed else ""
-        console.print(
-            f" [bold]{r.target_name}[/bold] ({r.artifact_type}) "
-            f"[{color}]{(r.score or 0) * 100:.1f}%[/]{reg_tag} — {r.judge_rationale[:80]}"
-        )
-        if repo:
-            repo.save_probe_result(run_id, r)
+        def on_result(r):
+            color = "green" if (r.score or 0) >= 0.8 else ("yellow" if (r.score or 0) >= 0.6 else "red")
+            reg_tag = " [bold red][REGRESSION][/bold red]" if r.regressed else ""
+            console.print(
+                f" [bold]{r.target_name}[/bold] ({r.artifact_type}) "
+                f"[{color}]{(r.score or 0) * 100:.1f}%[/]{reg_tag} — {r.judge_rationale[:80]}"
+            )
+            if repo:
+                repo.save_probe_result(run_id, r)
 
-    summary = asyncio.run(run_probe(
-        provider,
-        judge_provider=judge,
-        targets=targets,
-        model=model,
-        judge_model=judge_model,
-        thinking=thinking_flag,
-        thinking_budget=thinking_budget,
-        regression_threshold=0.10,
-        on_result=on_result,
-    ))
+        summary = asyncio.run(run_probe(
+            provider,
+            judge_provider=judge,
+            targets=targets,
+            model=model,
+            judge_model=judge_model,
+            thinking=thinking_flag,
+            thinking_budget=thinking_budget,
+            regression_threshold=0.10,
+            on_result=on_result,
+        ))
 
-    table = Table(title="Probe Summary")
-    table.add_column("Metric")
-    table.add_column("Value")
-    table.add_row("Provider", provider_name)
-    table.add_row("Targets", str(len(summary.results)))
-    table.add_row("Overall Score", f"{(summary.overall_score or 0) * 100:.1f}%")
-    if summary.regressions:
-        table.add_row("[red]Regressions[/red]", str(len(summary.regressions)))
-    console.print(table)
+        table = Table(title="Probe Summary")
+        table.add_column("Metric")
+        table.add_column("Value")
+        table.add_row("Provider", provider_name)
+        table.add_row("Targets", str(len(summary.results)))
+        table.add_row("Overall Score", f"{(summary.overall_score or 0) * 100:.1f}%")
+        if summary.regressions:
+            table.add_row("[red]Regressions[/red]", str(len(summary.regressions)))
+        console.print(table)
 
-    if repo:
-        repo.complete_probe_run(run_id)
-        repo.close()
-
-    if json_out:
-        import json as _json
-        with open(json_out, "w", encoding="utf-8") as fh:
-            _json.dump(summary.to_dict(), fh, indent=2)
-        console.print(f"[dim]Wrote JSON results to {json_out}[/dim]")
+        if json_out:
+            write_summary_json(summary, Path(json_out))
+            console.print(f"[dim]Wrote JSON results to {json_out}[/dim]")
 
     if alert_on_regression and summary.regressions:
         console.print(
@@ -809,17 +813,6 @@ def archreview(repo_name, models_csv, provider_name, ollama_host, vllm_host,
         context_tokens=8192 if judge_provider_name == "ollama" else None,
     )
 
-    repo = None
-    if save_results:
-        from atomics.storage.repository import MetricsRepository
-        repo = MetricsRepository(settings.db_path)
-        # Parent run row so archreview runs are listable/queryable like other
-        # suites; per-round rows land in archreview_results.
-        repo.create_run(
-            archreview_run_id, tier="archreview", provider=provider_name,
-            model=models_csv, trigger="manual",
-        )
-
     judge_label = f"{judge_provider_name}:{judge_model or judge_provider.default_model or 'default'}"
 
     table = Table(title=f"archreview — {spec.name} ({tier})", show_lines=True)
@@ -838,76 +831,86 @@ def archreview(repo_name, models_csv, provider_name, ollama_host, vllm_host,
     # later models ("Event loop is closed").
     all_results = []
 
-    async def _run_all() -> None:
-        for mdl in models:
-            test_provider = _build_provider(provider_name, mdl,
-                                            ollama_host if provider_name == "ollama" else vllm_host,
-                                            context_tokens=archreview_context_tokens
-                                            if provider_name == "ollama" else None)
-            collisions = detect_self_judge(test_provider, mdl, [(judge_provider, judge_model)])
-            if collisions:
-                console.print(f"[yellow]warning:[/yellow] judge collides with model under test: {collisions}")
+    with suite_run(
+        suite="archreview",
+        db_path=settings.db_path,
+        save=save_results,
+        finalize=finalize_archreview_run,
+        failure_prefix="Architecture review failed",
+    ) as run:
+        # Parent run row so archreview runs are listable/queryable like other
+        # suites; per-round rows land in archreview_results.
+        run.begin(
+            archreview_run_id,
+            provider=provider_name,
+            model=models_csv,
+        )
+        repo = run.repository
 
-            if verbose:
-                console.print(f"\n[bold]→ analyzing with [cyan]{mdl}[/cyan][/bold] "
-                              f"({provider_name}, {rounds} round{'s' if rounds != 1 else ''})…")
+        async def _run_all() -> None:
+            for mdl in models:
+                test_provider = _build_provider(provider_name, mdl,
+                                                ollama_host if provider_name == "ollama" else vllm_host,
+                                                context_tokens=archreview_context_tokens
+                                                if provider_name == "ollama" else None)
+                collisions = detect_self_judge(test_provider, mdl, [(judge_provider, judge_model)])
+                if collisions:
+                    console.print(f"[yellow]warning:[/yellow] judge collides with model under test: {collisions}")
 
-            results = await run_archreview(
-                spec=spec, tier=tier, pack=pack,
-                under_test=test_provider, under_test_model=mdl,
-                judge=judge_provider, judge_model=judge_model,
-                rounds=rounds, objective=not judge_only,
-                max_output_tokens=max_output_tokens,
-                run_id=archreview_run_id,
-            )
-            all_results.extend(results)
-            if repo:
-                for r in results:
-                    repo.save_archreview_result(r)
+                if verbose:
+                    console.print(f"\n[bold]→ analyzing with [cyan]{mdl}[/cyan][/bold] "
+                                  f"({provider_name}, {rounds} round{'s' if rounds != 1 else ''})…")
 
-            if verbose:
-                for r in results:
-                    if r.error_message:
-                        console.print(f"  [red]round {r.round}: {_rich_escape(r.error_class or '')}: {_rich_escape(r.error_message or '')}[/red]")
-                        continue
-                    judge_str = f"{r.judge_score:.2f}" if r.judge_score is not None else "—"
-                    flag = " [yellow](parse failed)[/yellow]" if r.parse_failed else ""
-                    console.print(
-                        f"  [dim]round {r.round}:[/dim] recall=[green]{r.objective_recall:.2f}[/green] "
-                        f"prec={r.objective_precision:.2f} obj-f={r.objective_f:.2f} "
-                        f"judge=[magenta]{judge_str}[/magenta] findings={len(r.findings)}"
-                        f" matched={r.matched_categories or '—'}{flag}"
-                    )
-                    for f in r.findings:
-                        console.print(f"      [dim]•[/dim] {f.category} · {f.location} · {f.severity}")
+                results = await run_archreview(
+                    spec=spec, tier=tier, pack=pack,
+                    under_test=test_provider, under_test_model=mdl,
+                    judge=judge_provider, judge_model=judge_model,
+                    rounds=rounds, objective=not judge_only,
+                    max_output_tokens=max_output_tokens,
+                    run_id=archreview_run_id,
+                )
+                all_results.extend(results)
+                if repo:
+                    for r in results:
+                        repo.save_archreview_result(r)
 
-            cat_sets = [{f.category for f in r.findings} for r in results]
-            recalls = [r.objective_recall for r in results]
-            stability, _sd = compute_robustness(cat_sets, recalls)
-            avg = lambda xs: round(sum(xs) / len(xs), 3) if xs else 0.0  # noqa: E731
-            judge_vals = [r.judge_score for r in results if r.judge_score is not None]
-            table.add_row(
-                mdl, str(avg(recalls)), str(avg([r.objective_precision for r in results])),
-                str(avg([r.objective_f for r in results])),
-                str(avg(judge_vals) if judge_vals else "—"),
-                judge_label, str(stability), str(round(sum(len(r.findings) for r in results) / len(results), 1)),
-            )
+                if verbose:
+                    for r in results:
+                        if r.error_message:
+                            console.print(f"  [red]round {r.round}: {_rich_escape(r.error_class or '')}: {_rich_escape(r.error_message or '')}[/red]")
+                            continue
+                        judge_str = f"{r.judge_score:.2f}" if r.judge_score is not None else "—"
+                        flag = " [yellow](parse failed)[/yellow]" if r.parse_failed else ""
+                        console.print(
+                            f"  [dim]round {r.round}:[/dim] recall=[green]{r.objective_recall:.2f}[/green] "
+                            f"prec={r.objective_precision:.2f} obj-f={r.objective_f:.2f} "
+                            f"judge=[magenta]{judge_str}[/magenta] findings={len(r.findings)}"
+                            f" matched={r.matched_categories or '—'}{flag}"
+                        )
+                        for f in r.findings:
+                            console.print(f"      [dim]•[/dim] {f.category} · {f.location} · {f.severity}")
 
-    asyncio.run(_run_all())
+                cat_sets = [{f.category for f in r.findings} for r in results]
+                recalls = [r.objective_recall for r in results]
+                stability, _sd = compute_robustness(cat_sets, recalls)
+                avg = lambda xs: round(sum(xs) / len(xs), 3) if xs else 0.0  # noqa: E731
+                judge_vals = [r.judge_score for r in results if r.judge_score is not None]
+                table.add_row(
+                    mdl, str(avg(recalls)), str(avg([r.objective_precision for r in results])),
+                    str(avg([r.objective_f for r in results])),
+                    str(avg(judge_vals) if judge_vals else "—"),
+                    judge_label, str(stability), str(round(sum(len(r.findings) for r in results) / len(results), 1)),
+                )
 
-    console.print(table)
-    if repo:
-        repo.complete_archreview_run(archreview_run_id)
-        repo.close()
+        asyncio.run(_run_all())
 
-    if json_out:
-        import json as _json
+        console.print(table)
 
-        from atomics.archreview.models import ArchReviewSummary
-        summary = ArchReviewSummary(repo=spec.name, tier=tier, results=all_results)
-        with open(json_out, "w", encoding="utf-8") as fh:
-            _json.dump(summary.to_dict(), fh, indent=2)
-        console.print(f"[dim]Wrote JSON results to {json_out}[/dim]")
+        if json_out:
+            from atomics.archreview.models import ArchReviewSummary
+            summary = ArchReviewSummary(repo=spec.name, tier=tier, results=all_results)
+            write_summary_json(summary, Path(json_out))
+            console.print(f"[dim]Wrote JSON results to {json_out}[/dim]")
 
 # ── refusal / codereview (folded from legacy modules) ─────────────────────
 

@@ -21,6 +21,7 @@ from atomics.commands.common import (
     eval_budget_from,
     write_summary_json,
 )
+from atomics.commands.suite_run import finalize_evaluation_run, suite_run
 from atomics.config import load_settings
 from atomics.eval.budget import share_budget
 from atomics.eval.toolcall.fixtures import (
@@ -283,18 +284,21 @@ def _render_summary(summary) -> None:
 
 
 def _save(summary, *, db_path) -> None:
-    from atomics.storage.repository import MetricsRepository
-
-    repo = MetricsRepository(db_path)
-    try:
+    with suite_run(
+        suite="toolcall",
+        db_path=db_path,
+        save=True,
+        finalize=finalize_evaluation_run,
+        failure_prefix="Tool-call persistence failed",
+    ) as run:
         # evaluation_results carries a foreign key to runs, so the parent row has
         # to exist before any fixture is written.
-        repo.create_run(
+        run.begin(
             summary.run_id,
-            tier="toolcall",
             provider=summary.provider,
             model=summary.model,
         )
+        repo = run.require_repository()
         for result in summary.fixtures:
             outcome = str(result["tool_outcome"])
             repo.save_evaluation_result(
@@ -326,5 +330,3 @@ def _save(summary, *, db_path) -> None:
                     result_json=result,
                 )
             )
-    finally:
-        repo.close()

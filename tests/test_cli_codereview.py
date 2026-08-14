@@ -313,7 +313,9 @@ def test_codereview_finalizer_failure_is_sanitized(monkeypatch, tmp_path) -> Non
     result = CliRunner().invoke(cli, ["--no-progress", "codereview"])
 
     assert result.exit_code == 1
-    assert "Code review evaluation failed" in result.output
+    # The shared lifetime names the operation that failed rather than the command,
+    # so a finalize problem is distinguishable from the run itself failing.
+    assert "Failed to finalize codereview run" in result.output
     assert "secret-finalizer-token" not in result.output
 
 

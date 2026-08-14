@@ -44,9 +44,8 @@ every item here is a refactor with the test suite as the contract.
       one `cmd_<name>` module each for `adversarial`, `redblue`, `multiturn`,
       `refusal`, and `codereview`, re-exported from `__init__` so `atomics.cli`
       and importers see no change. The `cmd_` prefix keeps re-exporting a command
-      function from shadowing the module it lives in. The persistence boilerplate
-      below still repeats across these five — deduplicating it is the next step,
-      now that each copy sits in its own file
+      function from shadowing the module it lives in. Splitting them is what made
+      the persistence divergence below visible and fixable
 - [x] Route `commands/benchmark.py` and `commands/admin.py` through
       `providers/factory.py` instead of hand-rolling the ten-provider branch
       that the factory exists to own. Both the benchmark `run` loop and
@@ -62,8 +61,14 @@ every item here is a refactor with the test suite as the contract.
       only over judges that parsed, so a mostly-failed run reported a
       healthy-looking score. Fixed by adding a suite-neutral constructor both
       paths count through
-- [ ] Deduplicate CLI persistence boilerplate, which still repeats about eight
-      times across the suite commands
+- [x] Deduplicate CLI persistence boilerplate, which repeated across every command
+      that records a run. The shared lifetime is `commands/suite_run.py`, and it
+      turned out to be a correctness item rather than a tidiness one: seven
+      commands finalized the parent row and closed the connection as the last
+      statements of the happy path, so anything that raised skipped both, leaking
+      a connection and leaving a row without `completed_at`. `toolcall` never
+      finalized its parent at all, on every run. All eleven recording commands now
+      share one lifetime
 - [ ] Group the 30 flat top-level modules into `load/`, `benchmark/`, and
       `reporting/` packages
 - [ ] Enforce the configured line length instead of `--ignore E501`, which
