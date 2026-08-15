@@ -89,7 +89,12 @@ class SuiteRun:
         # that fails on demand, which is the only way to exercise cleanup.
         from atomics.storage.repository import MetricsRepository as Repository
 
-        self.repository = Repository(self._db_path)
+        try:
+            self.repository = Repository(self._db_path)
+        except Exception as exc:
+            raise RuntimeError(
+                f"unable to open database {self._db_path}: {sanitize_error(exc)}"
+            ) from exc
 
     def require_repository(self) -> MetricsRepository:
         """The repository, for callers reached only when saving is on.

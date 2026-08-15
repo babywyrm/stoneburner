@@ -15,6 +15,26 @@ def _finalize(repo: MetricsRepository, run_id: str) -> object:
     return repo.complete_run(run_id)
 
 
+def test_open_failure_names_the_database_path(tmp_path) -> None:
+    """A locked or unreadable DB must not collapse to a bare sqlite message."""
+    db_path = tmp_path / "not-a-file"
+    db_path.mkdir()
+
+    with pytest.raises(click.ClickException) as excinfo:
+        with suite_run(
+            suite="demo",
+            db_path=db_path,
+            save=True,
+            finalize=_finalize,
+            failure_prefix="Demo failed",
+        ):
+            pass
+
+    message = str(excinfo.value)
+    assert "Demo failed" in message
+    assert str(db_path) in message
+
+
 def test_no_save_opens_nothing(tmp_path) -> None:
     db_path = tmp_path / "unused.db"
     with suite_run(
