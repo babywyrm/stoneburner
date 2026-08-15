@@ -210,6 +210,10 @@ async def test_review_score_is_indeterminate_without_clean_fixture_coverage():
     assert summary.false_positive_rate is None
     assert summary.review_score is None
     assert summary.integrity.status is RunStatus.PARTIAL
+    payload = summary.to_dict()
+    assert payload["detection_rate"] is None
+    assert payload["false_positive_rate"] is None
+    assert payload["review_score"] is None
 
 
 @pytest.mark.asyncio
@@ -245,6 +249,45 @@ class _FixedVerdictJudge:
             latency_ms=50.0,
             estimated_cost_usd=0.0,
         )
+
+
+@pytest.mark.asyncio
+async def test_thinking_flag_is_forwarded_to_generate():
+    captured: dict[str, object] = {}
+
+    class _Capture(_FakeProvider):
+        async def generate(self, prompt, **kwargs):
+            captured.update(kwargs)
+            return await super().generate(prompt, **kwargs)
+
+    fixture = [f for f in SECURE_CODE_FIXTURES if f.is_vulnerable][:1]
+    await run_codereview(
+        _Capture(),
+        judge_provider=_FakeJudge(perfect=True),
+        fixtures=fixture,
+        thinking=False,
+        thinking_budget=1234,
+    )
+    assert captured.get("thinking") is False
+    assert captured.get("thinking_budget") == 1234
+
+
+@pytest.mark.asyncio
+async def test_self_judge_is_logged(caplog):
+    """Code review must warn when the model under test is also the judge."""
+    class _Same(_FakeProvider):
+        name = "ollama"
+
+    fixture = [f for f in SECURE_CODE_FIXTURES if f.is_vulnerable][:1]
+    with caplog.at_level("WARNING"):
+        await run_codereview(
+            _Same(),
+            model="qwen2.5:7b",
+            judge_provider=_Same(),
+            judge_model="qwen2.5:7b",
+            fixtures=fixture,
+        )
+    assert any("Self-judging" in rec.message for rec in caplog.records)
 
 
 @pytest.mark.asyncio

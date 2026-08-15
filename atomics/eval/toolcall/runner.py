@@ -36,6 +36,7 @@ from typing import Any
 from atomics.eval.adversarial.scorer import ResistanceResult, _label_from_score, score_resistance
 from atomics.eval.attempt_serialization import integrity_to_dict
 from atomics.eval.consensus import NumericVote, combine_numeric
+from atomics.eval.judge import detect_self_judge
 from atomics.eval.outcomes import RunIntegrity
 from atomics.eval.suite_integrity import fixture_outcome, integrity_of
 from atomics.eval.toolcall.catalog import PROBE_PROMPT, PROBE_TOOL, schemas_for
@@ -302,9 +303,15 @@ async def _judge(
         )
         if combined.parse_failed:
             return primary
+        combined_label = _label_from_score(combined.score)
+        matching = sum(
+            1
+            for result in panel
+            if not result.parse_failed and _label_from_score(result.score) == combined_label
+        )
         return ResistanceResult(
             score=combined.score,
-            label=_label_from_score(combined.score),
+            label=combined_label,
             rationale=combined.rationale,
             judge_model=combined.judge_model,
             judge_cost_usd=sum(result.judge_cost_usd for result in panel),
@@ -314,6 +321,7 @@ async def _judge(
             ),
             judges_expected=len(panel),
             judges_scored=combined.n_judges,
+            judge_agreement=matching / combined.n_judges if combined.n_judges else None,
         )
     except Exception as exc:
         logger.warning("[toolcall] judge failed for %s: %s", fixture.id, exc)
@@ -342,6 +350,8 @@ async def run_toolcall_suite(
     extra_judges: list[tuple[BaseProvider, str | None]] | None = None,
     runs: int = 1,
     channel: str = "both",
+    thinking: bool | None = None,
+    thinking_budget: int | None = None,
     run_id: str | None = None,
     on_fixture_start: Callable[..., object] | None = None,
     on_fixture_done: Callable[..., object] | None = None,
@@ -354,6 +364,17 @@ async def run_toolcall_suite(
     if runs < 1:
         raise ValueError("runs must be at least 1")
     extra_judges = extra_judges or []
+    judges: list[tuple[BaseProvider, str | None]] = list(extra_judges)
+    if judge_provider is not None:
+        judges = [(judge_provider, judge_model), *judges]
+    collisions = detect_self_judge(provider, model, judges)
+    if collisions:
+        logger.warning(
+            "Self-judging detected: model under test is also a judge (%s). "
+            "Scores are biased upward by self-preference — use a "
+            "different judge model for a fair evaluation.",
+            ", ".join(collisions),
+        )
 
     run_id = run_id or uuid.uuid4().hex[:12]
     started_at = datetime.now(UTC)
@@ -404,6 +425,8 @@ async def run_toolcall_suite(
                     judge_model=judge_model,
                     extra_judges=extra_judges,
                     channel=channel,
+                    thinking=thinking,
+                    thinking_budget=thinking_budget,
                     run_number=run_number,
                 )
             )
@@ -431,6 +454,8 @@ async def _run_once(
     judge_model: str | None,
     extra_judges: list[tuple[BaseProvider, str | None]],
     channel: str,
+    thinking: bool | None,
+    thinking_budget: int | None,
     run_number: int,
 ) -> dict[str, Any]:
     """One paired pass over one fixture.
@@ -451,6 +476,7 @@ async def _run_once(
         "cost_usd": 0.0,
         "latency_ms": 0.0,
         "judge_parse_failures": 0,
+        "judge_agreement": None,
     }
 
     if channel != "prose":
@@ -501,6 +527,8 @@ async def _run_once(
                 system=_SYSTEM_PROMPT,
                 model=model,
                 max_tokens=_MAX_TOKENS,
+                thinking=thinking,
+                thinking_budget=thinking_budget,
             )
         except Exception as exc:
             record["error"] = f"{type(exc).__name__}: {exc}"
@@ -516,6 +544,7 @@ async def _run_once(
         record["prose_label"] = _label(judged)
         if judged is not None:
             record["cost_usd"] += judged.judge_cost_usd
+            record["judge_agreement"] = judged.judge_agreement
             if judged.parse_failed:
                 record["judge_parse_failures"] += 1
 
@@ -564,5 +593,6 @@ def _aggregate_runs(
             sum(r["latency_ms"] for r in per_run) / len(per_run), 1
         ),
         "cost_usd": round(sum(r["cost_usd"] for r in per_run), 6),
+        "judge_agreement": representative.get("judge_agreement"),
         "runs": per_run,
     }

@@ -350,3 +350,13 @@ def test_no_self_judge_when_model_unknowable():
     judge = _StubProvider("ollama", None)
     # Can't resolve the test model → don't guess a collision.
     assert detect_self_judge(ut, None, [(judge, None)]) == []
+
+
+def test_self_judge_tolerates_providers_without_default_model():
+    """Duck-typed judges must not crash the suite on a missing default_model."""
+    class _Bare:
+        name = "ollama"
+
+    collisions = detect_self_judge(_Bare(), "qwen2.5:7b", [(_Bare(), "qwen2.5:7b")])
+    assert collisions == ["ollama:qwen2.5:7b"]
+    assert detect_self_judge(_Bare(), None, [(_Bare(), None)]) == []

@@ -171,13 +171,13 @@ def detect_self_judge(
     collides when it shares the provider name AND resolves to the same model as
     the model under test (an unspecified model resolves to the provider default).
     """
-    ut_model = under_test_model or under_test.default_model
+    ut_model = under_test_model or getattr(under_test, "default_model", None)
     if ut_model is None:
         return []
     collisions: list[str] = []
     for judge_provider, judge_model in judges:
-        j_model = judge_model or judge_provider.default_model
-        if judge_provider.name == under_test.name and j_model == ut_model:
+        j_model = judge_model or getattr(judge_provider, "default_model", None)
+        if getattr(judge_provider, "name", None) == getattr(under_test, "name", None) and j_model == ut_model:
             collisions.append(f"{judge_provider.name}:{j_model}")
     return collisions
 

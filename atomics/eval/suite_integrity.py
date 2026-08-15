@@ -21,6 +21,7 @@ from atomics.eval.outcomes import (
     JudgeOutcomeStatus,
     ProviderOutcomeKind,
     RunIntegrity,
+    RunStatus,
 )
 
 
@@ -51,3 +52,24 @@ def fixture_outcome(*, generated: bool, scored: bool) -> FixtureOutcome:
 def integrity_of(outcomes: Sequence[FixtureOutcome]) -> RunIntegrity:
     """Run integrity for a suite that described its fixtures with `fixture_outcome`."""
     return RunIntegrity.from_fixture_outcomes(outcomes)
+
+
+def headline_rate(score: float | None, integrity: RunIntegrity) -> float | None:
+    """Publish a rate only when every fixture was scored.
+
+    The scored-subset average stays on the summary object for math. A partial
+    run that prints that average as the headline is the failure mode this
+    module exists to stop — a 100% on 2/12 looks finished.
+    """
+    if integrity.status is not RunStatus.COMPLETE:
+        return None
+    return score
+
+
+def format_headline_rate(score: float | None, integrity: RunIntegrity) -> str:
+    """Render a headline rate, or name the denominator when coverage is partial."""
+    if integrity.status is not RunStatus.COMPLETE:
+        return f"n/a ({integrity.fixtures_scored}/{integrity.fixtures_total} scored)"
+    if score is None:
+        return "n/a"
+    return f"{score * 100:.1f}%"

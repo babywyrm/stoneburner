@@ -150,6 +150,9 @@ def test_codereview_help_preserves_public_options() -> None:
         "--save",
         "--allow-partial",
         "--extra-judges",
+        "--thinking",
+        "--no-thinking",
+        "--thinking-budget",
     ):
         assert option in result.output
 
@@ -211,6 +214,8 @@ def test_codereview_partial_json_is_written_before_nonzero_exit(
     assert "ERROR" in result.output
     assert "MISS" not in result.output
     assert "Judge failures" in result.output
+    assert "n/a (0/1 scored)" in result.output
+    assert "100.0%" not in result.output
     assert json.loads(output.read_text(encoding="utf-8"))["integrity"]["status"] == (
         "infrastructure_invalid"
     )

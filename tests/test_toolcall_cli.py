@@ -13,6 +13,14 @@ def test_cli_toolcall_extra_judges_option():
     assert "--extra-judges" in result.output
 
 
+def test_cli_toolcall_thinking_options():
+    result = CliRunner().invoke(cli, ["toolcall", "--help"])
+    assert result.exit_code == 0
+    assert "--thinking" in result.output
+    assert "--no-thinking" in result.output
+    assert "--thinking-budget" in result.output
+
+
 def test_toolcall_is_registered():
     result = CliRunner().invoke(cli, ["toolcall", "--help"])
     assert result.exit_code == 0
