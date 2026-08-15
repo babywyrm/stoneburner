@@ -216,6 +216,15 @@ class OpenAIProvider(BaseProvider):
                     str(response.choices)[:300],
                 )
         text = _combine_response_text(text, refusal)
+        usage = response.usage
+        inp = usage.prompt_tokens if usage else 0
+        out = usage.completion_tokens if usage else 0
+
+        reasoning_tokens = 0
+        if usage and hasattr(usage, "completion_tokens_details"):
+            details = usage.completion_tokens_details
+            reasoning_tokens = getattr(details, "reasoning_tokens", 0) or 0
+
         if refusal:
             outcome_kind = ProviderOutcomeKind.REFUSED
         elif finish_reason == "content_filter":
@@ -224,6 +233,8 @@ class OpenAIProvider(BaseProvider):
             outcome_kind = ProviderOutcomeKind.TRUNCATED
         elif text:
             outcome_kind = ProviderOutcomeKind.COMPLETED
+        elif reasoning_tokens > 0:
+            outcome_kind = ProviderOutcomeKind.THINKING_BUDGET
         else:
             outcome_kind = ProviderOutcomeKind.EMPTY
         outcome = ProviderOutcome(
@@ -235,14 +246,6 @@ class OpenAIProvider(BaseProvider):
                 else None
             ),
         )
-        usage = response.usage
-        inp = usage.prompt_tokens if usage else 0
-        out = usage.completion_tokens if usage else 0
-
-        reasoning_tokens = 0
-        if usage and hasattr(usage, "completion_tokens_details"):
-            details = usage.completion_tokens_details
-            reasoning_tokens = getattr(details, "reasoning_tokens", 0) or 0
 
         tps = compute_tps(out, latency / 1000)
 
@@ -437,6 +440,16 @@ class OpenAIProvider(BaseProvider):
 
         error_code = _field(error, "code")
         error_message = _field(error, "message")
+        usage = getattr(response, "usage", None)
+        inp = getattr(usage, "input_tokens", 0) if usage else 0
+        out = getattr(usage, "output_tokens", 0) if usage else 0
+        # The Responses API reports reasoning under usage.output_tokens_details;
+        # fall back to a direct attribute for forward/backward compatibility.
+        details = getattr(usage, "output_tokens_details", None) if usage else None
+        if details is not None:
+            reasoning_tokens = getattr(details, "reasoning_tokens", 0) or 0
+        else:
+            reasoning_tokens = getattr(usage, "reasoning_tokens", 0) or 0
         policy_reason = policy_block_reason(
             code=(
                 finish_reason
@@ -459,6 +472,8 @@ class OpenAIProvider(BaseProvider):
             outcome_kind = ProviderOutcomeKind.REFUSED
         elif text:
             outcome_kind = ProviderOutcomeKind.COMPLETED
+        elif reasoning_tokens > 0:
+            outcome_kind = ProviderOutcomeKind.THINKING_BUDGET
         else:
             outcome_kind = ProviderOutcomeKind.EMPTY
 
@@ -489,17 +504,6 @@ class OpenAIProvider(BaseProvider):
                 else None
             ),
         )
-
-        usage = getattr(response, "usage", None)
-        inp = getattr(usage, "input_tokens", 0) if usage else 0
-        out = getattr(usage, "output_tokens", 0) if usage else 0
-        # The Responses API reports reasoning under usage.output_tokens_details;
-        # fall back to a direct attribute for forward/backward compatibility.
-        details = getattr(usage, "output_tokens_details", None) if usage else None
-        if details is not None:
-            reasoning_tokens = getattr(details, "reasoning_tokens", 0) or 0
-        else:
-            reasoning_tokens = getattr(usage, "reasoning_tokens", 0) or 0
 
         tps = compute_tps(out, latency / 1000)
 

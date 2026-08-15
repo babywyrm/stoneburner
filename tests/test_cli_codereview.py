@@ -27,6 +27,7 @@ class _Summary:
         self,
         *,
         partial: bool = False,
+        thinking_budget: bool = False,
         run_id: str = "codereview-run",
     ) -> None:
         self.run_id = run_id
@@ -55,8 +56,10 @@ class _Summary:
         payload: dict[str, object] = {
             "id": "cr-characterization",
             "status": self.integrity.status.value,
-            "score": None if partial else 1.0,
-            "generation_status": "completed",
+            "score": None if partial or thinking_budget else 1.0,
+            "generation_status": (
+                "thinking_budget" if thinking_budget else "completed"
+            ),
             "judge_status": "skipped" if partial else "scored",
             "latency_ms": 1.0,
             "estimated_cost_usd": 0.0,
@@ -102,6 +105,7 @@ def _patch_codereview(
     monkeypatch,
     *,
     partial: bool = False,
+    thinking_budget: bool = False,
     db_path=None,
     fail_after_callback: bool = False,
 ) -> None:
@@ -110,6 +114,7 @@ def _patch_codereview(
     async def fake_run_codereview(*_args, **kwargs):
         summary = _Summary(
             partial=partial,
+            thinking_budget=thinking_budget,
             run_id=kwargs.get("run_id") or "codereview-run",
         )
         start_callback = kwargs.get("on_fixture_start")
@@ -219,6 +224,16 @@ def test_codereview_partial_json_is_written_before_nonzero_exit(
     assert json.loads(output.read_text(encoding="utf-8"))["integrity"]["status"] == (
         "infrastructure_invalid"
     )
+
+
+def test_codereview_thinking_budget_is_not_an_error(monkeypatch) -> None:
+    _patch_codereview(monkeypatch, thinking_budget=True)
+
+    result = CliRunner().invoke(cli, ["--no-progress", "codereview", "--no-save"])
+
+    assert result.exit_code == 0
+    assert "THINK" in result.output
+    assert "ERROR" not in result.output
 
 
 def test_codereview_allow_partial_exits_zero(monkeypatch) -> None:

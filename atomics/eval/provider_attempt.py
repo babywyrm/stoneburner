@@ -15,11 +15,12 @@ def provider_outcome_from_response(response: ProviderResponse) -> ProviderOutcom
     """Use an adapter outcome when present, otherwise infer text completion."""
     if response.outcome is not None:
         return response.outcome
-    kind = (
-        ProviderOutcomeKind.COMPLETED
-        if response.text.strip()
-        else ProviderOutcomeKind.EMPTY
-    )
+    if response.text.strip():
+        kind = ProviderOutcomeKind.COMPLETED
+    elif response.thinking_tokens > 0 or response.thinking_text.strip():
+        kind = ProviderOutcomeKind.THINKING_BUDGET
+    else:
+        kind = ProviderOutcomeKind.EMPTY
     return ProviderOutcome(kind=kind, finish_reason=response.finish_reason)
 
 

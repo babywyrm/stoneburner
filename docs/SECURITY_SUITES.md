@@ -260,7 +260,7 @@ uv run atomics sweep --provider claude --models claude-sonnet-4-6,claude-haiku-4
 
 ## Integrity & Persistence
 
-`refusal` and `codereview` report typed run integrity and save each fixture immediately. Partial or infrastructure-invalid runs still write JSON and finalize stored results, then exit nonzero. Use `--allow-partial` when incomplete coverage is acceptable. Thinking models on short fixtures should pass `--no-thinking` (or a larger `--thinking-budget`); otherwise the visible answer can be empty.
+`refusal` and `codereview` report typed run integrity and save each fixture immediately. Partial or infrastructure-invalid runs still write JSON and finalize stored results, then exit nonzero. Use `--allow-partial` when incomplete coverage is acceptable. Thinking models on short fixtures should pass `--no-thinking` (or a larger `--thinking-budget`); otherwise the visible answer can be empty and the row is `THINK` (`generation_status: thinking_budget`) rather than `ERROR`.
 
 **Read the integrity block before trusting a score.** Every suite now emits one
 in `--json-out`:

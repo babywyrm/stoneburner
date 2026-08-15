@@ -19,9 +19,18 @@ class FakeChoice:
 
 
 class FakeUsage:
-    def __init__(self, prompt_tokens: int, completion_tokens: int) -> None:
+    def __init__(
+        self,
+        prompt_tokens: int,
+        completion_tokens: int,
+        reasoning_tokens: int = 0,
+    ) -> None:
         self.prompt_tokens = prompt_tokens
         self.completion_tokens = completion_tokens
+        if reasoning_tokens:
+            self.completion_tokens_details = SimpleNamespace(
+                reasoning_tokens=reasoning_tokens
+            )
 
 
 class FakeCompletionResponse:
@@ -247,6 +256,7 @@ def _chat_client(
     refusal: str | None = None,
     reasoning_content: str = "",
     completion_tokens: int = 5,
+    reasoning_tokens: int = 0,
 ):
     message = SimpleNamespace(
         content=content,
@@ -256,7 +266,7 @@ def _chat_client(
     choice = SimpleNamespace(message=message, finish_reason=finish_reason)
     response = SimpleNamespace(
         choices=[choice],
-        usage=FakeUsage(10, completion_tokens),
+        usage=FakeUsage(10, completion_tokens, reasoning_tokens=reasoning_tokens),
     )
 
     class Completions:
@@ -353,6 +363,29 @@ async def test_openai_chat_token_consuming_reasoning_without_visible_text_is_emp
     assert response.total_tokens == 74
     assert response.outcome is not None
     assert response.outcome.kind is ProviderOutcomeKind.EMPTY
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_openai_chat_reasoning_tokens_without_visible_text_is_thinking_budget():
+    provider = OpenAIProvider(
+        api_key="fake",
+        client=_chat_client(
+            content=None,
+            finish_reason="stop",
+            completion_tokens=64,
+            reasoning_tokens=64,
+        ),
+    )
+
+    response = await provider.generate("test")
+
+    assert response.text == ""
+    assert response.thinking_tokens == 64
+    assert response.outcome is not None
+    assert response.outcome.kind is ProviderOutcomeKind.THINKING_BUDGET
+    assert not response.outcome.is_scorable
+    assert not response.outcome.is_infrastructure_invalid
 
 
 @pytest.mark.unit
@@ -503,9 +536,18 @@ class FakeOutputMessage:
 
 
 class FakeResponsesUsage:
-    def __init__(self, input_tokens: int = 20, output_tokens: int = 30) -> None:
+    def __init__(
+        self,
+        input_tokens: int = 20,
+        output_tokens: int = 30,
+        reasoning_tokens: int = 0,
+    ) -> None:
         self.input_tokens = input_tokens
         self.output_tokens = output_tokens
+        if reasoning_tokens:
+            self.output_tokens_details = SimpleNamespace(
+                reasoning_tokens=reasoning_tokens
+            )
 
 
 class FakeResponsesResponse:
@@ -649,12 +691,13 @@ def _responses_response(
     output: list | None = None,
     incomplete_reason: str | None = None,
     error=None,
+    reasoning_tokens: int = 0,
 ):
     return SimpleNamespace(
         status=status,
         output_text=text,
         output=output or [],
-        usage=FakeResponsesUsage(),
+        usage=FakeResponsesUsage(reasoning_tokens=reasoning_tokens),
         incomplete_details=(
             SimpleNamespace(reason=incomplete_reason)
             if incomplete_reason is not None
@@ -690,6 +733,28 @@ async def test_openai_responses_normalizes_completed_status(
     assert response.outcome is not None
     assert response.outcome.kind is expected_kind
     assert response.outcome.finish_reason == "completed"
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_openai_responses_reasoning_tokens_without_visible_text_is_thinking_budget():
+    provider = OpenAIProvider(
+        client=_responses_client(
+            _responses_response(
+                status="completed",
+                text="",
+                reasoning_tokens=48,
+            )
+        ),
+        auth=FakeAuth(),
+    )
+
+    response = await provider.generate("test")
+
+    assert response.text == ""
+    assert response.thinking_tokens == 48
+    assert response.outcome is not None
+    assert response.outcome.kind is ProviderOutcomeKind.THINKING_BUDGET
 
 
 @pytest.mark.unit

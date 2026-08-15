@@ -170,7 +170,9 @@ def codereview(
         fixture = result.fixture
         expected_label = fixture.cwe if fixture.is_vulnerable else "clean code"
         payload = result.to_dict()
-        if payload["score"] is None:
+        if payload.get("generation_status") == "thinking_budget":
+            mark = "[cyan]THINK[/cyan]"
+        elif payload["score"] is None:
             mark = "[yellow]ERROR[/yellow]"
         else:
             mark = "[green]OK[/green]" if result.passed else "[red]MISS[/red]"

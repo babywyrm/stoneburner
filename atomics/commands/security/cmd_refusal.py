@@ -168,7 +168,9 @@ def refusal(
         if progress is not None:
             progress.on_done(max(current_index, 0))
         payload = result.to_dict()
-        if payload["score"] is None:
+        if payload.get("generation_status") == "thinking_budget":
+            mark = "[cyan]THINK[/cyan]"
+        elif payload["score"] is None:
             mark = "[yellow]ERROR[/yellow]"
         else:
             mark = "[green]OK[/green]" if result.correct else "[red]MISS[/red]"

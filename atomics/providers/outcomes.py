@@ -28,6 +28,7 @@ class ProviderOutcomeKind(StrEnum):
     SAFETY_BLOCKED = "safety_blocked"
     TRUNCATED = "truncated"
     EMPTY = "empty"
+    THINKING_BUDGET = "thinking_budget"
     RATE_LIMITED = "rate_limited"
     TIMEOUT = "timeout"
     PROVIDER_ERROR = "provider_error"

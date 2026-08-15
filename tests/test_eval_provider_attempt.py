@@ -16,6 +16,8 @@ def _response(
     text: str,
     *,
     outcome: ProviderOutcome | None = None,
+    thinking_tokens: int = 0,
+    thinking_text: str = "",
 ) -> ProviderResponse:
     return ProviderResponse(
         text=text,
@@ -25,7 +27,8 @@ def _response(
         model="qwen",
         latency_ms=10.0,
         estimated_cost_usd=0.25,
-        thinking_tokens=1,
+        thinking_tokens=thinking_tokens,
+        thinking_text=thinking_text,
         outcome=outcome,
         finish_reason=outcome.finish_reason if outcome is not None else "stop",
     )
@@ -51,6 +54,23 @@ def test_provider_outcome_from_response_marks_empty_text() -> None:
     assert outcome.finish_reason == "stop"
 
 
+def test_empty_visible_with_thinking_tokens_is_budget_spent_on_reasoning() -> None:
+    """A silent answer that burned tokens on hidden reasoning is not a dead provider."""
+    outcome = provider_outcome_from_response(_response("", thinking_tokens=768))
+
+    assert outcome.kind is ProviderOutcomeKind.THINKING_BUDGET
+    assert outcome.is_scorable is False
+    assert outcome.is_infrastructure_invalid is False
+
+
+def test_empty_visible_with_thinking_text_is_budget_spent_on_reasoning() -> None:
+    outcome = provider_outcome_from_response(
+        _response("", thinking_text="the model reasoned here")
+    )
+
+    assert outcome.kind is ProviderOutcomeKind.THINKING_BUDGET
+
+
 def test_provider_outcome_from_response_marks_visible_text_completed() -> None:
     outcome = provider_outcome_from_response(_response("answer"))
 
@@ -69,7 +89,7 @@ def test_provider_outcome_from_response_preserves_normalized_outcome() -> None:
 
 
 def test_build_attempt_includes_response_usage_and_judge_cost() -> None:
-    response = _response("answer")
+    response = _response("answer", thinking_tokens=1)
     attempt = build_attempt(
         attempt_index=0,
         outcome=ProviderOutcome(ProviderOutcomeKind.COMPLETED),
