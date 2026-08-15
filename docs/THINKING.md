@@ -25,9 +25,11 @@ uv run atomics provider-test -p ollama -m qwen3:14b --thinking
 |----------|--------|-----------|
 | **Claude** | Opus 4.x, Sonnet 4.x | Extended thinking API (`budget_tokens`) |
 | **OpenAI** | o3, o3-mini, o3-pro, o4-mini, gpt-5.x | Reasoning tokens (`completion_tokens_details`) |
-| **Ollama** | qwen3 family | `<think>` tag parsing, auto-stripped from output |
+| **Ollama** | qwen3 family, deepseek-r1, phi4-*-reasoning | Native `thinking` field, plus `<think>` tag fallback |
 
 When `--thinking` / `--no-thinking` is omitted, stoneburner checks the model against its capability registry and enables thinking automatically for known models. Use `--no-thinking` to force it off for A/B comparisons.
+
+The same `--thinking` / `--no-thinking` / `--thinking-budget` grammar is on every suite that calls `generate`: `run`, `eval`, `adversarial`, `redblue`, `refusal`, `toolcall` (prose channel), `codereview`, `multiturn`, `rag`, and `codegen`. For local thinking models on short fixtures, `--no-thinking` is the difference between a visible answer and an empty generation that spent the whole token budget on hidden reasoning.
 
 ## How the Engine Handles Thinking Tokens
 
@@ -37,7 +39,7 @@ The core challenge: thinking/reasoning tokens are **real computation** (they con
 
 | Provider | How thinking is requested | How thinking tokens are counted |
 |----------|--------------------------|-------------------------------|
-| **Ollama** | `body.think = true` (native API field). For older builds: `/no_think` prefix disables it. `num_predict` is inflated by `thinking_budget` so the visible answer isn't starved. | `<think>...</think>` tags are stripped from `response`. Thinking token count is **estimated** by character proportion of the total `eval_count` (Ollama doesn't report thinking tokens separately). |
+| **Ollama** | `body.think = true` (native API field). For older builds: `/no_think` prefix disables it. `num_predict` is inflated by `thinking_budget` so the visible answer isn't starved. | Newer Ollama returns a top-level `thinking` string; older builds embed `<think>...</think>` in `response`. Both are captured. Thinking token count is **estimated** by character proportion of the total `eval_count` (Ollama doesn't report thinking tokens separately). |
 | **Claude** | `thinking.budget_tokens` in the API request (extended thinking mode). | API returns `thinking_tokens` directly in the response metadata — no estimation needed. |
 | **OpenAI** | Reasoning models (o3, o4-mini, gpt-5.x) handle it internally. | `completion_tokens_details.reasoning_tokens` from the API response. |
 

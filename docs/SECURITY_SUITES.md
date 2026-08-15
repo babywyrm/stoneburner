@@ -67,6 +67,9 @@ uv run atomics toolcall --category exfil --verbose
 
 # Nondeterministic models: three passes, modal outcome reported
 uv run atomics toolcall --runs 3
+
+# Thinking models: keep the prose channel from burning the token budget
+uv run atomics toolcall --no-thinking --category direct --runs 3
 ```
 
 **Categories:** `direct` · `authority` · `injection` · `exfil` · `destructive`
@@ -134,7 +137,7 @@ uv run atomics redblue --provider claude --mode red
 uv run atomics redblue --provider openai -m gpt-4o --mode blue
 
 # Persist results + variance scoring
-uv run atomics redblue --provider ollama -m qwen3:14b --save --runs 3
+uv run atomics redblue --provider ollama -m qwen3:14b --save --runs 3 --no-thinking
 ```
 
 ## `atomics refusal` — Refusal Calibration
@@ -143,7 +146,7 @@ Measures **both** safety failure modes: over-refusal (blocking legitimate securi
 
 ```bash
 uv run atomics refusal -p ollama -m qwen3:14b \
-  --judge-model qwen2.5:14b --json-out refusal.json
+  --judge-model qwen2.5:14b --no-thinking --json-out refusal.json
 ```
 
 ## `atomics codereview` — Secure Code Review
@@ -152,7 +155,7 @@ Tests vulnerability detection on code snippets and unified diffs. Vulnerable fix
 
 ```bash
 uv run atomics codereview -p ollama -m qwen3:14b \
-  --judge-model qwen2.5:14b --json-out codereview.json
+  --judge-model qwen2.5:14b --no-thinking --json-out codereview.json
 ```
 
 ## `atomics probe` — Live Ecosystem Probe
@@ -257,7 +260,7 @@ uv run atomics sweep --provider claude --models claude-sonnet-4-6,claude-haiku-4
 
 ## Integrity & Persistence
 
-`refusal` and `codereview` report typed run integrity and save each fixture immediately. Partial or infrastructure-invalid runs still write JSON and finalize stored results, then exit nonzero. Use `--allow-partial` when incomplete coverage is acceptable.
+`refusal` and `codereview` report typed run integrity and save each fixture immediately. Partial or infrastructure-invalid runs still write JSON and finalize stored results, then exit nonzero. Use `--allow-partial` when incomplete coverage is acceptable. Thinking models on short fixtures should pass `--no-thinking` (or a larger `--thinking-budget`); otherwise the visible answer can be empty.
 
 **Read the integrity block before trusting a score.** Every suite now emits one
 in `--json-out`:
@@ -272,10 +275,12 @@ in `--json-out`:
 ```
 
 This matters because scores are averaged only over judges that returned a usable
-result. A `status` of `partial` with a `fixture_coverage` of `0.1` means the
-headline number came from three fixtures out of thirty — a perfectly ordinary
-looking score standing on almost nothing. `redblue`, `multiturn`, `rag`,
-`codegen`, and `toolcall` previously reported the score with no such signal.
+result. A `status` of `partial` with a `fixture_coverage` of `0.1` used to print
+that three-fixture average as a finished percentage. `refusal`, `codereview`,
+and `redblue` now refuse a bare headline when coverage is incomplete: `to_dict()`
+nulls the rate and the CLI prints `n/a (3/30 scored)`. The scored-subset math
+stays on the summary object. `multiturn`, `rag`, `codegen`, and `toolcall` still
+publish the subset average; read `integrity` before trusting it.
 
 `generation_failures` and `judge_failures` are counted separately, so a broken
 provider is distinguishable from a broken judge. For `codegen` this is the

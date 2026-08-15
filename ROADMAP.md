@@ -76,6 +76,49 @@ every item here is a refactor with the test suite as the contract.
 - [ ] Decide the fate of `inference.py` and `workers/bridge.py` — both are
       documented but reachable only from tests
 
+## v0.18.0 — Honest local evals
+
+The 2026-08-14/15 brainbox overnight (32 on-card models × redblue `--runs 3` ×
+refusal × toolcall × codereview) did not find a new architecture problem. It
+found places the tool still lets a number look finished when the run was not.
+
+Evidence, not vibes: `qwen3:14b` dropped from a June single-run 97% to a
+three-run **94.3% ±11.5**. `granite4.1:8b` held 97.3% ±8.1. Seven code-review
+exits were qwen3 / deepseek thinking models that spent the whole 768-token
+budget on hidden reasoning and produced an empty visible review. Toolcall
+`--skip-incapable` exited 0 for seven models that never emitted a call, which
+in a sweep reads as a pass.
+
+- [x] **`--thinking` / `--no-thinking` on every suite that calls `generate`.**
+      Red/blue and refusal have the flag. Toolcall and codereview now match:
+      same grammar, same default (`None` → provider decides).
+- [x] **Headline scores name their denominator.** A 100% on 2/12 scored
+      fixtures (refusal `qwen3:4b` in the afternoon gauntlet) or an F1 on 1/8
+      (overnight `qwen3.5:4b`) is no longer printable as a leaderboard row.
+      `to_dict()` nulls the headline unless integrity is complete; the CLI
+      prints `n/a (scored/total scored)`.
+- [ ] **Empty visible text with nonzero `thinking_tokens` is not a mystery
+      generation failure.** After the native-`thinking` parse, those attempts
+      are "budget spent on reasoning". Surface that in the fixture row and in
+      integrity, so a sweep does not look like Ollama died.
+- [ ] **`atomics sweep` grows into a multi-suite overnight driver.** Today's
+      sweep is one eval family. The night was a shell script in `/tmp` that
+      died twice to SIGPIPE because stdout was still the chat. A first-class
+      command (`--suites redblue,refusal,toolcall,codereview --runs 3
+      --no-thinking --models-from ollama`) with a status file and a detachable
+      log is the difference between a lab ritual and a product.
+- [ ] **`--skip-incapable` is the wrong default for a sweep.** Fine for a
+      human poking one model. In a 32-model loop it writes `EXIT=0` next to
+      `tool_capable: false`. Sweeps should use `--no-skip-incapable`, or the
+      driver should.
+- [ ] **Promote on `--runs 3`, not a single pass.** The leaderboard now has
+      the 08-14/15 three-run addendum (stdev still 8–13 on ten fixtures).
+      `compare` / `sweep` should prefer the multi-run row when both exist.
+- [ ] **Taxonomy is an exact map and will rot again.** The overnight box had
+      36 tags; we hand-registered the ones that showed `UNKNOWN`. A prefix /
+      size heuristic (or `atomics models` writing the missing rows) beats
+      another emergency patch every pull.
+
 ## Beyond
 
 Not scheduled, roughly in order of how often they come up.
