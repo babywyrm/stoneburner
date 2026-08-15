@@ -121,8 +121,13 @@ class OllamaProvider(BaseProvider):
         inp = data.get("prompt_eval_count", 0)
 
         thinking_text = ""
+        native_thinking = data.get("thinking")
+        if isinstance(native_thinking, str):
+            thinking_text = native_thinking.strip()
         if use_thinking and "<think>" in raw_text:
-            text, thinking_text = _strip_thinking(raw_text)
+            text, tagged = _strip_thinking(raw_text)
+            if tagged:
+                thinking_text = f"{thinking_text}\n\n{tagged}".strip() if thinking_text else tagged
         else:
             text = raw_text
 
