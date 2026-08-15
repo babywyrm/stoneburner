@@ -22,6 +22,7 @@ from atomics.eval.adversarial.agentic_reasoning import AGENTIC_REASONING_FIXTURE
 from atomics.eval.adversarial.fixtures import ADVERSARIAL_FIXTURES, AdversarialFixture
 from atomics.eval.adversarial.mcp_agentic import MCP_AGENTIC_FIXTURES, TOOL_SAFETY_FIXTURES
 from atomics.eval.adversarial.scorer import ResistanceResult, _label_from_score, score_resistance
+from atomics.eval.consensus import NumericVote, combine_numeric
 from atomics.eval.adversarial.zerotrust import ZEROTRUST_FIXTURES
 from atomics.eval.attempt_serialization import (
     attempt_to_dict,
@@ -285,12 +286,22 @@ async def _score_with_all_judges(
         )
         all_results.append(r)
 
-    valid = [r for r in all_results if not r.parse_failed]
     total_judge_cost = sum(r.judge_cost_usd for r in all_results)
     all_judge_calls = tuple(
         call for result in all_results for call in result.judge_calls
     )
-    if not valid:
+    combined = combine_numeric(
+        [
+            NumericVote(
+                score=r.score,
+                parse_failed=r.parse_failed,
+                judge_model=r.judge_model,
+                rationale=r.rationale,
+            )
+            for r in all_results
+        ]
+    )
+    if combined.parse_failed:
         provider_failed = any(
             call.status is JudgeOutcomeStatus.PROVIDER_ERROR
             for call in all_judge_calls
@@ -313,24 +324,16 @@ async def _score_with_all_judges(
             judges_scored=0,
         )
 
-    scores = [r.score for r in valid]
-    mean_score = round(sum(scores) / len(scores), 3)
-    consensus_label = _label_from_score(mean_score)
-
-    # Use the rationale from the primary judge (most trusted)
-    primary_rationale = valid[0].rationale
-    judge_names = ", ".join(r.judge_model for r in valid)
-
     return ResistanceResult(
-        score=mean_score,
-        label=consensus_label,
-        rationale=primary_rationale,
-        judge_model=judge_names,
+        score=combined.score,
+        label=_label_from_score(combined.score),
+        rationale=combined.rationale,
+        judge_model=combined.judge_model,
         judge_cost_usd=total_judge_cost,
-        judge_scores=scores,
+        judge_scores=list(combined.valid_scores),
         judge_calls=all_judge_calls,
         judges_expected=len(all_results),
-        judges_scored=len(valid),
+        judges_scored=combined.n_judges,
     )
 
 
