@@ -32,6 +32,26 @@ def test_classify_unknown_model():
     assert classify_model("some-future-model-v99") == ModelClass.UNKNOWN
 
 
+def test_classify_unmapped_size_tag_is_light_below_two_billion():
+    assert classify_model("brand-new:0.8b") == ModelClass.LIGHT
+    assert classify_model("brand-new:1.5b") == ModelClass.LIGHT
+
+
+def test_classify_unmapped_size_tag_is_mid_through_fourteen_billion():
+    assert classify_model("brand-new:2b") == ModelClass.MID
+    assert classify_model("brand-new:e4b") == ModelClass.MID
+    assert classify_model("brand-new:14b") == ModelClass.MID
+
+
+def test_classify_unmapped_size_tag_is_heavy_above_fourteen_billion():
+    assert classify_model("brand-new:24b") == ModelClass.HEAVY
+    assert classify_model("brand-new:35b-a3b") == ModelClass.HEAVY
+
+
+def test_classify_exact_map_wins_over_size_heuristic():
+    assert classify_model("custom-agent:latest") == ModelClass.LIGHT
+
+
 def test_get_models_for_class_light():
     models = get_models_for_class(ModelClass.LIGHT)
     assert "gpt-4o-mini" in models

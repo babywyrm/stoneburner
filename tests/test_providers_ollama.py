@@ -362,7 +362,7 @@ async def test_ollama_list_models():
         assert "model_class" in m
         assert "thinking" in m
     assert models[0]["model_class"] == "mid"
-    assert models[2]["model_class"] == "unknown"
+    assert models[2]["model_class"] == "light"
 
 
 @pytest.mark.asyncio

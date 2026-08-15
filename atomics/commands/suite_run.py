@@ -114,6 +114,7 @@ class SuiteRun:
         model: str,
         tier: str | None = None,
         trigger: str = "manual",
+        pass_count: int = 1,
     ) -> None:
         """Write the parent row a suite's fixture rows will reference.
 
@@ -128,6 +129,7 @@ class SuiteRun:
             provider=provider,
             model=model,
             trigger=trigger,
+            pass_count=pass_count,
         )
         self._run_ids.append(run_id)
 

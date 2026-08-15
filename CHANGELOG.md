@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+### Added
+- **`atomics sweep` is an overnight driver, not only an eval family.**
+  `--suites redblue,refusal,toolcall,codereview --runs 3 --no-thinking
+  --models-from ollama --status FILE --log FILE` writes a JSON status
+  file after each model×suite job and a detachable log that survives
+  SIGPIPE. Toolcall in a sweep uses `--no-skip-incapable`, so a model
+  that never emits a call is `INCAPABLE` / exit 1, not a silent pass.
+
+- **`compare` prefers a `--runs 3` row over a single pass.** Parent
+  `runs` rows now store `pass_count`. When the same model has both a
+  one-pass and a three-pass measurement, the comparison uses the
+  higher pass count.
+
+- **Unmapped Ollama tags classify from the size suffix.** `brand-new:3b`
+  is mid, `:1.5b` is light, `:35b-a3b` is heavy. The exact map still
+  wins when present; tags without a parameter size stay `UNKNOWN`.
+
 ### Fixed
 - **Empty visible text with nonzero thinking is `thinking_budget`, not a
   dead provider.** Overnight qwen3 / deepseek-r1 code-review FAILs spent

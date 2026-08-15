@@ -41,12 +41,15 @@ class MetricsRepository:
         provider: str = "claude",
         model: str = "",
         trigger: str = "manual",
+        pass_count: int = 1,
     ) -> None:
+        if pass_count < 1:
+            raise ValueError("pass_count must be at least 1")
         now = datetime.now(UTC).isoformat()
         self._conn.execute(
-            "INSERT INTO runs (run_id, started_at, tier, provider, model, trigger) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
-            (run_id, now, tier, provider, model, trigger),
+            "INSERT INTO runs (run_id, started_at, tier, provider, model, trigger, pass_count) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (run_id, now, tier, provider, model, trigger, pass_count),
         )
         self._conn.commit()
 
@@ -759,6 +762,13 @@ class MetricsRepository:
         if category is not None:
             clauses.append("category = ?")
             params.append(category)
+        clauses.append(
+            "COALESCE((SELECT pass_count FROM runs WHERE run_id = task_results.run_id), 1) = ("
+            "SELECT MAX(COALESCE(r2.pass_count, 1)) "
+            "FROM task_results t2 "
+            "JOIN runs r2 ON r2.run_id = t2.run_id "
+            "WHERE t2.model = task_results.model)"
+        )
         where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
         col = "provider" if group_by == "provider" else "model"
         other = "model" if group_by == "provider" else "provider"
