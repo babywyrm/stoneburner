@@ -183,6 +183,7 @@ def adversarial(
         run_id,
         provider=actual_provider_name,
         model=effective_model,
+        pass_count=runs,
     )
 
     # Actual fixture count (may be filtered by --category) via the single source
@@ -324,6 +325,7 @@ def adversarial(
             cmp_run_id,
             provider=actual_cmp_provider_name,
             model=effective_cmp_model,
+            pass_count=runs,
         )
         def on_compare_done(fr):
             if repo:

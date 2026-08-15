@@ -494,6 +494,41 @@ def tiers() -> None:
               help="Print each model's full reply alongside scores")
 @click.option("--save/--no-save", "save_results", default=False,
               help="Persist sweep results to database (default: off)")
+@click.option(
+    "--suites",
+    type=str,
+    default="eval",
+    show_default=True,
+    help="Comma-separated suites: eval, redblue, refusal, toolcall, codereview",
+)
+@click.option(
+    "--runs",
+    type=click.IntRange(min=1),
+    default=1,
+    show_default=True,
+    help="Passes per fixture for suites that support --runs (redblue, toolcall).",
+)
+@click.option(
+    "--status",
+    "status_path",
+    type=click.Path(dir_okay=False, writable=True),
+    default=None,
+    help="Rewrite a JSON status file after each model×suite job.",
+)
+@click.option(
+    "--log",
+    "log_path",
+    type=click.Path(dir_okay=False, writable=True),
+    default=None,
+    help="Append a detachable log. Survives a dead chat (SIGPIPE).",
+)
+@click.option(
+    "--models-from",
+    "models_from",
+    type=click.Choice(["ollama"]),
+    default=None,
+    help="Discover models from the provider (ollama is --all-local).",
+)
 @budget_option
 def sweep(
     provider_name: str,
@@ -509,6 +544,11 @@ def sweep(
     thinking_budget: int | None,
     verbose: bool,
     save_results: bool,
+    suites: str,
+    runs: int,
+    status_path: str | None,
+    log_path: str | None,
+    models_from: str | None,
     budget_usd: float | None,
 ) -> None:
     """Sweep eval fixtures across multiple models and compare results.
@@ -523,13 +563,29 @@ def sweep(
       atomics sweep --provider openai --models gpt-4o,gpt-4o-mini
       atomics sweep --all-local --fixtures ev-01,ev-02,ev-03
       atomics sweep --all-local --save
+      atomics sweep --suites redblue,refusal,toolcall,codereview --runs 3 \\
+        --no-thinking --models-from ollama --status sweep.status.json --log sweep.log
     """
+    from pathlib import Path
+
+    from atomics.eval.gauntlet import (
+        ignore_broken_pipe,
+        make_suite_runner,
+        parse_suites,
+        run_gauntlet,
+    )
     from atomics.sweep import ModelSweepResult, run_model_sweep
 
     settings = load_settings()
     setup_logging(settings.log_level)
     console = Console()
     effective_host = ollama_host or settings.ollama_host
+    try:
+        suite_list = parse_suites(suites)
+    except ValueError as exc:
+        raise click.ClickException(str(exc)) from exc
+    if models_from == "ollama":
+        all_local = True
 
     if all_local:
         if provider_name != "ollama":
@@ -574,6 +630,51 @@ def sweep(
             vllm_host=vllm_host,
         )
     )
+
+    if suite_list != ["eval"] or status_path or log_path:
+        ignore_broken_pipe()
+        suite_results = asyncio.run(
+            run_gauntlet(
+                models=model_list,
+                suites=suite_list,
+                run_suite=make_suite_runner(
+                    provider_factory=provider_factory,
+                    judge_provider=judge_provider,
+                    judge_model=judge_model,
+                    runs=runs,
+                    thinking=thinking_flag,
+                    thinking_budget=thinking_budget,
+                    fixture_ids=fixture_ids,
+                ),
+                status_path=Path(status_path) if status_path else None,
+                log_path=Path(log_path) if log_path else None,
+                skip_incapable=False,
+            )
+        )
+        table = Table(title="Suite Sweep Results", show_lines=True)
+        table.add_column("Model", style="cyan bold")
+        table.add_column("Suite")
+        table.add_column("Result", justify="right")
+        table.add_column("Headline", justify="right")
+        for row in suite_results:
+            mark = "[green]OK[/green]" if row.ok else "[red]FAIL[/red]"
+            if row.tool_capable is False:
+                mark = "[yellow]SKIP[/yellow]" if row.ok else "[red]INCAPABLE[/red]"
+            headline = (
+                f"{row.headline * 100:.1f}%" if row.headline is not None else "—"
+            )
+            table.add_row(row.model, row.suite, mark, headline)
+            try:
+                console.print(f"  [dim]{row.suite}[/dim] {row.model}")
+            except BrokenPipeError:
+                pass
+        try:
+            console.print(table)
+        except BrokenPipeError:
+            pass
+        if any(not row.ok for row in suite_results):
+            raise SystemExit(1)
+        return
 
     result_table = Table(title="Model Sweep Results", show_lines=True)
     result_table.add_column("Model", style="cyan bold")

@@ -104,23 +104,23 @@ in a sweep reads as a pass.
       thinking_budget`. An all-unscored run still becomes
       `infrastructure_invalid` because `fixtures_scored == 0`; the row
       itself no longer looks like Ollama died.
-- [ ] **`atomics sweep` grows into a multi-suite overnight driver.** Today's
+- [x] **`atomics sweep` grows into a multi-suite overnight driver.** Today's
       sweep is one eval family. The night was a shell script in `/tmp` that
       died twice to SIGPIPE because stdout was still the chat. A first-class
       command (`--suites redblue,refusal,toolcall,codereview --runs 3
       --no-thinking --models-from ollama`) with a status file and a detachable
       log is the difference between a lab ritual and a product.
-- [ ] **`--skip-incapable` is the wrong default for a sweep.** Fine for a
+- [x] **`--skip-incapable` is the wrong default for a sweep.** Fine for a
       human poking one model. In a 32-model loop it writes `EXIT=0` next to
-      `tool_capable: false`. Sweeps should use `--no-skip-incapable`, or the
-      driver should.
-- [ ] **Promote on `--runs 3`, not a single pass.** The leaderboard now has
+      `tool_capable: false`. The multi-suite driver always uses
+      `--no-skip-incapable`.
+- [x] **Promote on `--runs 3`, not a single pass.** The leaderboard now has
       the 08-14/15 three-run addendum (stdev still 8–13 on ten fixtures).
-      `compare` / `sweep` should prefer the multi-run row when both exist.
-- [ ] **Taxonomy is an exact map and will rot again.** The overnight box had
-      36 tags; we hand-registered the ones that showed `UNKNOWN`. A prefix /
-      size heuristic (or `atomics models` writing the missing rows) beats
-      another emergency patch every pull.
+      `compare` prefers the parent run with the highest `pass_count` when
+      both a one-pass and a three-pass row exist.
+- [x] **Taxonomy is an exact map and will rot again.** The overnight box had
+      36 tags; we hand-registered the ones that showed `UNKNOWN`. Unmapped
+      Ollama tags now classify from the `:Nb` / `:e4b` / `:35b-a3b` suffix.
 
 ## Beyond
 

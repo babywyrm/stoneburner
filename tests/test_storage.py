@@ -772,6 +772,55 @@ def test_compare_providers_by_model():
     repo.close()
 
 
+def test_compare_providers_prefers_multi_pass_run_for_the_same_model():
+    repo = _tmp_repo()
+    repo.create_run("single", provider="ollama", model="granite4.1:8b", pass_count=1)
+    repo.save_task_result(
+        TaskResult(
+            task_id="single-1",
+            run_id="single",
+            category=TaskCategory.GENERAL_QA,
+            task_name="rb-01",
+            provider="ollama",
+            model="granite4.1:8b",
+            status=TaskStatus.SUCCESS,
+            total_tokens=50,
+            latency_ms=100.0,
+            estimated_cost_usd=0.0,
+            accuracy_score=0.97,
+            started_at=datetime.now(UTC),
+            completed_at=datetime.now(UTC),
+        )
+    )
+    repo.complete_run("single")
+    repo.create_run("triple", provider="ollama", model="granite4.1:8b", pass_count=3)
+    repo.save_task_result(
+        TaskResult(
+            task_id="triple-1",
+            run_id="triple",
+            category=TaskCategory.GENERAL_QA,
+            task_name="rb-01",
+            provider="ollama",
+            model="granite4.1:8b",
+            status=TaskStatus.SUCCESS,
+            total_tokens=50,
+            latency_ms=110.0,
+            estimated_cost_usd=0.0,
+            accuracy_score=0.80,
+            started_at=datetime.now(UTC),
+            completed_at=datetime.now(UTC),
+        )
+    )
+    repo.complete_run("triple")
+
+    rows = repo.compare_providers(group_by="model")
+    assert len(rows) == 1
+    assert rows[0]["group_key"] == "granite4.1:8b"
+    assert rows[0]["task_count"] == 1
+    assert rows[0]["avg_accuracy_score"] == pytest.approx(0.80)
+    repo.close()
+
+
 def test_get_runs_by_provider():
     repo = _tmp_repo()
     repo.create_run("rbp-1", provider="claude")

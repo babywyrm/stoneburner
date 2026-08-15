@@ -6,6 +6,7 @@ flag mismatched comparisons and users can filter by class.
 
 from __future__ import annotations
 
+import re
 from enum import StrEnum
 
 
@@ -151,9 +152,31 @@ def supports_thinking(model_id: str) -> bool:
     return False
 
 
+_PARAMETER_TAG = re.compile(
+    r":e?(?P<n>\d+(?:\.\d+)?)b(?:-|:|$)",
+    re.IGNORECASE,
+)
+
+
+def _class_from_parameter_tag(model_id: str) -> ModelClass | None:
+    """Guess light/mid/heavy from an Ollama-style `:3b` / `:35b-a3b` tag."""
+    match = _PARAMETER_TAG.search(model_id)
+    if match is None:
+        return None
+    n = float(match.group("n"))
+    if n < 2:
+        return ModelClass.LIGHT
+    if n <= 14:
+        return ModelClass.MID
+    return ModelClass.HEAVY
+
+
 def classify_model(model_id: str) -> ModelClass:
-    """Return the class for a model ID, or UNKNOWN if not in the registry."""
-    return MODEL_CLASS_MAP.get(model_id, ModelClass.UNKNOWN)
+    """Return the class for a model ID, or a size-tag guess, or UNKNOWN."""
+    mapped = MODEL_CLASS_MAP.get(model_id)
+    if mapped is not None:
+        return mapped
+    return _class_from_parameter_tag(model_id) or ModelClass.UNKNOWN
 
 
 def get_models_for_class(cls: ModelClass) -> list[str]:

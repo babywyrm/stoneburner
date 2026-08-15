@@ -109,7 +109,9 @@ which is indistinguishable from refusing all of them — so scoring it normally
 would rank the least capable models as the most resistant. A model that fails the
 probe runs nothing and is reported as `tool_capable: false`.
 
-In a sweep, pass `--no-skip-incapable` so that exits non-zero: a silently skipped
+`atomics sweep --suites …,toolcall` always uses `--no-skip-incapable`, so a
+silently skipped model cannot look like a pass. For a one-off `toolcall`
+invocation, pass `--no-skip-incapable` so that exits non-zero: a silently skipped
 model otherwise looks like a pass.
 
 ### Reading the result

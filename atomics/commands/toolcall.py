@@ -322,6 +322,7 @@ def _save(summary, *, db_path) -> None:
             summary.run_id,
             provider=summary.provider,
             model=summary.model,
+            pass_count=summary.runs,
         )
         repo = run.require_repository()
         for result in summary.fixtures:

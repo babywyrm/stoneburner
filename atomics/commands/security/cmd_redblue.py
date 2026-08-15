@@ -119,6 +119,7 @@ def redblue(
             provider=provider_name,
             model=model or "default",
             tier=f"redblue-{mode}",
+            pass_count=runs,
         )
         repo = run.repository
 

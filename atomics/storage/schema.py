@@ -31,7 +31,8 @@ CREATE TABLE IF NOT EXISTS runs (
     total_output_tokens INTEGER DEFAULT 0,
     total_tokens    INTEGER DEFAULT 0,
     total_cost_usd  REAL DEFAULT 0.0,
-    avg_latency_ms  REAL DEFAULT 0.0
+    avg_latency_ms  REAL DEFAULT 0.0,
+    pass_count      INTEGER DEFAULT 1
 );
 
 CREATE TABLE IF NOT EXISTS evaluation_results (

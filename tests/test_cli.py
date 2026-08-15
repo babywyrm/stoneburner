@@ -922,6 +922,58 @@ def test_cli_sweep_requires_models_or_all_local(monkeypatch):
     assert result.exit_code == 1
 
 
+def test_cli_sweep_help_lists_overnight_driver_options() -> None:
+    result = CliRunner().invoke(cli, ["sweep", "--help"])
+
+    assert result.exit_code == 0
+    for option in (
+        "--suites",
+        "--runs",
+        "--status",
+        "--log",
+        "--models-from",
+    ):
+        assert option in result.output
+
+
+def test_cli_sweep_suites_uses_gauntlet(monkeypatch, tmp_path) -> None:
+    from atomics.eval.gauntlet import SuiteJobResult
+
+    async def fake_gauntlet(**kwargs):
+        assert kwargs["suites"] == ["redblue", "toolcall"]
+        assert kwargs["skip_incapable"] is False
+        return [
+            SuiteJobResult(model="qwen3:14b", suite="redblue", ok=True, headline=0.94),
+            SuiteJobResult(
+                model="qwen3:14b",
+                suite="toolcall",
+                ok=False,
+                tool_capable=False,
+                exit_code=1,
+            ),
+        ]
+
+    monkeypatch.setattr("atomics.eval.gauntlet.run_gauntlet", fake_gauntlet)
+    result = CliRunner().invoke(
+        cli,
+        [
+            "sweep",
+            "--models",
+            "qwen3:14b",
+            "--suites",
+            "redblue,toolcall",
+            "--status",
+            str(tmp_path / "status.json"),
+            "--log",
+            str(tmp_path / "sweep.log"),
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "qwen3:14b" in result.output
+    assert "toolcall" in result.output
+
+
 def test_cli_sweep_verbose_shows_replies(monkeypatch):
     """atomics sweep --verbose should print actual model replies."""
     from datetime import UTC, datetime
