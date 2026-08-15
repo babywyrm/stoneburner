@@ -66,6 +66,65 @@ percentages carry ±~8 points of run-to-run noise at this fixture count.
 
 ---
 
+## On-card cohort (2026-08-14)
+
+Same methodology (10 fixtures, mode `all`, qwen2.5:7b judge, `--no-thinking`,
+single run). All five models fit fully in the RTX 5070 12GB. Integrity: 50/50
+fixtures scored, zero generation / infrastructure / judge failures.
+
+| Rank | Model | Quality | Red | Blue | Avg Latency | Size | Tier |
+|------|-------|:-------:|:---:|:----:|:-----------:|:----:|------|
+| 1 | granite4.1:8b | **97%** | 100% | 94% | 9.4s | 5.3 GB | Elite |
+| 2 | ministral-3:8b | **94%** | 94% | 94% | 11.9s | 6.0 GB | Strong |
+| 2 | gemma4:12b | **94%** | 96% | 92% | 20.3s | 7.6 GB | Strong |
+| 4 | qwen3:8b | **91%** | 94% | 88% | 10.4s | 5.2 GB | Strong |
+| 5 | qwen3.5:9b | **85%** | 76% | 94% | 11.0s | 6.6 GB | Capable |
+
+- **`granite4.1:8b` (97%)** matches the June `qwen3:14b` headline at **9.4s**
+  instead of 63s, because it stays on the 5070. Only miss: detection-engineering
+  at 70%. This is the on-card workhorse.
+- **`ministral-3:8b` (94%)** steps up from the June `ministral-3:3b` (89%) and
+  ties `gemma4:12b` at about half the latency.
+- **`gemma4:12b` (94%)** re-ran within 2 points of the June 92% result. Same
+  Strong tier; slower than the new 8B class.
+- **`qwen3:8b` (91%)** fills the 4b → 14b gap and stays on-card. Family
+  placement is consistent with June (`qwen3:4b` 92%, `qwen3:14b` 97%).
+- **`qwen3.5:9b` (85%)** was **91%** on a smoke run an hour earlier. Blue is
+  solid; red tradecraft (priv-esc / lateral / web) is the swing. Treat as
+  Capable until a `--runs 3` pass.
+
+**Lab default recommendation:** `granite4.1:8b` for on-card work. Keep
+`qwen3:8b` when the box needs the Qwen3 thinking family. Leave the 27B tags
+for offload comparison only.
+
+---
+
+## Overnight `--runs 3` (2026-08-14/15)
+
+Same host and judge, 32 on-card models, 10 fixtures × 3 runs, `--no-thinking`.
+Integrity: 320/320 red/blue fixtures scored. Off-card 15 GB+ tags (qwen3.6
+27b/35b, both 24b Mistrals) were skipped.
+
+| Rank | Model | Quality | ± | vs June single-run |
+|------|-------|:-------:|:-:|--------------------|
+| 1 | granite4.1:8b | **97.3%** | 8.1 | new on-card default |
+| 1 | gemma4:e4b | **97.3%** | 8.1 | June 85% |
+| 1 | gemma4:12b | **97.3%** | 8.1 | June 92% |
+| 4 | ministral-3:8b | 96.0% | 10.2 | new |
+| 5 | qwen3:14b | 94.3% | 11.5 | June **97%** |
+| 6 | ministral-3:3b | 93.7% | 12.2 | June 89% |
+| 7 | mistral-nemo:12b | 93.3% | 13.0 | July addendum 85% |
+| 8 | qwen2.5:14b | 93.0% | 12.7 | June 96% |
+| 9 | phi4:latest | 92.7% | 12.4 | June 89% |
+| 10 | qwen2.5:7b | 92.3% | 12.8 | June 84% |
+
+Promote on `--runs 3`, not a single pass. The June `qwen3:14b` 97% is now
+**94.3% ±11.5**. Stdev on this card is still 8–13 points on ten fixtures;
+`nemotron-3-nano:4b` hit ±32.7. Single-run leaderboard rows above remain
+historical. `functiongemma:latest` scored 8.3% ±12.9 — not a security model.
+
+---
+
 ## Key findings
 
 - **`qwen3:14b` tops capability** at 97% — almost perfect security reasoning

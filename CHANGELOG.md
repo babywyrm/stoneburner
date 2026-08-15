@@ -3,6 +3,62 @@
 ## Unreleased
 
 ### Fixed
+- **`toolcall` and `codereview` accept `--thinking` / `--no-thinking`.**
+  Refusal and red/blue already had the flag. The overnight code-review
+  FAILs were thinking models that spent the 768-token budget on hidden
+  reasoning and produced an empty visible review. Same grammar, same
+  default (`None` → provider decides), `--thinking-budget` default 8000.
+  Toolcall forwards the flag to the prose `generate()` only;
+  `generate_with_tools` is unchanged.
+
+- **Headline scores no longer print a bare percentage on a partial run.**
+  A 100% on 2/12 scored fixtures (refusal `qwen3:4b`) or an F1 on 1/8
+  (overnight `qwen3.5:4b`) used to look like a finished leaderboard row.
+  `to_dict()` now nulls the headline rates unless integrity is
+  `complete`; the CLI prints `n/a (2/12 scored)` instead. The
+  scored-subset math stays on the summary object. Shared helpers live in
+  `suite_integrity.headline_rate` / `format_headline_rate`. Applied to
+  refusal, codereview, and red/blue (which also stopped rendering a
+  missing quality score as `0.0%`).
+
+- **A failed `--save` now names the database path.** `suite_run` used to
+  surface a bare `unable to open database file` when SQLite could not open
+  `atomics.db`, which hid whether the problem was the default `data/` path, a
+  permissions issue, or a lock. The wrapped error now includes the path.
+
+- **On-card Ollama tags no longer classify as `UNKNOWN`.** `qwen3:8b`,
+  `qwen3.5:9b`, `granite4.1:3b`, `granite4.1:8b`, `ministral-3:8b`,
+  `lfm2.5:8b`, `mistral-nemo:12b`, `nemotron-3-nano:4b`,
+  `phi4-mini-reasoning:3.8b` (mid), `smollm2:1.7b` (light), and the
+  off-card heavies `mistral-small:24b`, `qwen3.6:27b`, `qwen3.6:35b-a3b`,
+  `qwen3.8:27b` were missing from `MODEL_CLASS_MAP`, so `compare`/`sweep`
+  tables showed blanks. Thinking prefixes now cover `qwen3` and
+  `phi4-mini-reasoning`.
+
+- **Ollama now records the native `thinking` field.** Newer Ollama
+  returns reasoning in a top-level `thinking` key, not `<think>` tags
+  inside `response`. The adapter only stripped tags, so thinking models
+  that spent the whole `num_predict` budget on hidden reasoning showed
+  up as empty generations with `thinking_tokens=0`. The field is now
+  captured and counted.
+
+- **`toolcall --extra-judges` now records `judge_agreement`.** The prose
+  panel already averaged scores, but the fixture JSON and `--save` row
+  dropped the agreement, so a live granite + extra-judge run wrote
+  `NULL` into `evaluation_results.judge_agreement`. Agreement is the
+  fraction of panel labels that match the combined label.
+
+- **`refusal` accepts `--thinking` / `--no-thinking`.** Red/blue already
+  had the flag; refusal always left thinking at the provider default, so
+  qwen3 / deepseek-r1 burned the 512-token fixture budget and scored as
+  generation failures. Same grammar as red/blue.
+
+- **`refusal`, `toolcall`, and `codereview` now warn on self-judging.**
+  `detect_self_judge` already fired on `redblue` / `eval` / `adversarial` /
+  `rag`. The other three security suites silently accepted the model under
+  test as its own judge. They now log the same warning. The helper also
+  no longer crashes when a duck-typed provider has no `default_model`.
+
 - **A failed run no longer leaks its database connection or leaves an
   unfinishable row behind.** Seven commands — `redblue`, `multiturn`, `eval`,
   `rag`, `codegen`, `probe`, and `archreview` — finalized the parent `runs` row

@@ -62,13 +62,17 @@ Full command reference for `atomics`. See also [QUICKSTART.md](../QUICKSTART.md)
 | `atomics toolcall --channel tools` | Tool channel only — deterministic, needs no judge |
 | `atomics toolcall --runs 3` | Three passes per fixture, modal outcome reported |
 | `atomics toolcall --no-skip-incapable` | Non-zero exit if the model cannot emit tool calls (for sweeps) |
+| `atomics toolcall --no-thinking` | Force thinking off on the prose channel (same grammar as red/blue) |
 | `atomics refusal` | Refusal-calibration eval — over- vs under-refusal |
 | `atomics refusal --extra-judges ollama:mistral:7b` | Majority-vote classification; ties are unresolved |
+| `atomics refusal --no-thinking` | Force thinking off so reasoning models do not burn the fixture budget |
 | `atomics codereview` | Secure-code-review eval — planted-vuln detection + false positives |
 | `atomics codereview --extra-judges ollama:mistral:7b` | Majority-vote verdict; ties are unresolved |
+| `atomics codereview --no-thinking` | Force thinking off so the review is visible text, not hidden reasoning |
 | `atomics redblue --mode all` | Red/blue security capability eval (offensive + defensive) |
 | `atomics redblue --extra-judges ollama:mistral:7b` | Multi-judge mean ± stdev on the quality score |
 | `atomics redblue --runs 3 --json-out rb.json` | Variance-aware capability scoring + JSON export |
+| `atomics redblue --no-thinking --runs 3` | Multi-run capability score with thinking forced off |
 | `atomics probe --probes-file probes.yaml` | Live ecosystem probe against real artifacts |
 | `atomics archreview --repo juice-shop --models qwen3.5:4b` | Security-architecture repo benchmark |
 | `atomics archreview --tier local --max-output-tokens 512` | Practical local-GPU repo review |
