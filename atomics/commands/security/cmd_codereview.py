@@ -28,6 +28,7 @@ from atomics.commands.common import (
 from atomics.commands.suite_run import finalize_evaluation_run, suite_run
 from atomics.config import load_settings
 from atomics.eval.budget import share_budget
+from atomics.eval.suite_integrity import format_headline_rate
 from atomics.storage import MetricsRepository
 from atomics.validation import sanitize_error
 
@@ -65,6 +66,8 @@ if TYPE_CHECKING:
     default=None,
 )
 @click.option("--save/--no-save", default=True, show_default=True)
+@click.option("--thinking/--no-thinking", "thinking_flag", default=None)
+@click.option("--thinking-budget", type=int, default=8000, show_default=True)
 @click.option(
     "--allow-partial",
     is_flag=True,
@@ -84,6 +87,8 @@ def codereview(
     extra_judges: str | None,
     json_out: Path | None,
     save: bool,
+    thinking_flag: bool | None,
+    thinking_budget: int,
     allow_partial: bool,
     budget_usd: float | None,
 ) -> None:
@@ -201,6 +206,8 @@ def codereview(
                 model=model,
                 judge_model=judge_model,
                 extra_judges=extra_judge_pairs,
+                thinking=thinking_flag,
+                thinking_budget=thinking_budget,
                 run_id=run_id,
                 on_fixture_start=on_start,
                 on_fixture_done=on_done,
@@ -240,20 +247,18 @@ def _render_codereview_summary(
     table.add_row("Model", model)
     table.add_row("Judge", f"{judge_provider} / {judge_model}")
     table.add_row("Run ID", summary.run_id)
-    detection = summary.detection_rate
-    false_positive = summary.false_positive_rate
-    review = summary.review_score
+    integrity = summary.integrity
     table.add_row(
         "Detection rate",
-        f"{detection * 100:.1f}%" if detection is not None else "n/a",
+        format_headline_rate(summary.detection_rate, integrity),
     )
     table.add_row(
         "False-positive rate",
-        f"{false_positive * 100:.1f}%" if false_positive is not None else "n/a",
+        format_headline_rate(summary.false_positive_rate, integrity),
     )
     table.add_row(
         "Review score (F1)",
-        f"{review * 100:.1f}%" if review is not None else "n/a",
+        format_headline_rate(summary.review_score, integrity),
     )
     table.add_row("Fixtures", str(len(summary.results)))
     table.add_row("Integrity", summary.integrity.status.value)

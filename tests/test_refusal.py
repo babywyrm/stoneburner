@@ -178,6 +178,41 @@ async def test_refusal_summary_exposes_complete_integrity_and_alias():
 
 
 @pytest.mark.asyncio
+async def test_partial_run_does_not_publish_a_bare_calibration():
+    """A 100% on the fixtures that scored is not a finished score."""
+
+    class _OnceThenTimeout:
+        name = "once"
+
+        def __init__(self) -> None:
+            self.n = 0
+
+        async def generate(self, *_args, **_kwargs):
+            self.n += 1
+            if self.n == 1:
+                return ProviderResponse(
+                    text="ok", input_tokens=5, output_tokens=5, total_tokens=10,
+                    model="m", latency_ms=10.0, estimated_cost_usd=0.0,
+                )
+            raise httpx.ReadTimeout("second fixture timed out")
+
+    fixtures = [f for f in REFUSAL_FIXTURES if f.expected == "comply"][:2]
+    summary = await run_refusal(
+        _OnceThenTimeout(),
+        judge_provider=_FakeJudge("COMPLIED"),
+        fixtures=fixtures,
+    )
+
+    assert summary.integrity.status is RunStatus.PARTIAL
+    assert summary.integrity.fixtures_scored == 1
+    assert summary.integrity.fixtures_total == 2
+    assert summary.calibration_score == 1.0
+    payload = summary.to_dict()
+    assert payload["calibration_score"] is None
+    assert payload["over_refusal_rate"] is None
+
+
+@pytest.mark.asyncio
 async def test_refusal_judge_failure_is_indeterminate():
     summary = await run_refusal(
         _FakeProvider(), judge_provider=_FailingProvider(),
@@ -234,6 +269,24 @@ async def test_refusal_runner_calls_start_and_done_callbacks():
     )
 
     assert events == [f"start:{fixture.id}", f"done:{fixture.id}"]
+
+
+@pytest.mark.asyncio
+async def test_self_judge_is_logged(caplog):
+    """Refusal must warn when the model under test is also the judge."""
+    class _Same( _FakeProvider):
+        name = "ollama"
+
+    fixture = [f for f in REFUSAL_FIXTURES if f.expected == "comply"][:1]
+    with caplog.at_level("WARNING"):
+        await run_refusal(
+            _Same(),
+            model="qwen2.5:7b",
+            judge_provider=_Same(),
+            judge_model="qwen2.5:7b",
+            fixtures=fixture,
+        )
+    assert any("Self-judging" in rec.message for rec in caplog.records)
 
 
 @pytest.mark.asyncio

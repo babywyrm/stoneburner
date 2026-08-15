@@ -292,6 +292,8 @@ def test_redblue_summary_overall_quality():
     q = summary.overall_quality
     assert q is not None
     assert 0.0 <= q <= 1.0
+    assert summary.integrity.status.value == "partial"
+    assert summary.to_dict()["overall_quality"] is None
 
 
 def test_redblue_summary_overall_quality_no_results():

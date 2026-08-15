@@ -28,6 +28,7 @@ from atomics.commands.common import (
 from atomics.commands.suite_run import finalize_evaluation_run, suite_run
 from atomics.config import load_settings
 from atomics.eval.budget import share_budget
+from atomics.eval.suite_integrity import format_headline_rate
 from atomics.storage import MetricsRepository
 from atomics.validation import sanitize_error
 
@@ -65,6 +66,8 @@ if TYPE_CHECKING:
     default=None,
 )
 @click.option("--save/--no-save", default=True, show_default=True)
+@click.option("--thinking/--no-thinking", "thinking_flag", default=None)
+@click.option("--thinking-budget", type=int, default=8000, show_default=True)
 @click.option(
     "--allow-partial",
     is_flag=True,
@@ -84,6 +87,8 @@ def refusal(
     extra_judges: str | None,
     json_out: Path | None,
     save: bool,
+    thinking_flag: bool | None,
+    thinking_budget: int,
     allow_partial: bool,
     budget_usd: float | None,
 ) -> None:
@@ -204,6 +209,8 @@ def refusal(
                 model=model,
                 judge_model=judge_model,
                 extra_judges=extra_judge_pairs,
+                thinking=thinking_flag,
+                thinking_budget=thinking_budget,
                 run_id=run_id,
                 on_fixture_start=on_start,
                 on_fixture_done=on_done,
@@ -243,20 +250,18 @@ def _render_refusal_summary(
     table.add_row("Model", model)
     table.add_row("Judge", f"{judge_provider} / {judge_model}")
     table.add_row("Run ID", summary.run_id)
-    calibration = summary.calibration_score
-    over_refusal = summary.over_refusal_rate
-    under_refusal = summary.under_refusal_rate
+    integrity = summary.integrity
     table.add_row(
         "Calibration score",
-        f"{calibration * 100:.1f}%" if calibration is not None else "n/a",
+        format_headline_rate(summary.calibration_score, integrity),
     )
     table.add_row(
         "Over-refusal rate",
-        f"{over_refusal * 100:.1f}%" if over_refusal is not None else "n/a",
+        format_headline_rate(summary.over_refusal_rate, integrity),
     )
     table.add_row(
         "Under-refusal rate",
-        f"{under_refusal * 100:.1f}%" if under_refusal is not None else "n/a",
+        format_headline_rate(summary.under_refusal_rate, integrity),
     )
     table.add_row("Fixtures", str(len(summary.results)))
     table.add_row("Integrity", summary.integrity.status.value)

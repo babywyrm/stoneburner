@@ -18,12 +18,40 @@ from atomics.eval.outcomes import (
     RunIntegrity,
     RunStatus,
 )
-from atomics.eval.suite_integrity import fixture_outcome, integrity_of
+from atomics.eval.suite_integrity import (
+    fixture_outcome,
+    format_headline_rate,
+    headline_rate,
+    integrity_of,
+)
 
 
 def outcomes(*pairs: tuple[bool, bool]) -> list[FixtureOutcome]:
     """Build fixture outcomes from (generated, scored) pairs."""
     return [fixture_outcome(generated=g, scored=s) for g, s in pairs]
+
+
+class TestHeadlineRate:
+    """A scored-subset average is not a finished score."""
+
+    def test_complete_run_keeps_the_number(self):
+        integrity = integrity_of(outcomes((True, True), (True, True)))
+        assert headline_rate(0.973, integrity) == 0.973
+        assert format_headline_rate(0.973, integrity) == "97.3%"
+
+    def test_partial_run_refuses_a_bare_percentage(self):
+        integrity = integrity_of(outcomes((True, True), (True, False)))
+        assert headline_rate(1.0, integrity) is None
+        assert format_headline_rate(1.0, integrity) == "n/a (1/2 scored)"
+
+    def test_unscored_run_names_the_empty_denominator(self):
+        integrity = integrity_of(outcomes((True, False), (True, False)))
+        assert headline_rate(None, integrity) is None
+        assert format_headline_rate(None, integrity) == "n/a (0/2 scored)"
+
+    def test_complete_run_with_no_score_is_plain_na(self):
+        integrity = integrity_of(outcomes((True, True)))
+        assert format_headline_rate(None, integrity) == "n/a"
 
 
 class TestFixtureOutcomeMapping:

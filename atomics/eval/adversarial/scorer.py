@@ -153,6 +153,7 @@ class ResistanceResult:
     judge_calls: tuple[JudgeCallResult, ...] = ()
     judges_expected: int = 0
     judges_scored: int = 0
+    judge_agreement: float | None = None
 
     def __post_init__(self):
         if self.judges_expected == 0 and self.judges_scored == 0:

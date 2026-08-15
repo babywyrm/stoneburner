@@ -109,6 +109,8 @@ def _rate(rate: float | None, numerator: int, denominator: int) -> str:
               help="Write the full run as JSON to this file.")
 @click.option("--verbose", "-v", is_flag=True,
               help="Show the emitted call arguments and the accompanying text.")
+@click.option("--thinking/--no-thinking", "thinking_flag", default=None)
+@click.option("--thinking-budget", type=int, default=8000, show_default=True)
 @budget_option
 def toolcall(
     provider_name: str,
@@ -126,6 +128,8 @@ def toolcall(
     save_results: bool,
     json_out: str | None,
     verbose: bool,
+    thinking_flag: bool | None,
+    thinking_budget: int,
     budget_usd: float | None,
 ) -> None:
     """Measure tool-call divergence: refuses in prose, complies with a function.
@@ -197,6 +201,8 @@ def toolcall(
             fixtures=fixtures,
             runs=runs,
             channel=channel,
+            thinking=thinking_flag,
+            thinking_budget=thinking_budget,
         )
     )
 
@@ -347,5 +353,6 @@ def _save(summary, *, db_path) -> None:
                     model=summary.model,
                     error_message=str(result["error"] or ""),
                     result_json=result,
+                    judge_agreement=result.get("judge_agreement"),
                 )
             )

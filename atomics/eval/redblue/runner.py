@@ -23,7 +23,7 @@ from atomics.eval.judge import (
 )
 from atomics.eval.outcomes import RunIntegrity
 from atomics.eval.redblue.fixtures import ALL_FIXTURES, BLUE_FIXTURES, RED_FIXTURES, RedBlueFixture
-from atomics.eval.suite_integrity import fixture_outcome, integrity_of
+from atomics.eval.suite_integrity import fixture_outcome, headline_rate, integrity_of
 from atomics.model_classes import supports_thinking
 from atomics.models import TaskCategory, TaskResult, TaskStatus
 from atomics.providers.base import BaseProvider
@@ -146,7 +146,7 @@ class RedBlueSummary:
             "runs": self.runs,
             "started_at": self.started_at.isoformat(),
             "completed_at": self.completed_at.isoformat(),
-            "overall_quality": self.overall_quality,
+            "overall_quality": headline_rate(self.overall_quality, self.integrity),
             "quality_stddev": self.quality_stddev,
             "total_fixtures": self.total_fixtures,
             "category_scores": self.category_scores,

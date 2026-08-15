@@ -24,6 +24,8 @@ from atomics.commands.common import (
 from atomics.commands.suite_run import finalize_task_run, suite_run
 from atomics.config import load_settings
 from atomics.eval.budget import share_budget
+from atomics.eval.outcomes import RunStatus
+from atomics.eval.suite_integrity import format_headline_rate
 
 
 @click.command("redblue")
@@ -165,8 +167,11 @@ def redblue(
         table.add_row("Judge", f"{judge_provider_name} / {judge_model or 'default'}")
         table.add_row("Mode", mode)
         table.add_row("Runs per fixture", str(summary.runs))
-        quality_str = f"{(summary.overall_quality or 0) * 100:.1f}%"
-        if summary.quality_stddev is not None:
+        quality_str = format_headline_rate(summary.overall_quality, summary.integrity)
+        if (
+            summary.quality_stddev is not None
+            and summary.integrity.status is RunStatus.COMPLETE
+        ):
             quality_str += f"  ±{summary.quality_stddev * 100:.1f}%"
         table.add_row("Overall Quality", quality_str)
         table.add_row("Fixtures Run", str(summary.total_fixtures))

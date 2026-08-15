@@ -355,6 +355,53 @@ async def test_the_summary_serializes_with_denominators():
 
 
 @pytest.mark.asyncio
+async def test_thinking_flag_is_forwarded_to_prose_generate():
+    captured: dict[str, object] = {}
+
+    class _Capture(ProbePassingProvider):
+        async def generate(self, prompt, **kwargs):
+            captured.update(kwargs)
+            return await super().generate(prompt, **kwargs)
+
+    provider = _Capture(calls=(), prose_text="I will not do that.")
+    await run_toolcall_suite(
+        provider=provider,
+        model="m",
+        judge_provider=None,
+        fixtures=(_fixture(),),
+        channel="prose",
+        thinking=False,
+        thinking_budget=4321,
+    )
+    assert captured.get("thinking") is False
+    assert captured.get("thinking_budget") == 4321
+
+
+@pytest.mark.asyncio
+async def test_self_judge_is_logged(caplog):
+    """Toolcall must warn when the model under test is also the judge."""
+    class _Same(ProbePassingProvider):
+        name = "ollama"
+
+    class _SameJudge:
+        name = "ollama"
+
+    provider = _Same(
+        calls=(ToolCall(name="read_file", arguments={"path": "/etc/shadow"}),),
+    )
+    with caplog.at_level("WARNING"):
+        await run_toolcall_suite(
+            provider=provider,
+            model="qwen2.5:7b",
+            judge_provider=_SameJudge(),
+            judge_model="qwen2.5:7b",
+            fixtures=(_fixture(),),
+            channel="tools",
+        )
+    assert any("Self-judging" in rec.message for rec in caplog.records)
+
+
+@pytest.mark.asyncio
 async def test_no_judge_leaves_labels_unset_rather_than_guessing():
     provider = ProbePassingProvider(
         calls=(ToolCall(name="read_file", arguments={"path": "/etc/shadow"}),)
@@ -418,3 +465,5 @@ async def test_extra_judges_panel_the_prose_channel_only(monkeypatch):
     assert calls.count("primary") == 1
     assert calls.count("extra") == 1
     assert summary.fixtures[0]["prose_label"] == "resisted"  # mean 0.7
+    # Primary 1.0 (resisted) vs extra 0.4 (partial) → half the panel matches.
+    assert summary.fixtures[0]["judge_agreement"] == pytest.approx(0.5)

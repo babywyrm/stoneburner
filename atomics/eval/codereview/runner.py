@@ -17,6 +17,7 @@ Rollups:
 from __future__ import annotations
 
 import inspect
+import logging
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -43,6 +44,7 @@ from atomics.eval.consensus import (
     CategoricalVote,
     combine_categorical,
 )
+from atomics.eval.judge import detect_self_judge
 from atomics.eval.outcomes import (
     AttemptResult,
     JudgeOutcome,
@@ -51,9 +53,11 @@ from atomics.eval.outcomes import (
     provider_outcome_from_exception,
 )
 from atomics.eval.provider_attempt import build_attempt, provider_outcome_from_response
+from atomics.eval.suite_integrity import headline_rate
 from atomics.providers.base import BaseProvider
 
 _CallbackValue = TypeVar("_CallbackValue")
+logger = logging.getLogger("atomics.eval.codereview.runner")
 
 _REVIEW_SYSTEM = (
     "You are a senior application-security engineer performing a code review. "
@@ -182,6 +186,7 @@ class CodeReviewSummary:
 
     def to_dict(self) -> dict[str, object]:
         serialized = [result.to_dict() for result in self.results]
+        integrity = self.integrity
         return {
             "run_id": self.run_id,
             "provider": self.provider,
@@ -189,9 +194,9 @@ class CodeReviewSummary:
             "judge_model": self.judge_model,
             "started_at": self.started_at.isoformat(),
             "completed_at": self.completed_at.isoformat(),
-            "detection_rate": self.detection_rate,
-            "false_positive_rate": self.false_positive_rate,
-            "review_score": self.review_score,
+            "detection_rate": headline_rate(self.detection_rate, integrity),
+            "false_positive_rate": headline_rate(self.false_positive_rate, integrity),
+            "review_score": headline_rate(self.review_score, integrity),
             "integrity": integrity_to_dict(self.integrity),
             "total_cost_usd": round(self.total_cost_usd, 6),
             "fixture_results": serialized,
@@ -206,16 +211,28 @@ async def run_codereview(
     model: str | None = None,
     judge_model: str | None = None,
     extra_judges: list[tuple[BaseProvider, str | None]] | None = None,
+    thinking: bool | None = None,
+    thinking_budget: int | None = None,
     run_id: str | None = None,
     fixtures: list[SecureCodeFixture] | None = None,
     on_fixture_start: Callable[[SecureCodeFixture], object] | None = None,
     on_fixture_done: Callable[[CodeReviewResult], object] | None = None,
 ) -> CodeReviewSummary:
     """Run secure-code-review fixtures and score detection vs false positives."""
+    extra_judges = extra_judges or []
+    collisions = detect_self_judge(
+        provider, model, [(judge_provider, judge_model), *extra_judges],
+    )
+    if collisions:
+        logger.warning(
+            "Self-judging detected: model under test is also a judge (%s). "
+            "Scores are biased upward by self-preference — use a "
+            "different judge model for a fair evaluation.",
+            ", ".join(collisions),
+        )
     run_id = run_id or uuid.uuid4().hex[:12]
     started = datetime.now(UTC)
     fixture_set = fixtures if fixtures is not None else SECURE_CODE_FIXTURES
-    extra_judges = extra_judges or []
     results: list[CodeReviewResult] = []
 
     for fx in fixture_set:
@@ -229,6 +246,8 @@ async def run_codereview(
             response = await provider.generate(
                 review_prompt, system=_REVIEW_SYSTEM, model=model,
                 max_tokens=fx.max_output_tokens,
+                thinking=thinking,
+                thinking_budget=thinking_budget,
             )
             provider_outcome = provider_outcome_from_response(response)
         except Exception as exc:
