@@ -149,6 +149,7 @@ def test_codereview_help_preserves_public_options() -> None:
         "--json-out",
         "--save",
         "--allow-partial",
+        "--extra-judges",
     ):
         assert option in result.output
 

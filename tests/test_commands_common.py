@@ -163,3 +163,41 @@ def test_evaluation_record_from_fixture_rolls_up_attempt_usage() -> None:
     assert record.total_tokens == 12
     assert record.thinking_tokens == 2
     assert record.result_json is payload
+    assert record.judge_agreement is None
+
+
+def test_evaluation_record_from_fixture_copies_judge_agreement() -> None:
+    payload: dict[str, object] = {
+        "id": "fixture-1",
+        "status": "complete",
+        "score": 1.0,
+        "generation_status": "completed",
+        "judge_status": "scored",
+        "latency_ms": 20.0,
+        "estimated_cost_usd": 0.03,
+        "attempt_count": 1,
+        "generation_failures": 0,
+        "infrastructure_failures": 0,
+        "judge_failures": 0,
+        "parse_failed": False,
+        "error_class": "",
+        "error_message": "",
+        "judge_agreement": 2 / 3,
+        "attempts": [
+            {
+                "input_tokens": 8,
+                "output_tokens": 4,
+                "thinking_tokens": 2,
+            }
+        ],
+    }
+
+    record = evaluation_record_from_fixture(
+        run_id="run-1",
+        suite="refusal",
+        provider="ollama",
+        model="qwen",
+        payload=payload,
+    )
+
+    assert record.judge_agreement == pytest.approx(2 / 3)

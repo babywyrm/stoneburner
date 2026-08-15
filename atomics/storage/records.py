@@ -32,3 +32,4 @@ class EvaluationResultRecord:
     model: str = ""
     error_class: str = ""
     error_message: str = ""
+    judge_agreement: float | None = None

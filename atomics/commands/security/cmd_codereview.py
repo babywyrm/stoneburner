@@ -20,7 +20,9 @@ from atomics.commands.common import (
     effective_model,
     eval_budget_from,
     evaluation_record_from_fixture,
+    extra_judges_option,
     integrity_exit_code,
+    parse_extra_judges,
     write_summary_json,
 )
 from atomics.commands.suite_run import finalize_evaluation_run, suite_run
@@ -54,6 +56,7 @@ if TYPE_CHECKING:
 )
 @click.option("--judge-model", type=str, default=None)
 @click.option("--judge-host", type=str, default=None)
+@extra_judges_option
 @click.option(
     "-o",
     "--json-out",
@@ -78,6 +81,7 @@ def codereview(
     judge_provider_name: str,
     judge_model: str | None,
     judge_host: str | None,
+    extra_judges: str | None,
     json_out: Path | None,
     save: bool,
     allow_partial: bool,
@@ -105,7 +109,23 @@ def codereview(
         )
         attributed_model = effective_model(model, provider)
         attributed_judge = effective_model(judge_model, judge)
-        provider, judge = share_budget(eval_budget_from(budget_usd), provider, judge)
+        extra_judge_pairs = parse_extra_judges(
+            extra_judges,
+            build=lambda name, mdl, host: _make_provider(
+                name, mdl, host, settings, vllm_host=vllm_host
+            ),
+            default_host=judge_host or ollama_host,
+        )
+        guarded = share_budget(
+            eval_budget_from(budget_usd),
+            provider,
+            judge,
+            *(p for p, _ in extra_judge_pairs),
+        )
+        provider, judge = guarded[0], guarded[1]
+        extra_judge_pairs = [
+            (guarded[2 + i], mdl) for i, (_, mdl) in enumerate(extra_judge_pairs)
+        ]
     except click.ClickException:
         raise
     except Exception as exc:
@@ -180,6 +200,7 @@ def codereview(
                 judge_provider=judge,
                 model=model,
                 judge_model=judge_model,
+                extra_judges=extra_judge_pairs,
                 run_id=run_id,
                 on_fixture_start=on_start,
                 on_fixture_done=on_done,

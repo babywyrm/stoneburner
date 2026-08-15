@@ -11,6 +11,7 @@ from datetime import UTC, datetime
 from atomics.eval.attempt_serialization import integrity_to_dict
 from atomics.eval.multiturn import ConversationFixture
 from atomics.eval.multiturn.fixtures import ALL_MULTITURN_FIXTURES
+from atomics.eval.consensus import NumericVote, combine_numeric
 from atomics.eval.multiturn.judge import (
     ConversationJudgeResult,
     TurnJudgeResult,
@@ -202,6 +203,7 @@ async def run_multiturn(
     judge_provider: BaseProvider | None = None,
     model: str | None = None,
     judge_model: str | None = None,
+    extra_judges: list[tuple[BaseProvider, str | None]] | None = None,
     run_id: str | None = None,
     on_conversation_done: Callable[[ConversationResult], None] | None = None,
     thinking: bool | None = None,
@@ -210,6 +212,7 @@ async def run_multiturn(
 ) -> MultiturnRunSummary:
     """Run the multi-turn conversation evaluation."""
     effective_judge = judge_provider or provider
+    extra_judges = extra_judges or []
     effective_run_id = run_id or uuid.uuid4().hex[:12]
     selected = fixtures or ALL_MULTITURN_FIXTURES
     started = datetime.now(UTC)
@@ -287,11 +290,42 @@ async def run_multiturn(
 
         full_transcript = _build_transcript(fixture.system_prompt, completed_turns)
         if not conversation_failed:
-            conv_judge = await score_conversation(
-                transcript=full_transcript,
-                criteria=fixture.conversation_criteria,
-                judge=effective_judge,
-                judge_model=judge_model,
+            panel = [
+                await score_conversation(
+                    transcript=full_transcript,
+                    criteria=fixture.conversation_criteria,
+                    judge=effective_judge,
+                    judge_model=judge_model,
+                )
+            ]
+            for extra_provider, extra_model in extra_judges:
+                panel.append(
+                    await score_conversation(
+                        transcript=full_transcript,
+                        criteria=fixture.conversation_criteria,
+                        judge=extra_provider,
+                        judge_model=extra_model,
+                    )
+                )
+            combined = combine_numeric(
+                [
+                    NumericVote(
+                        score=result.score,
+                        parse_failed=result.parse_failed,
+                        judge_model=judge_model or "judge",
+                        rationale=result.rationale,
+                    )
+                    for result in panel
+                ]
+            )
+            primary = panel[0]
+            conv_judge = ConversationJudgeResult(
+                retention=primary.retention,
+                consistency=primary.consistency,
+                instruction=primary.instruction,
+                score=combined.score if not combined.parse_failed else primary.score,
+                rationale=combined.rationale,
+                parse_failed=combined.parse_failed,
             )
         else:
             conv_judge = None

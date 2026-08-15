@@ -439,3 +439,48 @@ def test_on_fixture_done_async_callback_on_failure():
     ))
 
     assert len(received) > 0
+
+
+def _rubric_judge(name: str, text: str):
+    j = AsyncMock()
+    j.name = name
+    j.generate = AsyncMock(return_value=SimpleNamespace(
+        text=text, model=name, input_tokens=20, output_tokens=30,
+        total_tokens=50, thinking_tokens=0, latency_ms=80.0,
+        estimated_cost_usd=0.0, tokens_per_second=100.0,
+    ))
+    return j
+
+
+def test_run_redblue_extra_judges_averages_scores():
+    from atomics.eval.redblue.runner import run_redblue
+
+    primary = _rubric_judge(
+        "judge-a", "ACCURACY: 4\nCOMPLETENESS: 3\nFORMAT: 3\nRATIONALE: great."
+    )
+    extra = _rubric_judge(
+        "judge-b", "ACCURACY: 2\nCOMPLETENESS: 1\nFORMAT: 1\nRATIONALE: weak."
+    )
+    summary = asyncio.run(
+        run_redblue(
+            _provider(),
+            judge_provider=primary,
+            extra_judges=[(extra, None)],
+            mode="red",
+        )
+    )
+    scored = [r for r in summary.results if r.judge and not r.judge.parse_failed]
+    assert scored
+    assert scored[0].judge.score == 0.7
+    assert scored[0].judge.score_stdev == 0.3
+    assert scored[0].task_result.judge_score_stdev == 0.3
+
+
+def test_cli_redblue_extra_judges_option():
+    from click.testing import CliRunner
+
+    from atomics.cli import cli
+
+    result = CliRunner().invoke(cli, ["redblue", "--help"])
+    assert result.exit_code == 0
+    assert "--extra-judges" in result.output

@@ -19,6 +19,8 @@ from atomics.commands.common import (
     budget_option,
     effective_model,
     eval_budget_from,
+    extra_judges_option,
+    parse_extra_judges,
     write_summary_json,
 )
 from atomics.commands.suite_run import finalize_evaluation_run, suite_run
@@ -86,6 +88,7 @@ def _rate(rate: float | None, numerator: int, denominator: int) -> str:
 @click.option("--judge-model", type=str, default=None, help="Judge model override.")
 @click.option("--judge-host", type=str, default=None,
               help="Ollama base URL for the judge.")
+@extra_judges_option
 @click.option("--runs", type=click.IntRange(min=1), default=1, show_default=True,
               help="Run each fixture N times. Both channels run per pass and pair "
                    "within it; the reported outcome is the modal one.")
@@ -115,6 +118,7 @@ def toolcall(
     judge_provider_name: str | None,
     judge_model: str | None,
     judge_host: str | None,
+    extra_judges: str | None,
     runs: int,
     category: str | None,
     channel: str,
@@ -146,10 +150,18 @@ def toolcall(
         provider_name, model, ollama_host, settings, vllm_host=vllm_host
     )
     judge = None
+    extra_judge_pairs: list = []
     if judge_provider_name:
         judge = _make_provider(
             judge_provider_name, judge_model, judge_host or ollama_host, settings,
             vllm_host=vllm_host,
+        )
+        extra_judge_pairs = parse_extra_judges(
+            extra_judges,
+            build=lambda name, mdl, host: _make_provider(
+                name, mdl, host, settings, vllm_host=vllm_host
+            ),
+            default_host=judge_host or ollama_host,
         )
 
     # The judge is optional here — the tool channel is scored deterministically
@@ -158,7 +170,13 @@ def toolcall(
     if judge is None:
         (provider,) = share_budget(budget, provider)
     else:
-        provider, judge = share_budget(budget, provider, judge)
+        guarded = share_budget(
+            budget, provider, judge, *(p for p, _ in extra_judge_pairs)
+        )
+        provider, judge = guarded[0], guarded[1]
+        extra_judge_pairs = [
+            (guarded[2 + i], mdl) for i, (_, mdl) in enumerate(extra_judge_pairs)
+        ]
 
     resolved_model = effective_model(model, provider)
     console.print(
@@ -175,6 +193,7 @@ def toolcall(
             model=model,
             judge_provider=judge,
             judge_model=judge_model,
+            extra_judges=extra_judge_pairs,
             fixtures=fixtures,
             runs=runs,
             channel=channel,

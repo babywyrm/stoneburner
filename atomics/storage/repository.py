@@ -112,10 +112,10 @@ class MetricsRepository:
                 input_tokens, output_tokens, total_tokens, thinking_tokens,
                 attempt_count, generation_failures, infrastructure_failures,
                 judge_failures, parse_failed, provider, model, error_class,
-                error_message, result_json, timestamp
+                error_message, result_json, timestamp, judge_agreement
             ) VALUES (
                 ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                ?, ?, ?, ?
+                ?, ?, ?, ?, ?
             )
             ON CONFLICT(run_id, suite, fixture_id) DO UPDATE SET
                 status = excluded.status,
@@ -138,7 +138,8 @@ class MetricsRepository:
                 error_class = excluded.error_class,
                 error_message = excluded.error_message,
                 result_json = excluded.result_json,
-                timestamp = excluded.timestamp
+                timestamp = excluded.timestamp,
+                judge_agreement = excluded.judge_agreement
             """,
             (
                 uuid.uuid4().hex[:12],
@@ -166,6 +167,7 @@ class MetricsRepository:
                 error_message,
                 json.dumps(record.result_json),
                 datetime.now(UTC).isoformat(),
+                record.judge_agreement,
             ),
         )
         self._conn.commit()
@@ -201,6 +203,69 @@ class MetricsRepository:
             item = dict(row)
             item["result_json"] = json.loads(str(item["result_json"]))
             item["parse_failed"] = bool(item["parse_failed"])
+            results.append(item)
+        return results
+
+    def save_agreement_result(
+        self,
+        *,
+        run_id: str,
+        suite: str,
+        fixture_id: str,
+        votes: dict[str, object],
+        agreement: float | None,
+        flipped: bool,
+    ) -> None:
+        """Upsert one judge-agreement study row. No parent `runs` row required."""
+        self._conn.execute(
+            """
+            INSERT INTO judge_agreement_results (
+                result_id, run_id, suite, fixture_id, votes_json,
+                agreement, flipped, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(run_id, suite, fixture_id) DO UPDATE SET
+                votes_json = excluded.votes_json,
+                agreement = excluded.agreement,
+                flipped = excluded.flipped,
+                created_at = excluded.created_at
+            """,
+            (
+                uuid.uuid4().hex[:12],
+                run_id,
+                suite,
+                fixture_id,
+                json.dumps(votes),
+                agreement,
+                int(flipped),
+                datetime.now(UTC).isoformat(),
+            ),
+        )
+        self._conn.commit()
+
+    def get_agreement_results(
+        self,
+        *,
+        run_id: str | None = None,
+        suite: str | None = None,
+    ) -> list[dict[str, object]]:
+        """Return study rows, newest first within a run."""
+        query = "SELECT * FROM judge_agreement_results"
+        clauses: list[str] = []
+        params: list[object] = []
+        if run_id is not None:
+            clauses.append("run_id = ?")
+            params.append(run_id)
+        if suite is not None:
+            clauses.append("suite = ?")
+            params.append(suite)
+        if clauses:
+            query += " WHERE " + " AND ".join(clauses)
+        query += " ORDER BY created_at, fixture_id"
+        rows = self._conn.execute(query, params).fetchall()
+        results: list[dict[str, object]] = []
+        for row in rows:
+            item = dict(row)
+            item["votes_json"] = json.loads(str(item["votes_json"]))
             results.append(item)
         return results
 

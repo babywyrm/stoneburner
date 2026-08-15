@@ -60,8 +60,21 @@ CREATE TABLE IF NOT EXISTS evaluation_results (
     error_message           TEXT NOT NULL DEFAULT '',
     result_json             TEXT NOT NULL DEFAULT '{}',
     timestamp               TEXT NOT NULL,
+    judge_agreement         REAL DEFAULT NULL,
     UNIQUE (run_id, suite, fixture_id),
     FOREIGN KEY (run_id) REFERENCES runs(run_id)
+);
+
+CREATE TABLE IF NOT EXISTS judge_agreement_results (
+    result_id     TEXT PRIMARY KEY,
+    run_id        TEXT NOT NULL,
+    suite         TEXT NOT NULL,
+    fixture_id    TEXT NOT NULL,
+    votes_json    TEXT NOT NULL DEFAULT '{}',
+    agreement     REAL DEFAULT NULL,
+    flipped       INTEGER NOT NULL DEFAULT 0,
+    created_at    TEXT NOT NULL,
+    UNIQUE (run_id, suite, fixture_id)
 );
 
 CREATE TABLE IF NOT EXISTS task_results (

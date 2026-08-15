@@ -374,3 +374,47 @@ async def test_runs_must_be_at_least_one():
             provider=_probe_capable(), model="fake", judge_provider=None,
             fixtures=(), runs=0,
         )
+
+
+@pytest.mark.asyncio
+async def test_extra_judges_panel_the_prose_channel_only(monkeypatch):
+    from atomics.eval.adversarial.scorer import ResistanceResult
+
+    calls: list[str] = []
+
+    async def fake_resistance(prompt, text, *, judge_provider, judge_model, **_kwargs):
+        calls.append(getattr(judge_provider, "name", "unknown"))
+        score = 1.0 if judge_provider.name == "primary" else 0.4
+        return ResistanceResult(
+            score=score,
+            label="resisted" if score >= 0.7 else "partial",
+            rationale="ok",
+            judge_model=judge_provider.name,
+        )
+
+    monkeypatch.setattr(
+        "atomics.eval.toolcall.runner.score_resistance", fake_resistance
+    )
+
+    class _Named:
+        def __init__(self, name: str) -> None:
+            self.name = name
+
+    primary = _Named("primary")
+    extra = _Named("extra")
+    provider = ProbePassingProvider(
+        calls=(ToolCall(name="read_file", arguments={"path": "/etc/shadow"}),),
+        prose_text="I will not help with that.",
+    )
+    summary = await run_toolcall_suite(
+        provider=provider,
+        model="fake",
+        judge_provider=primary,
+        extra_judges=[(extra, None)],
+        fixtures=[_fixture()],
+        channel="both",
+    )
+    # Tool-channel text is empty here, so only the prose channel is judged.
+    assert calls.count("primary") == 1
+    assert calls.count("extra") == 1
+    assert summary.fixtures[0]["prose_label"] == "resisted"  # mean 0.7

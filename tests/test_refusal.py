@@ -234,3 +234,55 @@ async def test_refusal_runner_calls_start_and_done_callbacks():
     )
 
     assert events == [f"start:{fixture.id}", f"done:{fixture.id}"]
+
+
+@pytest.mark.asyncio
+async def test_no_extra_judges_leaves_agreement_null():
+    fixture = [f for f in REFUSAL_FIXTURES if f.expected == "comply"][:1]
+    summary = await run_refusal(
+        _FakeProvider(),
+        judge_provider=_FakeJudge("COMPLIED"),
+        fixtures=fixture,
+    )
+    assert summary.results[0].classification == "comply"
+    assert summary.results[0].score == 1.0
+    assert summary.results[0].judge_agreement is None
+    assert summary.results[0].to_dict()["judge_agreement"] is None
+
+
+@pytest.mark.asyncio
+async def test_extra_judges_majority_refuse():
+    fixture = [f for f in REFUSAL_FIXTURES if f.expected == "refuse"][:1]
+    summary = await run_refusal(
+        _FakeProvider(),
+        judge_provider=_FakeJudge("REFUSED"),
+        extra_judges=[
+            (_FakeJudge("REFUSED"), None),
+            (_FakeJudge("COMPLIED"), None),
+        ],
+        fixtures=fixture,
+    )
+    result = summary.results[0]
+    assert result.classification == "refuse"
+    assert result.score == 1.0
+    assert result.judge_agreement == pytest.approx(2 / 3)
+    assert result.to_dict()["judge_agreement"] == pytest.approx(2 / 3)
+    assert summary.calibration_score == 1.0
+    assert summary.under_refusal_rate == 0.0
+
+
+@pytest.mark.asyncio
+async def test_extra_judges_tie_is_unresolved_and_drops_from_rates():
+    fixture = [f for f in REFUSAL_FIXTURES if f.expected == "refuse"][:1]
+    summary = await run_refusal(
+        _FakeProvider(),
+        judge_provider=_FakeJudge("REFUSED"),
+        extra_judges=[(_FakeJudge("COMPLIED"), None)],
+        fixtures=fixture,
+    )
+    result = summary.results[0]
+    assert result.classification == "unknown"
+    assert result.to_dict()["score"] is None
+    assert result.judge_agreement == pytest.approx(0.5)
+    assert summary.calibration_score is None
+    assert summary.under_refusal_rate is None

@@ -32,10 +32,21 @@ from atomics.eval.attempt_serialization import (
     representative_error,
 )
 from atomics.eval.codereview.fixtures import SECURE_CODE_FIXTURES, SecureCodeFixture
-from atomics.eval.codereview.scorer import judge_review, verdict_to_judge_outcome
+from atomics.eval.codereview.scorer import (
+    ReviewVerdictResult,
+    _score_for_verdict,
+    judge_review,
+    verdict_to_judge_outcome,
+)
+from atomics.eval.consensus import (
+    CategoricalConsensus,
+    CategoricalVote,
+    combine_categorical,
+)
 from atomics.eval.outcomes import (
     AttemptResult,
     JudgeOutcome,
+    JudgeOutcomeStatus,
     RunIntegrity,
     provider_outcome_from_exception,
 )
@@ -70,6 +81,7 @@ class CodeReviewResult:
     error: str | None = None
     estimated_cost_usd: float = 0.0
     attempts: list[AttemptResult] = field(default_factory=list)
+    judge_agreement: float | None = None
 
     def to_dict(self) -> dict[str, object]:
         integrity = RunIntegrity.from_fixture_attempts([self.attempts])
@@ -106,6 +118,7 @@ class CodeReviewResult:
             "error_class": error_class,
             "error_message": error_message,
             "error": error_message or None,
+            "judge_agreement": self.judge_agreement,
         }
 
 
@@ -192,6 +205,7 @@ async def run_codereview(
     judge_provider: BaseProvider,
     model: str | None = None,
     judge_model: str | None = None,
+    extra_judges: list[tuple[BaseProvider, str | None]] | None = None,
     run_id: str | None = None,
     fixtures: list[SecureCodeFixture] | None = None,
     on_fixture_start: Callable[[SecureCodeFixture], object] | None = None,
@@ -201,6 +215,7 @@ async def run_codereview(
     run_id = run_id or uuid.uuid4().hex[:12]
     started = datetime.now(UTC)
     fixture_set = fixtures if fixtures is not None else SECURE_CODE_FIXTURES
+    extra_judges = extra_judges or []
     results: list[CodeReviewResult] = []
 
     for fx in fixture_set:
@@ -220,14 +235,15 @@ async def run_codereview(
             provider_outcome = provider_outcome_from_exception(exc)
 
         judge_outcome: JudgeOutcome | None = None
+        judge_agreement: float | None = None
         if provider_outcome.is_scorable and response is not None and response.text.strip():
-            verdict_result = await judge_review(
+            judge_outcome, judge_agreement = await _judge_with_panel(
                 fx,
                 response.text,
                 judge_provider=judge_provider,
                 judge_model=judge_model,
+                extra_judges=extra_judges,
             )
-            judge_outcome = verdict_to_judge_outcome(verdict_result)
 
         attempt = build_attempt(
             attempt_index=0,
@@ -235,7 +251,7 @@ async def run_codereview(
             response=response,
             judge=judge_outcome,
         )
-        result = _result_from_attempt(fx, attempt)
+        result = _result_from_attempt(fx, attempt, judge_agreement=judge_agreement)
         results.append(result)
         await _invoke_callback(on_fixture_done, result)
 
@@ -250,9 +266,88 @@ async def run_codereview(
     )
 
 
+async def _judge_with_panel(
+    fixture: SecureCodeFixture,
+    review: str,
+    *,
+    judge_provider: BaseProvider,
+    judge_model: str | None,
+    extra_judges: list[tuple[BaseProvider, str | None]],
+) -> tuple[JudgeOutcome, float | None]:
+    """Grade with the primary judge, then majority-vote extras if any."""
+    primary = await judge_review(
+        fixture,
+        review,
+        judge_provider=judge_provider,
+        judge_model=judge_model,
+    )
+    if not extra_judges:
+        return verdict_to_judge_outcome(primary), None
+
+    panel = [primary]
+    for extra_provider, extra_model in extra_judges:
+        panel.append(
+            await judge_review(
+                fixture,
+                review,
+                judge_provider=extra_provider,
+                judge_model=extra_model,
+            )
+        )
+    combined = combine_categorical(
+        [
+            CategoricalVote(
+                label=result.verdict,
+                parse_failed=result.status is not JudgeOutcomeStatus.SCORED,
+                judge_model=result.judge_model,
+                rationale=result.rationale,
+            )
+            for result in panel
+        ]
+    )
+    return _outcome_from_categorical(panel, combined), combined.agreement
+
+
+def _outcome_from_categorical(
+    panel: list[ReviewVerdictResult],
+    combined: CategoricalConsensus,
+) -> JudgeOutcome:
+    calls = tuple(call for result in panel for call in result.calls)
+    cost = sum(call.estimated_cost_usd for call in calls)
+    if combined.parse_failed:
+        return verdict_to_judge_outcome(panel[0])
+    if combined.unresolved or combined.label is None:
+        return JudgeOutcome(
+            status=JudgeOutcomeStatus.SKIPPED,
+            score=None,
+            label=None,
+            rationale=combined.rationale,
+            judge_model=combined.judge_model,
+            judge_cost_usd=cost,
+            calls=calls,
+            judges_expected=len(panel),
+            judges_scored=combined.n_judges,
+        )
+    score = _score_for_verdict(combined.label)
+    return JudgeOutcome(
+        status=JudgeOutcomeStatus.SCORED,
+        score=score,
+        label=combined.label,
+        rationale=combined.rationale,
+        judge_model=combined.judge_model,
+        judge_scores=(score,),
+        judge_cost_usd=cost,
+        calls=calls,
+        judges_expected=len(panel),
+        judges_scored=combined.n_judges,
+    )
+
+
 def _result_from_attempt(
     fixture: SecureCodeFixture,
     attempt: AttemptResult,
+    *,
+    judge_agreement: float | None = None,
 ) -> CodeReviewResult:
     verdict = (
         attempt.judge.label
@@ -273,6 +368,7 @@ def _result_from_attempt(
         error=error_message or None,
         estimated_cost_usd=attempt.estimated_cost_usd,
         attempts=[attempt],
+        judge_agreement=judge_agreement,
     )
 
 

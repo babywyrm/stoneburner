@@ -18,6 +18,8 @@ from atomics.commands.common import (
     _make_provider,
     budget_option,
     eval_budget_from,
+    extra_judges_option,
+    parse_extra_judges,
 )
 from atomics.commands.suite_run import SuiteRun, finalize_adversarial_run
 from atomics.config import load_settings
@@ -50,10 +52,7 @@ def _parse_model_spec(spec: str, default_provider: str) -> tuple[str, str, str |
 @click.option("--judge-provider", "judge_provider_name", type=PROVIDER_CHOICES, default="ollama", show_default=True)
 @click.option("--judge-model", type=str, default=None, help="Primary judge model override.")
 @click.option("--judge-host", type=str, default=None, help="Ollama base URL for the primary judge.")
-@click.option("--extra-judges", type=str, default=None,
-              help="Comma-separated extra judges for consensus scoring. "
-                   "Format: provider:model or provider:model@host. "
-                   "Example: ollama:deepseek-r1:14b,claude:claude-sonnet-4-6")
+@extra_judges_option
 @click.option("--runs", type=click.IntRange(min=1), default=1, show_default=True,
               help="Run each fixture N times and report mean ± stddev (use 3+ for variance analysis).")
 @click.option("--category", type=str, default=None,
@@ -122,19 +121,13 @@ def adversarial(
     categories = [c.strip() for c in category.split(",")] if category else None
     selected_count = len(select_fixtures(categories))
 
-    # Parse --extra-judges "ollama:deepseek-r1:14b@http://host:port,claude:model"
-    extra_judge_pairs: list[tuple] = []
-    if extra_judges:
-        for spec in extra_judges.split(","):
-            spec = spec.strip()
-            host_override = None
-            if "@" in spec:
-                spec, host_override = spec.rsplit("@", 1)
-            parts = spec.split(":", 1)
-            ej_provider_name = parts[0]
-            ej_model = parts[1] if len(parts) > 1 else None
-            ej_provider = _make_provider(ej_provider_name, ej_model, host_override or judge_host or ollama_host, settings, vllm_host=vllm_host)
-            extra_judge_pairs.append((ej_provider, ej_model))
+    extra_judge_pairs = parse_extra_judges(
+        extra_judges,
+        build=lambda name, mdl, host: _make_provider(
+            name, mdl, host, settings, vllm_host=vllm_host
+        ),
+        default_host=judge_host or ollama_host,
+    )
 
     # This is the most expensive command in the tool: fixtures x --runs x every
     # judge. One shared ceiling covers all of it.
