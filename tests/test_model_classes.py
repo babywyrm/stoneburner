@@ -58,6 +58,20 @@ def test_classify_ollama_local_models():
     assert classify_model("llama3.2:1b") == ModelClass.LIGHT
     assert classify_model("qwen3.5:2b") == ModelClass.MID
     assert classify_model("ministral-3:3b") == ModelClass.MID
+    assert classify_model("ministral-3:8b") == ModelClass.MID
+    assert classify_model("qwen3:8b") == ModelClass.MID
+    assert classify_model("qwen3.5:9b") == ModelClass.MID
+    assert classify_model("granite4.1:3b") == ModelClass.MID
+    assert classify_model("granite4.1:8b") == ModelClass.MID
+    assert classify_model("lfm2.5:8b") == ModelClass.MID
+    assert classify_model("mistral-nemo:12b") == ModelClass.MID
+    assert classify_model("mistral-small:24b") == ModelClass.HEAVY
+    assert classify_model("nemotron-3-nano:4b") == ModelClass.MID
+    assert classify_model("phi4-mini-reasoning:3.8b") == ModelClass.MID
+    assert classify_model("qwen3.6:27b") == ModelClass.HEAVY
+    assert classify_model("qwen3.6:35b-a3b") == ModelClass.HEAVY
+    assert classify_model("qwen3.8:27b") == ModelClass.HEAVY
+    assert classify_model("smollm2:1.7b") == ModelClass.LIGHT
     assert classify_model("phi4-mini:3.8b") == ModelClass.MID
     assert classify_model("phi4:14b") == ModelClass.MID
     assert classify_model("dolphin3:8b") == ModelClass.MID
@@ -71,12 +85,16 @@ def test_classify_local_gateway_lineup_fully_tagged():
     gateway_models = [
         "cogito:3b", "deepseek-r1:7b", "deepseek-r1:14b", "dolphin3:8b", "dolphin3:latest",
         "functiongemma:latest", "gemma3:4b", "gemma4:12b", "gemma4:26b",
-        "gemma4:e4b", "custom-agent:latest", "llama3.2:1b", "ministral-3:3b",
+        "gemma4:e4b", "custom-agent:latest", "granite4.1:3b", "granite4.1:8b",
+        "llama3.2:1b", "ministral-3:3b", "ministral-3:8b",
         "mistral:7b", "mistral-small3.2:24b", "phi4-mini:3.8b", "phi4-mini:latest",
         "phi4:latest", "phi4-reasoning:14b",
         "qwen2.5-coder:14b", "qwen2.5:1.5b", "qwen2.5:14b", "qwen2.5:3b",
-        "qwen2.5:7b", "qwen3.5:0.8b", "qwen3.5:2b", "qwen3.5:4b", "qwen3:1.7b",
-        "qwen3:14b", "qwen3:4b",
+        "qwen2.5:7b", "qwen3.5:0.8b", "qwen3.5:2b", "qwen3.5:4b", "qwen3.5:9b",
+        "qwen3:1.7b", "qwen3:8b", "qwen3:14b", "qwen3:4b",
+        "lfm2.5:8b", "mistral-nemo:12b", "mistral-small:24b",
+        "nemotron-3-nano:4b", "phi4-mini-reasoning:3.8b",
+        "qwen3.6:27b", "qwen3.6:35b-a3b", "qwen3.8:27b", "smollm2:1.7b",
     ]
     unknown = [m for m in gateway_models if classify_model(m) == ModelClass.UNKNOWN]
     assert unknown == [], f"unclassified gateway models: {unknown}"
@@ -86,6 +104,11 @@ def test_thinking_support_qwen3_5_family():
     """qwen3.5 models should be thinking-capable."""
     assert supports_thinking("qwen3.5:0.8b") is True
     assert supports_thinking("qwen3.5:2b") is True
+    assert supports_thinking("qwen3.5:9b") is True
+    assert supports_thinking("qwen3:8b") is True
+    assert supports_thinking("qwen3.6:27b") is True
+    assert supports_thinking("qwen3.8:27b") is True
+    assert supports_thinking("phi4-mini-reasoning:3.8b") is True
 
 
 def test_thinking_support_deepseek_r1_all_sizes():
