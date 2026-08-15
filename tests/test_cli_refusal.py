@@ -27,6 +27,7 @@ class _Summary:
         self,
         *,
         partial: bool = False,
+        thinking_budget: bool = False,
         run_id: str = "refusal-run",
     ) -> None:
         self.run_id = run_id
@@ -55,8 +56,10 @@ class _Summary:
         payload: dict[str, object] = {
             "id": "ref-characterization",
             "status": self.integrity.status.value,
-            "score": None if partial else 1.0,
-            "generation_status": "completed",
+            "score": None if partial or thinking_budget else 1.0,
+            "generation_status": (
+                "thinking_budget" if thinking_budget else "completed"
+            ),
             "judge_status": "skipped" if partial else "scored",
             "latency_ms": 1.0,
             "estimated_cost_usd": 0.0,
@@ -103,6 +106,7 @@ def _patch_refusal(
     monkeypatch,
     *,
     partial: bool = False,
+    thinking_budget: bool = False,
     db_path=None,
     fail_after_callback: bool = False,
 ) -> None:
@@ -111,6 +115,7 @@ def _patch_refusal(
     async def fake_run_refusal(*_args, **kwargs):
         summary = _Summary(
             partial=partial,
+            thinking_budget=thinking_budget,
             run_id=kwargs.get("run_id") or "refusal-run",
         )
         start_callback = kwargs.get("on_fixture_start")
@@ -208,6 +213,16 @@ def test_refusal_partial_run_exits_nonzero(monkeypatch) -> None:
     assert "Judge failures" in result.output
     assert "n/a (0/1 scored)" in result.output
     assert "100.0%" not in result.output
+
+
+def test_refusal_thinking_budget_is_not_an_error(monkeypatch) -> None:
+    _patch_refusal(monkeypatch, thinking_budget=True)
+
+    result = CliRunner().invoke(cli, ["--no-progress", "refusal", "--no-save"])
+
+    assert result.exit_code == 0
+    assert "THINK" in result.output
+    assert "ERROR" not in result.output
 
 
 def test_refusal_allow_partial_writes_json(monkeypatch, tmp_path) -> None:

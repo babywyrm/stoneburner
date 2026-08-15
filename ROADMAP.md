@@ -97,10 +97,13 @@ in a sweep reads as a pass.
       (overnight `qwen3.5:4b`) is no longer printable as a leaderboard row.
       `to_dict()` nulls the headline unless integrity is complete; the CLI
       prints `n/a (scored/total scored)`.
-- [ ] **Empty visible text with nonzero `thinking_tokens` is not a mystery
+- [x] **Empty visible text with nonzero `thinking_tokens` is not a mystery
       generation failure.** After the native-`thinking` parse, those attempts
-      are "budget spent on reasoning". Surface that in the fixture row and in
-      integrity, so a sweep does not look like Ollama died.
+      are `thinking_budget` — not scorable, not infrastructure-invalid.
+      Fixture rows print `THINK`; JSON writes `generation_status:
+      thinking_budget`. An all-unscored run still becomes
+      `infrastructure_invalid` because `fixtures_scored == 0`; the row
+      itself no longer looks like Ollama died.
 - [ ] **`atomics sweep` grows into a multi-suite overnight driver.** Today's
       sweep is one eval family. The night was a shell script in `/tmp` that
       died twice to SIGPIPE because stdout was still the chat. A first-class

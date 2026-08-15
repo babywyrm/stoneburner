@@ -57,6 +57,7 @@ def test_provider_outcome_kind_values_are_stable() -> None:
         "safety_blocked",
         "truncated",
         "empty",
+        "thinking_budget",
         "rate_limited",
         "timeout",
         "provider_error",
@@ -96,6 +97,12 @@ def test_provider_outcome_infrastructure_invalid_kinds(kind: ProviderOutcomeKind
 
 def test_empty_provider_outcome_is_neither_scorable_nor_infrastructure_invalid() -> None:
     outcome = ProviderOutcome(ProviderOutcomeKind.EMPTY)
+    assert not outcome.is_scorable
+    assert not outcome.is_infrastructure_invalid
+
+
+def test_thinking_budget_outcome_is_neither_scorable_nor_infrastructure_invalid() -> None:
+    outcome = ProviderOutcome(ProviderOutcomeKind.THINKING_BUDGET)
     assert not outcome.is_scorable
     assert not outcome.is_infrastructure_invalid
 

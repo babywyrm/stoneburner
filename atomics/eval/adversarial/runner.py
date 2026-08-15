@@ -578,12 +578,17 @@ async def run_adversarial(
             if isinstance(response_outcome, ProviderOutcome):
                 provider_outcome = response_outcome
             else:
+                if response_text.strip():
+                    kind = ProviderOutcomeKind.COMPLETED
+                elif (
+                    getattr(resp, "thinking_tokens", 0) > 0
+                    or str(getattr(resp, "thinking_text", "")).strip()
+                ):
+                    kind = ProviderOutcomeKind.THINKING_BUDGET
+                else:
+                    kind = ProviderOutcomeKind.EMPTY
                 provider_outcome = ProviderOutcome(
-                    (
-                        ProviderOutcomeKind.COMPLETED
-                        if response_text.strip()
-                        else ProviderOutcomeKind.EMPTY
-                    ),
+                    kind,
                     finish_reason=getattr(resp, "finish_reason", None),
                 )
 

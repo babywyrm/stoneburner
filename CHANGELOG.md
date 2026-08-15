@@ -3,6 +3,15 @@
 ## Unreleased
 
 ### Fixed
+- **Empty visible text with nonzero thinking is `thinking_budget`, not a
+  dead provider.** Overnight qwen3 / deepseek-r1 code-review FAILs spent
+  the token budget on hidden reasoning and printed as `ERROR`. Those
+  attempts now classify as `ProviderOutcomeKind.THINKING_BUDGET`: not
+  scorable, not infrastructure-invalid. Fixture JSON writes
+  `generation_status: thinking_budget`; refusal and codereview print
+  `THINK` instead of `ERROR`. OpenAI chat and Responses paths do the
+  same when `reasoning_tokens > 0` and there is no visible text.
+
 - **`toolcall` and `codereview` accept `--thinking` / `--no-thinking`.**
   Refusal and red/blue already had the flag. The overnight code-review
   FAILs were thinking models that spent the 768-token budget on hidden
