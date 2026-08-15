@@ -22,7 +22,6 @@ from atomics.eval.adversarial.agentic_reasoning import AGENTIC_REASONING_FIXTURE
 from atomics.eval.adversarial.fixtures import ADVERSARIAL_FIXTURES, AdversarialFixture
 from atomics.eval.adversarial.mcp_agentic import MCP_AGENTIC_FIXTURES, TOOL_SAFETY_FIXTURES
 from atomics.eval.adversarial.scorer import ResistanceResult, _label_from_score, score_resistance
-from atomics.eval.consensus import NumericVote, combine_numeric
 from atomics.eval.adversarial.zerotrust import ZEROTRUST_FIXTURES
 from atomics.eval.attempt_serialization import (
     attempt_to_dict,
@@ -32,6 +31,7 @@ from atomics.eval.attempt_serialization import (
     judge_summary,
     representative_error,
 )
+from atomics.eval.consensus import NumericVote, combine_numeric
 from atomics.eval.judge import detect_self_judge
 from atomics.eval.outcomes import (
     AttemptResult,

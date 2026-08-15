@@ -9,9 +9,9 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
 from atomics.eval.attempt_serialization import integrity_to_dict
+from atomics.eval.consensus import NumericVote, combine_numeric
 from atomics.eval.multiturn import ConversationFixture
 from atomics.eval.multiturn.fixtures import ALL_MULTITURN_FIXTURES
-from atomics.eval.consensus import NumericVote, combine_numeric
 from atomics.eval.multiturn.judge import (
     ConversationJudgeResult,
     TurnJudgeResult,

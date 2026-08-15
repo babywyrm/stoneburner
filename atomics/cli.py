@@ -5,6 +5,7 @@ from __future__ import annotations
 import click
 
 from atomics.commands import admin as admin_commands
+from atomics.commands import agreement as agreement_commands
 from atomics.commands import api as api_commands
 from atomics.commands import benchmark as benchmark_commands
 from atomics.commands import distributed as distributed_commands
@@ -36,6 +37,7 @@ def cli(ctx: click.Context, verbose: bool, progress: bool) -> None:
     else:
         setup_logging("WARNING")
 
+cli.add_command(agreement_commands.judge_agreement)
 cli.add_command(security_commands.refusal)
 cli.add_command(security_commands.codereview)
 cli.add_command(toolcall_commands.toolcall)

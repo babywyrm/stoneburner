@@ -56,6 +56,18 @@
   indicator — are deliberate content and unchanged.
 
 ### Added
+- **`--extra-judges` on `redblue`, `multiturn`, `refusal`, `codereview`, and
+  `toolcall`.** Same grammar as `eval` / `adversarial` (`provider:model[@host]`),
+  same shared `--budget`. Default remains one judge. Numeric suites average;
+  categorical suites (`refusal`, `codereview`) majority-vote, and a tie is
+  unresolved rather than silently picking the primary. `multiturn` panels the
+  conversation score only; `toolcall` panels the prose channel only.
+
+- **`atomics judge-agreement`** generates each fixture once and scores that
+  same response with every judge, then reports pairwise agreement and
+  majority-flip rate. It is a study, not a leaderboard row: `--save` is off by
+  default, and even when on it never writes a parent `runs` row.
+
 - **`atomics mcp` serves atomics to LLM agents over the Model Context
   Protocol**, as a proxy over a running `atomics server`. Six tools: `health`,
   `get_job`, `compare`, and `recent_runs` are annotated read-only, while

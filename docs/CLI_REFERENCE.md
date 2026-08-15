@@ -49,6 +49,7 @@ Full command reference for `atomics`. See also [QUICKSTART.md](../QUICKSTART.md)
 | `atomics eval` | Run evaluation suite against a provider |
 | `atomics eval --fixtures ev-19` | Run a fixture subset for a fast spot-check |
 | `atomics eval --extra-judges ollama:mistral:7b` | Multi-judge consensus scoring |
+| `atomics judge-agreement --suite refusal --judges ollama:a,ollama:b` | Generate once, judge N times; report pairwise agreement and majority-flip rate |
 | `atomics adversarial` | Adversarial resilience eval — resistance to manipulation (72 fixtures) |
 | `atomics adversarial --category tool_desc_injection` | Run one suite/group |
 | `atomics adversarial --runs 3` | Variance-aware scoring (mean ± stddev) |
@@ -56,13 +57,17 @@ Full command reference for `atomics`. See also [QUICKSTART.md](../QUICKSTART.md)
 | `atomics adversarial --json-out run.json` | Write full per-fixture results as JSON |
 | `atomics adversarial --fail-on-resilience 60` | CI gate — non-zero exit if resilience < 60% |
 | `atomics toolcall` | Tool-call divergence — refuses in prose, complies via function call (20 fixtures). Calls are never executed |
+| `atomics toolcall --extra-judges ollama:mistral:7b` | Multi-judge consensus on the prose channel only |
 | `atomics toolcall --category exfil --verbose` | Run one category and print the arguments the model asked for |
 | `atomics toolcall --channel tools` | Tool channel only — deterministic, needs no judge |
 | `atomics toolcall --runs 3` | Three passes per fixture, modal outcome reported |
 | `atomics toolcall --no-skip-incapable` | Non-zero exit if the model cannot emit tool calls (for sweeps) |
 | `atomics refusal` | Refusal-calibration eval — over- vs under-refusal |
+| `atomics refusal --extra-judges ollama:mistral:7b` | Majority-vote classification; ties are unresolved |
 | `atomics codereview` | Secure-code-review eval — planted-vuln detection + false positives |
+| `atomics codereview --extra-judges ollama:mistral:7b` | Majority-vote verdict; ties are unresolved |
 | `atomics redblue --mode all` | Red/blue security capability eval (offensive + defensive) |
+| `atomics redblue --extra-judges ollama:mistral:7b` | Multi-judge mean ± stdev on the quality score |
 | `atomics redblue --runs 3 --json-out rb.json` | Variance-aware capability scoring + JSON export |
 | `atomics probe --probes-file probes.yaml` | Live ecosystem probe against real artifacts |
 | `atomics archreview --repo juice-shop --models qwen3.5:4b` | Security-architecture repo benchmark |
@@ -70,6 +75,7 @@ Full command reference for `atomics`. See also [QUICKSTART.md](../QUICKSTART.md)
 | `atomics archreview --tier wide --rounds 3` | Broader evidence pack with stability reporting |
 | `atomics archreview --tier expanded --rounds 3` | Largest pack for large-context/cloud backends |
 | `atomics multiturn` | Multi-turn conversation eval — context retention, coherence, contradiction detection, persona drift, long-context retention, tool-use chaining, and security scenarios |
+| `atomics multiturn --extra-judges ollama:mistral:7b` | Multi-judge consensus on the conversation score only |
 | `atomics multiturn --fixtures mt-eval-01,mt-eval-05` | Run a fixture subset |
 | `atomics codegen` | Code generation eval (functional correctness) |
 | `atomics codegen --fixtures cg-01,cg-05` | Run a fixture subset |

@@ -88,8 +88,10 @@ Not scheduled, roughly in order of how often they come up.
 - **PyPI distribution.** Needs a rename — `atomics` is taken by an unrelated
   package — which changes `pip install` for every consumer. See
   [RELEASING.md](RELEASING.md).
-- **Judge quality.** Multi-judge consensus exists for accuracy; extending it to
-  the security suites would reduce single-judge variance.
+- **Judge quality.** Security suites now take `--extra-judges` (numeric mean or
+  categorical majority) and `atomics judge-agreement` measures how often a
+  single judge would flip the headline. `rag`, `probe`, and `archreview` are
+  still single-judge.
 - **Read-only API endpoints for `models` and `provider-test`.** `atomics mcp`
   can only proxy what the API already exposes. Those two are the obvious next
   tools for an agent (discover what's available, then check it answers) and
