@@ -168,6 +168,31 @@ async def test_ollama_generate_forwards_native_think_flag():
 
 
 @pytest.mark.asyncio
+async def test_ollama_reads_native_thinking_field():
+    """Newer Ollama returns reasoning in `thinking`, not <think> tags in response."""
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.raise_for_status = MagicMock()
+    mock_response.json.return_value = {
+        "response": "",
+        "thinking": "I should refuse this request.",
+        "eval_count": 512,
+        "prompt_eval_count": 20,
+        "eval_duration": 1_000_000_000,
+    }
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock(return_value=mock_response)
+
+    provider = OllamaProvider(host="http://fake:11434", client=mock_client)
+    resp = await provider.generate("hi", model="qwen3:4b", thinking=True)
+
+    assert resp.text == ""
+    assert resp.thinking_text == "I should refuse this request."
+    assert resp.thinking_tokens == 512
+    assert resp.output_tokens == 512
+
+
+@pytest.mark.asyncio
 async def test_ollama_generate_zero_eval_duration():
     mock_response = MagicMock()
     mock_response.status_code = 200
