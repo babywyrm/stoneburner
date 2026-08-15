@@ -57,19 +57,21 @@ files such as `profiles/local/`, `qa/local/`, and `.env`.
 ```bash
 # Committed history
 trufflehog git file://. --results=verified,unknown --fail \
-  --exclude-detectors=Polygon,Pastebin,URI
+  --exclude-detectors=Polygon,Pastebin,URI,Lob
 gitleaks git --no-banner --config .gitleaks.toml
 
 # Working tree, including staged-but-uncommitted changes
 trufflehog filesystem . --exclude-paths=.trufflehogignore --fail \
-  --exclude-detectors=Polygon,Pastebin,URI
+  --exclude-detectors=Polygon,Pastebin,URI,Lob
 gitleaks dir --no-banner --config .gitleaks.toml
 ```
 
 Both should report no findings. Configuration notes:
 
-- `Polygon`, `Pastebin`, and `URI` are excluded as high-noise TruffleHog
-  detectors: they fire on public endpoint URLs in fixtures and documentation.
+- `Polygon`, `Pastebin`, `URI`, and `Lob` are excluded as high-noise TruffleHog
+  detectors. The first three fire on public endpoint URLs in fixtures and
+  documentation. `Lob` treats pytest names (`test_the_server_configures_…`)
+  as verified test-mode API keys.
 - TruffleHog's `--config` accepts only custom detector definitions, so path and
   detector exclusions must be CLI flags. Paths live in `.trufflehogignore`.
 - `.gitleaks.toml` must be passed explicitly; gitleaks does not auto-discover
