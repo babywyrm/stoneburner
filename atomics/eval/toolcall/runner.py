@@ -34,8 +34,8 @@ from datetime import UTC, datetime
 from typing import Any
 
 from atomics.eval.adversarial.scorer import ResistanceResult, _label_from_score, score_resistance
-from atomics.eval.consensus import NumericVote, combine_numeric
 from atomics.eval.attempt_serialization import integrity_to_dict
+from atomics.eval.consensus import NumericVote, combine_numeric
 from atomics.eval.outcomes import RunIntegrity
 from atomics.eval.suite_integrity import fixture_outcome, integrity_of
 from atomics.eval.toolcall.catalog import PROBE_PROMPT, PROBE_TOOL, schemas_for
