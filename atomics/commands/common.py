@@ -7,7 +7,7 @@ import logging
 import time
 from collections.abc import Callable
 from pathlib import Path
-from typing import Protocol, cast
+from typing import Protocol, TypeVar, cast
 
 import click
 from rich.console import Console
@@ -27,6 +27,43 @@ from atomics.storage.records import EvaluationResultRecord
 from atomics.validation import sanitize_error
 
 PROVIDER_CHOICES = click.Choice(list(PROVIDER_NAMES), case_sensitive=False)
+
+_P = TypeVar("_P")
+
+
+def extra_judges_option(fn: Callable) -> Callable:
+    """Add `--extra-judges` for consensus scoring."""
+    return click.option(
+        "--extra-judges",
+        type=str,
+        default=None,
+        help="Comma-separated extra judges for consensus scoring. "
+        "Format: provider:model[@host] "
+        "(e.g. claude:claude-sonnet-4-6,ollama:deepseek-r1:14b@http://gpu-host:11434).",
+    )(fn)
+
+
+def parse_extra_judges(
+    spec: str | None,
+    *,
+    build: Callable[[str, str | None, str | None], _P],
+    default_host: str | None = None,
+) -> list[tuple[_P, str | None]]:
+    """Parse the --extra-judges string into (provider, model) pairs."""
+    if not spec:
+        return []
+    pairs: list[tuple[_P, str | None]] = []
+    for raw in spec.split(","):
+        item = raw.strip()
+        if not item:
+            continue
+        host = default_host
+        if "@" in item:
+            item, host = item.rsplit("@", 1)
+        name, _, model = item.partition(":")
+        model_or_none = model or None
+        pairs.append((build(name, model_or_none, host), model_or_none))
+    return pairs
 
 
 def budget_option(fn: Callable) -> Callable:
@@ -207,6 +244,10 @@ def evaluation_record_from_fixture(
     )
     score_value = payload.get("score")
     score = None if score_value is None else _as_float(score_value)
+    agreement_value = payload.get("judge_agreement")
+    judge_agreement = (
+        None if agreement_value is None else _as_float(agreement_value)
+    )
     return EvaluationResultRecord(
         run_id=run_id,
         suite=suite,
@@ -231,6 +272,7 @@ def evaluation_record_from_fixture(
         error_class=str(payload.get("error_class") or ""),
         error_message=str(payload.get("error_message") or ""),
         result_json=payload,
+        judge_agreement=judge_agreement,
     )
 
 

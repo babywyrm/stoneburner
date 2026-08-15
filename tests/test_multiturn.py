@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from atomics.eval.multiturn import ConversationFixture, ConversationTurn
 from atomics.eval.multiturn.fixtures import ALL_MULTITURN_FIXTURES
 from atomics.eval.multiturn.judge import (
@@ -313,3 +315,72 @@ def test_cli_multiturn_help():
     assert result.exit_code == 0
     assert "context retention" in result.output.lower() or "Multi-turn" in result.output
     assert "--judge-provider" in result.output
+
+
+def test_cli_multiturn_extra_judges_option():
+    from click.testing import CliRunner
+
+    from atomics.cli import cli
+
+    result = CliRunner().invoke(cli, ["multiturn", "--help"])
+    assert result.exit_code == 0
+    assert "--extra-judges" in result.output
+
+
+@pytest.mark.asyncio
+async def test_multiturn_extra_judges_panels_conversation_only(monkeypatch):
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+
+    from atomics.eval.multiturn.judge import ConversationJudgeResult, TurnJudgeResult
+    from atomics.eval.multiturn.runner import run_multiturn
+
+    fixture = ConversationFixture(
+        id="mt-test-01",
+        complexity=TaskComplexity.LIGHT,
+        system_prompt="Be helpful.",
+        turns=[
+            ConversationTurn("Hi", "Greet", ["hello"]),
+            ConversationTurn("Again", "Remember", ["hello"]),
+        ],
+        conversation_criteria=["remember"],
+    )
+    provider = AsyncMock()
+    provider.name = "mock"
+    provider.generate = AsyncMock(
+        return_value=SimpleNamespace(
+            text="ok",
+            input_tokens=1,
+            output_tokens=1,
+            total_tokens=2,
+            latency_ms=1.0,
+            estimated_cost_usd=0.0,
+        )
+    )
+    primary = AsyncMock()
+    extra = AsyncMock()
+    turn_calls = {"n": 0}
+    conv_judges: list[object] = []
+
+    async def fake_turn(**_kwargs):
+        turn_calls["n"] += 1
+        return TurnJudgeResult(4, 3, 3, 1.0, "turn ok")
+
+    async def fake_conv(*, judge, **_kwargs):
+        conv_judges.append(judge)
+        if judge is primary:
+            return ConversationJudgeResult(4, 3, 3, 1.0, "great")
+        return ConversationJudgeResult(2, 1, 1, 0.4, "weak")
+
+    monkeypatch.setattr("atomics.eval.multiturn.runner.score_turn", fake_turn)
+    monkeypatch.setattr("atomics.eval.multiturn.runner.score_conversation", fake_conv)
+
+    summary = await run_multiturn(
+        provider,
+        judge_provider=primary,
+        extra_judges=[(extra, None)],
+        fixtures=[fixture],
+    )
+    assert turn_calls["n"] == 2
+    assert conv_judges == [primary, extra]
+    assert summary.conversation_results[0].conversation_judge.score == 0.7

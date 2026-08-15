@@ -32,6 +32,11 @@ from atomics.eval.attempt_serialization import (
     judge_summary,
     representative_error,
 )
+from atomics.eval.consensus import (
+    CategoricalConsensus,
+    CategoricalVote,
+    combine_categorical,
+)
 from atomics.eval.outcomes import (
     AttemptResult,
     JudgeOutcome,
@@ -43,6 +48,7 @@ from atomics.eval.outcomes import (
 from atomics.eval.provider_attempt import build_attempt, provider_outcome_from_response
 from atomics.eval.refusal.fixtures import REFUSAL_FIXTURES, RefusalFixture
 from atomics.eval.refusal.scorer import (
+    ClassificationResult,
     classification_to_judge_outcome,
     classification_to_score,
     classify_response,
@@ -65,6 +71,7 @@ class RefusalResult:
     response_text: str = ""
     estimated_cost_usd: float = 0.0
     attempts: list[AttemptResult] = field(default_factory=list)
+    judge_agreement: float | None = None
 
     def to_dict(self) -> dict[str, object]:
         integrity = RunIntegrity.from_fixture_attempts([self.attempts])
@@ -96,6 +103,7 @@ class RefusalResult:
             "error_class": error_class,
             "error_message": error_message,
             "error": error_message or None,
+            "judge_agreement": self.judge_agreement,
         }
 
 
@@ -179,6 +187,7 @@ async def run_refusal(
     judge_provider: BaseProvider,
     model: str | None = None,
     judge_model: str | None = None,
+    extra_judges: list[tuple[BaseProvider, str | None]] | None = None,
     run_id: str | None = None,
     fixtures: list[RefusalFixture] | None = None,
     on_fixture_start: Callable[[RefusalFixture], object] | None = None,
@@ -188,6 +197,7 @@ async def run_refusal(
     run_id = run_id or uuid.uuid4().hex[:12]
     started = datetime.now(UTC)
     fixture_set = fixtures if fixtures is not None else REFUSAL_FIXTURES
+    extra_judges = extra_judges or []
     results: list[RefusalResult] = []
 
     for fx in fixture_set:
@@ -205,17 +215,15 @@ async def run_refusal(
             provider_outcome = provider_outcome_from_exception(exc)
 
         judge_outcome: JudgeOutcome | None = None
+        judge_agreement: float | None = None
         if provider_outcome.is_scorable and response is not None and response.text.strip():
-            classification = await classify_response(
+            judge_outcome, judge_agreement = await _classify_with_panel(
                 fx.prompt,
                 response.text,
                 expected=fx.expected,
                 judge_provider=judge_provider,
                 judge_model=judge_model,
-            )
-            judge_outcome = classification_to_judge_outcome(
-                classification,
-                expected=fx.expected,
+                extra_judges=extra_judges,
             )
         elif provider_outcome.kind in {
             ProviderOutcomeKind.REFUSED,
@@ -229,7 +237,7 @@ async def run_refusal(
             response=response,
             judge=judge_outcome,
         )
-        result = _result_from_attempt(fx, attempt)
+        result = _result_from_attempt(fx, attempt, judge_agreement=judge_agreement)
         results.append(result)
         await _invoke_callback(on_fixture_done, result)
 
@@ -258,9 +266,93 @@ def _provider_refusal_outcome(fixture: RefusalFixture) -> JudgeOutcome:
     )
 
 
+async def _classify_with_panel(
+    prompt: str,
+    text: str,
+    *,
+    expected: str,
+    judge_provider: BaseProvider,
+    judge_model: str | None,
+    extra_judges: list[tuple[BaseProvider, str | None]],
+) -> tuple[JudgeOutcome, float | None]:
+    """Classify with the primary judge, then majority-vote extras if any."""
+    primary = await classify_response(
+        prompt,
+        text,
+        expected=expected,
+        judge_provider=judge_provider,
+        judge_model=judge_model,
+    )
+    if not extra_judges:
+        return classification_to_judge_outcome(primary, expected=expected), None
+
+    panel = [primary]
+    for extra_provider, extra_model in extra_judges:
+        panel.append(
+            await classify_response(
+                prompt,
+                text,
+                expected=expected,
+                judge_provider=extra_provider,
+                judge_model=extra_model,
+            )
+        )
+    combined = combine_categorical(
+        [
+            CategoricalVote(
+                label=result.classification,
+                parse_failed=result.status is not JudgeOutcomeStatus.SCORED,
+                judge_model=result.judge_model,
+                rationale=result.rationale,
+            )
+            for result in panel
+        ]
+    )
+    return _outcome_from_categorical(panel, combined, expected=expected), combined.agreement
+
+
+def _outcome_from_categorical(
+    panel: list[ClassificationResult],
+    combined: CategoricalConsensus,
+    *,
+    expected: str,
+) -> JudgeOutcome:
+    calls = tuple(call for result in panel for call in result.calls)
+    cost = sum(call.estimated_cost_usd for call in calls)
+    if combined.parse_failed:
+        return classification_to_judge_outcome(panel[0], expected=expected)
+    if combined.unresolved or combined.label is None:
+        return JudgeOutcome(
+            status=JudgeOutcomeStatus.SKIPPED,
+            score=None,
+            label=None,
+            rationale=combined.rationale,
+            judge_model=combined.judge_model,
+            judge_cost_usd=cost,
+            calls=calls,
+            judges_expected=len(panel),
+            judges_scored=combined.n_judges,
+        )
+    score = classification_to_score(expected, combined.label)
+    return JudgeOutcome(
+        status=JudgeOutcomeStatus.SCORED,
+        score=score,
+        label=combined.label,
+        rationale=combined.rationale,
+        judge_model=combined.judge_model,
+        judge_scores=(score,),
+        judge_cost_usd=cost,
+        calls=calls,
+        judges_expected=len(panel),
+        judges_scored=combined.n_judges,
+    )
+
+
 def _result_from_attempt(
     fixture: RefusalFixture,
     attempt: AttemptResult,
+    *,
+    judge_agreement: float | None = None,
 ) -> RefusalResult:
     judge_score = (
         attempt.judge.score
@@ -303,6 +395,7 @@ def _result_from_attempt(
         response_text=attempt.response_text,
         estimated_cost_usd=attempt.estimated_cost_usd,
         attempts=[attempt],
+        judge_agreement=judge_agreement,
     )
 
 

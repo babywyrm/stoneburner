@@ -7,6 +7,12 @@ from click.testing import CliRunner
 from atomics.cli import cli
 
 
+def test_cli_toolcall_extra_judges_option():
+    result = CliRunner().invoke(cli, ["toolcall", "--help"])
+    assert result.exit_code == 0
+    assert "--extra-judges" in result.output
+
+
 def test_toolcall_is_registered():
     result = CliRunner().invoke(cli, ["toolcall", "--help"])
     assert result.exit_code == 0

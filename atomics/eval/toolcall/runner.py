@@ -33,7 +33,8 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
-from atomics.eval.adversarial.scorer import ResistanceResult, score_resistance
+from atomics.eval.adversarial.scorer import ResistanceResult, _label_from_score, score_resistance
+from atomics.eval.consensus import NumericVote, combine_numeric
 from atomics.eval.attempt_serialization import integrity_to_dict
 from atomics.eval.outcomes import RunIntegrity
 from atomics.eval.suite_integrity import fixture_outcome, integrity_of
@@ -254,22 +255,65 @@ async def _judge(
     *,
     judge_provider: BaseProvider | None,
     judge_model: str | None,
+    extra_judges: list[tuple[BaseProvider, str | None]] | None = None,
 ) -> ResistanceResult | None:
     """Score one text channel, or None when there is no judge or no text.
 
     Empty text is not sent: there is nothing to judge, and a judge asked to score
-    silence returns noise.
+    silence returns noise. Extra judges, when supplied, convene a numeric panel
+    over this text only.
     """
     if judge_provider is None or not text.strip():
         return None
+    extra_judges = extra_judges or []
     try:
-        return await score_resistance(
+        primary = await score_resistance(
             fixture.prompt,
             text,
             attack_goal=fixture.attack_goal,
             resistance_criteria=list(fixture.resistance_criteria),
             judge_provider=judge_provider,
             judge_model=judge_model,
+        )
+        if not extra_judges:
+            return primary
+        panel = [primary]
+        for extra_provider, extra_model in extra_judges:
+            panel.append(
+                await score_resistance(
+                    fixture.prompt,
+                    text,
+                    attack_goal=fixture.attack_goal,
+                    resistance_criteria=list(fixture.resistance_criteria),
+                    judge_provider=extra_provider,
+                    judge_model=extra_model,
+                )
+            )
+        combined = combine_numeric(
+            [
+                NumericVote(
+                    score=result.score,
+                    parse_failed=result.parse_failed,
+                    judge_model=result.judge_model,
+                    rationale=result.rationale,
+                )
+                for result in panel
+            ]
+        )
+        if combined.parse_failed:
+            return primary
+        return ResistanceResult(
+            score=combined.score,
+            label=_label_from_score(combined.score),
+            rationale=combined.rationale,
+            judge_model=combined.judge_model,
+            judge_cost_usd=sum(result.judge_cost_usd for result in panel),
+            judge_scores=list(combined.valid_scores),
+            judge_calls=tuple(
+                call for result in panel for call in result.judge_calls
+            ),
+            judges_expected=len(panel),
+            judges_scored=combined.n_judges,
         )
     except Exception as exc:
         logger.warning("[toolcall] judge failed for %s: %s", fixture.id, exc)
@@ -295,6 +339,7 @@ async def run_toolcall_suite(
     judge_provider: BaseProvider | None,
     fixtures: Sequence[ToolCallFixture],
     judge_model: str | None = None,
+    extra_judges: list[tuple[BaseProvider, str | None]] | None = None,
     runs: int = 1,
     channel: str = "both",
     run_id: str | None = None,
@@ -308,6 +353,7 @@ async def run_toolcall_suite(
     """
     if runs < 1:
         raise ValueError("runs must be at least 1")
+    extra_judges = extra_judges or []
 
     run_id = run_id or uuid.uuid4().hex[:12]
     started_at = datetime.now(UTC)
@@ -356,6 +402,7 @@ async def run_toolcall_suite(
                     model=model,
                     judge_provider=judge_provider,
                     judge_model=judge_model,
+                    extra_judges=extra_judges,
                     channel=channel,
                     run_number=run_number,
                 )
@@ -382,6 +429,7 @@ async def _run_once(
     model: str | None,
     judge_provider: BaseProvider | None,
     judge_model: str | None,
+    extra_judges: list[tuple[BaseProvider, str | None]],
     channel: str,
     run_number: int,
 ) -> dict[str, Any]:
@@ -463,6 +511,7 @@ async def _run_once(
         judged = await _judge(
             fixture, prose.text,
             judge_provider=judge_provider, judge_model=judge_model,
+            extra_judges=extra_judges,
         )
         record["prose_label"] = _label(judged)
         if judged is not None:

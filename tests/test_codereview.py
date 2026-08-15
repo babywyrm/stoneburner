@@ -226,3 +226,70 @@ async def test_codereview_runner_calls_start_and_done_callbacks():
     )
 
     assert events == [f"start:{fixture.id}", f"done:{fixture.id}"]
+
+
+class _FixedVerdictJudge:
+    name = "judge"
+
+    def __init__(self, verdict: str) -> None:
+        self._verdict = verdict
+
+    async def generate(self, prompt, *, system=None, model=None, max_tokens=256,
+                       thinking=None, thinking_budget=None, temperature=None):
+        return ProviderResponse(
+            text=f"VERDICT: {self._verdict}\nRATIONALE: fixed",
+            input_tokens=5,
+            output_tokens=5,
+            total_tokens=10,
+            model="judge",
+            latency_ms=50.0,
+            estimated_cost_usd=0.0,
+        )
+
+
+@pytest.mark.asyncio
+async def test_no_extra_judges_leaves_agreement_null():
+    fixture = [f for f in SECURE_CODE_FIXTURES if f.is_vulnerable][:1]
+    summary = await run_codereview(
+        _FakeProvider(),
+        judge_provider=_FixedVerdictJudge("DETECTED"),
+        fixtures=fixture,
+    )
+    assert summary.results[0].verdict == "detected"
+    assert summary.results[0].judge_agreement is None
+    assert summary.results[0].to_dict()["judge_agreement"] is None
+
+
+@pytest.mark.asyncio
+async def test_extra_judges_majority_detected():
+    fixture = [f for f in SECURE_CODE_FIXTURES if f.is_vulnerable][:1]
+    summary = await run_codereview(
+        _FakeProvider(),
+        judge_provider=_FixedVerdictJudge("DETECTED"),
+        extra_judges=[
+            (_FixedVerdictJudge("DETECTED"), None),
+            (_FixedVerdictJudge("MISSED"), None),
+        ],
+        fixtures=fixture,
+    )
+    result = summary.results[0]
+    assert result.verdict == "detected"
+    assert result.judge_agreement == pytest.approx(2 / 3)
+    assert result.to_dict()["score"] == 1.0
+    assert summary.detection_rate == 1.0
+
+
+@pytest.mark.asyncio
+async def test_extra_judges_tie_is_unresolved_and_drops_from_rates():
+    fixture = [f for f in SECURE_CODE_FIXTURES if f.is_vulnerable][:1]
+    summary = await run_codereview(
+        _FakeProvider(),
+        judge_provider=_FixedVerdictJudge("DETECTED"),
+        extra_judges=[(_FixedVerdictJudge("MISSED"), None)],
+        fixtures=fixture,
+    )
+    result = summary.results[0]
+    assert result.verdict == "unknown"
+    assert result.to_dict()["score"] is None
+    assert result.judge_agreement == pytest.approx(0.5)
+    assert summary.detection_rate is None

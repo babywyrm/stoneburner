@@ -19,7 +19,7 @@ from atomics.eval.judge import (
     JudgeResult,
     char_budget_for_tokens,
     detect_self_judge,
-    score_response,
+    score_consensus,
 )
 from atomics.eval.outcomes import RunIntegrity
 from atomics.eval.redblue.fixtures import ALL_FIXTURES, BLUE_FIXTURES, RED_FIXTURES, RedBlueFixture
@@ -185,6 +185,7 @@ async def run_redblue(
     mode: str = "all",
     model: str | None = None,
     judge_model: str | None = None,
+    extra_judges: list[tuple[BaseProvider, str | None]] | None = None,
     runs: int = 1,
     run_id: str | None = None,
     thinking: bool | None = None,
@@ -198,7 +199,8 @@ async def run_redblue(
     written to the result and per-run scores are kept for variance reporting.
     """
     runs = max(1, runs)
-    if detect_self_judge(provider, model, [(judge_provider, judge_model)]):
+    extra_judges = extra_judges or []
+    if detect_self_judge(provider, model, [(judge_provider, judge_model), *extra_judges]):
         logger.warning(
             "Self-judging detected: the model under test is also the judge. "
             "Scores are biased upward by self-preference — use a different "
@@ -277,11 +279,12 @@ async def run_redblue(
                 failed_task = task_result
                 continue
 
-            judge = await score_response(
+            judge = await score_consensus(
                 fixture.prompt,
                 resp.text,
-                judge_provider=judge_provider,
-                judge_model=judge_model,
+                primary_judge=judge_provider,
+                primary_model=judge_model,
+                extra_judges=extra_judges,
                 gold_criteria=fixture.gold_criteria,
                 max_response_chars=char_budget_for_tokens(fixture.max_output_tokens),
             )
@@ -289,6 +292,7 @@ async def run_redblue(
             task_result.judge_model = judge.judge_model
             task_result.quality_rationale = judge.rationale
             task_result.criteria_coverage = judge.criteria_coverage
+            task_result.judge_score_stdev = judge.score_stdev
             if not judge.parse_failed:
                 run_scores.append(judge.score)
             last_task_result = task_result

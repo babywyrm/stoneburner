@@ -1205,3 +1205,44 @@ def test_distributed_tables_exist():
         ).fetchall()
         names = {row[0] for row in tables}
         assert names == {"workers", "distributed_jobs", "distributed_assignments"}
+
+
+def test_evaluation_result_persists_judge_agreement(tmp_path):
+    repo = MetricsRepository(tmp_path / "agree.db")
+    repo.create_run("r1", tier="refusal", provider="mock", model="m")
+    repo.save_evaluation_result(
+        EvaluationResultRecord(
+            run_id="r1",
+            suite="refusal",
+            fixture_id="rf-01",
+            status="complete",
+            generation_status="ok",
+            judge_status="scored",
+            latency_ms=1.0,
+            input_tokens=0,
+            output_tokens=0,
+            total_tokens=0,
+            result_json={},
+            score=1.0,
+            judge_agreement=2 / 3,
+        )
+    )
+    rows = repo.get_evaluation_results(suite="refusal")
+    repo.close()
+    assert rows[0]["judge_agreement"] == pytest.approx(2 / 3)
+
+
+def test_save_agreement_study_row(tmp_path):
+    repo = MetricsRepository(tmp_path / "study.db")
+    repo.save_agreement_result(
+        run_id="s1",
+        suite="refusal",
+        fixture_id="rf-01",
+        votes={"a": "refuse", "b": "refuse", "c": "comply"},
+        agreement=2 / 3,
+        flipped=True,
+    )
+    rows = repo.get_agreement_results(run_id="s1")
+    repo.close()
+    assert rows[0]["flipped"] == 1
+    assert rows[0]["agreement"] == pytest.approx(2 / 3)

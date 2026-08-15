@@ -17,6 +17,8 @@ from atomics.commands.common import (
     _make_provider,
     budget_option,
     eval_budget_from,
+    extra_judges_option,
+    parse_extra_judges,
     write_summary_json,
 )
 from atomics.commands.suite_run import finalize_task_run, suite_run
@@ -32,6 +34,7 @@ from atomics.eval.budget import share_budget
 @click.option("--judge-provider", "judge_provider_name", type=PROVIDER_CHOICES, default="ollama", show_default=True)
 @click.option("--judge-model", type=str, default=None)
 @click.option("--judge-host", type=str, default=None)
+@extra_judges_option
 @click.option("--mode", type=click.Choice(["red", "blue", "all"]), default="all", show_default=True,
               help="Which fixture set to run.")
 @click.option("--runs", type=int, default=1, show_default=True,
@@ -50,6 +53,7 @@ def redblue(
     judge_provider_name: str,
     judge_model: str | None,
     judge_host: str | None,
+    extra_judges: str | None,
     mode: str,
     runs: int,
     thinking_flag: bool | None,
@@ -70,7 +74,22 @@ def redblue(
     settings = load_settings()
     provider = _make_provider(provider_name, model, ollama_host, settings, vllm_host=vllm_host)
     judge = _make_provider(judge_provider_name, judge_model, judge_host or ollama_host, settings, vllm_host=vllm_host)
-    provider, judge = share_budget(eval_budget_from(budget_usd), provider, judge)
+    extra_judge_pairs = parse_extra_judges(
+        extra_judges,
+        build=lambda name, mdl, host: _make_provider(
+            name, mdl, host, settings, vllm_host=vllm_host
+        ),
+        default_host=judge_host or ollama_host,
+    )
+    budget = eval_budget_from(budget_usd)
+    if budget is not None:
+        guarded = share_budget(
+            budget, provider, judge, *(p for p, _ in extra_judge_pairs)
+        )
+        provider, judge = guarded[0], guarded[1]
+        extra_judge_pairs = [
+            (guarded[2 + i], mdl) for i, (_, mdl) in enumerate(extra_judge_pairs)
+        ]
 
     console.print(
         f"\n[bold]Red/Blue eval[/bold] — model: [cyan]{provider_name}[/cyan] ({model or 'default'})\n"
@@ -129,6 +148,7 @@ def redblue(
             mode=mode,
             model=model,
             judge_model=judge_model,
+            extra_judges=extra_judge_pairs,
             runs=runs,
             run_id=run_id,
             thinking=thinking_flag,

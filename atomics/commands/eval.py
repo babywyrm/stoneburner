@@ -16,6 +16,8 @@ from atomics.commands.common import (
     _make_provider,
     budget_option,
     eval_budget_from,
+    extra_judges_option,
+    parse_extra_judges,
     setup_logging,
     write_summary_json,
 )
@@ -43,10 +45,7 @@ from atomics.eval.budget import share_budget
 )
 @click.option("--judge-model", type=str, default=None, help="Model override for the judge")
 @click.option("--judge-host", type=str, default=None, help="Ollama host for the judge (if different)")
-@click.option("--extra-judges", type=str, default=None,
-              help="Comma-separated extra judges for consensus scoring. "
-                   "Format: provider:model (e.g. claude:claude-sonnet-4-6,ollama:deepseek-r1:14b). "
-                   "Reports mean quality and inter-judge stddev.")
+@extra_judges_option
 @click.option("--fixtures", "fixtures_filter", type=str, default=None,
               help="Comma-separated fixture IDs to run a subset (e.g. ev-19 or "
                    "ev-01,ev-02). Default: all 25 fixtures.")
@@ -105,23 +104,11 @@ def eval(
     judge_provider = _build_provider(judge_provider_name, judge_model, judge_host or ollama_host or settings.ollama_host)
 
     # Parse --extra-judges "claude:claude-sonnet-4-6,ollama:deepseek-r1:14b@http://host:11434"
-    extra_judge_pairs: list[tuple] = []
-    if extra_judges:
-        for spec in extra_judges.split(","):
-            spec = spec.strip()
-            if not spec:
-                continue
-            ej_host = None
-            if "@" in spec:
-                spec, ej_host = spec.rsplit("@", 1)
-            parts = spec.split(":", 1)
-            ej_provider_name = parts[0]
-            ej_model = parts[1] if len(parts) > 1 else None
-            ej_provider = _build_provider(
-                ej_provider_name, ej_model,
-                ej_host or judge_host or ollama_host or settings.ollama_host,
-            )
-            extra_judge_pairs.append((ej_provider, ej_model))
+    extra_judge_pairs = parse_extra_judges(
+        extra_judges,
+        build=lambda name, mdl, host: _build_provider(name, mdl, host),
+        default_host=judge_host or ollama_host or settings.ollama_host,
+    )
 
     # One ceiling across the model, the judge, and every consensus judge. Each
     # extra judge is another full pass over the fixture set, so metering them

@@ -16,6 +16,8 @@ from atomics.commands.common import (
     _make_provider,
     budget_option,
     eval_budget_from,
+    extra_judges_option,
+    parse_extra_judges,
     setup_logging,
     write_summary_json,
 )
@@ -33,6 +35,7 @@ from atomics.eval.budget import share_budget
 @click.option("--judge-provider", "judge_provider_name", type=PROVIDER_CHOICES, default="ollama", show_default=True)
 @click.option("--judge-model", type=str, default=None, help="Model for the judge.")
 @click.option("--judge-host", type=str, default=None, help="Ollama host for the judge.")
+@extra_judges_option
 @click.option("--fixtures", "fixtures_filter", type=str, default=None,
               help="Comma-separated fixture IDs (e.g. mt-eval-01,mt-eval-05).")
 @click.option("--save/--no-save", "save_results", default=True, help="Persist results.")
@@ -49,6 +52,7 @@ def multiturn(
     judge_provider_name: str,
     judge_model: str | None,
     judge_host: str | None,
+    extra_judges: str | None,
     fixtures_filter: str | None,
     save_results: bool,
     json_out: str | None,
@@ -72,9 +76,22 @@ def multiturn(
         judge_provider_name, judge_model, judge_host or ollama_host, settings,
         vllm_host=vllm_host, region=region,
     )
-    test_provider, judge_provider = share_budget(
-        eval_budget_from(budget_usd), test_provider, judge_provider
+    extra_judge_pairs = parse_extra_judges(
+        extra_judges,
+        build=lambda name, mdl, host: _make_provider(
+            name, mdl, host, settings, vllm_host=vllm_host, region=region,
+        ),
+        default_host=judge_host or ollama_host,
     )
+    budget = eval_budget_from(budget_usd)
+    if budget is not None:
+        guarded = share_budget(
+            budget, test_provider, judge_provider, *(p for p, _ in extra_judge_pairs)
+        )
+        test_provider, judge_provider = guarded[0], guarded[1]
+        extra_judge_pairs = [
+            (guarded[2 + i], mdl) for i, (_, mdl) in enumerate(extra_judge_pairs)
+        ]
 
     selected_fixtures = ALL_MULTITURN_FIXTURES
     if fixtures_filter:
@@ -161,6 +178,7 @@ def multiturn(
             judge_provider=judge_provider,
             model=model,
             judge_model=judge_model,
+            extra_judges=extra_judge_pairs,
             run_id=mt_run_id,
             on_conversation_done=on_done,
             thinking=eff_thinking,
