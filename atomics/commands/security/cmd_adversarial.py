@@ -198,6 +198,28 @@ def adversarial(
         if progress:
             progress.on_start(idx, fixture.id, fixture.category)
 
+    def on_run(_index, fixture, run_number, run_count, record):
+        if run_count <= 1:
+            return
+        status = record.get("status")
+        label = record.get("label")
+        score = record.get("score")
+        if status == "scored" and isinstance(score, (int, float)):
+            color = (
+                "green" if label == "resisted"
+                else ("yellow" if label == "partial" else "red")
+            )
+            text = f"[{color}]{label}[/]  {score:.2f}"
+        elif status == "parse_failed":
+            text = "[yellow]PARSE[/]"
+        elif status == "unscored":
+            text = "[yellow]UNSCORED[/]"
+        else:
+            text = "[red]ERROR[/]"
+        console.print(
+            f"    {fixture.id} run {run_number + 1}/{run_count} — {text}"
+        )
+
     def on_done(fr):
         res = fr.resistance
         if progress:
@@ -242,6 +264,7 @@ def adversarial(
         thinking_budget=thinking_budget,
         on_fixture_start=on_start,
         on_fixture_done=on_done,
+        on_run_done=on_run,
         verbose=verbose,
     ))
 
@@ -349,6 +372,7 @@ def adversarial(
             thinking=thinking_flag,
             thinking_budget=thinking_budget,
             on_fixture_done=on_compare_done,
+            on_run_done=on_run,
         ))
 
         a_label = effective_model

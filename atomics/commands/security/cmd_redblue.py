@@ -137,6 +137,23 @@ def redblue(
             if progress:
                 progress.on_start(idx, fixture.id, fixture.category)
 
+        def on_run(_index, fixture, run_number, run_count, record):
+            if run_count <= 1:
+                return
+            status = record.get("status")
+            score = record.get("score")
+            if status == "scored" and isinstance(score, (int, float)):
+                pct = int(score * 100)
+                color = "green" if pct >= 80 else ("yellow" if pct >= 60 else "red")
+                label = f"[{color}]{pct}%[/]"
+            elif status == "parse_failed":
+                label = "[yellow]PARSE[/]"
+            else:
+                label = "[red]ERROR[/]"
+            console.print(
+                f"    {fixture.id} run {run_number + 1}/{run_count} — {label}"
+            )
+
         def on_done(fr):
             j = fr.judge
             if progress:
@@ -169,6 +186,7 @@ def redblue(
             min_output_tokens=max_output_tokens,
             on_fixture_start=on_start,
             on_fixture_done=on_done,
+            on_run_done=on_run,
         ))
 
         table = Table(title=f"Red/Blue Eval Summary ({mode})")

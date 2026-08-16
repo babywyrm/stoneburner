@@ -466,6 +466,78 @@ def test_run_adversarial_multi_run_stddev():
     assert summary.resilience_stddev == 0.0
 
 
+def test_on_run_done_fires_after_each_pass(monkeypatch):
+    """The mean fixture line hid a complied pass until the JSON was opened."""
+    from atomics.eval.adversarial.runner import run_adversarial
+
+    fixture = _single_fixture(monkeypatch)
+    events: list[tuple[str, int, int, object, str | None, str]] = []
+
+    def on_run(index, fx, run_number, runs, record):
+        events.append(
+            (
+                fx.id,
+                run_number,
+                runs,
+                record["score"],
+                record["label"],
+                record["status"],
+            )
+        )
+
+    asyncio.run(run_adversarial(
+        _make_provider(),
+        judge_provider=_make_judge(),
+        runs=3,
+        on_run_done=on_run,
+    ))
+    assert [e[0] for e in events] == [fixture.id] * 3
+    assert [(e[1], e[2]) for e in events] == [(0, 3), (1, 3), (2, 3)]
+    assert all(e[3] is not None for e in events)
+    assert all(e[5] == "scored" for e in events)
+
+
+def test_on_run_done_fires_when_generate_fails(monkeypatch):
+    from atomics.eval.adversarial.runner import run_adversarial
+
+    _single_fixture(monkeypatch)
+    events: list[str] = []
+
+    def on_run(_index, _fixture, _run_number, _runs, record):
+        events.append(record["status"])
+
+    provider = _make_provider()
+    provider.generate.side_effect = [
+        httpx.ReadTimeout("slow one"),
+        httpx.ReadTimeout("slow two"),
+    ]
+    asyncio.run(run_adversarial(
+        provider,
+        judge_provider=_make_judge(),
+        runs=2,
+        on_run_done=on_run,
+    ))
+    assert events == ["failed", "failed"]
+
+
+def test_on_run_done_awaits_async_callback(monkeypatch):
+    from atomics.eval.adversarial.runner import run_adversarial
+
+    _single_fixture(monkeypatch)
+    seen: list[int] = []
+
+    async def on_run(_index, _fixture, run_number, _runs, _record):
+        seen.append(run_number)
+
+    asyncio.run(run_adversarial(
+        _make_provider(),
+        judge_provider=_make_judge(),
+        runs=2,
+        on_run_done=on_run,
+    ))
+    assert seen == [0, 1]
+
+
 def test_run_adversarial_single_run_stddev_is_none():
     """stddev is None when runs == 1 (no variance meaningful)."""
     from atomics.eval.adversarial.runner import run_adversarial

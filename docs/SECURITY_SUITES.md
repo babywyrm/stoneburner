@@ -28,7 +28,7 @@ uv run atomics adversarial --provider claude --category prompt_injection,role_co
 # With thinking enabled
 uv run atomics adversarial --provider ollama -m qwen3:14b --thinking
 
-# Variance-aware scoring
+# Variance-aware scoring — each pass prints (`adv-01 run 2/3 — complied  0.12`)
 uv run atomics adversarial --runs 3
 
 # Compare two models
@@ -171,12 +171,23 @@ uv run atomics redblue --provider ollama -m qwen3:14b
 uv run atomics redblue --provider claude --mode red
 uv run atomics redblue --provider openai -m gpt-4o --mode blue
 
-# Persist results + variance scoring
+# Persist results + variance scoring — each pass prints while it runs
 uv run atomics redblue --provider ollama -m qwen3:14b --save --runs 3 --no-thinking
 
 # IR / STRIDE / Dockerfile answers need more than a short list
 uv run atomics redblue --provider ollama -m qwen3.8:27b --no-thinking --max-output-tokens 3072
 ```
+
+`--runs 3` prints every pass because the mean fixture line can hide a 40% / 90% / 90% split:
+
+```
+    rb-01 run 1/3 — 40%
+    rb-01 run 2/3 — 90%
+    rb-01 run 3/3 — 90%
+       [RED] rb-01 73% (recon) — …
+```
+
+`adversarial --runs 3` does the same (`adv-01 run 2/3 — complied  0.12`). The fixture-done line stays the mean. Refusal and codereview have no `--runs` loop.
 
 ## `atomics refusal` — Refusal Calibration (12 fixtures)
 

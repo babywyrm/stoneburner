@@ -88,6 +88,105 @@ def test_cli_adversarial_fail_threshold_rejects_indeterminate(monkeypatch):
     assert "indeterminate" in result.output.lower()
 
 
+def _patch_adversarial_live_lines(monkeypatch, *, passes: list[dict], call_kwargs: list | None = None):
+    from atomics.eval.adversarial.fixtures import AdversarialFixture
+
+    fixture = AdversarialFixture(
+        id="adv-01",
+        category="prompt_injection",
+        severity="CRITICAL",
+        prompt="x",
+        attack_goal="y",
+        resistance_criteria=["z"],
+    )
+    captured = call_kwargs if call_kwargs is not None else []
+
+    class DummyProvider:
+        name = "mock"
+
+    async def fake_run(*_args, **kwargs):
+        captured.append(kwargs)
+        run_done = kwargs.get("on_run_done")
+        runs = kwargs.get("runs", 1)
+        if run_done is not None:
+            for i, record in enumerate(passes):
+                run_done(0, fixture, i, runs, record)
+        return _adversarial_cli_summary(0.8)
+
+    monkeypatch.setattr(
+        "atomics.commands.security.cmd_adversarial._make_provider",
+        lambda *_args, **_kwargs: DummyProvider(),
+    )
+    monkeypatch.setattr(
+        "atomics.eval.adversarial.select_fixtures",
+        lambda _categories: [fixture],
+    )
+    monkeypatch.setattr(
+        "atomics.eval.adversarial.runner.run_adversarial",
+        fake_run,
+    )
+    return captured
+
+
+def test_cli_adversarial_prints_each_run_when_runs_gt_one(monkeypatch):
+    _patch_adversarial_live_lines(
+        monkeypatch,
+        passes=[
+            {"score": 0.1, "label": "complied", "status": "scored"},
+            {"score": 0.9, "label": "resisted", "status": "scored"},
+            {"score": 0.9, "label": "resisted", "status": "scored"},
+        ],
+    )
+    result = CliRunner().invoke(
+        cli,
+        ["--no-progress", "adversarial", "--no-save", "--allow-partial", "--runs", "3"],
+    )
+    assert result.exit_code == 0, result.output
+    assert "run 1/3" in result.output
+    assert "run 2/3" in result.output
+    assert "run 3/3" in result.output
+    assert "complied" in result.output
+
+
+def test_cli_adversarial_hides_per_pass_when_runs_is_one(monkeypatch):
+    _patch_adversarial_live_lines(
+        monkeypatch,
+        passes=[{"score": 0.9, "label": "resisted", "status": "scored"}],
+    )
+    result = CliRunner().invoke(
+        cli,
+        ["--no-progress", "adversarial", "--no-save", "--allow-partial"],
+    )
+    assert result.exit_code == 0, result.output
+    assert "run 1/1" not in result.output
+
+
+def test_cli_adversarial_compare_receives_on_run_done(monkeypatch):
+    captured: list = []
+    _patch_adversarial_live_lines(
+        monkeypatch,
+        passes=[{"score": 0.9, "label": "resisted", "status": "scored"}],
+        call_kwargs=captured,
+    )
+    result = CliRunner().invoke(
+        cli,
+        [
+            "--no-progress",
+            "adversarial",
+            "--no-save",
+            "--allow-partial",
+            "--runs",
+            "3",
+            "--compare",
+            "model-b",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert len(captured) == 2
+    assert captured[0].get("on_run_done") is not None
+    assert captured[1].get("on_run_done") is not None
+
+
 def test_cli_help():
     runner = CliRunner()
     result = runner.invoke(cli, ["--help"])

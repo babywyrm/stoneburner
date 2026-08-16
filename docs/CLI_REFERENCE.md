@@ -53,7 +53,7 @@ Full command reference for `atomics`. See also [QUICKSTART.md](../QUICKSTART.md)
 | `atomics judge-agreement --suite refusal --judges ollama:a,ollama:b` | Generate once, judge N times; report pairwise agreement and majority-flip rate |
 | `atomics adversarial` | Adversarial resilience eval — resistance to manipulation (72 fixtures) |
 | `atomics adversarial --category tool_desc_injection` | Run one suite/group |
-| `atomics adversarial --runs 3` | Variance-aware scoring (mean ± stddev) |
+| `atomics adversarial --runs 3` | Variance-aware scoring (mean ± stddev). Live `run 2/3` lines print each pass so a 1/3 comply is visible |
 | `atomics adversarial --compare mistral-small:24b` | Run a second model, print per-fixture diff |
 | `atomics adversarial --json-out run.json` | Write full per-fixture results as JSON |
 | `atomics adversarial --fail-on-resilience 60` | CI gate — non-zero exit if resilience < 60% |
@@ -74,7 +74,7 @@ Full command reference for `atomics`. See also [QUICKSTART.md](../QUICKSTART.md)
 | `atomics codereview --no-thinking` | Force thinking off so the review is visible text, not hidden reasoning |
 | `atomics redblue --mode all` | Red/blue security capability eval (offensive + defensive) |
 | `atomics redblue --extra-judges ollama:mistral:7b` | Multi-judge mean ± stdev on the quality score |
-| `atomics redblue --runs 3 --json-out rb.json` | Variance-aware capability scoring + JSON export |
+| `atomics redblue --runs 3 --json-out rb.json` | Variance-aware capability scoring + JSON export. Live `run 2/3` lines print each pass |
 | `atomics redblue --no-thinking --runs 3` | Multi-run capability score with thinking forced off |
 | `atomics redblue --max-output-tokens 3072` | Floor the visible-answer budget (fixtures default to 2048) |
 | `atomics probe --probes-file probes.yaml` | Live ecosystem probe against real artifacts |
