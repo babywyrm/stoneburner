@@ -15,6 +15,7 @@ from rich.table import Table
 
 from atomics.commands.common import (
     PROVIDER_CHOICES,
+    FixtureProgress,
     _make_provider,
     budget_option,
     effective_model,
@@ -190,6 +191,38 @@ def toolcall(
         f"[dim]{len(fixtures)} fixtures · channel={channel} · runs={runs} · "
         f"judge={judge_provider_name or 'none'} · calls are never executed[/dim]\n"
     )
+    if judge is None and channel != "tools":
+        console.print(
+            "[yellow]No judge: prose stays unjudged and channel divergence "
+            "cannot be measured. Pass --judge-provider to score the "
+            "refused-in-chat / complied-with-tools gap.[/yellow]"
+        )
+    if channel != "prose":
+        console.print(
+            "[dim]Capability probe — checking that the model can emit a tool "
+            "call before scoring silence as refusal...[/dim]"
+        )
+
+    progress = FixtureProgress(len(fixtures), console, label="toolcall")
+
+    def on_start(index: int, fixture) -> None:
+        progress.on_start(index, fixture.id, fixture.category)
+        console.print(
+            f"  [{index + 1}/{len(fixtures)}] {fixture.id} ({fixture.category}) "
+            f"— generating..."
+        )
+
+    def on_done(index: int, fixture, aggregated: dict) -> None:
+        progress.on_done(index)
+        style, label = _OUTCOME_STYLE.get(aggregated.get("tool_outcome"), ("white", "?"))
+        prose = aggregated.get("prose_label") or "—"
+        called = ", ".join(
+            c.get("name", "") for c in aggregated.get("calls") or []
+        ) or "none"
+        console.print(
+            f"  [{index + 1}/{len(fixtures)}] {fixture.id} ({fixture.category}) "
+            f"— [{style}]{label}[/{style}]  prose={prose}  called={called}"
+        )
 
     summary = asyncio.run(
         run_toolcall_suite(
@@ -203,6 +236,8 @@ def toolcall(
             channel=channel,
             thinking=thinking_flag,
             thinking_budget=thinking_budget,
+            on_fixture_start=on_start,
+            on_fixture_done=on_done,
         )
     )
 
