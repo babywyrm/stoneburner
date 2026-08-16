@@ -40,6 +40,10 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
     .bar { height: 1.25rem; background: #58a6ff; border-radius: 4px; min-width: 2px; }
     .row { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.4rem; }
     .row span { width: 8rem; font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    button.link { background: none; border: none; padding: 0; color: #0969da; cursor: pointer; font: inherit; }
+    @media (prefers-color-scheme: dark) { button.link { color: #58a6ff; } }
+    #run-detail { display: none; margin-top: 1.5rem; }
+    #run-detail.visible { display: block; }
   </style>
 </head>
 <body>
@@ -65,6 +69,11 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
       <h2>Compare by provider</h2>
       <div id="compare"><p class="empty">Loading...</p></div>
     </div>
+  </div>
+  <div id="run-detail" class="card">
+    <h2>Run <button type="button" id="run-back" class="link">← all runs</button></h2>
+    <div id="run-summary"><p class="empty">Select a run.</p></div>
+    <div id="run-fixtures"></div>
   </div>
 
   <script>
@@ -140,19 +149,100 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
       container.appendChild(table);
     }
 
+    function selectRun(runId) {
+      if (location.hash !== "#run=" + runId) {
+        location.hash = "run=" + runId;
+      }
+      loadRunDetail(runId);
+    }
+
+    function clearRun() {
+      if (location.hash.startsWith("#run=")) {
+        history.replaceState(null, "", location.pathname + location.search);
+      }
+      document.getElementById("run-detail").classList.remove("visible");
+    }
+
+    async function loadRunDetail(runId) {
+      const panel = document.getElementById("run-detail");
+      const summary = document.getElementById("run-summary");
+      const fixtures = document.getElementById("run-fixtures");
+      panel.classList.add("visible");
+      emptyNote(summary, "Loading " + runId.slice(0, 8) + "…");
+      fixtures.textContent = "";
+      const data = await get("/api/v1/runs/" + encodeURIComponent(runId));
+      if (!data || !data.run) {
+        emptyNote(summary, "Run not found.");
+        return;
+      }
+      const r = data.run;
+      summary.textContent = "";
+      const meta = document.createElement("p");
+      meta.textContent = [
+        r.provider || "-",
+        r.model || "-",
+        r.tier || "-",
+        (r.total_tokens != null ? r.total_tokens + " tok" : ""),
+        (r.total_cost_usd != null ? "$" + Number(r.total_cost_usd).toFixed(4) : ""),
+      ].filter(Boolean).join(" · ");
+      summary.appendChild(meta);
+      const rows = (data.fixtures || []).map(f => [
+        f.id,
+        f.kind,
+        f.suite || "-",
+        f.score == null ? "-" : Number(f.score).toFixed(2),
+        f.label || f.status || "-",
+        f.latency_ms == null ? "-" : Math.round(f.latency_ms) + "ms",
+      ]);
+      renderTable("run-fixtures", rows, ["Fixture", "Kind", "Suite", "Score", "Label", "Latency"]);
+    }
+
     async function loadRecentRuns() {
       const data = await get("/api/v1/reports/recent-runs?limit=10");
-      const rows = (data?.runs || []).map(r => [
-        r.run_id.slice(0, 8),
-        r.provider || r.model || "-",
-        r.tier || "-",
-        { class: "status " + statusClass(r.status), text: r.status || "-" },
-        r.total_tasks ?? "-",
-        r.successful_tasks ?? "-",
-        r.total_tokens ?? "-",
-        r.total_cost_usd != null ? "$" + r.total_cost_usd.toFixed(4) : "-",
-      ]);
-      renderTable("recent-runs", rows, ["Run", "Provider", "Tier", "Status", "Tasks", "OK", "Tokens", "Cost"]);
+      const container = document.getElementById("recent-runs");
+      const runs = data?.runs || [];
+      if (!runs.length) { emptyNote(container, "No data yet."); return; }
+      const table = document.createElement("table");
+      const headRow = document.createElement("tr");
+      for (const h of ["Run", "Provider", "Tier", "Status", "Tasks", "OK", "Tokens", "Cost"]) {
+        const th = document.createElement("th");
+        th.textContent = h;
+        headRow.appendChild(th);
+      }
+      table.appendChild(headRow);
+      for (const r of runs) {
+        const tr = document.createElement("tr");
+        const idCell = document.createElement("td");
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "link";
+        btn.textContent = String(r.run_id).slice(0, 8);
+        btn.addEventListener("click", () => selectRun(r.run_id));
+        idCell.appendChild(btn);
+        tr.appendChild(idCell);
+        const cells = [
+          r.provider || r.model || "-",
+          r.tier || "-",
+          { class: "status " + statusClass(r.status), text: r.status || "-" },
+          r.total_tasks ?? "-",
+          r.successful_tasks ?? "-",
+          r.total_tokens ?? "-",
+          r.total_cost_usd != null ? "$" + r.total_cost_usd.toFixed(4) : "-",
+        ];
+        for (const c of cells) {
+          const td = document.createElement("td");
+          if (c !== null && typeof c === "object") {
+            td.className = c.class;
+            td.textContent = c.text;
+          } else {
+            td.textContent = c == null ? "-" : String(c);
+          }
+          tr.appendChild(td);
+        }
+        table.appendChild(tr);
+      }
+      container.textContent = "";
+      container.appendChild(table);
     }
 
     async function loadDistributedJobs() {
@@ -209,11 +299,22 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
       document.getElementById("key-warning").style.display = "none";
       refresh();
     });
+    document.getElementById("run-back").addEventListener("click", clearRun);
+    window.addEventListener("hashchange", () => {
+      if (location.hash.startsWith("#run=")) {
+        loadRunDetail(location.hash.slice(5));
+      } else {
+        document.getElementById("run-detail").classList.remove("visible");
+      }
+    });
 
     if (!API_KEY) {
       document.getElementById("key-warning").style.display = "block";
     }
     refresh();
+    if (location.hash.startsWith("#run=")) {
+      loadRunDetail(location.hash.slice(5));
+    }
     setInterval(refresh, 10000);
   </script>
 </body>

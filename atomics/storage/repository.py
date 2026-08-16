@@ -651,6 +651,66 @@ class MetricsRepository:
         ).fetchall()
         return [dict(r) for r in rows]
 
+    def get_run(self, run_id: str) -> dict | None:
+        row = self._conn.execute(
+            "SELECT * FROM runs WHERE run_id = ?", (run_id,)
+        ).fetchone()
+        return dict(row) if row is not None else None
+
+    def get_run_detail(self, run_id: str) -> dict | None:
+        """Parent run plus fixture rows, with prompts and raw JSON stripped.
+
+        The dashboard and `GET /api/v1/runs/{id}` share this so a future
+        export path cannot accidentally reuse the raw getters.
+        """
+        run = self.get_run(run_id)
+        if run is None:
+            return None
+        fixtures: list[dict[str, object]] = []
+        for row in self.get_evaluation_results(run_id=run_id):
+            fixtures.append(
+                {
+                    "id": row["fixture_id"],
+                    "kind": "evaluation",
+                    "suite": row["suite"],
+                    "score": row["score"],
+                    "label": None,
+                    "status": row["status"],
+                    "generation_status": row["generation_status"],
+                    "latency_ms": row["latency_ms"],
+                    "cost_usd": row["estimated_cost_usd"],
+                }
+            )
+        for row in self.get_adversarial_results(run_id=run_id):
+            fixtures.append(
+                {
+                    "id": row["fixture_id"],
+                    "kind": "adversarial",
+                    "suite": "adversarial",
+                    "score": row["resistance_score"],
+                    "label": row["resistance_label"],
+                    "status": row["status"],
+                    "generation_status": row["generation_status"],
+                    "latency_ms": row["latency_ms"],
+                    "cost_usd": row["estimated_cost_usd"],
+                }
+            )
+        for row in self.get_run_tasks(run_id):
+            fixtures.append(
+                {
+                    "id": row["task_name"],
+                    "kind": "task",
+                    "suite": row["suite"],
+                    "score": row["accuracy_score"],
+                    "label": None,
+                    "status": row["status"],
+                    "generation_status": row["status"],
+                    "latency_ms": row["latency_ms"],
+                    "cost_usd": row["estimated_cost_usd"],
+                }
+            )
+        return {"run": run, "fixtures": fixtures}
+
     def get_run_tasks(self, run_id: str) -> list[dict]:
         rows = self._conn.execute(
             "SELECT * FROM task_results WHERE run_id = ? ORDER BY started_at", (run_id,)

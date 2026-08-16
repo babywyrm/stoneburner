@@ -45,6 +45,48 @@ def test_dashboard_html_is_self_contained(client_with_dashboard):
     assert "Distributed jobs" in res.text
     assert "Workers" in res.text
     assert "Compare by provider" in res.text
+    assert "run-detail" in res.text
+    assert "/api/v1/runs/" in res.text
+    assert "selectRun" in res.text
+
+
+def test_dashboard_run_detail_omits_result_json(tmp_path):
+    from atomics.storage.records import EvaluationResultRecord
+    from atomics.storage.repository import MetricsRepository
+
+    db = tmp_path / "dash-detail.db"
+    repo = MetricsRepository(db)
+    repo.create_run("dash-run", tier="refusal", provider="ollama", model="qwen")
+    repo.save_evaluation_result(
+        EvaluationResultRecord(
+            run_id="dash-run",
+            suite="refusal",
+            fixture_id="rf-01",
+            status="complete",
+            generation_status="completed",
+            judge_status="scored",
+            latency_ms=12.0,
+            input_tokens=3,
+            output_tokens=2,
+            total_tokens=5,
+            score=0.75,
+            result_json={"prompt": "do not leak"},
+            provider="ollama",
+            model="qwen",
+        )
+    )
+    repo.close()
+
+    app = create_app(
+        ServerSettings(no_auth=True, with_dashboard=True, db_path=db)
+    )
+    with TestClient(app) as tc:
+        page = tc.get("/dashboard")
+        assert "selectRun" in page.text
+        detail = tc.get("/api/v1/runs/dash-run")
+    assert detail.status_code == 200
+    assert detail.json()["fixtures"][0]["id"] == "rf-01"
+    assert "do not leak" not in detail.text
 
 
 def test_dashboard_lists_no_data_when_empty(client_with_dashboard):

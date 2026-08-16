@@ -158,6 +158,27 @@ async def provider_test(
     return ProviderTestResponse(**body)
 
 
+@router.get("/runs/{run_id}")
+async def get_run(
+    run_id: str,
+    request: Request,
+    _: None = Depends(require_auth),
+) -> dict:
+    """One persisted run and its fixtures. Prompts and raw JSON are omitted."""
+    settings = request.app.state.settings
+    repo = MetricsRepository(settings.db_path)
+    try:
+        detail = repo.get_run_detail(run_id)
+    finally:
+        repo.close()
+    if detail is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Run not found",
+        )
+    return detail
+
+
 @router.get("/compare", response_model=CompareResponse)
 async def compare(
     by: str = "provider",
