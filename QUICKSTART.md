@@ -178,6 +178,13 @@ uv run atomics redblue --provider ollama -m qwen3:14b
 uv run atomics -v toolcall -p ollama -m qwen3:14b \
   --judge-provider ollama --judge-model qwen2.5:14b --runs 3 --no-thinking
 
+# One box, no second GPU: tools only. Live lines still print.
+# Channel divergence is not measured — that needs a judge.
+uv run atomics doctor
+uv run atomics provider-test -p ollama -m qwen3:14b --no-thinking
+uv run atomics -v toolcall -p ollama -m qwen3:14b \
+  --category direct --channel tools --runs 3 --no-thinking --no-skip-incapable
+
 # Point an LLM at real artifacts (logs, scan reports, configs)
 uv run atomics probe --artifact access-log --file /var/log/nginx/access.log
 ```
@@ -192,8 +199,9 @@ uv run atomics probe --artifact access-log --file /var/log/nginx/access.log
   an attack — read those first.
 - `toolcall` measures the **agent gap**: refused in chat, then emitted the
   call when handed function schemas. Calls are never executed. Live lines
-  print `prose=resisted` + `DANGEROUS` when that gap is the result. Omit a
-  judge and divergence is not measured.
+  print `prose=resisted` + `DANGEROUS` when that gap is the result. A
+  tools-only one-box run is a valid first run and cannot produce channel
+  divergence. Omit a judge and divergence is not measured.
 
 A model can score high on one and low on the other. In practice a **capable but
 low-resilience** model (good at the tasks, easy to manipulate) is the riskiest
