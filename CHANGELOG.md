@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Removed
+- **`atomics/workers/bridge.py`.** Unused Phase-3 scaffold. `atomics worker-npm`
+  is the npm worker and never called `invoke_worker`.
+
 ### Fixed
 - **`doctor` no longer claims a Claude key is required for `provider-test`.**
   Local Ollama / vLLM runs do not need `ANTHROPIC_API_KEY`. The line now

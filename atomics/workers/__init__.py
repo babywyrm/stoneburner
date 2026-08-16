@@ -1,1 +1,1 @@
-"""Worker bridge — optional npm/external worker support."""
+"""Distributed workers — Python pool and the npm worker package."""
