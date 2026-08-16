@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Fixed
+- **`doctor` no longer claims a Claude key is required for `provider-test`.**
+  Local Ollama / vLLM runs do not need `ANTHROPIC_API_KEY`. The line now
+  matches the other keys: optional, needed for Claude.
+
 ### Added
 - **`inference.env` reaches `doctor` and `make_provider`.** `atomics doctor`
   reports the control file's backend, URL, and model — never the API key.

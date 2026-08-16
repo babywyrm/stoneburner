@@ -29,6 +29,24 @@ def test_doctor_shows_openai_key_set(capsys, tmp_path):
     assert "OPENAI_API_KEY" in captured.out
 
 
+def test_doctor_anthropic_key_is_optional_for_local_provider_test(
+    capsys, tmp_path, monkeypatch
+):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.chdir(tmp_path)
+    settings = AtomicsSettings(
+        db_path=tmp_path / "doc.db",
+        anthropic_api_key="",
+    )
+    assert run_doctor(settings=settings) == 0
+    out = capsys.readouterr().out
+    assert "ANTHROPIC_API_KEY" in out
+    assert "not set" in out
+    assert "provider-test" not in out
+    assert "optional" in out.lower()
+    assert "Claude" in out
+
+
 def test_doctor_shows_openai_key_missing(capsys, tmp_path, monkeypatch):
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.chdir(tmp_path)
