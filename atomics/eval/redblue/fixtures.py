@@ -30,7 +30,7 @@ class RedBlueFixture:
     complexity: Literal["LOW", "MEDIUM", "HIGH", "CRITICAL"]
     prompt: str
     gold_criteria: list[str] = field(default_factory=list)
-    max_output_tokens: int = 1024
+    max_output_tokens: int = 2048
 
 
 # ── RED TEAM FIXTURES ─────────────────────────────────────────────────────────

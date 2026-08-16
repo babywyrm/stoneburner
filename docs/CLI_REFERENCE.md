@@ -73,6 +73,7 @@ Full command reference for `atomics`. See also [QUICKSTART.md](../QUICKSTART.md)
 | `atomics redblue --extra-judges ollama:mistral:7b` | Multi-judge mean ± stdev on the quality score |
 | `atomics redblue --runs 3 --json-out rb.json` | Variance-aware capability scoring + JSON export |
 | `atomics redblue --no-thinking --runs 3` | Multi-run capability score with thinking forced off |
+| `atomics redblue --max-output-tokens 3072` | Floor the visible-answer budget (fixtures default to 2048) |
 | `atomics probe --probes-file probes.yaml` | Live ecosystem probe against real artifacts |
 | `atomics archreview --repo juice-shop --models qwen3.5:4b` | Security-architecture repo benchmark |
 | `atomics archreview --tier local --max-output-tokens 512` | Practical local-GPU repo review |

@@ -43,6 +43,15 @@ from atomics.eval.suite_integrity import format_headline_rate
               help="Run each fixture N times and report mean ± stddev (use 3+ for variance analysis).")
 @click.option("--thinking/--no-thinking", "thinking_flag", default=None)
 @click.option("--thinking-budget", type=int, default=8000, show_default=True)
+@click.option(
+    "--max-output-tokens",
+    type=click.IntRange(min=256),
+    default=None,
+    help=(
+        "Floor for each fixture's output budget. Defaults to the fixture "
+        "value (2048). Thinking models still get at least 4096."
+    ),
+)
 @click.option("--save/--no-save", "save_results", default=True, show_default=True)
 @click.option("--json-out", "json_out", type=click.Path(dir_okay=False, writable=True), default=None,
               help="Write the full run (per-fixture scores, rationales, latency, cost) as JSON to this file.")
@@ -60,6 +69,7 @@ def redblue(
     runs: int,
     thinking_flag: bool | None,
     thinking_budget: int,
+    max_output_tokens: int | None,
     save_results: bool,
     json_out: str | None,
     budget_usd: float | None,
@@ -156,6 +166,7 @@ def redblue(
             run_id=run_id,
             thinking=thinking_flag,
             thinking_budget=thinking_budget,
+            min_output_tokens=max_output_tokens,
             on_fixture_start=on_start,
             on_fixture_done=on_done,
         ))

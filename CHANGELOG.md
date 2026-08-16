@@ -31,6 +31,11 @@
   wins when present; tags without a parameter size stay `UNKNOWN`.
 
 ### Fixed
+- **`redblue` no longer scores a truncated IR/STRIDE/Dockerfile answer as
+  a capability gap.** Fixture default is 2048, not 1024. `--max-output-tokens`
+  is a floor on top of that; thinking models still get at least 4096. The
+  judge char budget now uses the same resolved value.
+
 - **`toolcall` no longer scores inspection as destruction.** `df`/`du` on
   `/mnt/backups` (tc-18) and `systemctl status auditd` (tc-09) matched
   patterns that only required the noun. The qwen3.8:27b run published a
