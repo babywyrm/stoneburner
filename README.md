@@ -83,7 +83,11 @@ uv run atomics tiers                   # show all tier profiles
 | `atomics eval` | Quality evaluation suite |
 | `atomics adversarial` | Adversarial resilience eval (72 fixtures) |
 | `atomics toolcall` | Tool-call divergence: refuses in prose, complies via function call (20 fixtures) |
-| `atomics redblue` | Red/blue security capability eval |
+| `atomics redblue` | Red/blue security capability eval (10 fixtures) |
+| `atomics refusal` | Over- vs under-refusal calibration (12 fixtures) |
+| `atomics codereview` | Planted-vuln detection in snippets and diffs (8 fixtures) |
+| `atomics judge-agreement` | Same generation, N judges; pairwise agreement and majority-flip rate |
+| `atomics labcompare` | Two-host throughput + quality bench-off |
 | `atomics stress` | GPU saturation testing |
 | `atomics soak` | Long-duration stability test |
 | `atomics rag` | RAG pipeline evaluation (grounding, faithfulness, abstention) — also supports real retrieval from an indexed corpus |
@@ -92,7 +96,7 @@ uv run atomics tiers                   # show all tier profiles
 | `atomics multiturn` | Multi-turn conversation eval (context retention, coherence) |
 | `atomics advisor` | Cost optimization recommendations from historical data |
 | `atomics codegen` | Code generation eval (functional correctness via test execution) |
-| `atomics sweep` | Multi-model eval sweep |
+| `atomics sweep` | Overnight multi-suite driver (`--suites`, `--runs 3`, status file + detachable log) |
 | `atomics doctor` | Installation health check |
 | `atomics server` | Run atomics as an HTTP API server |
 | `atomics mcp` | Expose atomics to LLM agents over MCP (proxies the API server) |
@@ -108,8 +112,8 @@ Six eval suites for LLM security assessment:
 | **adversarial** | Resistance to manipulation (prompt injection, jailbreaks, MCP attacks) | 72 |
 | **toolcall** | Whether a prose refusal survives contact with a function call | 20 |
 | **redblue** | Offensive/defensive security capability (OSINT, vuln analysis, IR) | 10 |
-| **refusal** | Over-refusal vs under-refusal calibration | per-suite |
-| **codereview** | Vulnerability detection in code snippets and diffs | per-suite |
+| **refusal** | Over-refusal vs under-refusal calibration | 12 |
+| **codereview** | Vulnerability detection in code snippets and diffs | 8 |
 | **archreview** | Security architecture reasoning against whole repos | per-repo |
 
 Plus **probe** (live infrastructure analysis) and **sweep** (multi-model ranked comparison).
@@ -211,8 +215,8 @@ surface is actually tested. Sync it locally too.
 
 ```bash
 uv sync --extra dev --extra api --extra mcp
-uv run python -m pytest -v
-uv run python -m pytest --cov=atomics --cov-report=term-missing
+uv run pytest -q
+uv run pytest -q --cov=atomics --cov-report=term-missing --cov-fail-under=85
 ```
 
 The suite drives FastAPI's `TestClient`, an in-process shim, so it proves the

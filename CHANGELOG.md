@@ -3,6 +3,13 @@
 ## Unreleased
 
 ### Added
+- **Operator docs match the CLI that ships.** README lists `refusal`,
+  `codereview`, `judge-agreement`, `labcompare`, and real fixture counts
+  (72/20/10/12/8) instead of "per-suite". QUICKSTART's suite list and
+  `provider-test` mention thinking models. `CLI_REFERENCE` puts `sweep`
+  back in the evaluation table. `THINKING.md` shows `--no-thinking` on
+  a qwen3.8 smoke test.
+
 - **`toolcall` live output is documented where operators actually look.**
   `SECURITY_SUITES`, `CLI_REFERENCE`, and `QUICKSTART` now show the
   `run 2/3` lines and how to read `prose=resisted` + `DANGEROUS` as
