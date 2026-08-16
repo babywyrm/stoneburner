@@ -65,6 +65,8 @@ would expose eval submission to the network unauthenticated.
 | POST | `/api/v1/runs` | Start a benchmark run |
 | POST | `/api/v1/evals` | Start an eval suite |
 | GET | `/api/v1/jobs/{job_id}` | Poll job status/result |
+| GET | `/api/v1/models` | List Ollama or vLLM tags (`?provider=&host=`) |
+| POST | `/api/v1/provider-test` | Health + fixed 2+2 generate (spends a few tokens) |
 | GET | `/api/v1/compare` | Compare providers/models |
 | GET | `/api/v1/reports/recent-runs` | Recent run report |
 | POST | `/api/v1/workers/register` | Register a worker |

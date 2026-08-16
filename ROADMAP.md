@@ -142,6 +142,15 @@ lie toolcall had before `on_run_done`.
 - [x] `on_run_done` on redblue and adversarial, including failed passes
 - [x] CLI prints `run 2/3` only when `--runs > 1`; compare uses the same hook
 
+## v0.21.0 — Discover, then probe
+
+An MCP agent could submit an eval but could not ask what was loaded or
+whether it answered. Endpoints first, then the proxy.
+
+- [x] `GET /api/v1/models` and `POST /api/v1/provider-test` (auth, no
+      caller prompt)
+- [x] MCP `list_models` (read-only) and `provider_test` (spends)
+
 ## Beyond
 
 Not scheduled, roughly in order of how often they come up.
@@ -158,11 +167,6 @@ Not scheduled, roughly in order of how often they come up.
   categorical majority) and `atomics judge-agreement` measures how often a
   single judge would flip the headline. `rag`, `probe`, and `archreview` are
   still single-judge.
-- **Read-only API endpoints for `models` and `provider-test`.** `atomics mcp`
-  can only proxy what the API already exposes. Those two are the obvious next
-  tools for an agent (discover what's available, then check it answers) and
-  they are currently CLI-only. Add the endpoints first, with the auth the API
-  already applies, then the MCP tools come for free.
 - **Interactive REPL.** Tab-completion over the existing Click tree is cheap;
   the useful part is session state (selected provider/model, last result set)
   for exploratory work. Heavy ops (`soak`, `sweep`) should submit jobs, not

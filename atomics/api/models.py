@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 # Upper bounds exist so one authenticated request cannot pin the server or run
 # up an unbounded provider bill. They are deliberately generous: the CLI is the
@@ -103,3 +103,34 @@ class ReportResponse(BaseModel):
 
 class ReportSummaryResponse(BaseModel):
     providers: list[dict]
+
+
+class ModelsResponse(BaseModel):
+    provider: str
+    models: list[dict]
+
+
+class ProviderTestRequest(BaseModel):
+    """Probe a provider. The generate prompt is fixed server-side."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    provider: str
+    model: str | None = None
+    host: str | None = None
+    thinking: bool | None = None
+
+
+class ProviderTestResponse(BaseModel):
+    ok: bool
+    health: bool
+    provider: str
+    model: str | None = None
+    response: str | None = None
+    error: str | None = None
+    input_tokens: int = 0
+    output_tokens: int = 0
+    total_tokens: int = 0
+    thinking_tokens: int = 0
+    latency_ms: float = 0.0
+    cost_usd: float = 0.0

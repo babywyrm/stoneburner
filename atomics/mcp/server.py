@@ -6,15 +6,16 @@ and async job scheduling, so an agent driving this server gets exactly the
 guardrails a remote HTTP caller gets — no more, and no separate copy of them.
 
 The tool surface is deliberately bounded by what the API already exposes. The
-CLI can do considerably more (`models`, `provider-test`, `sweep`, `stress`,
-`soak`, `probe`), but those have no endpoint, and inventing one for each would
-widen the remotely reachable surface well beyond what a proxy should decide on
-its own. If one of them is worth exposing, it should become an API endpoint
-first, with the auth and bounds that implies, and reach MCP from there.
+CLI can do considerably more (`sweep`, `stress`, `soak`, `probe`), but those
+have no endpoint, and inventing one for each would widen the remotely reachable
+surface well beyond what a proxy should decide on its own. If one of them is
+worth exposing, it should become an API endpoint first, with the auth and bounds
+that implies, and reach MCP from there.
 
 Runs and evals are asynchronous: submitting returns a job id immediately and the
-agent polls `get_job`. No tool blocks on model work, which is what keeps a
-multi-hour eval from timing out an agent's tool call.
+agent polls `get_job`. `list_models` and `provider_test` are the two short
+synchronous probes — listing tags, then a fixed 2+2 generate. Nothing else
+blocks on model work.
 """
 
 from __future__ import annotations
@@ -31,10 +32,11 @@ INSTRUCTIONS = """Evaluate and benchmark language models through a running atomi
 Runs and evals are asynchronous. `submit_run` and `submit_eval` return a job id;
 poll `get_job` with that id until its status is finished, then read the result.
 
-Read-only tools (`health`, `get_job`, `compare`, `recent_runs`) are safe to call
-freely. `submit_run` and `submit_eval` spend real provider tokens and money, so
-treat them as costly: the server enforces a per-eval dollar ceiling, but staying
-well inside it is the caller's job.
+Read-only tools (`health`, `list_models`, `get_job`, `compare`, `recent_runs`)
+are safe to call freely. `provider_test` spends a few tokens on a fixed probe.
+`submit_run` and `submit_eval` spend real provider tokens and money, so treat
+them as costly: the server enforces a per-eval dollar ceiling, but staying well
+inside it is the caller's job.
 """
 
 READ_ONLY = ToolAnnotations(read_only_hint=True, destructive_hint=False)
@@ -53,6 +55,31 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
         instructions=INSTRUCTIONS,
         version=_version(),
     )
+
+    @server.tool(annotations=READ_ONLY)
+    def list_models(provider: str = "ollama", host: str | None = None) -> Any:
+        """List models loaded on an Ollama or vLLM instance.
+
+        `provider` is `ollama` or `vllm`. Pass `host` to override the server's
+        configured endpoint. Does not generate and does not spend tokens.
+        """
+        return api.list_models(provider=provider, host=host)
+
+    @server.tool(annotations=SPENDS)
+    def provider_test(
+        provider: str,
+        model: str | None = None,
+        host: str | None = None,
+        thinking: bool | None = None,
+    ) -> Any:
+        """Health-check a provider and generate a fixed 2+2 probe.
+
+        Spends a few tokens. The prompt is fixed server-side. Use this after
+        `list_models` to confirm a tag answers before submitting an eval.
+        """
+        return api.provider_test(
+            provider=provider, model=model, host=host, thinking=thinking
+        )
 
     @server.tool(annotations=READ_ONLY)
     def health() -> Any:

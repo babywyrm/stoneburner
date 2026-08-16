@@ -110,6 +110,36 @@ def test_unknown_job_is_a_404_not_a_routing_error(app_client):
     assert replay(app_client, request).status_code == 404
 
 
+def test_list_models_is_accepted_by_the_real_api(app_client, monkeypatch):
+
+    async def fake_list(_provider, _host):
+        return {"provider": "ollama", "models": []}
+
+    monkeypatch.setattr("atomics.api.routes.list_models", fake_list)
+    request = captured_request(lambda c: c.list_models(provider="ollama"))
+    response = replay(app_client, request)
+    assert response.status_code == 200
+    assert response.json()["provider"] == "ollama"
+
+
+def test_provider_test_is_accepted_by_the_real_api(app_client, monkeypatch):
+
+    async def fake_test(_payload):
+        return {
+            "ok": True,
+            "health": True,
+            "provider": "ollama",
+            "model": None,
+            "response": "4",
+        }
+
+    monkeypatch.setattr("atomics.api.routes.run_provider_test", fake_test)
+    request = captured_request(lambda c: c.provider_test(provider="ollama"))
+    response = replay(app_client, request)
+    assert response.status_code == 200
+    assert response.json()["ok"] is True
+
+
 def test_the_api_key_header_is_what_authenticates(app_client):
     """Negative control. If the client sent the key under any other name, the
     positive tests above would still pass whenever auth happened to be off."""

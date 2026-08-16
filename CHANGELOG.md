@@ -3,6 +3,12 @@
 ## Unreleased
 
 ### Added
+- **API `models` and `provider-test`, then MCP.** `GET /api/v1/models`
+  lists Ollama or vLLM tags. `POST /api/v1/provider-test` health-checks
+  and generates a fixed 2+2 probe (no caller prompt). Both require the
+  API key. MCP gains `list_models` (read-only) and `provider_test`
+  (spends). Sweep / stress / soak / probe stay CLI-only.
+
 - **`redblue` and `adversarial` print each pass when `--runs` is greater
   than one.** The mean fixture line hid a 40% pass (or a 1/3 comply)
   until the JSON was opened. Both runners now have `on_run_done`, matching

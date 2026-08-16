@@ -215,3 +215,26 @@ class AtomicsApiClient:
 
     def recent_runs(self, *, limit: int = 10) -> Any:
         return self._request("GET", "/reports/recent-runs", params={"limit": limit})
+
+    def list_models(self, *, provider: str = "ollama", host: str | None = None) -> Any:
+        params: dict[str, Any] = {"provider": provider}
+        if host is not None:
+            params["host"] = host
+        return self._request("GET", "/models", params=params)
+
+    def provider_test(
+        self,
+        *,
+        provider: str,
+        model: str | None = None,
+        host: str | None = None,
+        thinking: bool | None = None,
+    ) -> Any:
+        payload: dict[str, Any] = {"provider": provider}
+        if model is not None:
+            payload["model"] = model
+        if host is not None:
+            payload["host"] = host
+        if thinking is not None:
+            payload["thinking"] = thinking
+        return self._request("POST", "/provider-test", json=payload)
