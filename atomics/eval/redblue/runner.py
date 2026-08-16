@@ -38,9 +38,17 @@ logger = logging.getLogger("atomics.eval.redblue.runner")
 _THINKING_MIN_OUTPUT_TOKENS = 4096
 
 
-def _output_budget(fixture: RedBlueFixture, *, thinking: bool | None, model: str | None) -> int:
+def _output_budget(
+    fixture: RedBlueFixture,
+    *,
+    thinking: bool | None,
+    model: str | None,
+    min_output_tokens: int | None = None,
+) -> int:
     """Resolve the output-token budget, giving thinking models room to reason."""
     base = fixture.max_output_tokens
+    if min_output_tokens is not None:
+        base = max(base, min_output_tokens)
     use_thinking = thinking if thinking is not None else (
         supports_thinking(model) if model else False
     )
@@ -190,6 +198,7 @@ async def run_redblue(
     run_id: str | None = None,
     thinking: bool | None = None,
     thinking_budget: int | None = None,
+    min_output_tokens: int | None = None,
     on_fixture_start: Callable[..., object] | None = None,
     on_fixture_done: Callable[..., object] | None = None,
 ) -> RedBlueSummary:
@@ -246,11 +255,17 @@ async def run_redblue(
             )
 
             try:
+                output_tokens = _output_budget(
+                    fixture,
+                    thinking=thinking,
+                    model=model,
+                    min_output_tokens=min_output_tokens,
+                )
                 resp = await provider.generate(
                     fixture.prompt,
                     system="You are a highly knowledgeable security engineering assistant.",
                     model=model,
-                    max_tokens=_output_budget(fixture, thinking=thinking, model=model),
+                    max_tokens=output_tokens,
                     thinking=thinking,
                     thinking_budget=thinking_budget,
                 )
@@ -286,7 +301,7 @@ async def run_redblue(
                 primary_model=judge_model,
                 extra_judges=extra_judges,
                 gold_criteria=fixture.gold_criteria,
-                max_response_chars=char_budget_for_tokens(fixture.max_output_tokens),
+                max_response_chars=char_budget_for_tokens(output_tokens),
             )
             task_result.accuracy_score = judge.score
             task_result.judge_model = judge.judge_model

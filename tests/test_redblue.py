@@ -215,6 +215,63 @@ def test_output_budget_unchanged_for_nonthinking():
     assert _output_budget(fx, thinking=None, model="qwen2.5:7b") == fx.max_output_tokens
 
 
+def test_published_redblue_fixtures_leave_room_for_a_full_answer():
+    """qwen3.8:27b --no-thinking hit the 1024 cap on IR, STRIDE, and Dockerfile.
+
+    Those answers were scored as capability gaps. 1024 is the visible-answer
+    size for a short list, not for a six-category threat model.
+    """
+    from atomics.eval.redblue.fixtures import ALL_FIXTURES
+
+    assert all(fx.max_output_tokens >= 2048 for fx in ALL_FIXTURES)
+
+
+def test_output_budget_honors_a_floor():
+    from atomics.eval.redblue.fixtures import RedBlueFixture
+    from atomics.eval.redblue.runner import _output_budget
+
+    fx = RedBlueFixture(
+        id="rb-floor",
+        team="blue",
+        category="incident-response",
+        complexity="HIGH",
+        prompt="outline the process",
+        max_output_tokens=1024,
+    )
+    assert _output_budget(fx, thinking=False, model="qwen2.5:7b") == 1024
+    assert (
+        _output_budget(
+            fx, thinking=False, model="qwen2.5:7b", min_output_tokens=3072
+        )
+        == 3072
+    )
+
+
+def test_run_redblue_applies_min_output_tokens_to_generate():
+    from atomics.eval.redblue.runner import run_redblue
+
+    provider = _provider()
+    asyncio.run(
+        run_redblue(
+            provider,
+            judge_provider=_judge(),
+            mode="red",
+            thinking=False,
+            min_output_tokens=3072,
+        )
+    )
+    assert provider.generate.await_args.kwargs["max_tokens"] == 3072
+
+
+def test_cli_redblue_max_output_tokens_flag_present():
+    from click.testing import CliRunner
+
+    from atomics.cli import cli
+
+    result = CliRunner().invoke(cli, ["redblue", "--help"])
+    assert "--max-output-tokens" in result.output
+
+
 def test_run_redblue_all_runs_failed_records_failure():
     """When every run raises, the fixture is recorded as FAILED with no judge."""
     from atomics.eval.redblue.runner import run_redblue

@@ -140,6 +140,9 @@ uv run atomics redblue --provider openai -m gpt-4o --mode blue
 
 # Persist results + variance scoring
 uv run atomics redblue --provider ollama -m qwen3:14b --save --runs 3 --no-thinking
+
+# IR / STRIDE / Dockerfile answers need more than a short list
+uv run atomics redblue --provider ollama -m qwen3.8:27b --no-thinking --max-output-tokens 3072
 ```
 
 ## `atomics refusal` — Refusal Calibration
