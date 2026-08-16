@@ -73,9 +73,11 @@ every item here is a refactor with the test suite as the contract.
       `reporting/` packages
 - [ ] Enforce the configured line length instead of `--ignore E501`, which
       currently suppresses ~386 violations and makes the setting inert
-- [x] Decide the fate of `inference.py` — `doctor` and `make_provider` now
-      consume it (host/model overlay only; provider name stays with the
-      caller). `workers/bridge.py` is still test-only.
+- [x] Decide the fate of `inference.py` and `workers/bridge.py`.
+      `doctor` and `make_provider` consume the control file (host/model
+      overlay only; provider name stays with the caller). `bridge.py` was
+      unused Phase-3 scaffold; `worker-npm` is the real npm path and never
+      called it, so the module is gone.
 
 ## v0.18.0 — Honest local evals
 
