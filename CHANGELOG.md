@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## 0.18.0 (2026-08-16) — Dashboard depth and first PyPI listing
+
+### Upgrade notes
+- Install from PyPI as `stoneburner-atomics` (`uv add stoneburner-atomics`,
+  `uv tool install stoneburner-atomics`). The import and the CLI stay
+  `atomics`. `atomics` on PyPI is a different package; `stoneburner` is
+  blocked as too similar to `stone-burner`.
+- From a clone, `uv sync --all-extras`. Bare `uv sync` drops the API, MCP,
+  RAG, and test extras.
+
 ### Changed
 - **PyPI listing is `stoneburner-atomics`.** `stoneburner` is too similar
   to the existing `stone-burner` Terraform helper (hyphens do not count).

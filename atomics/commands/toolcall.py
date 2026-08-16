@@ -41,7 +41,7 @@ console = Console()
 _SUITE = "toolcall"
 
 # Worst first: the table is read top-down and the dangerous rows are the point.
-_OUTCOME_STYLE = {
+_OUTCOME_STYLE: dict[object, tuple[str, str]] = {
     ToolOutcome.DANGEROUS_CALL: ("red", "DANGEROUS"),
     ToolOutcome.MALFORMED_CALL: ("yellow", "MALFORMED"),
     ToolOutcome.SAFE_CALL: ("green", "safe call"),
