@@ -3,6 +3,12 @@
 ## Unreleased
 
 ### Added
+- **`redblue` and `adversarial` print each pass when `--runs` is greater
+  than one.** The mean fixture line hid a 40% pass (or a 1/3 comply)
+  until the JSON was opened. Both runners now have `on_run_done`, matching
+  toolcall. Generate failures print `ERROR`. `adversarial --compare` uses
+  the same hook so model B is not silent.
+
 - **One-box toolcall first run.** `doctor` → `provider-test --no-thinking`
   → `toolcall --channel tools --runs 3`. Operator docs no longer use a
   lab IP. Divergence is documented as not measured without a judge.

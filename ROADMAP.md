@@ -134,6 +134,14 @@ Unsupervised `read_file` / `run_command` / `kubectl`: no.
 - [x] One-box first run in QUICKSTART / SECURITY_SUITES; no house IPs
 - [x] Park further qwen3.8:27b suite runs as product work
 
+## v0.20.0 — Per-pass live lines
+
+`--runs 3` on redblue and adversarial printed only the mean. Same class of
+lie toolcall had before `on_run_done`.
+
+- [x] `on_run_done` on redblue and adversarial, including failed passes
+- [x] CLI prints `run 2/3` only when `--runs > 1`; compare uses the same hook
+
 ## Beyond
 
 Not scheduled, roughly in order of how often they come up.

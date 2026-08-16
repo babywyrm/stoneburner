@@ -482,6 +482,7 @@ async def run_adversarial(
     thinking_budget: int | None = None,
     on_fixture_start: Callable[..., object] | None = None,
     on_fixture_done: Callable[..., object] | None = None,
+    on_run_done: Callable[..., object] | None = None,
     verbose: bool = False,
 ) -> AdversarialSummary:
     """Run adversarial fixtures, supporting multi-pass (runs) and multi-judge consensus."""
@@ -570,6 +571,14 @@ async def run_adversarial(
                 logger.warning(
                     "[adversarial] %s run %d generate failed: %s",
                     fixture.id, run_num + 1, sanitize_error(exc),
+                )
+                await _emit_run_done(
+                    on_run_done,
+                    idx,
+                    fixture,
+                    run_num,
+                    runs,
+                    _pass_record(attempts[-1]),
                 )
                 continue
 
@@ -692,6 +701,15 @@ async def run_adversarial(
                     print(f"    {i}. {c}")
                 print()
 
+            await _emit_run_done(
+                on_run_done,
+                idx,
+                fixture,
+                run_num,
+                runs,
+                _pass_record(attempts[-1]),
+            )
+
         aggregate_resistance = _aggregate_resistance(attempts)
         _, _, run_scores = aggregate_attempt_scores(attempts, _label_from_score)
         final_response = next(
@@ -733,3 +751,29 @@ async def run_adversarial(
         completed_at=datetime.now(UTC),
         fixture_results=fixture_results,
     )
+
+
+def _pass_record(attempt: AttemptResult) -> dict[str, object]:
+    judge = attempt.judge
+    if judge is not None and judge.is_scored and judge.score is not None:
+        return {"score": judge.score, "label": judge.label, "status": "scored"}
+    if judge is not None and judge.status is JudgeOutcomeStatus.PARSE_FAILED:
+        return {"score": None, "label": judge.label, "status": "parse_failed"}
+    if judge is None:
+        return {"score": None, "label": None, "status": "failed"}
+    return {"score": None, "label": judge.label, "status": "unscored"}
+
+
+async def _emit_run_done(
+    callback: Callable[..., object] | None,
+    index: int,
+    fixture: AdversarialFixture,
+    run_number: int,
+    runs: int,
+    record: dict[str, object],
+) -> None:
+    if callback is None:
+        return
+    result = callback(index, fixture, run_number, runs, record)
+    if inspect.isawaitable(result):
+        await result

@@ -160,6 +160,155 @@ def test_cli_redblue_runs_flag_present():
     assert "--runs" in result.output
 
 
+def test_on_run_done_fires_after_each_pass():
+    """The mean fixture line hid a 40% pass until the JSON was opened."""
+    from atomics.eval.redblue.fixtures import RED_FIXTURES
+    from atomics.eval.redblue.runner import run_redblue
+
+    events: list[tuple[str, int, int, object, str]] = []
+
+    def on_run(index, fixture, run_number, runs, record):
+        events.append(
+            (fixture.id, run_number, runs, record["score"], record["status"])
+        )
+
+    asyncio.run(run_redblue(
+        _provider(),
+        judge_provider=_judge(score=0.8),
+        mode="red",
+        runs=3,
+        on_run_done=on_run,
+    ))
+    assert len(events) == len(RED_FIXTURES) * 3
+    assert {(e[1], e[2]) for e in events} == {(0, 3), (1, 3), (2, 3)}
+    assert all(e[3] is not None for e in events)
+    assert all(e[4] == "scored" for e in events)
+
+
+def test_on_run_done_fires_when_generate_fails():
+    from atomics.eval.redblue.fixtures import RED_FIXTURES
+    from atomics.eval.redblue.runner import run_redblue
+
+    events: list[str] = []
+
+    def on_run(_index, _fixture, _run_number, _runs, record):
+        events.append(record["status"])
+
+    p = AsyncMock()
+    p.name = "mock"
+    p.generate = AsyncMock(side_effect=RuntimeError("boom"))
+    asyncio.run(run_redblue(
+        p, judge_provider=_judge(), mode="red", runs=2, on_run_done=on_run,
+    ))
+    assert events == ["failed"] * (len(RED_FIXTURES) * 2)
+
+
+def test_on_run_done_awaits_async_callback():
+    from atomics.eval.redblue.runner import run_redblue
+
+    seen: list[int] = []
+
+    async def on_run(_index, _fixture, run_number, _runs, _record):
+        seen.append(run_number)
+
+    asyncio.run(run_redblue(
+        _provider(),
+        judge_provider=_judge(),
+        mode="red",
+        runs=2,
+        on_run_done=on_run,
+    ))
+    assert 0 in seen and 1 in seen
+
+
+def _empty_redblue_summary(*, runs: int):
+    from datetime import UTC, datetime
+
+    from atomics.eval.redblue.runner import RedBlueSummary
+
+    now = datetime.now(UTC)
+    return RedBlueSummary(
+        run_id="rb-live",
+        provider="mock",
+        model="x",
+        mode="red",
+        started_at=now,
+        completed_at=now,
+        runs=runs,
+    )
+
+
+def _patch_redblue_cli(monkeypatch, *, scores: list[float | None]):
+    from types import SimpleNamespace
+
+    from atomics.eval.redblue.fixtures import RedBlueFixture
+
+    fixture = RedBlueFixture(
+        id="rb-01",
+        team="red",
+        category="recon",
+        complexity="MEDIUM",
+        prompt="x",
+        gold_criteria=["a"],
+    )
+    provider = SimpleNamespace(name="ollama", default_model="x")
+
+    async def fake_run(_provider, **kwargs):
+        run_done = kwargs.get("on_run_done")
+        runs = kwargs.get("runs", 1)
+        if run_done is not None:
+            for i, score in enumerate(scores):
+                run_done(
+                    0,
+                    fixture,
+                    i,
+                    runs,
+                    {
+                        "score": score,
+                        "status": "scored" if score is not None else "failed",
+                    },
+                )
+        return _empty_redblue_summary(runs=runs)
+
+    monkeypatch.setattr(
+        "atomics.commands.security.cmd_redblue._make_provider",
+        lambda *_args, **_kwargs: provider,
+    )
+    monkeypatch.setattr(
+        "atomics.eval.redblue.runner.run_redblue",
+        fake_run,
+    )
+
+
+def test_cli_redblue_prints_each_run_when_runs_gt_one(monkeypatch) -> None:
+    from click.testing import CliRunner
+
+    from atomics.cli import cli
+
+    _patch_redblue_cli(monkeypatch, scores=[0.4, 0.9, 0.9])
+    result = CliRunner().invoke(
+        cli, ["--no-progress", "redblue", "--no-save", "--mode", "red", "--runs", "3"]
+    )
+    assert result.exit_code == 0, result.output
+    assert "run 1/3" in result.output
+    assert "run 2/3" in result.output
+    assert "run 3/3" in result.output
+    assert "40%" in result.output
+
+
+def test_cli_redblue_hides_per_pass_when_runs_is_one(monkeypatch) -> None:
+    from click.testing import CliRunner
+
+    from atomics.cli import cli
+
+    _patch_redblue_cli(monkeypatch, scores=[0.8])
+    result = CliRunner().invoke(
+        cli, ["--no-progress", "redblue", "--no-save", "--mode", "red"]
+    )
+    assert result.exit_code == 0, result.output
+    assert "run 1/1" not in result.output
+
+
 # ── --json-out ───────────────────────────────────────────────────────────────
 
 def test_redblue_summary_to_dict_serializable():

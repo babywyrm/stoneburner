@@ -201,6 +201,7 @@ async def run_redblue(
     min_output_tokens: int | None = None,
     on_fixture_start: Callable[..., object] | None = None,
     on_fixture_done: Callable[..., object] | None = None,
+    on_run_done: Callable[..., object] | None = None,
 ) -> RedBlueSummary:
     """Run red/blue fixtures against provider, judge with quality scorer.
 
@@ -292,6 +293,14 @@ async def run_redblue(
                 task_result.error_message = err
                 task_result.completed_at = datetime.now(UTC)
                 failed_task = task_result
+                await _emit_run_done(
+                    on_run_done,
+                    idx,
+                    fixture,
+                    run_num,
+                    runs,
+                    {"score": None, "status": "failed"},
+                )
                 continue
 
             judge = await score_consensus(
@@ -316,6 +325,17 @@ async def run_redblue(
             logger.info(
                 "[redblue] %s run %d/%d → %.3f — %s",
                 fixture.id, run_num + 1, runs, judge.score, judge.rationale[:80],
+            )
+            await _emit_run_done(
+                on_run_done,
+                idx,
+                fixture,
+                run_num,
+                runs,
+                {
+                    "score": None if judge.parse_failed else judge.score,
+                    "status": "parse_failed" if judge.parse_failed else "scored",
+                },
             )
 
         if last_task_result is None:
@@ -356,3 +376,18 @@ async def run_redblue(
         runs=runs,
         results=results,
     )
+
+
+async def _emit_run_done(
+    callback: Callable[..., object] | None,
+    index: int,
+    fixture: RedBlueFixture,
+    run_number: int,
+    runs: int,
+    record: dict[str, object],
+) -> None:
+    if callback is None:
+        return
+    result = callback(index, fixture, run_number, runs, record)
+    if inspect.isawaitable(result):
+        await result
