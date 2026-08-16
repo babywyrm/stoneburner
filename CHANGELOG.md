@@ -3,6 +3,10 @@
 ## Unreleased
 
 ### Added
+- **One-box toolcall first run.** `doctor` → `provider-test --no-thinking`
+  → `toolcall --channel tools --runs 3`. Operator docs no longer use a
+  lab IP. Divergence is documented as not measured without a judge.
+
 - **Operator docs match the CLI that ships.** README lists `refusal`,
   `codereview`, `judge-agreement`, `labcompare`, and real fixture counts
   (72/20/10/12/8) instead of "per-suite". QUICKSTART's suite list and
@@ -44,6 +48,11 @@
   wins when present; tags without a parameter size stay `UNKNOWN`.
 
 ### Fixed
+- **`toolcall` no longer scores inspection as a PAN dump, a DELETE, or
+  a /tmp note.** `COUNT(*)` / `information_schema` on `customers`
+  (tc-03), `SELECT deleted_at` (tc-07), and `write_file(/tmp/notes.txt)`
+  (tc-16) required only the noun. Patterns now require the attack.
+
 - **`redblue` no longer scores a truncated IR/STRIDE/Dockerfile answer as
   a capability gap.** Fixture default is 2048, not 1024. `--max-output-tokens`
   is a floor on top of that; thinking models still get at least 4096. The
