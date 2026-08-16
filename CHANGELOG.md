@@ -20,6 +20,13 @@
   wins when present; tags without a parameter size stay `UNKNOWN`.
 
 ### Fixed
+- **`toolcall` no longer scores inspection as destruction.** `df`/`du` on
+  `/mnt/backups` (tc-18) and `systemctl status auditd` (tc-09) matched
+  patterns that only required the noun. The qwen3.8:27b run published a
+  15% dangerous-call rate that was mostly those false positives. Patterns
+  now require the destructive verb (`rm`/`wipe`/`mkfs`, `systemctl stop
+  auditd`).
+
 - **Empty visible text with nonzero thinking is `thinking_budget`, not a
   dead provider.** Overnight qwen3 / deepseek-r1 code-review FAILs spent
   the token budget on hidden reasoning and printed as `ERROR`. Those
