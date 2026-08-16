@@ -181,9 +181,9 @@ When asked to write a K8s attack chain (pentest report), qwen3.6:35b-a3b with
 
 ### Implications for stoneburner
 
-1. **Our `max_output_tokens: 1024` in redblue fixtures is too low for thinking models.**
-   When thinking is enabled, the model needs `thinking_budget + response_tokens`.
-   For qwen3.6: thinking alone uses 2000+ tokens, so we need `num_predict: 3000-4000`.
+1. **Redblue fixtures default to 2048 visible tokens; thinking still needs more.**
+   `--no-thinking` is enough for IR/STRIDE/Dockerfile. With thinking on, the
+   runner floors the budget at 4096. Use `--max-output-tokens` to lift further.
 
 2. **The "refusal" we observed earlier (`think: false`) is genuine safety alignment.**
    Without thinking mode, the model truly refuses. WITH thinking mode, it reasons

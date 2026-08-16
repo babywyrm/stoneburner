@@ -17,6 +17,9 @@ uv run atomics run --provider claude --thinking --thinking-budget 20000 -n 5
 
 # Provider test shows thinking token breakdown
 uv run atomics provider-test -p ollama -m qwen3:14b --thinking
+
+# Smoke-test a thinking model without burning the visible answer
+uv run atomics provider-test -p ollama -m qwen3.8:27b --no-thinking
 ```
 
 ## Supported Models
@@ -25,7 +28,7 @@ uv run atomics provider-test -p ollama -m qwen3:14b --thinking
 |----------|--------|-----------|
 | **Claude** | Opus 4.x, Sonnet 4.x | Extended thinking API (`budget_tokens`) |
 | **OpenAI** | o3, o3-mini, o3-pro, o4-mini, gpt-5.x | Reasoning tokens (`completion_tokens_details`) |
-| **Ollama** | qwen3 family, deepseek-r1, phi4-*-reasoning | Native `thinking` field, plus `<think>` tag fallback |
+| **Ollama** | qwen3 family (including qwen3.8), deepseek-r1, phi4-*-reasoning | Native `thinking` field, plus `<think>` tag fallback |
 
 When `--thinking` / `--no-thinking` is omitted, stoneburner checks the model against its capability registry and enables thinking automatically for known models. Use `--no-thinking` to force it off for A/B comparisons.
 

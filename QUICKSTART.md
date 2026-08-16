@@ -28,6 +28,8 @@ uv run atomics doctor
 
 # 4. Smoke test the provider you plan to use
 uv run atomics provider-test -p ollama -m qwen2.5:7b
+# Thinking models (qwen3, qwen3.8, deepseek-r1): add --no-thinking
+# or the visible answer can come back empty.
 ```
 
 `doctor` exits non‑zero if anything is missing, so it's safe in front of a long
@@ -38,9 +40,10 @@ run: `uv run atomics doctor && uv run atomics run --tier ez -n 3`.
 ## 2. Choose a backend — local **and** cloud are first-class
 
 `atomics` treats local inference and cloud APIs as peers. Every suite
-(`run`, `eval`, `sweep`, `adversarial`, `redblue`, `probe`) takes the same
-`--provider` flag, so you can benchmark a private on-prem model and a frontier
-cloud model with identical commands and compare them side-by-side.
+(`run`, `eval`, `sweep`, `adversarial`, `redblue`, `toolcall`, `refusal`,
+`codereview`, `probe`) takes the same `--provider` flag, so you can
+benchmark a private on-prem model and a frontier cloud model with identical
+commands and compare them side-by-side.
 
 ### Local / self-hosted (private, $0, nothing leaves the LAN)
 

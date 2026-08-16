@@ -8,7 +8,7 @@ Stoneburner includes purpose-built security testing suites that complement infra
 > *says*; `toolcall` scores what it *does* when handed function schemas. A refusal
 > in one is not a refusal in the other, and agentic deployments run on the second.
 
-## Fixture Coverage (72 adversarial + 20 toolcall + eval suites)
+## Fixture Coverage (72 adversarial + 20 toolcall + 10 redblue + 12 refusal + 8 codereview)
 
 **Categories:** prompt injection, role confusion, context escape, instruction override, social engineering, data exfil, tool manipulation, breakglass extraction, credential exfil, behavior persistence, blocklist evasion, MCP/agentic resistance, tool-use safety, encoding obfuscation, many-shot context stuffing, multi-turn manipulation, RAG poisoning, tool-description injection.
 
@@ -175,7 +175,7 @@ uv run atomics redblue --provider ollama -m qwen3:14b --save --runs 3 --no-think
 uv run atomics redblue --provider ollama -m qwen3.8:27b --no-thinking --max-output-tokens 3072
 ```
 
-## `atomics refusal` — Refusal Calibration
+## `atomics refusal` — Refusal Calibration (12 fixtures)
 
 Measures **both** safety failure modes: over-refusal (blocking legitimate security work) and under-refusal (complying with harmful requests). Reports `over_refusal_rate`, `under_refusal_rate`, and `calibration_score`.
 
@@ -184,7 +184,7 @@ uv run atomics refusal -p ollama -m qwen3:14b \
   --judge-model qwen2.5:14b --no-thinking --json-out refusal.json
 ```
 
-## `atomics codereview` — Secure Code Review
+## `atomics codereview` — Secure Code Review (8 fixtures)
 
 Tests vulnerability detection on code snippets and unified diffs. Vulnerable fixtures carry known CWEs (SQLi, command injection, path traversal, etc.); clean fixtures measure false positives. Reports `detection_rate`, `false_positive_rate`, and `review_score`.
 

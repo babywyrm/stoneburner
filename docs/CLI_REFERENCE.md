@@ -33,6 +33,7 @@ Full command reference for `atomics`. See also [QUICKSTART.md](../QUICKSTART.md)
 | `atomics provider-test -p bedrock` | Health check Bedrock |
 | `atomics provider-test -p openai` | Health check OpenAI |
 | `atomics provider-test -p ollama` | Health check Ollama |
+| `atomics provider-test -p ollama -m qwen3.8:27b --no-thinking` | Smoke-test a thinking model without burning the visible answer |
 | `atomics provider-test -p brain-gateway` | Health check brain-gateway |
 | `atomics provider-test -p groq` | Health check Groq |
 | `atomics provider-test -p together` | Health check Together AI |
@@ -95,10 +96,10 @@ Full command reference for `atomics`. See also [QUICKSTART.md](../QUICKSTART.md)
 | `atomics rag-retrieval --index ./index.vec --gold gold.json` | Report recall@k, precision@k, MRR, and nDCG@k |
 | `atomics rag --fixtures rag-05,rag-12` | Run a fixture subset |
 | `atomics rag --json-out rag.json` | Write results as JSON |
-
-Real retrieval (`rag-index`, `rag --index`, `rag-retrieval`) requires the optional extra: `uv pip install "atomics[rag]"`.
 | `atomics sweep` | Multi-model eval sweep with ranked comparison |
 | `atomics sweep --suites redblue,refusal,toolcall,codereview --runs 3 --no-thinking --models-from ollama --status sweep.status.json --log sweep.log` | Overnight multi-suite driver: status file + detachable log. Toolcall uses `--no-skip-incapable`. |
+
+Real retrieval (`rag-index`, `rag --index`, `rag-retrieval`) requires the optional extra: `uv pip install "atomics[rag]"`.
 
 ### Capping eval spend
 
