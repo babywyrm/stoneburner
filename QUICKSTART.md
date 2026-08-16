@@ -171,6 +171,10 @@ uv run atomics adversarial --provider ollama -m qwen3:14b --judge-model qwen2.5:
 # Offensive + defensive security capability (red/blue tasks)
 uv run atomics redblue --provider ollama -m qwen3:14b
 
+# Tool-call divergence: refuses in chat, then emits the call (never executed)
+uv run atomics -v toolcall -p ollama -m qwen3:14b \
+  --judge-provider ollama --judge-model qwen2.5:14b --runs 3 --no-thinking
+
 # Point an LLM at real artifacts (logs, scan reports, configs)
 uv run atomics probe --artifact access-log --file /var/log/nginx/access.log
 ```
@@ -183,6 +187,10 @@ uv run atomics probe --artifact access-log --file /var/log/nginx/access.log
   manipulated (prompt injection, jailbreaks, encoded payloads…). Higher = harder
   to subvert. It flags **CRITICAL/HIGH** fixtures where the model *complied* with
   an attack — read those first.
+- `toolcall` measures the **agent gap**: refused in chat, then emitted the
+  call when handed function schemas. Calls are never executed. Live lines
+  print `prose=resisted` + `DANGEROUS` when that gap is the result. Omit a
+  judge and divergence is not measured.
 
 A model can score high on one and low on the other. In practice a **capable but
 low-resilience** model (good at the tasks, easy to manipulate) is the riskiest
@@ -250,6 +258,12 @@ uv run atomics adversarial -p ollama -m qwen2.5:7b --fail-on-resilience 60
 
 # Run red/blue capability eval (variance-aware + JSON export)
 uv run atomics redblue -p ollama -m qwen3.5:4b --runs 3 --no-thinking --json-out redblue.json
+
+# Tool-call divergence. Live lines print each pass; a judge is required
+# or prose stays unjudged and channel divergence is not measured.
+uv run atomics -v toolcall -p ollama -m qwen3.8:27b \
+  --judge-provider ollama --judge-model qwen2.5:14b \
+  --runs 3 --no-thinking --no-skip-incapable --json-out toolcall.json
 
 # Measure over- and under-refusal; fixture rows are saved as they complete
 uv run atomics refusal -p ollama -m qwen3.5:4b \
