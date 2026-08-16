@@ -1281,6 +1281,36 @@ def test_evaluation_result_persists_judge_agreement(tmp_path):
     assert rows[0]["judge_agreement"] == pytest.approx(2 / 3)
 
 
+def test_get_run_detail_returns_sanitized_fixtures(tmp_path):
+    """A dashboard must not receive prompts or result_json."""
+    repo = MetricsRepository(tmp_path / "detail.db")
+    repo.create_run("rb-run", tier="refusal", provider="ollama", model="qwen")
+    repo.save_evaluation_result(
+        _evaluation_record(
+            run_id="rb-run",
+            fixture_id="rf-01",
+            score=0.9,
+        )
+    )
+    detail = repo.get_run_detail("rb-run")
+    repo.close()
+    assert detail is not None
+    assert detail["run"]["run_id"] == "rb-run"
+    assert detail["run"]["provider"] == "ollama"
+    assert [f["id"] for f in detail["fixtures"]] == ["rf-01"]
+    assert detail["fixtures"][0]["score"] == 0.9
+    blob = str(detail)
+    assert "result_json" not in blob
+    assert "prompt" not in blob
+    assert "response" not in blob
+
+
+def test_get_run_detail_missing_is_none(tmp_path):
+    repo = MetricsRepository(tmp_path / "missing.db")
+    assert repo.get_run_detail("nope") is None
+    repo.close()
+
+
 def test_save_agreement_study_row(tmp_path):
     repo = MetricsRepository(tmp_path / "study.db")
     repo.save_agreement_result(

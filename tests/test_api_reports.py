@@ -37,3 +37,56 @@ def test_compare_invalid_by(client):
     assert resp.status_code == 400
     assert "provider" in resp.json()["detail"]
 
+
+def test_get_run_requires_auth():
+    app = create_app(settings=ServerSettings(api_keys={"secret"}))
+    with TestClient(app) as tc:
+        resp = tc.get("/api/v1/runs/abc")
+        assert resp.status_code == 401
+
+
+def test_get_run_missing_is_404(tmp_path):
+    app = create_app(settings=ServerSettings(no_auth=True, db_path=tmp_path / "empty.db"))
+    with TestClient(app) as tc:
+        resp = tc.get("/api/v1/runs/no-such-run")
+    assert resp.status_code == 404
+
+
+def test_get_run_returns_sanitized_detail(tmp_path):
+    from atomics.storage.records import EvaluationResultRecord
+    from atomics.storage.repository import MetricsRepository
+
+    db = tmp_path / "runs.db"
+    repo = MetricsRepository(db)
+    repo.create_run("run-detail", tier="refusal", provider="ollama", model="qwen")
+    repo.save_evaluation_result(
+        EvaluationResultRecord(
+            run_id="run-detail",
+            suite="refusal",
+            fixture_id="rf-01",
+            status="complete",
+            generation_status="completed",
+            judge_status="scored",
+            latency_ms=10.0,
+            input_tokens=4,
+            output_tokens=2,
+            total_tokens=6,
+            score=0.8,
+            result_json={"secret": "should-not-leak"},
+            provider="ollama",
+            model="qwen",
+        )
+    )
+    repo.close()
+
+    app = create_app(settings=ServerSettings(no_auth=True, db_path=db))
+    with TestClient(app) as tc:
+        resp = tc.get("/api/v1/runs/run-detail")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["run"]["run_id"] == "run-detail"
+    assert body["fixtures"][0]["id"] == "rf-01"
+    assert body["fixtures"][0]["score"] == 0.8
+    assert "result_json" not in str(body)
+    assert "should-not-leak" not in str(body)
+

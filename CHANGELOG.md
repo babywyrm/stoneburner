@@ -3,6 +3,10 @@
 ## Unreleased
 
 ### Added
+- **Dashboard drill-in.** Click a recent run (or `#run=<id>`) to see
+  fixture scores. `GET /api/v1/runs/{run_id}` returns the parent row and
+  sanitized fixtures — no prompts, responses, or `result_json`.
+
 - **API `models` and `provider-test`, then MCP.** `GET /api/v1/models`
   lists Ollama or vLLM tags. `POST /api/v1/provider-test` health-checks
   and generates a fixed 2+2 probe (no caller prompt). Both require the

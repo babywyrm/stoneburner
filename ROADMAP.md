@@ -151,6 +151,14 @@ whether it answered. Endpoints first, then the proxy.
       caller prompt)
 - [x] MCP `list_models` (read-only) and `provider_test` (spends)
 
+## v0.22.0 — Dashboard drill-in
+
+The recent-runs card was a truncated id. Opening a run is how you check
+the headline.
+
+- [x] `GET /api/v1/runs/{run_id}` with sanitized fixtures
+- [x] Dashboard click / `#run=` detail panel (`textContent` only)
+
 ## Beyond
 
 Not scheduled, roughly in order of how often they come up.
@@ -158,8 +166,8 @@ Not scheduled, roughly in order of how often they come up.
 - **Non-destructive migrations.** Only nullable column adds are safe today; a
   type or constraint change resets the table. Fine pre-1.0, a blocker for
   anyone treating the database as durable.
-- **Dashboard depth.** Currently four read-only cards. Historical trends, drill
-  into a single run, and live job progress are the obvious next steps.
+- **Dashboard depth.** Drill-in shipped in v0.22.0. Historical trends and
+  live job progress are still open.
 - **PyPI distribution.** Needs a rename — `atomics` is taken by an unrelated
   package — which changes `pip install` for every consumer. See
   [RELEASING.md](RELEASING.md).

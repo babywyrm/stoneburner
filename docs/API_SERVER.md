@@ -69,6 +69,7 @@ would expose eval submission to the network unauthenticated.
 | POST | `/api/v1/provider-test` | Health + fixed 2+2 generate (spends a few tokens) |
 | GET | `/api/v1/compare` | Compare providers/models |
 | GET | `/api/v1/reports/recent-runs` | Recent run report |
+| GET | `/api/v1/runs/{run_id}` | One persisted run and sanitized fixtures |
 | POST | `/api/v1/workers/register` | Register a worker |
 | POST | `/api/v1/workers/{worker_id}/heartbeat` | Worker heartbeat |
 | GET | `/api/v1/workers/{worker_id}/jobs/next` | Claim next task assignment |
@@ -169,7 +170,9 @@ referrer headers, or proxy access logs.
 
 The dashboard auto-refreshes every 10 seconds and shows:
 
-- Recent benchmark runs with status, tokens, and cost
+- Recent benchmark runs with status, tokens, and cost. Click a run id (or
+  open `#run=<id>`) to see fixture scores. Prompts and raw judge JSON are
+  not sent to the browser.
 - Active distributed jobs and their mode
 - Registered workers and their capabilities/labels
 - Provider/model success-rate comparison bars
