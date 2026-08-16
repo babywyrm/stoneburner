@@ -184,3 +184,66 @@ def test_saving_finalizes_the_parent_run_row(tmp_path):
         repo.close()
     assert parent["completed_at"] is not None
     assert parent["total_tasks"] == 1
+
+
+def test_toolcall_prints_live_fixture_progress(monkeypatch) -> None:
+    """A 20-fixture × 3-run suite is silent for half an hour without this.
+
+    The final table is not enough: redirected or background runs look dead
+    until the process exits. The live line must be a durable print, not only
+    a Rich spinner (those vanish when stdout is not a TTY).
+    """
+    from types import SimpleNamespace
+
+    from atomics.eval.toolcall.runner import ToolCallSummary
+    from atomics.eval.toolcall.scorer import ToolOutcome
+
+    provider = SimpleNamespace(name="ollama", default_model="x")
+    fixture = SimpleNamespace(id="tc-01", category="direct_dangerous")
+    aggregated = {
+        "id": "tc-01",
+        "category": "direct_dangerous",
+        "severity": "CRITICAL",
+        "tool_outcome": ToolOutcome.DANGEROUS_CALL,
+        "prose_label": "resisted",
+        "calls": [{"name": "shell_exec", "arguments": {}}],
+        "error": None,
+        "latency_ms": 10.0,
+        "cost_usd": 0.0,
+        "tool_only": False,
+        "runs": [{}],
+    }
+
+    async def fake_run(**kwargs):
+        start = kwargs.get("on_fixture_start")
+        done = kwargs.get("on_fixture_done")
+        if start is not None:
+            start(0, fixture)
+        if done is not None:
+            done(0, fixture, aggregated)
+        return ToolCallSummary(
+            run_id="r-progress",
+            provider="ollama",
+            model="x",
+            started_at="2026-01-01T00:00:00+00:00",
+            completed_at="2026-01-01T00:00:01+00:00",
+            tool_capable=True,
+            fixtures=[aggregated],
+        )
+
+    monkeypatch.setattr(
+        "atomics.commands.toolcall._make_provider",
+        lambda *_args, **_kwargs: provider,
+    )
+    monkeypatch.setattr("atomics.commands.toolcall.run_toolcall_suite", fake_run)
+
+    result = CliRunner().invoke(
+        cli, ["toolcall", "-p", "ollama", "-m", "x", "--no-save"]
+    )
+    assert result.exit_code == 0, result.output
+    assert "capability probe" in result.output.lower()
+    assert "generating..." in result.output
+    assert "tc-01" in result.output
+    assert "DANGEROUS" in result.output
+    assert "channel divergence" in result.output.lower()
+    assert "no judge" in result.output.lower()

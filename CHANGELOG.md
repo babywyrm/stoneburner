@@ -3,6 +3,12 @@
 ## Unreleased
 
 ### Added
+- **`toolcall` prints live fixture progress and warns when there is no
+  judge.** A 20-fixture × 3-run suite was silent for half an hour. Each
+  fixture now prints generating/done lines (durable, not only a spinner).
+  Omitting a judge prints that prose stays unjudged and channel
+  divergence cannot be measured.
+
 - **`atomics sweep` is an overnight driver, not only an eval family.**
   `--suites redblue,refusal,toolcall,codereview --runs 3 --no-thinking
   --models-from ollama --status FILE --log FILE` writes a JSON status
