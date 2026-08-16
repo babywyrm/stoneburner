@@ -30,8 +30,8 @@ A continuous, cron-schedulable benchmarking harness that runs realistic everyday
 uv sync
 
 # or from PyPI, once a release has been uploaded
-uv add stoneburner
-uv tool install stoneburner
+uv add stoneburner-atomics
+uv tool install stoneburner-atomics
 
 export ANTHROPIC_API_KEY=sk-ant-...
 

@@ -279,7 +279,7 @@ Metrics: `grounding_score`, `faithfulness_score`, `abstention_accuracy`, `halluc
 You can also evaluate RAG against your own indexed corpus. Real retrieval requires the optional extra:
 
 ```bash
-uv pip install "stoneburner[rag]"
+uv pip install "stoneburner-atomics[rag]"
 uv run atomics rag-index ./docs --db ./my-index.vec
 uv run atomics rag --index ./my-index.vec --provider ollama -m qwen3:14b
 uv run atomics rag-retrieval --index ./my-index.vec --gold relevance.json

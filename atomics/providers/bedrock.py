@@ -1,6 +1,6 @@
 """AWS Bedrock provider adapter using the Converse API.
 
-Requires: pip install stoneburner[bedrock]  (adds boto3)
+Requires: pip install stoneburner-atomics[bedrock]  (adds boto3)
 Auth: uses standard AWS credential chain (env vars, ~/.aws/credentials, IAM role).
 """
 

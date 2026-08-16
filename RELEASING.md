@@ -75,8 +75,8 @@ That satisfies the guard without inventing a release that never happened.
 
 6. **Check the workflow.** `gh run list --limit 3`. The `publish` workflow builds
    the distribution, creates the GitHub release from the changelog, moves the
-   floating `v0` tag, and uploads `stoneburner` to PyPI if the trusted
-   publisher is registered.
+   floating `v0` tag, and uploads `stoneburner-atomics` to PyPI if the
+   trusted publisher is registered.
 
 ## What the tag triggers
 
@@ -90,23 +90,23 @@ That satisfies the guard without inventing a release that never happened.
   anything that wants to follow the major line. It is deliberately mutable.
 
 - **PyPI** — `uv publish` via trusted publishing, as a job that does not
-  block the GitHub release. The listing name is `stoneburner`. See
-  Distribution below.
+  block the GitHub release. The listing name is `stoneburner-atomics`
+  (`stoneburner` collides with `stone-burner`). See Distribution below.
 
 ## Distribution
 
-The PyPI / `uv add` name is `stoneburner`. The importable package and the
-CLI stay `atomics`:
+The PyPI / `uv add` name is `stoneburner-atomics`. The importable package
+and the CLI stay `atomics`:
 
 ```bash
-uv add stoneburner
-uv tool install stoneburner
-uv add 'stoneburner[api,mcp]'
+uv add stoneburner-atomics
+uv tool install stoneburner-atomics
+uv add 'stoneburner-atomics[api,mcp]'
 ```
 
 From a clone, `uv sync` is unchanged. `import atomics` and `atomics --version`
-are unchanged. `atomics.__version__` reads metadata for the `stoneburner`
-distribution.
+are unchanged. `atomics.__version__` reads metadata for the
+`stoneburner-atomics` distribution.
 
 **Before the first tag that should upload:** create a GitHub Environment
 named `pypi`, then on https://pypi.org/manage/account/publishing/ add a
@@ -114,7 +114,7 @@ pending trusted publisher:
 
 | Field | Value |
 |-------|--------|
-| PyPI project name | `stoneburner` |
+| PyPI project name | `stoneburner-atomics` |
 | Owner | `babywyrm` |
 | Repository | `stoneburner` |
 | Workflow | `publish.yml` |

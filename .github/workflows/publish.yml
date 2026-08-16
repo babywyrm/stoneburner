@@ -5,9 +5,10 @@ on:
     tags:
       - "v[0-9]*"
 
-# id-token is granted only on the PyPI job. The listing name is `stoneburner`;
-# the import and CLI stay `atomics`. Register the trusted publisher on PyPI
-# before the first tag that should upload — see RELEASING.md.
+# id-token is granted only on the PyPI job. The listing name is
+# `stoneburner-atomics`; the import and CLI stay `atomics`. Register the
+# trusted publisher on PyPI before the first tag that should upload —
+# see RELEASING.md.
 permissions:
   contents: write
 

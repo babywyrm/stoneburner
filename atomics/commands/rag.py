@@ -185,7 +185,7 @@ def rag(
             except ImportError as exc:
                 console.print(
                     "[red]RAG indexing requires the [rag] extra:[/red] "
-                    'uv pip install "stoneburner[rag]"'
+                    'uv pip install "stoneburner-atomics[rag]"'
                 )
                 raise SystemExit(1) from exc
             from atomics.eval.rag.retrieval import (
@@ -281,7 +281,7 @@ def rag_index(
     except ImportError as exc:
         console.print(
             "[red]RAG indexing requires the [rag] extra:[/red] "
-            'uv pip install "stoneburner[rag]"'
+            'uv pip install "stoneburner-atomics[rag]"'
         )
         raise SystemExit(1) from exc
 
@@ -343,7 +343,7 @@ def rag_retrieval(
     except ImportError as exc:
         console.print(
             "[red]RAG retrieval requires the [rag] extra:[/red] "
-            'uv pip install "stoneburner[rag]"'
+            'uv pip install "stoneburner-atomics[rag]"'
         )
         raise SystemExit(1) from exc
 

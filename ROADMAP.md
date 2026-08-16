@@ -176,9 +176,10 @@ Not scheduled, roughly in order of how often they come up.
   anyone treating the database as durable.
 - **Dashboard depth.** Drill-in, trends, and live API jobs shipped. A
   browser-run dashboard test still does not exist.
-- **PyPI first upload.** The listing is `stoneburner`; import and CLI stay
-  `atomics`. Register the trusted publisher (see [RELEASING.md](RELEASING.md))
-  before the next tag, or the publish job goes red.
+- **PyPI first upload.** The listing is `stoneburner-atomics` (`stoneburner`
+  is too similar to `stone-burner`). Import and CLI stay `atomics`. Register
+  the trusted publisher (see [RELEASING.md](RELEASING.md)) before the next
+  tag, or the publish job goes red.
 - **Judge quality.** Security suites now take `--extra-judges` (numeric mean or
   categorical majority) and `atomics judge-agreement` measures how often a
   single judge would flip the headline. `rag`, `probe`, and `archreview` are

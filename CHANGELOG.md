@@ -3,9 +3,11 @@
 ## Unreleased
 
 ### Changed
-- **PyPI listing is `stoneburner`.** `uv add stoneburner` / `uv tool install
-  stoneburner`. `import atomics` and the `atomics` CLI are unchanged.
-  Version metadata reads the `stoneburner` distribution. Trusted publishing
+- **PyPI listing is `stoneburner-atomics`.** `stoneburner` is too similar
+  to the existing `stone-burner` Terraform helper (hyphens do not count).
+  `uv add stoneburner-atomics` / `uv tool install stoneburner-atomics`.
+  `import atomics` and the `atomics` CLI are unchanged.
+  Version metadata reads the `stoneburner-atomics` distribution. Trusted publishing
   is back on the tag workflow as a job that does not block the GitHub
   release. Register the pending publisher before the first upload — see
   RELEASING.md.

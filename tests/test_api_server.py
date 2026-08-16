@@ -34,4 +34,4 @@ def test_the_api_advertises_the_installed_package_version():
     version, so it kept announcing 0.12.0 while the package moved on, and
     atomics.__version__ sat at 0.1.0 through eleven releases."""
     app = create_app(settings=ServerSettings(no_auth=True))
-    assert app.version == version("stoneburner")
+    assert app.version == version("stoneburner-atomics")
