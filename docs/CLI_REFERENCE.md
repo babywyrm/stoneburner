@@ -11,9 +11,9 @@ Full command reference for `atomics`. See also [QUICKSTART.md](../QUICKSTART.md)
 | `atomics run --provider bedrock` | Use AWS Bedrock instead of Claude API |
 | `atomics run --provider openai` | Use OpenAI / Codex |
 | `atomics run --provider ollama` | Use local Ollama inference |
-| `atomics run --provider ollama --ollama-host http://gpu:11434` | Use remote Ollama |
-| `atomics run --provider brain-gateway` | Use camazotz brain-gateway |
-| `atomics run --provider brain-gateway --gateway-url http://gpu-host:30080` | Use remote brain-gateway |
+| `atomics run --provider ollama --ollama-host http://localhost:11434` | Use local Ollama |
+| `atomics run --provider brain-gateway` | Use a brain-gateway |
+| `atomics run --provider brain-gateway --gateway-url http://localhost:30080` | Use a remote brain-gateway |
 | `atomics run --thinking` | Enable thinking/reasoning mode for capable models |
 | `atomics run --no-thinking` | Force thinking off (A/B comparison) |
 | `atomics run --thinking-budget 20000` | Set max thinking tokens (provider-specific default otherwise) |
@@ -233,7 +233,7 @@ Start a worker process that registers with the coordinator, heartbeats, polls fo
 | `--heartbeat-interval N` | Heartbeat interval in seconds (default: 30) |
 | `--provider`, `-p` | Provider used by this worker (default: `ollama`) |
 | `--model`, `-m` | Model override for this worker |
-| `--host`, `-h` | Provider host/URL override (e.g. `http://gpu-host:30080`) |
+| `--host`, `-h` | Provider host/URL override (e.g. `http://localhost:30080`) |
 
 `--host` applies to whichever provider the worker selected, including `vllm`.
 
@@ -247,8 +247,8 @@ rather than inlining it, keeping keys out of shell history.
 
 ```bash
 uv run atomics worker --label gpu=1
-uv run atomics worker --provider brain-gateway --host http://gpu-host:30080 --model qwen3:4b
-uv run atomics worker --provider vllm --host http://gpu-host:30080/v1 --label gpu=4090
+uv run atomics worker --provider brain-gateway --host http://localhost:30080 --model qwen3:4b
+uv run atomics worker --provider vllm --host http://localhost:8000/v1 --label gpu=4090
 ```
 
 ## atomics worker-npm

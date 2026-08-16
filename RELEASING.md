@@ -108,9 +108,9 @@ From a clone, `uv sync` is unchanged. `import atomics` and `atomics --version`
 are unchanged. `atomics.__version__` reads metadata for the
 `stoneburner-atomics` distribution.
 
-**Before the first tag that should upload:** create a GitHub Environment
-named `pypi`, then on https://pypi.org/manage/account/publishing/ add a
-pending trusted publisher:
+Trusted publishing is registered. v0.18.0 claimed `stoneburner-atomics`.
+Later tags reuse the same GitHub Environment `pypi` and the same
+publisher row:
 
 | Field | Value |
 |-------|--------|
@@ -120,11 +120,10 @@ pending trusted publisher:
 | Workflow | `publish.yml` |
 | Environment | `pypi` |
 
-The first successful tag claims the name. Do not tag until that publisher
-is registered, or the PyPI job will go red. The GitHub release still
-publishes; the two jobs are independent on purpose. The old `atomics`
-trusted-publish job failed on every tag because that name belongs to an
-unrelated C++ package.
+The GitHub release and the PyPI job are independent on purpose. The old
+`atomics` trusted-publish job failed on every tag because that name
+belongs to an unrelated C++ package. `stoneburner` is too similar to
+`stone-burner`.
 
 **Release notes did not always come from the changelog.** Releases through
 v0.13.1 were created with `generate_release_notes`, which diffs against the

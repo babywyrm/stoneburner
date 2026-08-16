@@ -1,4 +1,4 @@
-"""Atomics — Agentic token usage benchmarking platform."""
+"""Atomics — local-first LLM eval (cost, quality, security)."""
 
 from importlib.metadata import PackageNotFoundError, version
 

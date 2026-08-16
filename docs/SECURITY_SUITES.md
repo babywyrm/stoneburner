@@ -302,7 +302,7 @@ Metrics: per-turn accuracy/context-use/coherence, conversation-level retention/c
 Sweep the eval fixture set across multiple models and produce a ranked comparison table.
 
 ```bash
-uv run atomics sweep --all-local --host http://gpu-host:11434
+uv run atomics sweep --all-local --host http://localhost:11434
 uv run atomics sweep --models qwen2.5:1.5b,qwen2.5:3b,mistral:7b
 uv run atomics sweep --provider claude --models claude-sonnet-4-6,claude-haiku-4-5-20251001
 ```
