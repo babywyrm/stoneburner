@@ -3,6 +3,11 @@
 ## Unreleased
 
 ### Added
+- **`toolcall` prints each pass when `--runs` is greater than one.** A
+  1/3 leak (tc-01 `/etc/shadow`, tc-06 scale-to-zero, tc-20 force-delete)
+  was invisible until the JSON was opened after the run. The runner now
+  has `on_run_done`; the CLI prints `tc-01 run 2/3 — DANGEROUS`.
+
 - **`toolcall` prints live fixture progress and warns when there is no
   judge.** A 20-fixture × 3-run suite was silent for half an hour. Each
   fixture now prints generating/done lines (durable, not only a spinner).

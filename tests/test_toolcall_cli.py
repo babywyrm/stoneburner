@@ -247,3 +247,79 @@ def test_toolcall_prints_live_fixture_progress(monkeypatch) -> None:
     assert "DANGEROUS" in result.output
     assert "channel divergence" in result.output.lower()
     assert "no judge" in result.output.lower()
+
+
+def test_toolcall_prints_each_run_outcome(monkeypatch) -> None:
+    """A 1/3 leak is invisible if we only print the modal fixture line."""
+    from types import SimpleNamespace
+
+    from atomics.eval.toolcall.runner import ToolCallSummary
+    from atomics.eval.toolcall.scorer import ToolOutcome
+
+    provider = SimpleNamespace(name="ollama", default_model="x")
+    fixture = SimpleNamespace(id="tc-01", category="direct_dangerous")
+    aggregated = {
+        "id": "tc-01",
+        "category": "direct_dangerous",
+        "severity": "CRITICAL",
+        "tool_outcome": ToolOutcome.NO_CALL,
+        "prose_label": None,
+        "calls": [],
+        "error": None,
+        "latency_ms": 10.0,
+        "cost_usd": 0.0,
+        "tool_only": False,
+        "runs": [{}],
+    }
+
+    async def fake_run(**kwargs):
+        start = kwargs.get("on_fixture_start")
+        run_done = kwargs.get("on_run_done")
+        done = kwargs.get("on_fixture_done")
+        if start is not None:
+            start(0, fixture)
+        for i, outcome in enumerate(
+            (ToolOutcome.NO_CALL, ToolOutcome.DANGEROUS_CALL, ToolOutcome.NO_CALL)
+        ):
+            if run_done is not None:
+                run_done(
+                    0,
+                    fixture,
+                    i,
+                    3,
+                    {
+                        "tool_outcome": outcome,
+                        "calls": (
+                            [{"name": "read_file"}]
+                            if outcome is ToolOutcome.DANGEROUS_CALL
+                            else []
+                        ),
+                    },
+                )
+        if done is not None:
+            done(0, fixture, aggregated)
+        return ToolCallSummary(
+            run_id="r-runs",
+            provider="ollama",
+            model="x",
+            started_at="2026-01-01T00:00:00+00:00",
+            completed_at="2026-01-01T00:00:01+00:00",
+            tool_capable=True,
+            fixtures=[aggregated],
+        )
+
+    monkeypatch.setattr(
+        "atomics.commands.toolcall._make_provider",
+        lambda *_args, **_kwargs: provider,
+    )
+    monkeypatch.setattr("atomics.commands.toolcall.run_toolcall_suite", fake_run)
+
+    result = CliRunner().invoke(
+        cli, ["toolcall", "-p", "ollama", "-m", "x", "--no-save", "--runs", "3"]
+    )
+    assert result.exit_code == 0, result.output
+    assert "run 1/3" in result.output
+    assert "run 2/3" in result.output
+    assert "run 3/3" in result.output
+    assert "DANGEROUS" in result.output
+    assert "read_file" in result.output

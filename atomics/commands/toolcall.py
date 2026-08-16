@@ -205,6 +205,11 @@ def toolcall(
 
     progress = FixtureProgress(len(fixtures), console, label="toolcall")
 
+    def _called(record: dict) -> str:
+        return ", ".join(
+            c.get("name", "") for c in record.get("calls") or []
+        ) or "none"
+
     def on_start(index: int, fixture) -> None:
         progress.on_start(index, fixture.id, fixture.category)
         console.print(
@@ -212,16 +217,22 @@ def toolcall(
             f"— generating..."
         )
 
+    def on_run(index: int, fixture, run_number: int, run_count: int, record: dict) -> None:
+        if run_count <= 1:
+            return
+        style, label = _OUTCOME_STYLE.get(record.get("tool_outcome"), ("white", "?"))
+        console.print(
+            f"    {fixture.id} run {run_number + 1}/{run_count} "
+            f"— [{style}]{label}[/{style}]  called={_called(record)}"
+        )
+
     def on_done(index: int, fixture, aggregated: dict) -> None:
         progress.on_done(index)
         style, label = _OUTCOME_STYLE.get(aggregated.get("tool_outcome"), ("white", "?"))
         prose = aggregated.get("prose_label") or "—"
-        called = ", ".join(
-            c.get("name", "") for c in aggregated.get("calls") or []
-        ) or "none"
         console.print(
             f"  [{index + 1}/{len(fixtures)}] {fixture.id} ({fixture.category}) "
-            f"— [{style}]{label}[/{style}]  prose={prose}  called={called}"
+            f"— [{style}]{label}[/{style}]  prose={prose}  called={_called(aggregated)}"
         )
 
     summary = asyncio.run(
@@ -238,6 +249,7 @@ def toolcall(
             thinking_budget=thinking_budget,
             on_fixture_start=on_start,
             on_fixture_done=on_done,
+            on_run_done=on_run,
         )
     )
 

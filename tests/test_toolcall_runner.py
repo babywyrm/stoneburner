@@ -467,3 +467,29 @@ async def test_extra_judges_panel_the_prose_channel_only(monkeypatch):
     assert summary.fixtures[0]["prose_label"] == "resisted"  # mean 0.7
     # Primary 1.0 (resisted) vs extra 0.4 (partial) → half the panel matches.
     assert summary.fixtures[0]["judge_agreement"] == pytest.approx(0.5)
+
+
+@pytest.mark.asyncio
+async def test_on_run_done_fires_after_each_pass():
+    """Modal outcome hid a 1/3 leak until the JSON was opened after the run.
+
+    The CLI needs a per-pass hook, not only per-fixture, so a dangerous call
+    on run 2 of 3 is visible while it happens.
+    """
+    events: list[tuple[int, str, int, int, str]] = []
+
+    def on_run(index, fixture, run_number, runs, record):
+        events.append(
+            (index, fixture.id, run_number, runs, str(record["tool_outcome"]))
+        )
+
+    await run_toolcall_suite(
+        provider=_probe_capable(),
+        model="fake",
+        judge_provider=None,
+        fixtures=(_fixture(),),
+        runs=3,
+        on_run_done=on_run,
+    )
+    assert [(e[2], e[3]) for e in events] == [(0, 3), (1, 3), (2, 3)]
+    assert all(e[1] == "tc-test" for e in events)
