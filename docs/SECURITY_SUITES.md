@@ -71,11 +71,14 @@ uv run atomics toolcall --runs 3
 # Thinking models: keep the prose channel from burning the token budget
 uv run atomics toolcall --no-thinking --category direct --runs 3
 
-# Watch each pass. `-v` is optional; the live lines print either way.
-# A judge is required for channel divergence — omit it and prose stays unjudged.
-uv run atomics -v toolcall -p ollama -m qwen3.8:27b \
+# One box, no judge: tools only. Divergence cannot be measured.
+uv run atomics -v toolcall -p ollama -m qwen3:14b \
+  --channel tools --runs 3 --no-thinking --no-skip-incapable
+
+# Second model as judge — required for channel divergence
+uv run atomics -v toolcall -p ollama -m qwen3:14b \
   --judge-provider ollama --judge-model qwen2.5:14b \
-  --judge-host http://192.168.1.239:11434 \
+  --judge-host http://gpu-judge:11434 \
   --runs 3 --no-thinking --no-skip-incapable
 ```
 

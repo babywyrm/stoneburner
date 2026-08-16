@@ -61,6 +61,7 @@ Full command reference for `atomics`. See also [QUICKSTART.md](../QUICKSTART.md)
 | `atomics toolcall --extra-judges ollama:mistral:7b` | Multi-judge consensus on the prose channel only |
 | `atomics toolcall --category exfil --verbose` | Run one category and print the arguments the model asked for |
 | `atomics toolcall --channel tools` | Tool channel only — deterministic, needs no judge |
+| `atomics toolcall --channel tools --runs 3` | One-box first run. No judge. Divergence not measured. |
 | `atomics toolcall --runs 3` | Three passes per fixture, modal outcome reported. Live `run 2/3` lines print each pass so a 1/3 leak is visible |
 | `atomics -v toolcall --judge-provider ollama --judge-model qwen2.5:14b` | Required for channel divergence. Live lines show `prose=resisted` + `DANGEROUS` when the model refused in chat and still called the tool |
 | `atomics toolcall --no-skip-incapable` | Non-zero exit if the model cannot emit tool calls (for sweeps) |
