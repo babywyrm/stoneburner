@@ -1,7 +1,7 @@
 """Tests for the SQLite metrics storage layer."""
 
 import tempfile
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -703,6 +703,129 @@ def test_get_hourly_token_rate_sums_recent_tasks():
 
     rate = repo.get_hourly_token_rate()
     assert rate == 42.0
+    repo.close()
+
+
+def test_token_usage_by_hour_sums_task_tokens():
+    repo = _tmp_repo()
+    repo.create_run("trend-task")
+    repo.save_task_result(
+        TaskResult(
+            run_id="trend-task",
+            category=TaskCategory.GENERAL_QA,
+            task_name="t1",
+            provider="ollama",
+            model="qwen",
+            status=TaskStatus.SUCCESS,
+            input_tokens=10,
+            output_tokens=20,
+            total_tokens=30,
+            estimated_cost_usd=0.05,
+            started_at=datetime.now(UTC),
+            completed_at=datetime.now(UTC),
+        )
+    )
+    rows = repo.get_token_usage_by_hour(hours=24)
+    assert len(rows) == 1
+    assert rows[0]["total_tokens"] == 30
+    assert rows[0]["input_tokens"] == 10
+    assert rows[0]["output_tokens"] == 20
+    assert rows[0]["cost"] == pytest.approx(0.05)
+    assert rows[0]["task_count"] == 1
+    repo.close()
+
+
+def test_token_usage_by_hour_includes_evaluation_fixtures():
+    repo = _tmp_repo()
+    repo.create_run("trend-eval", tier="refusal")
+    repo.save_evaluation_result(
+        EvaluationResultRecord(
+            run_id="trend-eval",
+            suite="refusal",
+            fixture_id="rf-01",
+            status="complete",
+            generation_status="completed",
+            judge_status="scored",
+            latency_ms=8.0,
+            input_tokens=7,
+            output_tokens=3,
+            total_tokens=10,
+            estimated_cost_usd=0.01,
+            result_json={"prompt": "must-not-affect-trend"},
+            provider="ollama",
+            model="qwen",
+        )
+    )
+    rows = repo.get_token_usage_by_hour(hours=24)
+    assert len(rows) == 1
+    assert rows[0]["total_tokens"] == 10
+    assert rows[0]["task_count"] == 1
+    repo.close()
+
+
+def test_token_usage_by_hour_includes_adversarial_fixtures():
+    repo = _tmp_repo()
+    repo.create_run("trend-adv", tier="adversarial")
+    repo._conn.execute(
+        """
+        INSERT INTO adversarial_results (
+            result_id, run_id, fixture_id, category, severity,
+            provider, model, timestamp, input_tokens, output_tokens,
+            total_tokens, estimated_cost_usd
+        ) VALUES (
+            'adv-1', 'trend-adv', 'adv-01', 'prompt_injection', 'HIGH',
+            'ollama', 'qwen', ?, 4, 6, 10, 0.02
+        )
+        """,
+        (datetime.now(UTC).isoformat(),),
+    )
+    repo._conn.commit()
+    rows = repo.get_token_usage_by_hour(hours=24)
+    assert len(rows) == 1
+    assert rows[0]["total_tokens"] == 10
+    assert rows[0]["cost"] == pytest.approx(0.02)
+    repo.close()
+
+
+def test_token_usage_by_hour_excludes_rows_outside_the_window():
+    repo = _tmp_repo()
+    repo.create_run("trend-old")
+    old = datetime.now(UTC).replace(microsecond=0) - timedelta(hours=25)
+    repo.save_task_result(
+        TaskResult(
+            run_id="trend-old",
+            category=TaskCategory.GENERAL_QA,
+            task_name="old",
+            provider="ollama",
+            model="qwen",
+            status=TaskStatus.SUCCESS,
+            total_tokens=99,
+            estimated_cost_usd=0.0,
+            started_at=old,
+            completed_at=old,
+        )
+    )
+    repo.save_evaluation_result(
+        EvaluationResultRecord(
+            run_id="trend-old",
+            suite="refusal",
+            fixture_id="rf-old",
+            status="complete",
+            generation_status="completed",
+            judge_status="scored",
+            latency_ms=1.0,
+            input_tokens=1,
+            output_tokens=1,
+            total_tokens=99,
+            result_json={},
+        )
+    )
+    repo._conn.execute(
+        "UPDATE evaluation_results SET timestamp = ? WHERE fixture_id = 'rf-old'",
+        (old.isoformat(),),
+    )
+    repo._conn.commit()
+    assert repo.get_token_usage_by_hour(hours=24) == []
     repo.close()
 
 

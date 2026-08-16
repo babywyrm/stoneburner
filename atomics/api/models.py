@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field
 MAX_ITERATIONS = 1000
 MAX_INTERVAL_SECONDS = 3600
 MAX_FIXTURES = 500
+MAX_TREND_HOURS = 168
 
 # Dollar ceiling for one API-triggered eval, shared by the model and its judge.
 # Eval suites are the only remotely reachable path that spends without a tier
@@ -99,6 +100,27 @@ class CompareResponse(BaseModel):
 
 class ReportResponse(BaseModel):
     runs: list[dict]
+
+
+class TrendsResponse(BaseModel):
+    hours: int
+    rows: list[dict]
+
+
+class JobSummary(BaseModel):
+    """In-memory job without the result payload."""
+
+    job_id: str
+    status: str
+    kind: str
+    created_at: str
+    started_at: str | None = None
+    completed_at: str | None = None
+    error: dict | None = None
+
+
+class JobsListResponse(BaseModel):
+    jobs: list[JobSummary]
 
 
 class ReportSummaryResponse(BaseModel):

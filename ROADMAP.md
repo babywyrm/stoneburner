@@ -159,6 +159,14 @@ the headline.
 - [x] `GET /api/v1/runs/{run_id}` with sanitized fixtures
 - [x] Dashboard click / `#run=` detail panel (`textContent` only)
 
+## v0.23.0 — Trends and live jobs
+
+Compare was a snapshot and an API job was invisible unless you already
+had the id.
+
+- [x] Hourly trends including eval/adversarial fixtures
+- [x] `GET /api/v1/jobs` without `result`; dashboard `#job=` poll
+
 ## Beyond
 
 Not scheduled, roughly in order of how often they come up.
@@ -166,8 +174,8 @@ Not scheduled, roughly in order of how often they come up.
 - **Non-destructive migrations.** Only nullable column adds are safe today; a
   type or constraint change resets the table. Fine pre-1.0, a blocker for
   anyone treating the database as durable.
-- **Dashboard depth.** Drill-in shipped in v0.22.0. Historical trends and
-  live job progress are still open.
+- **Dashboard depth.** Drill-in, trends, and live API jobs shipped. A
+  browser-run dashboard test still does not exist.
 - **PyPI distribution.** Needs a rename — `atomics` is taken by an unrelated
   package — which changes `pip install` for every consumer. See
   [RELEASING.md](RELEASING.md).

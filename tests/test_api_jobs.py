@@ -104,6 +104,22 @@ async def test_wait_for_completed_job_returns_immediately():
 
 
 @pytest.mark.asyncio
+async def test_list_jobs_newest_first():
+    manager = JobManager()
+
+    async def work(job_id):
+        return {"secret": "do-not-list"}
+
+    first = await manager.submit("run", work)
+    second = await manager.submit("eval", work)
+    await manager.wait_for(first)
+    await manager.wait_for(second)
+    listed = manager.list_jobs()
+    assert [job.job_id for job in listed] == [second, first]
+    assert listed[0].kind == "eval"
+
+
+@pytest.mark.asyncio
 async def test_wait_for_no_timeout_awaits_task():
     manager = JobManager()
 

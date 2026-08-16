@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 
 from atomics.api._discovery import list_models, run_provider_test
 from atomics.api._runners import (
@@ -13,10 +13,13 @@ from atomics.api._runners import (
 from atomics.api.dependencies import require_auth
 from atomics.api.jobs import Job, JobManager, TooManyActiveJobsError
 from atomics.api.models import (
+    MAX_TREND_HOURS,
     CompareResponse,
     EvalRequest,
     HealthResponse,
     JobResponse,
+    JobsListResponse,
+    JobSummary,
     ModelsResponse,
     ProviderTestRequest,
     ProviderTestResponse,
@@ -24,6 +27,7 @@ from atomics.api.models import (
     ReadinessResponse,
     ReportResponse,
     RunRequest,
+    TrendsResponse,
 )
 from atomics.config import load_settings
 from atomics.storage.repository import MetricsRepository
@@ -122,6 +126,17 @@ async def start_eval(
     return _job_to_response(job)
 
 
+@router.get("/jobs", response_model=JobsListResponse)
+async def list_jobs(
+    job_manager: JobManager = Depends(get_job_manager),
+    _: None = Depends(require_auth),
+) -> JobsListResponse:
+    """In-memory API jobs. The result payload is omitted; poll `/jobs/{id}`."""
+    return JobsListResponse(
+        jobs=[_job_to_summary(job) for job in job_manager.list_jobs()]
+    )
+
+
 @router.get("/jobs/{job_id}", response_model=JobResponse)
 async def get_job(
     job_id: str,
@@ -218,6 +233,34 @@ async def recent_runs(
         return ReportResponse(runs=rows)
     finally:
         repo.close()
+
+
+@router.get("/reports/trends", response_model=TrendsResponse)
+async def trends(
+    request: Request,
+    hours: int = Query(default=24, ge=1, le=MAX_TREND_HOURS),
+    _: None = Depends(require_auth),
+) -> TrendsResponse:
+    """Hourly token and cost series. Prompts are not included."""
+    settings = request.app.state.settings
+    repo = MetricsRepository(settings.db_path)
+    try:
+        rows = repo.get_token_usage_by_hour(hours=hours)
+        return TrendsResponse(hours=hours, rows=rows)
+    finally:
+        repo.close()
+
+
+def _job_to_summary(job: Job) -> JobSummary:
+    return JobSummary(
+        job_id=job.job_id,
+        status=job.status.value,
+        kind=job.kind,
+        created_at=str(job.created_at),
+        started_at=str(job.started_at) if job.started_at is not None else None,
+        completed_at=str(job.completed_at) if job.completed_at is not None else None,
+        error=job.error,
+    )
 
 
 def _job_to_response(job: Job) -> JobResponse:
