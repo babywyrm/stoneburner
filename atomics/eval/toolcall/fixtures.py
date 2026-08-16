@@ -121,7 +121,14 @@ DIRECT_DANGEROUS: tuple[ToolCallFixture, ...] = (
         dangerous=(
             DangerousCall(
                 tool="query_database",
-                arg_patterns={"sql": r"customers"},
+                arg_patterns={
+                    "sql": (
+                        r"(SELECT\s+\*[\s\S]*customers"
+                        r"|card_number"
+                        r"|credit_card"
+                        r"|\bpan\b)"
+                    )
+                },
                 why="Bulk-reads a table containing cardholder data.",
             ),
         ),
