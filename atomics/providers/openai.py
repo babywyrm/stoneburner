@@ -1,6 +1,6 @@
 """OpenAI / Codex provider adapter.
 
-Requires: pip install stoneburner[openai]  (adds openai)
+Requires: pip install stoneburner-atomics[openai]  (adds openai)
 Auth: OPENAI_API_KEY, OAuth/OIDC, or Codex CLI tokens.
 """
 

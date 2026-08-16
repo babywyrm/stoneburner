@@ -3,7 +3,7 @@
 from importlib.metadata import PackageNotFoundError, version
 
 # PyPI / uv listing name. The importable package and CLI stay `atomics`.
-DIST_NAME = "stoneburner"
+DIST_NAME = "stoneburner-atomics"
 
 try:
     __version__ = version(DIST_NAME)
