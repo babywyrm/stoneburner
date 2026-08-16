@@ -57,7 +57,22 @@ def make_provider(
     `host_label` and `vllm_host_label` name the offending setting in endpoint
     validation errors. The CLI passes its flag names; other callers leave the
     neutral defaults so a server does not claim a command-line flag was wrong.
+
+    When ``host`` / ``model`` / ``vllm_host`` are unset, an ``inference.env``
+    control file can fill them — but only if the requested provider matches
+    the file's backend, and only if the matching ``ATOMICS_*`` env is unset.
+    The provider name is never taken from the file.
     """
+    from atomics.inference import load_control_file, overlay_provider_defaults
+
+    name, model, host, vllm_host = overlay_provider_defaults(
+        name=name,
+        model=model,
+        host=host,
+        vllm_host=vllm_host,
+        target=load_control_file(),
+    )
+
     if host:
         try:
             host = validate_endpoint_url(host, label=host_label)

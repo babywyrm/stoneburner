@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Added
+- **`inference.env` reaches `doctor` and `make_provider`.** `atomics doctor`
+  reports the control file's backend, URL, and model — never the API key.
+  `--provider ollama` / `vllm` fill host and model from the file when those
+  flags and the matching `ATOMICS_*` env are unset. The provider name is
+  never taken from the file. See `docs/INFERENCE_ENV.md`.
+
 ### Changed
 - **PyPI / GitHub storefront.** The listing summary, keywords, classifiers,
   and project URLs name local eval and the security suites. README and

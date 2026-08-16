@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import datetime
 import os
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -118,6 +119,21 @@ class InferenceTarget:
         return cls.from_mapping(parse_env(text))
 
 
+def _control_file_candidates(path: str | None = None) -> list[str]:
+    if path is not None:
+        return [path]
+    candidates = [os.environ[e] for e in _ENV_OVERRIDES if os.environ.get(e)]
+    candidates.extend(_DEFAULT_PATHS)
+    return candidates
+
+
+def _first_control_file_path(path: str | None = None) -> str | None:
+    for cand in _control_file_candidates(path):
+        if cand and os.path.isfile(cand):
+            return cand
+    return None
+
+
 def load_control_file(path: str | None = None) -> InferenceTarget | None:
     """Load and normalize a control file.
 
@@ -125,17 +141,79 @@ def load_control_file(path: str | None = None) -> InferenceTarget | None:
     Without: search ``$INFERENCE_ENV``, ``$BRAIN_ENV``, then the default paths;
     returns ``None`` if nothing is found so callers can fall back cleanly.
     """
-    candidates: list[str] = []
-    if path is not None:
-        candidates.append(path)
-    else:
-        candidates.extend(os.environ[e] for e in _ENV_OVERRIDES if os.environ.get(e))
-        candidates.extend(_DEFAULT_PATHS)
-    for cand in candidates:
-        if cand and os.path.isfile(cand):
-            with open(cand) as f:
-                return InferenceTarget.from_text(f.read())
-    return None
+    found = _first_control_file_path(path)
+    if found is None:
+        return None
+    with open(found) as f:
+        return InferenceTarget.from_text(f.read())
+
+
+@dataclass(frozen=True)
+class ControlFileView:
+    """Safe summary of a control file for operator display.
+
+    Deliberately omits ``api_key``. Do not add it.
+    """
+
+    path: str
+    backend: str
+    url: str
+    model: str
+    think: bool
+
+
+def inspect_control_file(path: str | None = None) -> ControlFileView | None:
+    """Load a control file for display. Never includes the API key."""
+    found = _first_control_file_path(path)
+    if found is None:
+        return None
+    target = load_control_file(found)
+    if target is None:
+        return None
+    return ControlFileView(
+        path=found,
+        backend=target.backend,
+        url=target.url,
+        model=target.model,
+        think=target.think,
+    )
+
+
+_OLLAMA_HOST_ENV = "ATOMICS_OLLAMA_HOST"
+_OLLAMA_MODEL_ENV = "ATOMICS_OLLAMA_MODEL"
+_VLLM_HOST_ENV = "ATOMICS_VLLM_HOST"
+_VLLM_MODEL_ENV = "ATOMICS_VLLM_MODEL"
+
+
+def overlay_provider_defaults(
+    *,
+    name: str,
+    model: str | None,
+    host: str | None,
+    vllm_host: str | None = None,
+    target: InferenceTarget | None = None,
+    env: Mapping[str, str] | None = None,
+) -> tuple[str, str | None, str | None, str | None]:
+    """Fill host/model from a control file when the caller left them unset.
+
+    Precedence: explicit host/model/vllm_host, then ``ATOMICS_*`` env, then
+    the file. The provider ``name`` is never changed — a default Claude run
+    does not become Ollama because a file exists.
+    """
+    if target is None or name != target.backend:
+        return name, model, host, vllm_host
+    environ = os.environ if env is None else env
+    if name == "ollama":
+        if host is None and not environ.get(_OLLAMA_HOST_ENV) and target.url:
+            host = target.url
+        if model is None and not environ.get(_OLLAMA_MODEL_ENV) and target.model:
+            model = target.model
+    elif name == "vllm":
+        if vllm_host is None and not environ.get(_VLLM_HOST_ENV) and target.url:
+            vllm_host = target.url
+        if model is None and not environ.get(_VLLM_MODEL_ENV) and target.model:
+            model = target.model
+    return name, model, host, vllm_host
 
 
 # ── resolver (agnostic intent -> resolved) ────────────────────────────────────

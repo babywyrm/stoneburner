@@ -36,7 +36,12 @@ atomics secrets set ANTHROPIC_API_KEY
 ```
 
 Point at a non-local Ollama with `ATOMICS_OLLAMA_HOST` (default
-`http://localhost:11434`).
+`http://localhost:11434`). A box that already has an `inference.env`
+(`$INFERENCE_ENV` or `/etc/agentic/inference.env`) is enough:
+`atomics doctor` shows the backend/URL/model (never the API key), and
+`atomics run --provider ollama` fills host and model from the file
+unless you pass flags or `ATOMICS_*`. See
+[`docs/INFERENCE_ENV.md`](docs/INFERENCE_ENV.md).
 
 `doctor` exits non-zero if anything is missing, so it's safe in front of a
 long run: `atomics doctor && atomics run --tier ez -n 3`.
