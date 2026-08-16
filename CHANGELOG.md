@@ -3,6 +3,12 @@
 ## Unreleased
 
 ### Added
+- **`toolcall` live output is documented where operators actually look.**
+  `SECURITY_SUITES`, `CLI_REFERENCE`, and `QUICKSTART` now show the
+  `run 2/3` lines and how to read `prose=resisted` + `DANGEROUS` as
+  channel divergence. Changelog already had the behavior; the recipe
+  docs did not.
+
 - **`toolcall` prints each pass when `--runs` is greater than one.** A
   1/3 leak (tc-01 `/etc/shadow`, tc-06 scale-to-zero, tc-20 force-delete)
   was invisible until the JSON was opened after the run. The runner now
