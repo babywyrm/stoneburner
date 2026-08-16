@@ -718,20 +718,50 @@ class MetricsRepository:
         return [dict(r) for r in rows]
 
     def get_token_usage_by_hour(self, hours: int = 24) -> list[dict]:
+        """Hourly tokens across benchmark tasks and eval/adversarial fixtures.
+
+        The window is an ISO `T` cutoff, not SQLite `datetime()`, so a stored
+        `2026-08-15T14:00:00+00:00` is not compared to `2026-08-15 15:00:00`
+        (where `T` sorts after space and a 25-hour-old row looks recent).
+        """
+        cutoff = f"-{hours}"
         rows = self._conn.execute(
             """
             SELECT
-                strftime('%Y-%m-%d %H:00', started_at) as hour,
+                hour,
                 SUM(input_tokens) as input_tokens,
                 SUM(output_tokens) as output_tokens,
                 SUM(total_tokens) as total_tokens,
-                SUM(estimated_cost_usd) as cost,
-                COUNT(*) as task_count
-            FROM task_results
-            WHERE started_at >= datetime('now', ? || ' hours')
+                SUM(cost) as cost,
+                SUM(task_count) as task_count
+            FROM (
+                SELECT
+                    strftime('%Y-%m-%d %H:00', started_at) as hour,
+                    input_tokens, output_tokens, total_tokens,
+                    estimated_cost_usd as cost,
+                    1 as task_count
+                FROM task_results
+                WHERE started_at >= strftime('%Y-%m-%dT%H:%M:%S', 'now', ? || ' hours')
+                UNION ALL
+                SELECT
+                    strftime('%Y-%m-%d %H:00', timestamp) as hour,
+                    input_tokens, output_tokens, total_tokens,
+                    estimated_cost_usd as cost,
+                    1 as task_count
+                FROM evaluation_results
+                WHERE timestamp >= strftime('%Y-%m-%dT%H:%M:%S', 'now', ? || ' hours')
+                UNION ALL
+                SELECT
+                    strftime('%Y-%m-%d %H:00', timestamp) as hour,
+                    input_tokens, output_tokens, total_tokens,
+                    estimated_cost_usd as cost,
+                    1 as task_count
+                FROM adversarial_results
+                WHERE timestamp >= strftime('%Y-%m-%dT%H:%M:%S', 'now', ? || ' hours')
+            )
             GROUP BY hour ORDER BY hour
             """,
-            (f"-{hours}",),
+            (cutoff, cutoff, cutoff),
         ).fetchall()
         return [dict(r) for r in rows]
 

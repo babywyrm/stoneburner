@@ -3,6 +3,12 @@
 ## Unreleased
 
 ### Added
+- **Dashboard trends and live API jobs.** Hourly token/cost bars from
+  `GET /api/v1/reports/trends` (eval and adversarial fixtures count;
+  `hours` is 1–168). `GET /api/v1/jobs` lists in-memory jobs without
+  `result`. Click a job (or `#job=<id>`) to watch status on the 10s
+  refresh. The panel never writes the result payload into the DOM.
+
 - **Dashboard drill-in.** Click a recent run (or `#run=<id>`) to see
   fixture scores. `GET /api/v1/runs/{run_id}` returns the parent row and
   sanitized fixtures — no prompts, responses, or `result_json`.

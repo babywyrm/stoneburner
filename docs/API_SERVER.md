@@ -64,11 +64,13 @@ would expose eval submission to the network unauthenticated.
 | GET | `/api/v1/ready` | Readiness — can it serve real work (public) |
 | POST | `/api/v1/runs` | Start a benchmark run |
 | POST | `/api/v1/evals` | Start an eval suite |
+| GET | `/api/v1/jobs` | List in-memory API jobs (no result payload) |
 | GET | `/api/v1/jobs/{job_id}` | Poll job status/result |
 | GET | `/api/v1/models` | List Ollama or vLLM tags (`?provider=&host=`) |
 | POST | `/api/v1/provider-test` | Health + fixed 2+2 generate (spends a few tokens) |
 | GET | `/api/v1/compare` | Compare providers/models |
 | GET | `/api/v1/reports/recent-runs` | Recent run report |
+| GET | `/api/v1/reports/trends` | Hourly token/cost series (`?hours=1..168`) |
 | GET | `/api/v1/runs/{run_id}` | One persisted run and sanitized fixtures |
 | POST | `/api/v1/workers/register` | Register a worker |
 | POST | `/api/v1/workers/{worker_id}/heartbeat` | Worker heartbeat |
@@ -173,6 +175,9 @@ The dashboard auto-refreshes every 10 seconds and shows:
 - Recent benchmark runs with status, tokens, and cost. Click a run id (or
   open `#run=<id>`) to see fixture scores. Prompts and raw judge JSON are
   not sent to the browser.
+- Hourly token trends (eval and benchmark fixtures)
+- In-memory API jobs. Click a job id (or `#job=<id>`) to watch status on
+  the 10s refresh. The list omits `result`; the panel never renders it.
 - Active distributed jobs and their mode
 - Registered workers and their capabilities/labels
 - Provider/model success-rate comparison bars

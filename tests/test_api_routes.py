@@ -82,3 +82,41 @@ def test_get_job_returns_running_while_in_progress(client):
         assert poll.json()["status"] == "completed"
         assert poll.json()["result"]["run_id"] == "slow"
 
+
+def test_list_jobs_requires_auth():
+    app = create_app(settings=ServerSettings(api_keys={"secret"}))
+    with TestClient(app) as tc:
+        resp = tc.get("/api/v1/jobs")
+        assert resp.status_code == 401
+
+
+def test_list_jobs_empty(client):
+    resp = client.get("/api/v1/jobs")
+    assert resp.status_code == 200
+    assert resp.json() == {"jobs": []}
+
+
+def test_list_jobs_omits_result_payload(client):
+    from unittest.mock import AsyncMock, patch
+
+    with patch(
+        "atomics.api.routes.run_benchmark_from_request",
+        new=AsyncMock(return_value={"prompt": "list-secret", "run_id": "listed"}),
+    ):
+        started = client.post("/api/v1/runs", json={"provider": "ollama"})
+        assert started.status_code == 202
+        job_id = started.json()["job_id"]
+        for _ in range(50):
+            listed = client.get("/api/v1/jobs")
+            jobs = listed.json()["jobs"]
+            if jobs and jobs[0]["status"] == "completed":
+                break
+        assert listed.status_code == 200
+        assert len(jobs) == 1
+        assert jobs[0]["job_id"] == job_id
+        assert jobs[0]["kind"] == "run"
+        assert "result" not in jobs[0]
+        assert "list-secret" not in listed.text
+        detail = client.get(f"/api/v1/jobs/{job_id}")
+        assert detail.json()["result"]["prompt"] == "list-secret"
+

@@ -42,8 +42,8 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
     .row span { width: 8rem; font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     button.link { background: none; border: none; padding: 0; color: #0969da; cursor: pointer; font: inherit; }
     @media (prefers-color-scheme: dark) { button.link { color: #58a6ff; } }
-    #run-detail { display: none; margin-top: 1.5rem; }
-    #run-detail.visible { display: block; }
+    #run-detail, #job-detail { display: none; margin-top: 1.5rem; }
+    #run-detail.visible, #job-detail.visible { display: block; }
   </style>
 </head>
 <body>
@@ -69,11 +69,23 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
       <h2>Compare by provider</h2>
       <div id="compare"><p class="empty">Loading...</p></div>
     </div>
+    <div class="card">
+      <h2>Trends</h2>
+      <div id="trends"><p class="empty">Loading...</p></div>
+    </div>
+    <div class="card">
+      <h2>API jobs</h2>
+      <div id="api-jobs"><p class="empty">Loading...</p></div>
+    </div>
   </div>
   <div id="run-detail" class="card">
     <h2>Run <button type="button" id="run-back" class="link">← all runs</button></h2>
     <div id="run-summary"><p class="empty">Select a run.</p></div>
     <div id="run-fixtures"></div>
+  </div>
+  <div id="job-detail" class="card">
+    <h2>Job <button type="button" id="job-back" class="link">← all jobs</button></h2>
+    <div id="job-summary"><p class="empty">Select a job.</p></div>
   </div>
 
   <script>
@@ -161,6 +173,40 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
         history.replaceState(null, "", location.pathname + location.search);
       }
       document.getElementById("run-detail").classList.remove("visible");
+    }
+
+    function selectJob(jobId) {
+      if (location.hash !== "#job=" + jobId) {
+        location.hash = "job=" + jobId;
+      }
+      loadJobDetail(jobId);
+    }
+
+    function clearJob() {
+      if (location.hash.startsWith("#job=")) {
+        history.replaceState(null, "", location.pathname + location.search);
+      }
+      document.getElementById("job-detail").classList.remove("visible");
+    }
+
+    async function loadJobDetail(jobId) {
+      const panel = document.getElementById("job-detail");
+      const summary = document.getElementById("job-summary");
+      panel.classList.add("visible");
+      emptyNote(summary, "Loading " + jobId.slice(0, 8) + "…");
+      const data = await get("/api/v1/jobs/" + encodeURIComponent(jobId));
+      if (!data || !data.job_id) {
+        emptyNote(summary, "Job not found.");
+        return;
+      }
+      summary.textContent = "";
+      const meta = document.createElement("p");
+      meta.textContent = [
+        data.kind || "-",
+        data.status || "-",
+        data.error && data.error.message ? data.error.message : "",
+      ].filter(Boolean).join(" · ");
+      summary.appendChild(meta);
     }
 
     async function loadRunDetail(runId) {
@@ -289,8 +335,80 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
       }
     }
 
+    async function loadTrends() {
+      const data = await get("/api/v1/reports/trends?hours=24");
+      const container = document.getElementById("trends");
+      const rows = data?.rows || [];
+      if (!rows.length) { emptyNote(container, "No trend data yet."); return; }
+      const maxTok = Math.max(...rows.map(r => Number(r.total_tokens) || 0), 1);
+      container.textContent = "";
+      for (const r of rows) {
+        const tokens = Number(r.total_tokens) || 0;
+        const pct = Math.max(0, Math.min(100, Math.round((tokens / maxTok) * 100)));
+        const row = document.createElement("div");
+        row.className = "row";
+        const name = document.createElement("span");
+        name.textContent = r.hour || "-";
+        const bar = document.createElement("div");
+        bar.className = "bar";
+        bar.style.width = pct + "%";
+        const value = document.createElement("span");
+        value.textContent = tokens + " tok";
+        row.append(name, bar, value);
+        container.appendChild(row);
+      }
+    }
+
+    async function loadApiJobs() {
+      const data = await get("/api/v1/jobs");
+      const container = document.getElementById("api-jobs");
+      const jobs = data?.jobs || [];
+      if (!jobs.length) { emptyNote(container, "No API jobs yet."); return; }
+      const table = document.createElement("table");
+      const headRow = document.createElement("tr");
+      for (const h of ["Job", "Kind", "Status"]) {
+        const th = document.createElement("th");
+        th.textContent = h;
+        headRow.appendChild(th);
+      }
+      table.appendChild(headRow);
+      for (const j of jobs) {
+        const tr = document.createElement("tr");
+        const idCell = document.createElement("td");
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "link";
+        btn.textContent = String(j.job_id).slice(0, 8);
+        btn.addEventListener("click", () => selectJob(j.job_id));
+        idCell.appendChild(btn);
+        tr.appendChild(idCell);
+        for (const c of [
+          j.kind || "-",
+          { class: "status " + statusClass(j.status), text: j.status || "-" },
+        ]) {
+          const td = document.createElement("td");
+          if (c !== null && typeof c === "object") {
+            td.className = c.class;
+            td.textContent = c.text;
+          } else {
+            td.textContent = String(c);
+          }
+          tr.appendChild(td);
+        }
+        table.appendChild(tr);
+      }
+      container.textContent = "";
+      container.appendChild(table);
+    }
+
     async function refresh() {
-      await Promise.all([loadRecentRuns(), loadDistributedJobs(), loadWorkers(), loadCompare()]);
+      await Promise.all([
+        loadRecentRuns(), loadDistributedJobs(), loadWorkers(),
+        loadCompare(), loadTrends(), loadApiJobs(),
+      ]);
+      if (location.hash.startsWith("#job=")) {
+        loadJobDetail(location.hash.slice(5));
+      }
     }
 
     document.getElementById("key-save").addEventListener("click", () => {
@@ -300,11 +418,17 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
       refresh();
     });
     document.getElementById("run-back").addEventListener("click", clearRun);
+    document.getElementById("job-back").addEventListener("click", clearJob);
     window.addEventListener("hashchange", () => {
       if (location.hash.startsWith("#run=")) {
+        document.getElementById("job-detail").classList.remove("visible");
         loadRunDetail(location.hash.slice(5));
+      } else if (location.hash.startsWith("#job=")) {
+        document.getElementById("run-detail").classList.remove("visible");
+        loadJobDetail(location.hash.slice(5));
       } else {
         document.getElementById("run-detail").classList.remove("visible");
+        document.getElementById("job-detail").classList.remove("visible");
       }
     });
 
@@ -314,6 +438,8 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
     refresh();
     if (location.hash.startsWith("#run=")) {
       loadRunDetail(location.hash.slice(5));
+    } else if (location.hash.startsWith("#job=")) {
+      loadJobDetail(location.hash.slice(5));
     }
     setInterval(refresh, 10000);
   </script>

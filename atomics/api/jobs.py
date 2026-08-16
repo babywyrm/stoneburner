@@ -103,6 +103,14 @@ class JobManager:
     def active_count(self) -> int:
         return sum(1 for job in self.jobs.values() if self._is_active(job))
 
+    def list_jobs(self) -> list[Job]:
+        """Current jobs, newest first. Retention still applies."""
+        return sorted(
+            self.jobs.values(),
+            key=lambda job: job.created_at,
+            reverse=True,
+        )
+
     def active_count_for(self, owner: str) -> int:
         """Concurrent jobs currently held by one caller."""
         return sum(
