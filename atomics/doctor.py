@@ -47,7 +47,7 @@ def run_doctor(settings: AtomicsSettings | None = None) -> int:
         console.print("[green]ANTHROPIC_API_KEY[/green] set")
     else:
         console.print(
-            "[yellow]ANTHROPIC_API_KEY[/yellow] not set (required for Claude / provider-test)"
+            "[yellow]ANTHROPIC_API_KEY[/yellow] not set (optional; needed for Claude)"
         )
 
     if settings.openai_api_key:
