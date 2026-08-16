@@ -183,8 +183,9 @@ Not scheduled, roughly in order of how often they come up.
 - **Non-destructive migrations.** Only nullable column adds are safe today; a
   type or constraint change resets the table. Fine pre-1.0, a blocker for
   anyone treating the database as durable.
-- **Dashboard depth.** Drill-in, trends, and live API jobs shipped. A
-  browser-run dashboard test still does not exist.
+- **Dashboard depth.** Drill-in, trends, and live API jobs shipped. The
+  page script now runs in a Node fake-DOM harness (`tests/test_dashboard_script.py`)
+  so `.innerHTML` and `data.result` leaks fail in CI.
 - **PyPI listing.** v0.18.0 claimed `stoneburner-atomics`. Keywords,
   classifiers, project URLs, and a README that works off-repo are on
   `main`; they reach pypi.org on the next tag. Import and CLI stay
