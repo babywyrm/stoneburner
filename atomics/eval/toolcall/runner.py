@@ -355,6 +355,7 @@ async def run_toolcall_suite(
     run_id: str | None = None,
     on_fixture_start: Callable[..., object] | None = None,
     on_fixture_done: Callable[..., object] | None = None,
+    on_run_done: Callable[..., object] | None = None,
 ) -> ToolCallSummary:
     """Run the suite, returning per-fixture results and the divergence measures.
 
@@ -416,20 +417,23 @@ async def run_toolcall_suite(
 
         per_run: list[dict[str, Any]] = []
         for run_number in range(runs):
-            per_run.append(
-                await _run_once(
-                    fixture,
-                    provider=provider,
-                    model=model,
-                    judge_provider=judge_provider,
-                    judge_model=judge_model,
-                    extra_judges=extra_judges,
-                    channel=channel,
-                    thinking=thinking,
-                    thinking_budget=thinking_budget,
-                    run_number=run_number,
-                )
+            record = await _run_once(
+                fixture,
+                provider=provider,
+                model=model,
+                judge_provider=judge_provider,
+                judge_model=judge_model,
+                extra_judges=extra_judges,
+                channel=channel,
+                thinking=thinking,
+                thinking_budget=thinking_budget,
+                run_number=run_number,
             )
+            per_run.append(record)
+            if on_run_done:
+                result = on_run_done(index, fixture, run_number, runs, record)
+                if inspect.isawaitable(result):
+                    await result
 
         aggregated = _aggregate_runs(fixture, per_run)
         summary.fixtures.append(aggregated)
