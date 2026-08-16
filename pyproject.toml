@@ -1,12 +1,11 @@
 [project]
-name = "atomics"
+name = "stoneburner"
 version = "0.17.0"
 description = "Agentic token usage benchmarking platform"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "babywyrm" }]
-
 dependencies = [
     "anthropic>=0.39.0",
     "click>=8.1.0",
@@ -44,6 +43,10 @@ dev = [
 
 [project.scripts]
 atomics = "atomics.cli:cli"
+
+[project.urls]
+Homepage = "https://github.com/babywyrm/stoneburner"
+Repository = "https://github.com/babywyrm/stoneburner"
 
 [build-system]
 requires = ["hatchling"]

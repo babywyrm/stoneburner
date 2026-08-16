@@ -74,8 +74,9 @@ That satisfies the guard without inventing a release that never happened.
    ```
 
 6. **Check the workflow.** `gh run list --limit 3`. The `publish` workflow builds
-   the distribution, creates the GitHub release from the changelog, and moves the
-   floating `v0` tag.
+   the distribution, creates the GitHub release from the changelog, moves the
+   floating `v0` tag, and uploads `stoneburner` to PyPI if the trusted
+   publisher is registered.
 
 ## What the tag triggers
 
@@ -88,24 +89,42 @@ That satisfies the guard without inventing a release that never happened.
 - **Update floating major tag** — force-moves `v0` to the new release, for
   anything that wants to follow the major line. It is deliberately mutable.
 
-There is no PyPI step. See Distribution below.
+- **PyPI** — `uv publish` via trusted publishing, as a job that does not
+  block the GitHub release. The listing name is `stoneburner`. See
+  Distribution below.
 
 ## Distribution
 
-Atomics is installed from source — `uv sync`, or `pip install` from a clone or
-the wheel attached to each GitHub release. It is not on PyPI.
+The PyPI / `uv add` name is `stoneburner`. The importable package and the
+CLI stay `atomics`:
 
-There was a `publish-pypi` job, and it failed on every tag from the first
-release onward. It used trusted publishing for a distribution named `atomics`,
-but that name on PyPI belongs to an unrelated C++ package
-(`doodspav/atomics`, "Atomic lock-free primitives"), so it could never have
-succeeded. It was removed rather than left red: a job that cannot pass is not a
-known issue, it is noise, and it made every release look half-broken.
+```bash
+uv add stoneburner
+uv tool install stoneburner
+uv add 'stoneburner[api,mcp]'
+```
 
-Publishing to PyPI would need a distribution rename — `stoneburner-atomics` or
-similar — which changes `pip install` for every consumer while leaving the
-importable package as `atomics`. Worth doing when there are consumers who want
-it. Until then the wheel on each release is the artifact.
+From a clone, `uv sync` is unchanged. `import atomics` and `atomics --version`
+are unchanged. `atomics.__version__` reads metadata for the `stoneburner`
+distribution.
+
+**Before the first tag that should upload:** create a GitHub Environment
+named `pypi`, then on https://pypi.org/manage/account/publishing/ add a
+pending trusted publisher:
+
+| Field | Value |
+|-------|--------|
+| PyPI project name | `stoneburner` |
+| Owner | `babywyrm` |
+| Repository | `stoneburner` |
+| Workflow | `publish.yml` |
+| Environment | `pypi` |
+
+The first successful tag claims the name. Do not tag until that publisher
+is registered, or the PyPI job will go red. The GitHub release still
+publishes; the two jobs are independent on purpose. The old `atomics`
+trusted-publish job failed on every tag because that name belongs to an
+unrelated C++ package.
 
 **Release notes did not always come from the changelog.** Releases through
 v0.13.1 were created with `generate_release_notes`, which diffs against the

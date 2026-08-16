@@ -5,10 +5,9 @@ on:
     tags:
       - "v[0-9]*"
 
-# No id-token: write — that existed only for PyPI trusted publishing, and there
-# is no PyPI job. See "Distribution" in RELEASING.md before adding one: the name
-# `atomics` on PyPI belongs to an unrelated package, so a publish job cannot
-# succeed until the distribution is renamed.
+# id-token is granted only on the PyPI job. The listing name is `stoneburner`;
+# the import and CLI stay `atomics`. Register the trusted publisher on PyPI
+# before the first tag that should upload — see RELEASING.md.
 permissions:
   contents: write
 
@@ -81,3 +80,25 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git tag -fa "${MAJOR}" -m "Update ${MAJOR} to ${GITHUB_REF_NAME}"
           git push origin "${MAJOR}" --force
+
+  # Independent of the GitHub release so a missing trusted publisher does not
+  # blank the release page the way the old `atomics` name collision did.
+  publish-pypi:
+    name: Publish to PyPI
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - name: Download dist
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Publish
+        run: uv publish
