@@ -29,7 +29,10 @@ from atomics.commands.common import setup_logging
               help="Show real-time progress during long runs.")
 @click.pass_context
 def cli(ctx: click.Context, verbose: bool, progress: bool) -> None:
-    """Atomics — Agentic token usage benchmarking platform."""
+    """Atomics — local-first LLM eval (cost, quality, security).
+
+    PyPI listing: stoneburner-atomics. The CLI name stays atomics.
+    """
     ctx.ensure_object(dict)
     ctx.obj["verbose"] = verbose
     ctx.obj["progress"] = progress

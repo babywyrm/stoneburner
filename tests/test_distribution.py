@@ -5,6 +5,7 @@
 """
 
 from importlib.metadata import entry_points, metadata, version
+from pathlib import Path
 
 import atomics
 from atomics.api.config import ServerSettings
@@ -29,3 +30,26 @@ def test_console_script_is_still_atomics():
 def test_the_api_advertises_the_distribution_version():
     app = create_app(settings=ServerSettings(no_auth=True))
     assert app.version == version(atomics.DIST_NAME)
+
+
+def test_pypi_listing_has_discoverability_metadata():
+    meta = metadata(atomics.DIST_NAME)
+    keywords = {part.strip().lower() for part in meta.get("Keywords", "").split(",") if part.strip()}
+    assert {"llm", "eval", "ollama", "prompt-injection", "mcp"} <= keywords
+    classifiers = meta.get_all("Classifier") or []
+    assert "License :: OSI Approved :: MIT License" in classifiers
+    assert "Topic :: Security" in classifiers
+    summary = meta["Summary"]
+    assert "atomics" in summary.lower()
+    assert "ollama" in summary.lower() or "local" in summary.lower()
+    urls = " ".join(meta.get_all("Project-URL") or [])
+    assert "Documentation" in urls
+    assert "Changelog" in urls
+    assert "Issues" in urls
+
+
+def test_readme_leads_with_pypi_install():
+    text = Path("README.md").read_text()
+    assert "uv tool install stoneburner-atomics" in text
+    assert "once a release has been uploaded" not in text
+    assert "http://localhost:11434" in text

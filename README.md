@@ -1,16 +1,20 @@
 # Stoneburner
 
-> **Atomics** — Agentic token usage benchmarking platform
+Local-first LLM evaluation: token cost, quality, and security suites.
 
-A continuous, cron-schedulable benchmarking harness that runs realistic everyday tasks against LLM providers to measure token consumption, cost, throughput, and performance trends over time. Supports tiered usage profiles, multiple providers (including local Ollama), and a full security evaluation suite.
+The PyPI listing is **[stoneburner-atomics](https://pypi.org/project/stoneburner-atomics/)**.
+The CLI and the import stay **`atomics`**. (`atomics` on PyPI is a different
+package; `stoneburner` is too similar to an existing `stone-burner`.)
 
-> **New here?** Start with [**QUICKSTART.md**](QUICKSTART.md) — copy-pasteable commands grouped by goal.
+> **New here?** [QUICKSTART](https://github.com/babywyrm/stoneburner/blob/main/QUICKSTART.md)
+> — copy-pasteable commands grouped by goal.
 >
-> **Contributing?** Read [**ARCHITECTURE.md**](ARCHITECTURE.md) — layer map, primitives, how to add an eval suite.
+> **Contributing?** [ARCHITECTURE](https://github.com/babywyrm/stoneburner/blob/main/ARCHITECTURE.md)
+> — layer map, primitives, how to add an eval suite.
 
 ## Table of Contents
 
-- [Quick Start](#quick-start)
+- [Install](#install)
 - [Providers](#providers)
 - [Burn Tiers](#burn-tiers)
 - [Key Commands](#key-commands)
@@ -23,26 +27,41 @@ A continuous, cron-schedulable benchmarking harness that runs realistic everyday
 - [Running Tests](#running-tests)
 - [Further Reading](#further-reading)
 
-## Quick Start
+## Install
+
+Ollama on `http://localhost:11434` is the one-box path. No cloud key required.
 
 ```bash
-# from a clone
-uv sync
-
-# or from PyPI, once a release has been uploaded
-uv add stoneburner-atomics
 uv tool install stoneburner-atomics
+atomics doctor
+atomics provider-test --provider ollama --no-thinking
+atomics toolcall --provider ollama --channel tools --runs 3 --no-thinking
+```
 
+`--no-thinking` keeps reasoning models from spending the whole token budget
+on hidden chain-of-thought. A tools-only `toolcall` run is a valid first
+run; channel divergence needs a second model as judge.
+
+API, MCP, or RAG extras:
+
+```bash
+uv tool install 'stoneburner-atomics[api,mcp]'
+uv add 'stoneburner-atomics[rag]'          # from another project
+```
+
+From a clone, `uv sync --all-extras`. Bare `uv sync` drops the API, MCP,
+RAG, and test extras.
+
+Cloud providers work the same way once a key is set:
+
+```bash
 export ANTHROPIC_API_KEY=sk-ant-...
+atomics provider-test
+atomics run -n 5
+atomics report
 
-uv run atomics provider-test          # verify connection
-uv run atomics run -n 5               # run 5 benchmark tasks
-uv run atomics report                 # view results
-
-# other providers
-uv run atomics run --provider openai -n 5
-uv run atomics run --provider bedrock --region us-east-1 -n 5
-uv run atomics run --provider ollama -n 5
+atomics run --provider openai -n 5
+atomics run --provider bedrock --region us-east-1 -n 5
 ```
 
 ## Providers
@@ -60,11 +79,17 @@ uv run atomics run --provider ollama -n 5
 | **llama.cpp** (local) | `--provider llamacpp` | `uv sync` (uses httpx) |
 | **vLLM** (OpenAI-compat) | `--provider vllm` | `uv sync` (uses httpx) |
 
-Compare providers after running benchmarks: `uv run atomics compare` — see [docs/COMPARING.md](docs/COMPARING.md) for model classes, metrics fidelity, and judge accuracy.
+Compare providers after running benchmarks: `atomics compare` — see
+[COMPARING](https://github.com/babywyrm/stoneburner/blob/main/docs/COMPARING.md)
+for model classes, metrics fidelity, and judge accuracy.
 
-> **Optional extras:** Real RAG retrieval (`atomics rag-index`, `atomics rag-retrieval`, `atomics rag --index`) requires `uv sync --extra rag` to install `sqlite-vec` and `sentence-transformers`. Bedrock and OpenAI providers need `--extra bedrock` and `--extra openai` respectively.
-
-The API server mode requires `uv sync --extra api` to install FastAPI and uvicorn. Add `--with-dashboard` to serve a read-only web UI at `/dashboard`. Serving atomics to LLM agents over MCP (`atomics mcp`) requires `uv sync --extra mcp`; it proxies a running API server and inherits that server's authentication and spend ceilings. See [docs/MCP_SERVER.md](docs/MCP_SERVER.md).
+> **Optional extras:** from PyPI, `uv add 'stoneburner-atomics[rag]'` (or
+> `[bedrock]`, `[openai]`, `[api]`, `[mcp]`). From a clone,
+> `uv sync --all-extras`. RAG is `atomics rag-index` / `rag-retrieval` /
+> `rag --index`. `atomics server --with-dashboard` serves the read-only UI
+> at `/dashboard`. `atomics mcp` proxies a running API server and inherits
+> that server's authentication and spend ceilings. See
+> [MCP_SERVER](https://github.com/babywyrm/stoneburner/blob/main/docs/MCP_SERVER.md).
 
 ## Burn Tiers
 
@@ -107,7 +132,7 @@ uv run atomics tiers                   # show all tier profiles
 | `atomics server` | Run atomics as an HTTP API server |
 | `atomics mcp` | Expose atomics to LLM agents over MCP (proxies the API server) |
 
-Full reference: [docs/CLI_REFERENCE.md](docs/CLI_REFERENCE.md)
+Full reference: [CLI_REFERENCE](https://github.com/babywyrm/stoneburner/blob/main/docs/CLI_REFERENCE.md)
 
 ## Security Suites
 
@@ -124,8 +149,9 @@ Six eval suites for LLM security assessment:
 
 Plus **probe** (live infrastructure analysis) and **sweep** (multi-model ranked comparison).
 
-Full documentation: [docs/SECURITY_SUITES.md](docs/SECURITY_SUITES.md) ·
-Leaderboards: [adversarial](docs/LEADERBOARD.md) · [red/blue](docs/LEADERBOARD-REDBLUE.md)
+Full documentation: [SECURITY_SUITES](https://github.com/babywyrm/stoneburner/blob/main/docs/SECURITY_SUITES.md) ·
+Leaderboards: [adversarial](https://github.com/babywyrm/stoneburner/blob/main/docs/LEADERBOARD.md) ·
+[red/blue](https://github.com/babywyrm/stoneburner/blob/main/docs/LEADERBOARD-REDBLUE.md)
 
 ## Load Testing
 
@@ -137,7 +163,7 @@ Leaderboards: [adversarial](docs/LEADERBOARD.md) · [red/blue](docs/LEADERBOARD-
 | `atomics capacity` | User load projection from stress data |
 | `atomics labcompare` | Two-host throughput + quality bench-off |
 
-Full documentation: [docs/LOAD_TESTING.md](docs/LOAD_TESTING.md)
+Full documentation: [LOAD_TESTING](https://github.com/babywyrm/stoneburner/blob/main/docs/LOAD_TESTING.md)
 
 ## Thinking Mode
 
@@ -149,7 +175,7 @@ uv run atomics run --provider claude --thinking -n 5      # explicit
 uv run atomics run --provider openai -m o3 --no-thinking  # forced off for A/B
 ```
 
-Full documentation: [docs/THINKING.md](docs/THINKING.md)
+Full documentation: [THINKING](https://github.com/babywyrm/stoneburner/blob/main/docs/THINKING.md)
 
 ## Configuration
 
@@ -205,11 +231,12 @@ stoneburner/
 │   └── cli.py            # Thin Click root — registers commands from commands/
 ├── profiles/             # Custom target profiles (local/ gitignored)
 ├── qa/                   # QA fixture suites (local/ gitignored)
-├── tests/                # 2289 tests at 89% coverage
+├── tests/                # 2500+ tests
 └── docs/                 # Detailed documentation
 ```
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for the full layer map and contributor guide.
+See [ARCHITECTURE](https://github.com/babywyrm/stoneburner/blob/main/ARCHITECTURE.md)
+for the full layer map and contributor guide.
 
 ## Running Tests
 
@@ -220,7 +247,7 @@ collection instead of skipping. The `mcp` extra is not required for collection
 surface is actually tested. Sync it locally too.
 
 ```bash
-uv sync --extra dev --extra api --extra mcp
+uv sync --all-extras
 uv run pytest -q
 uv run pytest -q --cov=atomics --cov-report=term-missing --cov-fail-under=85
 ```
@@ -239,28 +266,30 @@ no credentials and no model, and touches no real database.
 
 ## Further Reading
 
+Links are absolute so they work on PyPI as well as GitHub.
+
 | Document | Description |
 |----------|-------------|
-| [QUICKSTART.md](QUICKSTART.md) | Recipe-first guide grouped by goal |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | Setup, the checks CI runs, and project conventions |
-| [ARCHITECTURE.md](ARCHITECTURE.md) | Layer map, primitives, contributor guide |
-| [SECURITY.md](SECURITY.md) | Vulnerability reporting and operational security considerations |
-| [CHANGELOG.md](CHANGELOG.md) | Version history |
-| [RELEASING.md](RELEASING.md) | Release process, versioning and tag conventions |
-| [ROADMAP.md](ROADMAP.md) | Priorities and future directions |
-| [docs/CLI_REFERENCE.md](docs/CLI_REFERENCE.md) | Full CLI command reference |
-| [docs/API_SERVER.md](docs/API_SERVER.md) | HTTP API server, authentication, distributed runs, dashboard |
-| [docs/MCP_SERVER.md](docs/MCP_SERVER.md) | MCP server for LLM agents, tool surface, trust model |
-| [docs/SECURITY_SUITES.md](docs/SECURITY_SUITES.md) | Security evaluation suites |
-| [docs/ADVERSARIAL_SUITES.md](docs/ADVERSARIAL_SUITES.md) | Adversarial fixture flow, scoring, and categories |
-| [docs/LOAD_TESTING.md](docs/LOAD_TESTING.md) | Stress, soak, scenario, capacity testing |
-| [docs/COMPARING.md](docs/COMPARING.md) | Provider comparison, model classes, judge accuracy |
-| [docs/THINKING.md](docs/THINKING.md) | Thinking/reasoning mode internals |
-| [docs/LEADERBOARD.md](docs/LEADERBOARD.md) | Adversarial resistance leaderboard |
-| [docs/LEADERBOARD-REDBLUE.md](docs/LEADERBOARD-REDBLUE.md) | Red/blue capability leaderboard |
-| [docs/FRONTIER_COMPARISON.md](docs/FRONTIER_COMPARISON.md) | Local vs frontier model comparison |
-| [docs/INFERENCE_ENV.md](docs/INFERENCE_ENV.md) | Vendor-neutral inference control file spec |
+| [QUICKSTART](https://github.com/babywyrm/stoneburner/blob/main/QUICKSTART.md) | Recipe-first guide grouped by goal |
+| [CONTRIBUTING](https://github.com/babywyrm/stoneburner/blob/main/CONTRIBUTING.md) | Setup, the checks CI runs, and project conventions |
+| [ARCHITECTURE](https://github.com/babywyrm/stoneburner/blob/main/ARCHITECTURE.md) | Layer map, primitives, contributor guide |
+| [SECURITY](https://github.com/babywyrm/stoneburner/blob/main/SECURITY.md) | Vulnerability reporting and operational security considerations |
+| [CHANGELOG](https://github.com/babywyrm/stoneburner/blob/main/CHANGELOG.md) | Version history |
+| [RELEASING](https://github.com/babywyrm/stoneburner/blob/main/RELEASING.md) | Release process, versioning and tag conventions |
+| [ROADMAP](https://github.com/babywyrm/stoneburner/blob/main/ROADMAP.md) | Priorities and future directions |
+| [CLI_REFERENCE](https://github.com/babywyrm/stoneburner/blob/main/docs/CLI_REFERENCE.md) | Full CLI command reference |
+| [API_SERVER](https://github.com/babywyrm/stoneburner/blob/main/docs/API_SERVER.md) | HTTP API server, authentication, distributed runs, dashboard |
+| [MCP_SERVER](https://github.com/babywyrm/stoneburner/blob/main/docs/MCP_SERVER.md) | MCP server for LLM agents, tool surface, trust model |
+| [SECURITY_SUITES](https://github.com/babywyrm/stoneburner/blob/main/docs/SECURITY_SUITES.md) | Security evaluation suites |
+| [ADVERSARIAL_SUITES](https://github.com/babywyrm/stoneburner/blob/main/docs/ADVERSARIAL_SUITES.md) | Adversarial fixture flow, scoring, and categories |
+| [LOAD_TESTING](https://github.com/babywyrm/stoneburner/blob/main/docs/LOAD_TESTING.md) | Stress, soak, scenario, capacity testing |
+| [COMPARING](https://github.com/babywyrm/stoneburner/blob/main/docs/COMPARING.md) | Provider comparison, model classes, judge accuracy |
+| [THINKING](https://github.com/babywyrm/stoneburner/blob/main/docs/THINKING.md) | Thinking/reasoning mode internals |
+| [LEADERBOARD](https://github.com/babywyrm/stoneburner/blob/main/docs/LEADERBOARD.md) | Adversarial resistance leaderboard |
+| [LEADERBOARD-REDBLUE](https://github.com/babywyrm/stoneburner/blob/main/docs/LEADERBOARD-REDBLUE.md) | Red/blue capability leaderboard |
+| [FRONTIER_COMPARISON](https://github.com/babywyrm/stoneburner/blob/main/docs/FRONTIER_COMPARISON.md) | Local vs frontier model comparison |
+| [INFERENCE_ENV](https://github.com/babywyrm/stoneburner/blob/main/docs/INFERENCE_ENV.md) | Vendor-neutral inference control file spec |
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT — see [LICENSE](https://github.com/babywyrm/stoneburner/blob/main/LICENSE).

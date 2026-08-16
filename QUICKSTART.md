@@ -1,8 +1,9 @@
 # Stoneburner Quickstart
 
-Recipe-first guide to **`atomics`** — the agentic token-usage benchmarking and
-LLM-evaluation harness. Every block below is copy‑pasteable. For the full
-reference see [`README.md`](README.md).
+Recipe-first guide to **`atomics`** — local-first LLM eval (cost, quality,
+security). The PyPI listing is `stoneburner-atomics`; the CLI stays
+`atomics`. Every block below is copy-pasteable. For the full reference see
+[`README.md`](README.md).
 
 > **Mental model:** point `atomics` at a provider (cloud API or a local
 > Ollama/vLLM box), pick a *goal* (cost, quality, safety, scale), run the
@@ -10,30 +11,35 @@ reference see [`README.md`](README.md).
 
 ---
 
-## 1. 60‑second setup
+## 1. 60-second setup
+
+From PyPI (Ollama on `http://localhost:11434`, no cloud key):
 
 ```bash
-# 1. Install (uv manages the venv)
-uv sync
-
-# 2. Pick a backend — set whichever you'll use
-export ANTHROPIC_API_KEY=sk-ant-...        # Claude (default provider)
-# Or store securely in the OS keychain (no plaintext file needed):
-# atomics secrets set ANTHROPIC_API_KEY
-export OPENAI_API_KEY=sk-...               # OpenAI / o-series
-export ATOMICS_OLLAMA_HOST=http://gpu:11434  # local Ollama (zero cost)
-
-# 3. Pre-flight: confirms keys, hosts, DB are all wired
-uv run atomics doctor
-
-# 4. Smoke test the provider you plan to use
-uv run atomics provider-test -p ollama -m qwen2.5:7b
-# Thinking models (qwen3, qwen3.8, deepseek-r1): add --no-thinking
-# or the visible answer can come back empty.
+uv tool install stoneburner-atomics
+atomics doctor
+atomics provider-test --provider ollama --no-thinking
 ```
 
-`doctor` exits non‑zero if anything is missing, so it's safe in front of a long
-run: `uv run atomics doctor && uv run atomics run --tier ez -n 3`.
+Thinking models (qwen3, qwen3.8, deepseek-r1) need `--no-thinking` or the
+visible answer can come back empty.
+
+From a clone: `uv sync --all-extras`, then prefix commands with `uv run`.
+Bare `uv sync` drops the API, MCP, RAG, and test extras.
+
+Cloud keys are optional. Store them in the OS keychain if you use them:
+
+```bash
+atomics secrets set ANTHROPIC_API_KEY
+# or: export ANTHROPIC_API_KEY=sk-ant-...
+# or: export OPENAI_API_KEY=sk-...
+```
+
+Point at a non-local Ollama with `ATOMICS_OLLAMA_HOST` (default
+`http://localhost:11434`).
+
+`doctor` exits non-zero if anything is missing, so it's safe in front of a
+long run: `atomics doctor && atomics run --tier ez -n 3`.
 
 ---
 
@@ -51,18 +57,18 @@ commands and compare them side-by-side.
 |---------|------|-------------|
 | **Ollama** | `--provider ollama` | Default for eval/security suites — free, private GPU box |
 | **vLLM / OpenAI-compatible gateway** | `--provider vllm` | LiteLLM, vLLM, TGI, or any `/v1/chat/completions` endpoint on the LAN |
-| **brain-gateway** (camazotz) | `--provider brain-gateway` | Internal agentic gateway in the ecosystem |
+| **brain-gateway** | `--provider brain-gateway` | Optional HTTP gateway in front of local models |
 
 ```bash
-# Ollama on a GPU box — list models (class + thinking annotations)
-uv run atomics models --host http://gpu:11434
-uv run atomics run --provider ollama -m qwen2.5:7b --ollama-host http://gpu:11434 -n 5 -i 0
+# Ollama on this machine — list models (class + thinking annotations)
+atomics models --host http://localhost:11434
+atomics run --provider ollama -m qwen2.5:7b --ollama-host http://localhost:11434 -n 5 -i 0
 
-# vLLM / OpenAI-compatible gateway (e.g. a LiteLLM gateway at :8000/v1)
-uv run atomics run --provider vllm --vllm-host http://gpu:8000/v1 -m qwen2.5:7b -n 5 -i 0
+# vLLM / OpenAI-compatible gateway (e.g. LiteLLM at :8000/v1)
+atomics run --provider vllm --vllm-host http://localhost:8000/v1 -m qwen2.5:7b -n 5 -i 0
 
-# Internal brain-gateway
-uv run atomics run --provider brain-gateway --gateway-url http://gpu-host:30080 -n 5 -i 0
+# Optional brain-gateway
+atomics run --provider brain-gateway --gateway-url http://localhost:30080 -n 5 -i 0
 ```
 
 > **Model-agnostic:** `-m`/`--model` accepts *any* model the backend serves —
@@ -157,7 +163,7 @@ ATOMICS_LIVE_JUDGE=1 uv run pytest tests/test_calibration.py::test_live_judge_is
 
 ```bash
 # Sweep every model on the GPU box, ranked table
-uv run atomics sweep --all-local --host http://gpu:11434
+uv run atomics sweep --all-local --host http://localhost:11434
 
 # Specific models across families, just a few fixtures
 # (use tags that are actually pulled on the host — a missing tag shows
@@ -218,7 +224,7 @@ uv run atomics adversarial --provider ollama -m gemma4:12b --judge-model qwen2.5
 
 ```bash
 # Find the GPU saturation point (ramp concurrency 1→8)
-uv run atomics stress --model qwen2.5:7b --max-concurrency 8 --ollama-host http://gpu:11434
+uv run atomics stress --model qwen2.5:7b --max-concurrency 8 --ollama-host http://localhost:11434
 
 # How many users can this setup serve? (pure math from measured data)
 uv run atomics capacity --users 200 --model qwen2.5:7b
@@ -235,7 +241,7 @@ uv run atomics scenario -w "gate:qwen2.5:3b:2:5000" -w "eval:qwen2.5:7b:1:15000"
 ```bash
 # Test a model directly against pass/fail patterns
 uv run atomics qa --file qa/examples/app-gate-guardrails.yaml \
-                  --model qwen2.5:3b --ollama-host http://gpu:11434
+                  --model qwen2.5:3b --ollama-host http://localhost:11434
 
 # Test a real app endpoint (secrets stay in a gitignored profile)
 uv run atomics qa --file qa/examples/ai-gate-regression.yaml \
@@ -400,7 +406,7 @@ Set via env vars (prefix `ATOMICS_`) or a `.env` file in the repo root:
 `.env` example:
 
 ```ini
-ATOMICS_OLLAMA_HOST=http://gpu-host:11434
+ATOMICS_OLLAMA_HOST=http://localhost:11434
 ATOMICS_OLLAMA_MODEL=qwen2.5:7b
 ATOMICS_OLLAMA_TIMEOUT=600   # big reasoning models on hard prompts
 ```

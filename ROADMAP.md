@@ -122,6 +122,9 @@ in a sweep reads as a pass.
       36 tags; we hand-registered the ones that showed `UNKNOWN`. Unmapped
       Ollama tags now classify from the `:Nb` / `:e4b` / `:35b-a3b` suffix.
 
+Shipped items below that still carry 0.19–0.23 headings landed in
+v0.18.0. The numbers were planning labels, not unreleased versions.
+
 ## v0.19.0 — A stranger can trust a headline
 
 The 2026-08-15 `qwen3.8:27b` judged toolcall (10% dangerous, 12%
@@ -176,10 +179,10 @@ Not scheduled, roughly in order of how often they come up.
   anyone treating the database as durable.
 - **Dashboard depth.** Drill-in, trends, and live API jobs shipped. A
   browser-run dashboard test still does not exist.
-- **PyPI first upload.** The listing is `stoneburner-atomics` (`stoneburner`
-  is too similar to `stone-burner`). Import and CLI stay `atomics`. Register
-  the trusted publisher (see [RELEASING.md](RELEASING.md)) before the next
-  tag, or the publish job goes red.
+- **PyPI listing.** v0.18.0 claimed `stoneburner-atomics`. Keywords,
+  classifiers, project URLs, and a README that works off-repo are on
+  `main`; they reach pypi.org on the next tag. Import and CLI stay
+  `atomics`.
 - **Judge quality.** Security suites now take `--extra-judges` (numeric mean or
   categorical majority) and `atomics judge-agreement` measures how often a
   single judge would flip the headline. `rag`, `probe`, and `archreview` are

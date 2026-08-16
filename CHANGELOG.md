@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Changed
+- **PyPI / GitHub storefront.** The listing summary, keywords, classifiers,
+  and project URLs name local eval and the security suites. README and
+  QUICKSTART lead with `uv tool install stoneburner-atomics` and a
+  localhost Ollama first run. Operator recipes no longer use a lab
+  hostname. `atomics --help` matches the listing tagline.
+
 ## 0.18.0 (2026-08-16) — Dashboard depth and first PyPI listing
 
 ### Upgrade notes
