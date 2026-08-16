@@ -278,4 +278,4 @@ handles API keys and can send data to LLM providers. Rules for contributors:
 
 ## Module split candidates (tech debt, tracked)
 
-Large modules that are future split targets: `storage/repository.py` (~780; per-suite persistence mixins). `inference.py` is consumed by `doctor` and `make_provider`. The unused `workers/bridge.py` scaffold was removed; npm workers go through `atomics worker-npm`.
+`storage/repository/` is mixins per domain (runs, evaluation, tasks, security, analytics, schedules, load). `inference.py` is consumed by `doctor` and `make_provider`. The unused `workers/bridge.py` scaffold was removed; npm workers go through `atomics worker-npm`.

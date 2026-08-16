@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Changed
+- **`MetricsRepository` is a package of domain mixins.** Same import and
+  method set. Runs, evaluation, tasks, security suites, analytics,
+  schedules, and load results each live in their own module.
+- **PyPI / GitHub storefront.** The listing summary, keywords, classifiers,
+  and project URLs name local eval and the security suites. README and
+  QUICKSTART lead with `uv tool install stoneburner-atomics` and a
+  localhost Ollama first run. Operator recipes no longer use a lab
+  hostname. `atomics --help` matches the listing tagline.
+
 ### Removed
 - **`atomics/workers/bridge.py`.** Unused Phase-3 scaffold. `atomics worker-npm`
   is the npm worker and never called `invoke_worker`.
@@ -17,13 +27,6 @@
   `--provider ollama` / `vllm` fill host and model from the file when those
   flags and the matching `ATOMICS_*` env are unset. The provider name is
   never taken from the file. See `docs/INFERENCE_ENV.md`.
-
-### Changed
-- **PyPI / GitHub storefront.** The listing summary, keywords, classifiers,
-  and project URLs name local eval and the security suites. README and
-  QUICKSTART lead with `uv tool install stoneburner-atomics` and a
-  localhost Ollama first run. Operator recipes no longer use a lab
-  hostname. `atomics --help` matches the listing tagline.
 
 ## 0.18.0 (2026-08-16) — Dashboard depth and first PyPI listing
 
