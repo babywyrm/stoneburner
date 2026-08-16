@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
+from atomics.api._discovery import list_models, run_provider_test
 from atomics.api._runners import (
     run_benchmark_from_request,
     run_eval_suite,
@@ -16,6 +17,9 @@ from atomics.api.models import (
     EvalRequest,
     HealthResponse,
     JobResponse,
+    ModelsResponse,
+    ProviderTestRequest,
+    ProviderTestResponse,
     ReadinessCheck,
     ReadinessResponse,
     ReportResponse,
@@ -131,6 +135,27 @@ async def get_job(
             detail="Job not found",
         )
     return _job_to_response(job)
+
+
+@router.get("/models", response_model=ModelsResponse)
+async def get_models(
+    provider: str = "ollama",
+    host: str | None = None,
+    _: None = Depends(require_auth),
+) -> ModelsResponse:
+    """List tags on an Ollama or vLLM instance. Does not generate."""
+    body = await list_models(provider, host)
+    return ModelsResponse(**body)
+
+
+@router.post("/provider-test", response_model=ProviderTestResponse)
+async def provider_test(
+    payload: ProviderTestRequest,
+    _: None = Depends(require_auth),
+) -> ProviderTestResponse:
+    """Health-check a provider and generate a fixed 2+2 probe. Spends tokens."""
+    body = await run_provider_test(payload)
+    return ProviderTestResponse(**body)
 
 
 @router.get("/compare", response_model=CompareResponse)

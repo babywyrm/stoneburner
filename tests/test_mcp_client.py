@@ -130,6 +130,41 @@ def test_compare_omits_unset_filters():
     assert "category" not in params
 
 
+def test_list_models_uses_query_params():
+    requests: list[httpx.Request] = []
+    with client_recording(requests) as client:
+        client.list_models(provider="vllm", host="http://gpu:8000/v1")
+
+    assert requests[0].method == "GET"
+    assert requests[0].url.path == "/api/v1/models"
+    assert requests[0].url.params["provider"] == "vllm"
+    assert requests[0].url.params["host"] == "http://gpu:8000/v1"
+
+
+def test_list_models_omits_host_when_unset():
+    requests: list[httpx.Request] = []
+    with client_recording(requests) as client:
+        client.list_models(provider="ollama")
+
+    assert "host" not in requests[0].url.params
+
+
+def test_provider_test_posts_expected_payload():
+    requests: list[httpx.Request] = []
+    with client_recording(requests) as client:
+        client.provider_test(provider="ollama", model="qwen3:14b", thinking=False)
+
+    import json
+
+    assert requests[0].method == "POST"
+    assert requests[0].url.path == "/api/v1/provider-test"
+    assert json.loads(requests[0].content) == {
+        "provider": "ollama",
+        "model": "qwen3:14b",
+        "thinking": False,
+    }
+
+
 def test_recent_runs_passes_limit():
     requests: list[httpx.Request] = []
     with client_recording(requests) as client:

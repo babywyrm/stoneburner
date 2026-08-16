@@ -85,14 +85,16 @@ ATOMICS_API_URL="https://atomics.internal:8000" uv run atomics mcp
 | Tool | Read-only | What it does |
 |------|-----------|--------------|
 | `health` | yes | Check the API server is reachable |
+| `list_models` | yes | List tags on Ollama or vLLM |
 | `get_job` | yes | Status, and result once finished, for a submitted job |
 | `compare` | yes | Compare recorded results by provider or model |
 | `recent_runs` | yes | List recent recorded runs |
+| `provider_test` | **no** | Health + a fixed 2+2 generate — spends a few tokens |
 | `submit_run` | **no** | Start a benchmark run — spends tokens |
 | `submit_eval` | **no** | Start an eval suite — spends tokens |
 
-The two submitting tools are annotated as not read-only so a client can treat
-them as costly. The four read tools are annotated read-only so an agent is not
+The spending tools are annotated as not read-only so a client can treat them
+as costly. The five read tools are annotated read-only so an agent is not
 discouraged from the cheap calls.
 
 ### Asynchronous by design
@@ -117,10 +119,9 @@ connection error.
 ## Scope
 
 The tool surface is bounded by what the API exposes. The CLI can do more —
-`models`, `provider-test`, `sweep`, `stress`, `soak`, `probe` — but those have
-no endpoint, and a proxy should not invent one. Exposing any of them means
-adding an API endpoint first, with the authentication and bounds that implies,
-and reaching MCP from there.
+`sweep`, `stress`, `soak`, `probe` — but those have no endpoint, and a proxy
+should not invent one. Exposing any of them means adding an API endpoint first,
+with the authentication and bounds that implies, and reaching MCP from there.
 
 Note the symmetry worth keeping in mind: atomics ships an adversarial suite that
 tests models against MCP and agentic manipulation (`--category mcp`). A server

@@ -18,8 +18,8 @@ pytest.importorskip("mcp")
 from atomics.mcp.client import AtomicsApiError
 from atomics.mcp.server import build_server
 
-READ_ONLY_TOOLS = {"health", "get_job", "compare", "recent_runs"}
-SPENDING_TOOLS = {"submit_run", "submit_eval"}
+READ_ONLY_TOOLS = {"health", "get_job", "compare", "recent_runs", "list_models"}
+SPENDING_TOOLS = {"submit_run", "submit_eval", "provider_test"}
 
 
 class FakeApi:
@@ -53,6 +53,12 @@ class FakeApi:
 
     def recent_runs(self, **kwargs):
         return self._record("recent_runs", **kwargs)
+
+    def list_models(self, **kwargs):
+        return self._record("list_models", **kwargs)
+
+    def provider_test(self, **kwargs):
+        return self._record("provider_test", **kwargs)
 
 
 def payload_of(result):
@@ -93,6 +99,28 @@ async def test_submit_run_forwards_arguments_to_the_api():
     assert kwargs["provider"] == "claude"
     assert kwargs["model"] == "sonnet"
     assert kwargs["iterations"] == 9
+
+
+async def test_list_models_forwards_arguments_to_the_api():
+    api = FakeApi(result={"provider": "ollama", "models": []})
+    await build_server(api).call_tool(
+        "list_models", {"provider": "vllm", "host": "http://gpu:8000/v1"}
+    )
+    name, kwargs = api.calls[0]
+    assert name == "list_models"
+    assert kwargs["provider"] == "vllm"
+    assert kwargs["host"] == "http://gpu:8000/v1"
+
+
+async def test_provider_test_forwards_arguments_to_the_api():
+    api = FakeApi(result={"ok": True, "health": True})
+    await build_server(api).call_tool(
+        "provider_test", {"provider": "ollama", "model": "qwen3:14b"}
+    )
+    name, kwargs = api.calls[0]
+    assert name == "provider_test"
+    assert kwargs["provider"] == "ollama"
+    assert kwargs["model"] == "qwen3:14b"
 
 
 async def test_submit_eval_forwards_budget():
