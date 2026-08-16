@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import click
 
+from atomics import DIST_NAME
 from atomics.commands import admin as admin_commands
 from atomics.commands import agreement as agreement_commands
 from atomics.commands import api as api_commands
@@ -22,7 +23,7 @@ from atomics.commands.common import setup_logging
 
 
 @click.group()
-@click.version_option(package_name="atomics")
+@click.version_option(package_name=DIST_NAME)
 @click.option("-v", "--verbose", is_flag=True, default=False, help="Enable verbose/debug output.")
 @click.option("--progress/--no-progress", default=True, show_default=True,
               help="Show real-time progress during long runs.")

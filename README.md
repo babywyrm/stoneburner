@@ -26,7 +26,13 @@ A continuous, cron-schedulable benchmarking harness that runs realistic everyday
 ## Quick Start
 
 ```bash
+# from a clone
 uv sync
+
+# or from PyPI, once a release has been uploaded
+uv add stoneburner
+uv tool install stoneburner
+
 export ANTHROPIC_API_KEY=sk-ant-...
 
 uv run atomics provider-test          # verify connection

@@ -100,7 +100,7 @@ Full command reference for `atomics`. See also [QUICKSTART.md](../QUICKSTART.md)
 | `atomics sweep` | Multi-model eval sweep with ranked comparison |
 | `atomics sweep --suites redblue,refusal,toolcall,codereview --runs 3 --no-thinking --models-from ollama --status sweep.status.json --log sweep.log` | Overnight multi-suite driver: status file + detachable log. Toolcall uses `--no-skip-incapable`. |
 
-Real retrieval (`rag-index`, `rag --index`, `rag-retrieval`) requires the optional extra: `uv pip install "atomics[rag]"`.
+Real retrieval (`rag-index`, `rag --index`, `rag-retrieval`) requires the optional extra: `uv pip install "stoneburner[rag]"` (or `uv sync --extra rag` from a clone).
 
 ### Capping eval spend
 

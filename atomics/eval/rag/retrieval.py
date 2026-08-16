@@ -80,7 +80,7 @@ class LocalSentenceTransformerEmbedder:
         except ImportError as exc:
             raise ImportError(
                 "RAG indexing requires the [rag] extra: "
-                'uv pip install "atomics[rag]"'
+                'uv pip install "stoneburner[rag]"'
             ) from exc
         self.model_name = model
         self._model = SentenceTransformer(model)
@@ -144,7 +144,7 @@ def _require_sqlite_vec() -> Any:
     except ImportError as exc:
         raise ImportError(
             "RAG indexing requires the [rag] extra: "
-            'uv pip install "atomics[rag]"'
+            'uv pip install "stoneburner[rag]"'
         ) from exc
     return sqlite_vec
 

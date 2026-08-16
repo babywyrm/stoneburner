@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Changed
+- **PyPI listing is `stoneburner`.** `uv add stoneburner` / `uv tool install
+  stoneburner`. `import atomics` and the `atomics` CLI are unchanged.
+  Version metadata reads the `stoneburner` distribution. Trusted publishing
+  is back on the tag workflow as a job that does not block the GitHub
+  release. Register the pending publisher before the first upload — see
+  RELEASING.md.
+
 ### Added
 - **Dashboard trends and live API jobs.** Hourly token/cost bars from
   `GET /api/v1/reports/trends` (eval and adversarial fixtures count;
