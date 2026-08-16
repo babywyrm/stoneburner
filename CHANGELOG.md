@@ -22,6 +22,10 @@
   matches the other keys: optional, needed for Claude.
 
 ### Added
+- **Dashboard script runs in CI.** `tests/test_dashboard_script.py` executes
+  the page script in a Node fake DOM: `#run=` / `#job=` render through
+  `textContent`, a worker `<img onerror>` label stays text, and a planted
+  `result` payload never reaches the DOM.
 - **`inference.env` reaches `doctor` and `make_provider`.** `atomics doctor`
   reports the control file's backend, URL, and model — never the API key.
   `--provider ollama` / `vllm` fill host and model from the file when those

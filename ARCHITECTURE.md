@@ -267,7 +267,8 @@ handles API keys and can send data to LLM providers. Rules for contributors:
 
 - Tests live in `tests/`, mock providers/httpx, and must not hit the network by
   default. The one live test (`test_calibration.py`) is gated behind
-  `ATOMICS_LIVE_JUDGE=1`.
+  `ATOMICS_LIVE_JUDGE=1`. The dashboard page script is executed by
+  `tests/test_dashboard_script.py` (skipped if `node` is missing).
 - CI (`.github/workflows/ci.yml`) runs ruff + pytest on Linux/macOS across
   Python 3.11–3.13, with `--extra dev --extra api --extra mcp`. The `api` extra
   is required for collection; the `mcp` extra is required for the MCP tests to
