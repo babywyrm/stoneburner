@@ -37,8 +37,11 @@ Making the server safe to leave running unattended.
 Paying down concentration before it compounds. No user-visible behavior change;
 every item here is a refactor with the test suite as the contract.
 
-- [ ] Split `MetricsRepository` (1132 lines, ~35 methods spanning runs, eight
-      suite tables, analytics, and schedules) along domain seams
+- [x] Split `MetricsRepository` along domain seams. It is now the
+      `storage/repository/` package: mixins for runs, evaluation, tasks,
+      security suites, analytics, schedules, and load results. Callers still
+      import `MetricsRepository`; `get_run_detail` stays on the composed
+      class because it reads three tables.
 - [x] Split `commands/security.py` (1287 lines, the largest module in the repo)
       into one module per command. It is now the `commands/security/` package:
       one `cmd_<name>` module each for `adversarial`, `redblue`, `multiturn`,
