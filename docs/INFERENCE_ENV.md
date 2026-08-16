@@ -126,3 +126,24 @@ provider = provider_from_target(target)   # an OllamaProvider/VllmProvider/...
 
 If no control file is found, `load_control_file()` returns `None` and the
 caller should fall back to its normal configuration (`AtomicsSettings`).
+
+## How `atomics` uses it
+
+`atomics doctor` reports whether a control file was found, and the
+backend / URL / model it resolved. It never prints `INFERENCE_API_KEY`.
+
+`atomics run --provider ollama` (and the other suites that go through
+`make_provider`) fill `--ollama-host` / `--model` from the file when those
+flags are omitted. Same for `--provider vllm` and `--vllm-host`.
+
+Precedence, highest first:
+
+1. Explicit CLI flags (`--ollama-host`, `--vllm-host`, `--model`)
+2. `ATOMICS_OLLAMA_HOST` / `ATOMICS_OLLAMA_MODEL` / `ATOMICS_VLLM_HOST` /
+   `ATOMICS_VLLM_MODEL`
+3. The control file, and only when `--provider` matches `INFERENCE_BACKEND`
+4. Built-in defaults (`http://localhost:11434`, `qwen2.5:7b`, …)
+
+The provider name is never taken from the file. `atomics run` with no
+`--provider` still uses Claude. A box wired to Ollama is
+`atomics run --provider ollama`.

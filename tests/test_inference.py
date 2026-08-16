@@ -208,3 +208,102 @@ def test_provider_from_target_unknown_backend_raises():
     t = inference.InferenceTarget(backend="nope", url="", model="m")
     with pytest.raises(ValueError):
         inference.provider_from_target(t, client=object())
+
+
+# ── inspect / overlay (CLI + factory consumers) ───────────────────────────────
+
+def test_inspect_control_file_omits_api_key(tmp_path, monkeypatch):
+    p = tmp_path / "inference.env"
+    p.write_text(
+        "INFERENCE_BACKEND=ollama\n"
+        "INFERENCE_URL=http://127.0.0.1:11434\n"
+        "INFERENCE_MODEL=gemma3:4b\n"
+        "INFERENCE_API_KEY=sk-secret-must-not-leak\n"
+    )
+    monkeypatch.setenv("INFERENCE_ENV", str(p))
+    monkeypatch.delenv("BRAIN_ENV", raising=False)
+    view = inference.inspect_control_file()
+    assert view is not None
+    assert view.path == str(p)
+    assert view.backend == "ollama"
+    assert view.url == "http://127.0.0.1:11434"
+    assert view.model == "gemma3:4b"
+    assert "api_key" not in view.__dict__ or not hasattr(view, "api_key")
+    assert "sk-secret-must-not-leak" not in repr(view)
+
+
+def test_inspect_control_file_missing_returns_none(tmp_path, monkeypatch):
+    monkeypatch.setenv("INFERENCE_ENV", str(tmp_path / "missing.env"))
+    monkeypatch.delenv("BRAIN_ENV", raising=False)
+    monkeypatch.setattr(inference, "_DEFAULT_PATHS", ())
+    assert inference.inspect_control_file() is None
+
+
+def test_overlay_fills_ollama_host_and_model_from_file():
+    target = inference.InferenceTarget(
+        backend="ollama", url="http://127.0.0.1:11434", model="gemma3:4b"
+    )
+    name, model, host, vllm_host = inference.overlay_provider_defaults(
+        name="ollama", model=None, host=None, target=target, env={},
+    )
+    assert name == "ollama"
+    assert host == "http://127.0.0.1:11434"
+    assert model == "gemma3:4b"
+    assert vllm_host is None
+
+
+def test_overlay_cli_host_and_model_win():
+    target = inference.InferenceTarget(
+        backend="ollama", url="http://127.0.0.1:9999", model="from-file"
+    )
+    name, model, host, _ = inference.overlay_provider_defaults(
+        name="ollama",
+        model="cli-model",
+        host="http://localhost:11434",
+        target=target,
+        env={},
+    )
+    assert name == "ollama"
+    assert host == "http://localhost:11434"
+    assert model == "cli-model"
+
+
+def test_overlay_atomics_env_blocks_file_host():
+    target = inference.InferenceTarget(
+        backend="ollama", url="http://127.0.0.1:9999", model="from-file"
+    )
+    _, model, host, _ = inference.overlay_provider_defaults(
+        name="ollama",
+        model=None,
+        host=None,
+        target=target,
+        env={"ATOMICS_OLLAMA_HOST": "http://localhost:11434"},
+    )
+    assert host is None
+    assert model == "from-file"
+
+
+def test_overlay_ignores_file_when_provider_differs():
+    target = inference.InferenceTarget(
+        backend="ollama", url="http://127.0.0.1:11434", model="gemma3:4b"
+    )
+    name, model, host, vllm_host = inference.overlay_provider_defaults(
+        name="claude", model=None, host=None, target=target, env={},
+    )
+    assert name == "claude"
+    assert host is None
+    assert model is None
+    assert vllm_host is None
+
+
+def test_overlay_fills_vllm_host_from_file():
+    target = inference.InferenceTarget(
+        backend="vllm", url="http://127.0.0.1:8000/v1", model="qwen2.5:3b"
+    )
+    name, model, host, vllm_host = inference.overlay_provider_defaults(
+        name="vllm", model=None, host=None, vllm_host=None, target=target, env={},
+    )
+    assert name == "vllm"
+    assert vllm_host == "http://127.0.0.1:8000/v1"
+    assert model == "qwen2.5:3b"
+    assert host is None

@@ -151,6 +151,37 @@ def test_doctor_linux_paths(capsys, tmp_path):
     assert "data dir" in captured.out.lower() or "Linux" in captured.out or captured.out
 
 
+def test_doctor_reports_inference_env_without_leaking_key(capsys, tmp_path, monkeypatch):
+    env_path = tmp_path / "inference.env"
+    env_path.write_text(
+        "INFERENCE_BACKEND=ollama\n"
+        "INFERENCE_URL=http://127.0.0.1:11434\n"
+        "INFERENCE_MODEL=gemma3:4b\n"
+        "INFERENCE_API_KEY=sk-secret-must-not-leak\n"
+    )
+    monkeypatch.setenv("INFERENCE_ENV", str(env_path))
+    monkeypatch.delenv("BRAIN_ENV", raising=False)
+    settings = AtomicsSettings(db_path=tmp_path / "doc.db")
+    assert run_doctor(settings=settings) == 0
+    out = capsys.readouterr().out
+    assert "inference.env" in out
+    assert "ollama" in out
+    assert "gemma3:4b" in out
+    assert "http://127.0.0.1:11434" in out
+    assert "sk-secret-must-not-leak" not in out
+
+
+def test_doctor_reports_missing_inference_env(capsys, tmp_path, monkeypatch):
+    monkeypatch.setenv("INFERENCE_ENV", str(tmp_path / "missing.env"))
+    monkeypatch.delenv("BRAIN_ENV", raising=False)
+    monkeypatch.setattr("atomics.inference._DEFAULT_PATHS", ())
+    settings = AtomicsSettings(db_path=tmp_path / "doc.db")
+    assert run_doctor(settings=settings) == 0
+    out = capsys.readouterr().out
+    assert "inference.env" in out
+    assert "not found" in out.lower()
+
+
 def test_doctor_scheduler_systemd_missing_systemctl(capsys, tmp_path):
     """Line 104: systemd scheduler detected but systemctl binary missing."""
     from atomics.config import AtomicsSettings

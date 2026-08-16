@@ -278,4 +278,4 @@ handles API keys and can send data to LLM providers. Rules for contributors:
 
 ## Module split candidates (tech debt, tracked)
 
-Large modules that are future split targets: `storage/repository.py` (~780; per-suite persistence mixins). Orphaned utilities to wire in or remove: `inference.py`, `workers/bridge.py`.
+Large modules that are future split targets: `storage/repository.py` (~780; per-suite persistence mixins). `inference.py` is consumed by `doctor` and `make_provider`. Still orphaned: `workers/bridge.py`.

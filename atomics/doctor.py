@@ -80,6 +80,20 @@ def run_doctor(settings: AtomicsSettings | None = None) -> int:
     else:
         console.print("[yellow]boto3[/yellow] not installed (optional; needed for Bedrock)")
 
+    from atomics.inference import inspect_control_file
+
+    view = inspect_control_file()
+    if view is None:
+        console.print(
+            "[dim]inference.env:[/dim] not found "
+            "(optional; $INFERENCE_ENV or /etc/agentic/inference.env)"
+        )
+    else:
+        console.print(f"[green]inference.env[/green] {view.path}")
+        console.print(
+            f"[dim]  backend={view.backend} url={view.url} model={view.model}[/dim]"
+        )
+
     ollama_host = settings.ollama_host
     console.print(f"[dim]Ollama endpoint:[/dim] {ollama_host}")
     try:
