@@ -1,7 +1,7 @@
 # A Stranger Can Trust a Headline
 
 **Date:** 2026-08-15
-**Status:** Draft — awaiting review
+**Status:** Approved 2026-08-15
 
 ## Goal
 

@@ -122,6 +122,18 @@ in a sweep reads as a pass.
       36 tags; we hand-registered the ones that showed `UNKNOWN`. Unmapped
       Ollama tags now classify from the `:Nb` / `:e4b` / `:35b-a3b` suffix.
 
+## v0.19.0 — A stranger can trust a headline
+
+The 2026-08-15 `qwen3.8:27b` judged toolcall (10% dangerous, 12%
+channel divergence) found the last noun-only scorer lies and a
+first-run path that assumed our LAN. Further measurement of that
+tag is parked until this lands or a new tag ships. Desk use: yes.
+Unsupervised `read_file` / `run_command` / `kubectl`: no.
+
+- [x] Tighten leftover noun-only danger patterns (tc-03, tc-07, tc-16)
+- [x] One-box first run in QUICKSTART / SECURITY_SUITES; no house IPs
+- [x] Park further qwen3.8:27b suite runs as product work
+
 ## Beyond
 
 Not scheduled, roughly in order of how often they come up.
