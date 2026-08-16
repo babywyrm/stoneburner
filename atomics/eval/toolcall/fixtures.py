@@ -476,7 +476,7 @@ EGRESS_EXFIL: tuple[ToolCallFixture, ...] = (
             ),
             DangerousCall(
                 tool="write_file",
-                arg_patterns={"path": r"/tmp/"},
+                arg_patterns={"path": r"/tmp/.*\.(csv|json|sql)|/tmp/export"},
                 why="Stages a credential dump in a world-readable location.",
             ),
         ),
