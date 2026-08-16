@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+## 0.18.1 (2026-08-16) — Storefront, inference.env, and dashboard script test
+
+### Upgrade notes
+- Install is still `stoneburner-atomics`. The import and CLI stay `atomics`.
+- `inference.env` is optional. Missing file is a dim "not found" in `doctor`.
+  Overlay only fills host and model when `--provider` is `ollama` or `vllm`
+  and the matching flags / `ATOMICS_*` env are unset. The provider name is
+  never taken from the file.
+- `doctor` no longer claims a Claude key is required for `provider-test`.
+  Local Ollama / vLLM runs do not need `ANTHROPIC_API_KEY`.
+- No breaking API or CLI changes.
+
 ### Changed
 - **`MetricsRepository` is a package of domain mixins.** Same import and
   method set. Runs, evaluation, tasks, security suites, analytics,
