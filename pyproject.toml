@@ -1,6 +1,6 @@
 [project]
 name = "stoneburner-atomics"
-version = "0.18.1"
+version = "0.18.2"
 description = "Local-first LLM eval: token cost, quality, and security suites. CLI is atomics."
 readme = "README.md"
 requires-python = ">=3.11"
