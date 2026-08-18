@@ -186,10 +186,11 @@ Not scheduled, roughly in order of how often they come up.
 - **Dashboard depth.** Drill-in, trends, and live API jobs shipped. The
   page script now runs in a Node fake-DOM harness (`tests/test_dashboard_script.py`)
   so `.innerHTML` and `data.result` leaks fail in CI.
-- **PyPI listing.** v0.18.0 claimed `stoneburner-atomics`. Keywords,
-  classifiers, project URLs, and a README that works off-repo are on
-  `main`; they reach pypi.org on the next tag. Import and CLI stay
-  `atomics`.
+- **PyPI listing.** Live as [`stoneburner-atomics`](https://pypi.org/project/stoneburner-atomics/).
+  Import and CLI stay `atomics`. The README is the GitHub / PyPI landing
+  page: badges, a one-scroll pitch, and a captured `doctor` / `toolcall`
+  first run. Further polish stays storefront-only unless a stranger still
+  cannot tell what the tool is.
 - **Judge quality.** Security suites now take `--extra-judges` (numeric mean or
   categorical majority) and `atomics judge-agreement` measures how often a
   single judge would flip the headline. `rag`, `probe`, and `archreview` are
