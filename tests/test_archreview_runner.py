@@ -81,6 +81,23 @@ async def test_run_archreview_uses_custom_max_output_tokens():
 
 
 @pytest.mark.asyncio
+async def test_run_archreview_extra_judges_averages_reasoning():
+    pack = EvidencePack(text="PACK", content_hash="deadbeef", file_count=3, truncated=False)
+    under_test = _Provider("ollama", _GOOD, model="qwen2.5:14b")
+    primary = _Provider("claude", "REASONING: 8\nRATIONALE: strong", model="opus")
+    extra = _Provider("ollama", "REASONING: 4\nRATIONALE: weak", model="mistral")
+    results = await run_archreview(
+        spec=_spec(), tier="floor", pack=pack,
+        under_test=under_test, under_test_model="qwen2.5:14b",
+        judge=primary, judge_model="opus",
+        extra_judges=[(extra, "mistral")],
+        rounds=1,
+    )
+    assert results[0].judge_score == 0.6
+    assert extra.calls
+
+
+@pytest.mark.asyncio
 async def test_run_archreview_judge_only_skips_objective_when_no_key():
     pack = EvidencePack(text="PACK", content_hash="h", file_count=1, truncated=False)
     under_test = _Provider("ollama", _GOOD, model="m")

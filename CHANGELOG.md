@@ -3,6 +3,9 @@
 ## Unreleased
 
 ### Added
+- **`--extra-judges` on `rag`, `probe`, and `archreview`.** Same numeric
+  mean as redblue / multiturn. Extra judges share the spend ceiling. The
+  headline score is the panel mean; RAG also records `score_stdev`.
 - **`doctor` prints one next command.** After a healthy check it suggests
   `atomics provider-test --provider ollama --no-thinking` when Ollama
   answers, `atomics provider-test` when a Claude key is set and Ollama is

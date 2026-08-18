@@ -17,6 +17,8 @@ from atomics.commands.common import (
     _make_provider,
     budget_option,
     eval_budget_from,
+    extra_judges_option,
+    parse_extra_judges,
     setup_logging,
     write_summary_json,
 )
@@ -51,6 +53,7 @@ from atomics.eval.budget import BudgetMeter, share_budget
               help="Write the full run as JSON to this file.")
 @click.option("--thinking/--no-thinking", "thinking_flag", default=None, help="Enable/disable thinking.")
 @click.option("--thinking-budget", type=int, default=None, help="Max thinking tokens.")
+@extra_judges_option
 @budget_option
 def rag(
     provider_name: str,
@@ -68,6 +71,7 @@ def rag(
     thinking_budget: int | None,
     index_path: Path | None,
     top_k: int,
+    extra_judges: str | None,
     budget_usd: float | None,
 ) -> None:
     """RAG pipeline evaluation — grounding, faithfulness, and abstention scoring."""
@@ -86,9 +90,22 @@ def rag(
         judge_provider_name, judge_model, judge_host or ollama_host, settings,
         vllm_host=vllm_host, region=region,
     )
-    test_provider, judge_provider = share_budget(
-        eval_budget_from(budget_usd), test_provider, judge_provider
+    extra_judge_pairs = parse_extra_judges(
+        extra_judges,
+        build=lambda name, mdl, host: _make_provider(
+            name, mdl, host, settings, vllm_host=vllm_host, region=region,
+        ),
+        default_host=judge_host or ollama_host,
     )
+    budget = eval_budget_from(budget_usd)
+    if budget is not None:
+        guarded = share_budget(
+            budget, test_provider, judge_provider, *(p for p, _ in extra_judge_pairs)
+        )
+        test_provider, judge_provider = guarded[0], guarded[1]
+        extra_judge_pairs = [
+            (guarded[2 + i], mdl) for i, (_, mdl) in enumerate(extra_judge_pairs)
+        ]
 
     selected_fixtures = ALL_RAG_FIXTURES
     if fixtures_filter:
@@ -203,6 +220,7 @@ def rag(
             judge_provider=judge_provider,
             model=model,
             judge_model=judge_model,
+            extra_judges=extra_judge_pairs,
             run_id=rag_run_id,
             on_fixture_done=on_done,
             thinking=eff_thinking,
@@ -591,6 +609,7 @@ def codegen(
 @click.option("--save/--no-save", "save_results", default=True, show_default=True)
 @click.option("--json-out", "json_out", type=click.Path(dir_okay=False, writable=True), default=None,
               help="Write the full run (per-target scores, rationales, regressions) as JSON to this file.")
+@extra_judges_option
 @budget_option
 def probe(
     provider_name: str,
@@ -608,6 +627,7 @@ def probe(
     alert_on_regression: bool,
     save_results: bool,
     json_out: str | None,
+    extra_judges: str | None,
     budget_usd: float | None,
 ) -> None:
     """Run LLM-evaluated live ecosystem health probes against configured artifact targets."""
@@ -620,7 +640,22 @@ def probe(
     settings = load_settings()
     provider = _make_provider(provider_name, model, ollama_host, settings, vllm_host=vllm_host)
     judge = _make_provider(judge_provider_name, judge_model, judge_host or ollama_host, settings, vllm_host=vllm_host)
-    provider, judge = share_budget(eval_budget_from(budget_usd), provider, judge)
+    extra_judge_pairs = parse_extra_judges(
+        extra_judges,
+        build=lambda name, mdl, host: _make_provider(
+            name, mdl, host, settings, vllm_host=vllm_host,
+        ),
+        default_host=judge_host or ollama_host,
+    )
+    budget = eval_budget_from(budget_usd)
+    if budget is not None:
+        guarded = share_budget(
+            budget, provider, judge, *(p for p, _ in extra_judge_pairs)
+        )
+        provider, judge = guarded[0], guarded[1]
+        extra_judge_pairs = [
+            (guarded[2 + i], mdl) for i, (_, mdl) in enumerate(extra_judge_pairs)
+        ]
 
     targets = []
     if probes_file:
@@ -674,6 +709,7 @@ def probe(
             targets=targets,
             model=model,
             judge_model=judge_model,
+            extra_judges=extra_judge_pairs,
             thinking=thinking_flag,
             thinking_budget=thinking_budget,
             regression_threshold=0.10,
@@ -726,11 +762,12 @@ def probe(
 @click.option("--save/--no-save", "save_results", default=True)
 @click.option("--json-out", "json_out", type=click.Path(dir_okay=False, writable=True), default=None,
               help="Write the full run (per-round findings, scores, cost) as JSON to this file.")
+@extra_judges_option
 @budget_option
 def archreview(repo_name, models_csv, provider_name, ollama_host, vllm_host,
                region, judge_provider_name, judge_model, judge_host, tier, rounds,
                max_output_tokens, inference_timeout, judge_only, verbose, save_results,
-               json_out, budget_usd):
+               json_out, extra_judges, budget_usd):
     """Benchmark models on a security-architecture review of a repo."""
     import asyncio
     import os
@@ -812,6 +849,14 @@ def archreview(repo_name, models_csv, provider_name, ollama_host, vllm_host,
         judge_host or ollama_host or settings.ollama_host,
         context_tokens=8192 if judge_provider_name == "ollama" else None,
     )
+    extra_judge_pairs = parse_extra_judges(
+        extra_judges,
+        build=lambda name, mdl, host: _build_provider(
+            name, mdl, host,
+            context_tokens=8192 if name == "ollama" else None,
+        ),
+        default_host=judge_host or ollama_host or settings.ollama_host,
+    )
 
     judge_label = f"{judge_provider_name}:{judge_model or judge_provider.default_model or 'default'}"
 
@@ -853,7 +898,9 @@ def archreview(repo_name, models_csv, provider_name, ollama_host, vllm_host,
                                                 ollama_host if provider_name == "ollama" else vllm_host,
                                                 context_tokens=archreview_context_tokens
                                                 if provider_name == "ollama" else None)
-                collisions = detect_self_judge(test_provider, mdl, [(judge_provider, judge_model)])
+                collisions = detect_self_judge(
+                    test_provider, mdl, [(judge_provider, judge_model), *extra_judge_pairs]
+                )
                 if collisions:
                     console.print(f"[yellow]warning:[/yellow] judge collides with model under test: {collisions}")
 
@@ -865,6 +912,7 @@ def archreview(repo_name, models_csv, provider_name, ollama_host, vllm_host,
                     spec=spec, tier=tier, pack=pack,
                     under_test=test_provider, under_test_model=mdl,
                     judge=judge_provider, judge_model=judge_model,
+                    extra_judges=extra_judge_pairs,
                     rounds=rounds, objective=not judge_only,
                     max_output_tokens=max_output_tokens,
                     run_id=archreview_run_id,

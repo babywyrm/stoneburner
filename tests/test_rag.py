@@ -693,3 +693,77 @@ async def test_run_rag_uses_provider_as_judge_when_none_provided():
     )
     summary = await run_rag(provider, fixtures=[fixture])
     assert summary.judge_provider == "mock-provider"
+
+
+def _rag_rubric_judge(name: str, text: str) -> AsyncMock:
+    judge = AsyncMock()
+    judge.name = name
+    judge.generate = AsyncMock(
+        return_value=SimpleNamespace(
+            text=text,
+            model=name,
+            input_tokens=5,
+            output_tokens=5,
+            total_tokens=10,
+            latency_ms=1.0,
+            estimated_cost_usd=0.0,
+        )
+    )
+    return judge
+
+
+def _rag_model_provider() -> AsyncMock:
+    provider = AsyncMock()
+    provider.name = "mock"
+    provider.generate = AsyncMock(
+        return_value=ProviderResponse(
+            text="The context says the answer is 42.",
+            model="mock",
+            input_tokens=5,
+            output_tokens=5,
+            total_tokens=10,
+            latency_ms=1.0,
+            estimated_cost_usd=0.0,
+        )
+    )
+    return provider
+
+
+@pytest.mark.asyncio
+async def test_run_rag_extra_judges_averages_scores():
+    primary = _rag_rubric_judge(
+        "judge-a",
+        "GROUNDING: 4\nFAITHFULNESS: 3\nABSTENTION: 3\nRATIONALE: strong.",
+    )
+    extra = _rag_rubric_judge(
+        "judge-b",
+        "GROUNDING: 2\nFAITHFULNESS: 1\nABSTENTION: 1\nRATIONALE: weak.",
+    )
+    fixture = RAGFixture(
+        id="rag-panel",
+        complexity=TaskComplexity.LIGHT,
+        question="What is the answer?",
+        context_chunks=[RAGChunk(content="The answer is 42.", label="relevant", source="x.md")],
+    )
+    summary = await run_rag(
+        _rag_model_provider(),
+        judge_provider=primary,
+        extra_judges=[(extra, None)],
+        fixtures=[fixture],
+    )
+    judge = summary.fixture_results[0].judge
+    assert judge is not None
+    assert judge.parse_failed is False
+    assert judge.score == 0.7
+    assert judge.score_stdev == 0.3
+    extra.generate.assert_awaited()
+
+
+def test_cli_rag_extra_judges_option():
+    from click.testing import CliRunner
+
+    from atomics.cli import cli
+
+    result = CliRunner().invoke(cli, ["rag", "--help"])
+    assert result.exit_code == 0
+    assert "--extra-judges" in result.output

@@ -7,7 +7,7 @@ import logging
 from atomics.archreview.models import ArchReviewResult, RepoSpec
 from atomics.archreview.pack import EvidencePack
 from atomics.archreview.prompt import build_analysis_prompt, parse_findings
-from atomics.archreview.scorer import score_objective, score_reasoning
+from atomics.archreview.scorer import score_objective, score_reasoning_consensus
 from atomics.providers.base import BaseProvider
 from atomics.validation import sanitize_error
 
@@ -26,12 +26,14 @@ async def run_archreview(
     under_test_model: str | None,
     judge: BaseProvider | None,
     judge_model: str | None,
+    extra_judges: list[tuple[BaseProvider, str | None]] | None = None,
     rounds: int = 1,
     objective: bool = True,
     max_output_tokens: int = 2048,
     run_id: str = "",
 ) -> list[ArchReviewResult]:
     """Run the analysis `rounds` times against `under_test`, scoring each round."""
+    extra_judges = extra_judges or []
     system, task = build_analysis_prompt(pack.text)
     results: list[ArchReviewResult] = []
 
@@ -89,8 +91,12 @@ async def run_archreview(
 
         if judge is not None:
             try:
-                score, _rationale = await score_reasoning(
-                    resp.text, judge=judge, judge_model=judge_model)
+                score, _rationale = await score_reasoning_consensus(
+                    resp.text,
+                    judge=judge,
+                    judge_model=judge_model,
+                    extra_judges=extra_judges,
+                )
                 result.judge_score = score
             except Exception as exc:  # noqa: BLE001
                 logger.warning("judge failed on %s round %d: %s",

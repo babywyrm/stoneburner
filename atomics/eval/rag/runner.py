@@ -10,10 +10,11 @@ from datetime import UTC, datetime
 from typing import Any
 
 from atomics.eval.attempt_serialization import integrity_to_dict
+from atomics.eval.judge import detect_self_judge
 from atomics.eval.outcomes import RunIntegrity
 from atomics.eval.rag import RAGFixture
 from atomics.eval.rag.fixtures import ALL_RAG_FIXTURES
-from atomics.eval.rag.judge import RAGJudgeResult, compute_hallucination, score_rag_response
+from atomics.eval.rag.judge import RAGJudgeResult, compute_hallucination, score_rag_consensus
 from atomics.eval.rag.retrieval import RAGIndex
 from atomics.eval.suite_integrity import fixture_outcome, integrity_of
 from atomics.models import TaskCategory, TaskResult, TaskStatus
@@ -172,6 +173,7 @@ class RAGRunSummary:
                     "faithfulness": r.judge.faithfulness if r.judge else None,
                     "abstention": r.judge.abstention if r.judge else None,
                     "score": r.judge.score if r.judge else None,
+                    "score_stdev": r.judge.score_stdev if r.judge else None,
                     "rationale": r.judge.rationale if r.judge else None,
                     "latency_ms": r.task_result.latency_ms,
                     "tokens": r.task_result.total_tokens,
@@ -203,6 +205,7 @@ async def run_rag(
     judge_provider: BaseProvider | None = None,
     model: str | None = None,
     judge_model: str | None = None,
+    extra_judges: list[tuple[BaseProvider, str | None]] | None = None,
     run_id: str | None = None,
     on_fixture_done: Callable[[RAGFixtureResult], None] | None = None,
     thinking: bool | None = None,
@@ -213,6 +216,15 @@ async def run_rag(
 ) -> RAGRunSummary:
     """Run the RAG evaluation suite."""
     effective_judge = judge_provider or provider
+    extra_judges = extra_judges or []
+    if detect_self_judge(
+        provider, model, [(effective_judge, judge_model), *extra_judges]
+    ):
+        logger.warning(
+            "Self-judging detected: the model under test is also a judge. "
+            "Scores are biased upward by self-preference — use a different "
+            "judge model for a fair evaluation.",
+        )
     effective_run_id = run_id or uuid.uuid4().hex[:12]
     selected = fixtures if fixtures is not None else ALL_RAG_FIXTURES
     started = datetime.now(UTC)
@@ -291,11 +303,12 @@ async def run_rag(
                 on_fixture_done(fr)
             continue
 
-        judge_result = await score_rag_response(
+        judge_result = await score_rag_consensus(
             response=resp.text,
             fixture=effective_fixture,
             judge=effective_judge,
             judge_model=judge_model,
+            extra_judges=extra_judges,
         )
 
         tr.accuracy_score = judge_result.score

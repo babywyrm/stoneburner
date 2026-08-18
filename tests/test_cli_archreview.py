@@ -330,3 +330,9 @@ def test_archreview_runs_is_alias_for_rounds():
     assert "no such option" not in result.output.lower()
     if captured:
         assert captured["rounds"] == 2
+
+
+def test_cli_archreview_extra_judges_option():
+    result = CliRunner().invoke(cli, ["archreview", "--help"])
+    assert result.exit_code == 0
+    assert "--extra-judges" in result.output
