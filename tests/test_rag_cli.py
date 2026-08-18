@@ -24,6 +24,7 @@ def test_rag_cli_has_index_options():
     assert result.exit_code == 0
     assert "--index" in result.output
     assert "--top-k" in result.output
+    assert "--extra-judges" in result.output
 
 
 @pytest.mark.skipif(_RAG_EXTRAS_MISSING, reason="rag extras not installed")
@@ -124,6 +125,24 @@ def test_rag_cli_with_fixtures_filter():
         call_kwargs = run_rag.call_args.kwargs
         assert len(call_kwargs["fixtures"]) == 2
         assert call_kwargs["fixtures"][0].id == "rag-01"
+
+
+def test_rag_cli_passes_extra_judges_into_the_runner():
+    runner = CliRunner()
+    extra = _mock_provider()
+    extra.name = "extra-judge"
+    with patch("atomics.commands.rag._make_provider", return_value=_mock_provider()), \
+         patch(
+             "atomics.commands.rag.parse_extra_judges",
+             return_value=[(extra, "mistral:7b")],
+         ), \
+         patch("atomics.eval.rag.runner.run_rag", new=AsyncMock(return_value=_mock_summary())) as run_rag:
+        result = runner.invoke(
+            cli,
+            ["rag", "--no-save", "--extra-judges", "ollama:mistral:7b"],
+        )
+        assert result.exit_code == 0, result.output
+        assert run_rag.call_args.kwargs["extra_judges"] == [(extra, "mistral:7b")]
 
 
 def test_rag_cli_with_invalid_fixtures_exits():

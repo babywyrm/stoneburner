@@ -15,6 +15,7 @@ import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from atomics.eval.consensus import NumericVote, combine_numeric
 from atomics.providers.base import BaseProvider
 
 if TYPE_CHECKING:
@@ -94,6 +95,7 @@ class RAGJudgeResult:
     rationale: str
     parse_failed: bool = False
     raw: str = ""
+    score_stdev: float = 0.0
 
 
 def _parse_rag_rubric(raw: str) -> tuple[int, int, int, str] | None:
@@ -213,6 +215,66 @@ async def score_rag_response(
         score=round(score, 3),
         rationale=rationale,
         raw=raw,
+    )
+
+
+async def score_rag_consensus(
+    response: str,
+    fixture: RAGFixture,
+    judge: BaseProvider,
+    *,
+    judge_model: str | None = None,
+    extra_judges: list[tuple[BaseProvider, str | None]] | None = None,
+    max_response_chars: int = 4000,
+) -> RAGJudgeResult:
+    """Score a RAG response with the primary judge plus any extras.
+
+    The headline score is the numeric mean of votes that parsed. Sub-scores
+    stay on the primary so the fixture row still names one rubric.
+    """
+    extra_judges = extra_judges or []
+    panel = [
+        await score_rag_response(
+            response,
+            fixture,
+            judge,
+            judge_model=judge_model,
+            max_response_chars=max_response_chars,
+        )
+    ]
+    for extra_provider, extra_model in extra_judges:
+        panel.append(
+            await score_rag_response(
+                response,
+                fixture,
+                extra_provider,
+                judge_model=extra_model,
+                max_response_chars=max_response_chars,
+            )
+        )
+    if len(panel) == 1:
+        return panel[0]
+    combined = combine_numeric(
+        [
+            NumericVote(
+                score=result.score,
+                parse_failed=result.parse_failed,
+                judge_model=judge_model or "judge",
+                rationale=result.rationale,
+            )
+            for result in panel
+        ]
+    )
+    primary = panel[0]
+    return RAGJudgeResult(
+        grounding=primary.grounding,
+        faithfulness=primary.faithfulness,
+        abstention=primary.abstention,
+        score=combined.score if not combined.parse_failed else primary.score,
+        rationale=combined.rationale,
+        parse_failed=combined.parse_failed,
+        raw=primary.raw,
+        score_stdev=combined.score_stdev,
     )
 
 

@@ -395,6 +395,41 @@ def test_cli_probe_has_json_out_flag():
     result = CliRunner().invoke(cli, ["probe", "--help"])
     assert result.exit_code == 0
     assert "--json-out" in result.output
+    assert "--extra-judges" in result.output
+
+
+def test_run_probe_extra_judges_averages_scores(tmp_path):
+    from atomics.probe.config import ProbeTarget
+    from atomics.probe.runner import run_probe
+
+    f = tmp_path / "access.log"
+    f.write_text("10.0.0.5 GET /admin 403\n")
+    targets = [ProbeTarget(name="nginx", artifact_type="access-log", source="file", path=str(f))]
+
+    primary = _judge()
+    primary.generate = AsyncMock(return_value=SimpleNamespace(
+        text="ACCURACY: 4\nCOMPLETENESS: 3\nFORMAT: 3\nRATIONALE: strong.",
+        model="judge-a", input_tokens=50, output_tokens=40,
+        total_tokens=90, thinking_tokens=0, latency_ms=100.0,
+        estimated_cost_usd=0.0, tokens_per_second=90.0,
+    ))
+    extra = _judge()
+    extra.name = "extra"
+    extra.generate = AsyncMock(return_value=SimpleNamespace(
+        text="ACCURACY: 2\nCOMPLETENESS: 1\nFORMAT: 1\nRATIONALE: weak.",
+        model="judge-b", input_tokens=50, output_tokens=40,
+        total_tokens=90, thinking_tokens=0, latency_ms=100.0,
+        estimated_cost_usd=0.0, tokens_per_second=90.0,
+    ))
+
+    summary = asyncio.run(run_probe(
+        _provider(),
+        judge_provider=primary,
+        extra_judges=[(extra, None)],
+        targets=targets,
+    ))
+    assert summary.results[0].score == 0.7
+    extra.generate.assert_awaited()
 
 
 def test_probe_summary_overall_score_empty():

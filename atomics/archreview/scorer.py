@@ -6,6 +6,7 @@ import re
 import statistics
 
 from atomics.archreview.models import AnswerKey, Finding
+from atomics.eval.consensus import NumericVote, combine_numeric
 from atomics.providers.base import BaseProvider
 
 
@@ -97,3 +98,41 @@ async def score_reasoning(
     raw = min(int(m.group(1)), 10)
     rationale = " ".join(m.group(2).strip().splitlines()).strip()
     return round(raw / 10.0, 4), rationale
+
+
+async def score_reasoning_consensus(
+    analysis_text: str,
+    *,
+    judge: BaseProvider,
+    judge_model: str | None,
+    extra_judges: list[tuple[BaseProvider, str | None]] | None = None,
+) -> tuple[float, str]:
+    """Mean the reasoning scores of the primary judge plus any extras."""
+    extra_judges = extra_judges or []
+    primary_score, primary_rationale = await score_reasoning(
+        analysis_text, judge=judge, judge_model=judge_model
+    )
+    if not extra_judges:
+        return primary_score, primary_rationale
+    votes = [
+        NumericVote(
+            score=primary_score,
+            parse_failed=primary_rationale.startswith("(unparseable"),
+            judge_model=judge_model or "judge",
+            rationale=primary_rationale,
+        )
+    ]
+    for extra_provider, extra_model in extra_judges:
+        score, rationale = await score_reasoning(
+            analysis_text, judge=extra_provider, judge_model=extra_model
+        )
+        votes.append(
+            NumericVote(
+                score=score,
+                parse_failed=rationale.startswith("(unparseable"),
+                judge_model=extra_model or "judge",
+                rationale=rationale,
+            )
+        )
+    combined = combine_numeric(votes)
+    return combined.score, combined.rationale

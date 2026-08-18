@@ -215,6 +215,7 @@ Fetches real artifacts from infrastructure (logs, API responses, scan reports) a
 uv run atomics probe --probes-file /path/to/probes.yaml
 uv run atomics probe --artifact access-log --file /var/log/nginx/access.log
 uv run atomics probe --probes-file probes.yaml --alert-on-regression
+uv run atomics probe --probes-file probes.yaml --extra-judges ollama:mistral:7b
 ```
 
 <details>
@@ -254,7 +255,8 @@ Benchmarks how well models reason about the security architecture of a whole rep
 JUICE_SHOP_PATH=~/juice-shop atomics archreview --repo juice-shop \
   --models "qwen2.5:14b,qwen3.5:4b" --provider ollama \
   --judge-provider claude --judge-model claude-opus-4-7 \
-  --tier floor --rounds 3
+  --tier floor --rounds 3 \
+  --extra-judges ollama:mistral:7b
 ```
 
 Answer keys are pluggable per repo (`atomics/archreview/repos/<name>.yaml`). See the README's archreview section for parser tolerance, taxonomy, and tier details.
@@ -269,6 +271,7 @@ Tests how well models use retrieved context: grounding (does it reference the do
 ```bash
 uv run atomics rag --provider ollama -m qwen3:14b --judge-model qwen2.5:14b
 uv run atomics rag --fixtures rag-05,rag-12
+uv run atomics rag --extra-judges ollama:mistral:7b
 uv run atomics rag --json-out rag.json
 ```
 

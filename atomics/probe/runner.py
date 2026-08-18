@@ -6,7 +6,7 @@ import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
-from atomics.eval.judge import score_response
+from atomics.eval.judge import detect_self_judge, score_consensus
 from atomics.probe.checks import build_check
 from atomics.probe.config import ProbeTarget
 from atomics.probe.connectors import ProbeConnectorError, fetch_artifact
@@ -81,6 +81,7 @@ async def run_probe(
     targets: list[ProbeTarget],
     model: str | None = None,
     judge_model: str | None = None,
+    extra_judges: list[tuple[BaseProvider, str | None]] | None = None,
     thinking: bool | None = None,
     thinking_budget: int | None = None,
     prev_scores: dict[str, float] | None = None,
@@ -88,6 +89,15 @@ async def run_probe(
     on_result: Callable[..., object] | None = None,
 ) -> ProbeSummary:
     """Run LLM probe checks against a list of configured artifact targets."""
+    extra_judges = extra_judges or []
+    if detect_self_judge(
+        provider, model, [(judge_provider, judge_model), *extra_judges]
+    ):
+        logger.warning(
+            "Self-judging detected: the model under test is also a judge. "
+            "Scores are biased upward by self-preference — use a different "
+            "judge model for a fair evaluation.",
+        )
     prev_scores = prev_scores or {}
     results: list[ProbeResult] = []
 
@@ -144,11 +154,12 @@ async def run_probe(
                 on_result(result)
             continue
 
-        judge = await score_response(
+        judge = await score_consensus(
             check["prompt"],
             analysis,
-            judge_provider=judge_provider,
-            judge_model=judge_model,
+            primary_judge=judge_provider,
+            primary_model=judge_model,
+            extra_judges=extra_judges,
             gold_criteria=check.get("gold_criteria"),
         )
 

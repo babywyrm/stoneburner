@@ -78,7 +78,9 @@ Full command reference for `atomics`. See also [QUICKSTART.md](../QUICKSTART.md)
 | `atomics redblue --no-thinking --runs 3` | Multi-run capability score with thinking forced off |
 | `atomics redblue --max-output-tokens 3072` | Floor the visible-answer budget (fixtures default to 2048) |
 | `atomics probe --probes-file probes.yaml` | Live ecosystem probe against real artifacts |
+| `atomics probe --extra-judges ollama:mistral:7b` | Multi-judge mean ± stdev on the quality score |
 | `atomics archreview --repo juice-shop --models qwen3.5:4b` | Security-architecture repo benchmark |
+| `atomics archreview --extra-judges ollama:mistral:7b` | Multi-judge mean on the reasoning score |
 | `atomics archreview --tier local --max-output-tokens 512` | Practical local-GPU repo review |
 | `atomics archreview --tier wide --rounds 3` | Broader evidence pack with stability reporting |
 | `atomics archreview --tier expanded --rounds 3` | Largest pack for large-context/cloud backends |
@@ -91,6 +93,7 @@ Full command reference for `atomics`. See also [QUICKSTART.md](../QUICKSTART.md)
 | `atomics advisor --min-quality 0.9` | Higher quality threshold |
 | `atomics advisor --current-model claude-sonnet-4-6` | Optimize from a specific model |
 | `atomics eval --fixtures ml-01,ml-05` | Run multilingual fixtures (8 languages) |
+| `atomics rag --extra-judges ollama:mistral:7b` | Multi-judge mean ± stdev on the RAG score |
 | `atomics rag` | RAG pipeline evaluation — grounding, faithfulness, abstention (uses hand-crafted or retrieved context) |
 | `atomics rag --index ./index.vec` | Run RAG fixtures against chunks retrieved from a sqlite-vec index |
 | `atomics rag-index ./docs --db ./index.vec` | Build a sqlite-vec index from a directory of documents |

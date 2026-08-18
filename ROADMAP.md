@@ -191,10 +191,11 @@ Not scheduled, roughly in order of how often they come up.
   page: badges, a one-scroll pitch, and a captured `doctor` / `toolcall`
   first run. Further polish stays storefront-only unless a stranger still
   cannot tell what the tool is.
-- **Judge quality.** Security suites now take `--extra-judges` (numeric mean or
-  categorical majority) and `atomics judge-agreement` measures how often a
-  single judge would flip the headline. `rag`, `probe`, and `archreview` are
-  still single-judge.
+- **Judge quality.** `--extra-judges` is on every judged suite: numeric mean
+  (eval, adversarial, redblue, multiturn, rag, probe, archreview) or
+  categorical majority (refusal, codereview, toolcall prose).
+  `atomics judge-agreement` measures how often a single judge would flip the
+  headline.
 - **Interactive REPL.** Tab-completion over the existing Click tree is cheap;
   the useful part is session state (selected provider/model, last result set)
   for exploratory work. Heavy ops (`soak`, `sweep`) should submit jobs, not

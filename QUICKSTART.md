@@ -353,6 +353,7 @@ quality score on each host with a speedup ratio and parity verdict.
 # RAG pipeline eval — does the model ground answers in provided context?
 uv run atomics rag --provider ollama -m qwen3:14b --judge-model qwen2.5:14b
 uv run atomics rag --fixtures rag-05,rag-12          # subset
+uv run atomics rag --extra-judges ollama:mistral:7b  # numeric mean of the panel
 
 # Real retrieval against your own indexed corpus (requires uv sync --extra rag)
 uv run atomics rag-index ./docs --db ./my-index.vec
