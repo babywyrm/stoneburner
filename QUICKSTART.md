@@ -44,7 +44,9 @@ unless you pass flags or `ATOMICS_*`. See
 [`docs/INFERENCE_ENV.md`](docs/INFERENCE_ENV.md).
 
 `doctor` exits non-zero if anything is missing, so it's safe in front of a
-long run: `atomics doctor && atomics run --tier ez -n 3`.
+long run: `atomics doctor && atomics run --tier ez -n 3`. A healthy check
+prints one `Next:` command — Ollama when it answers, otherwise Claude if
+a key is set.
 
 ---
 

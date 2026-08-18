@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Added
+- **`doctor` prints one next command.** After a healthy check it suggests
+  `atomics provider-test --provider ollama --no-thinking` when Ollama
+  answers, `atomics provider-test` when a Claude key is set and Ollama is
+  down, or the localhost Ollama command when neither is ready. Blocking
+  errors suppress the line. The default provider is unchanged.
+
 ### Changed
 - **README is a landing page.** Badges, a one-scroll pitch, and a captured
   `doctor` / `toolcall` first run sit above the reference manual. Incomplete

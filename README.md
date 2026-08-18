@@ -18,6 +18,7 @@ finished-looking percentage on a partial run is the failure mode it is
 built to avoid: incomplete coverage prints `n/a (scored/total scored)`
 and JSON nulls the headline.
 
+`atomics doctor` ends with one `Next:` command when the check is healthy.
 Typical first-run output (Ollama on localhost, no cloud key):
 
 ```text
@@ -31,6 +32,9 @@ OPENAI_API_KEY not set (optional; needed for OpenAI)
 inference.env: not found (optional; $INFERENCE_ENV or /etc/agentic/inference.env)
 Ollama endpoint: http://localhost:11434
 Ollama reachable — 3 model(s): qwen2.5:7b, gemma3:4b, llama3.2:3b
+
+Next: atomics provider-test --provider ollama --no-thinking
+      Ollama is reachable.
 ```
 
 ```text

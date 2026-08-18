@@ -5,7 +5,7 @@ import sys
 import pytest
 
 from atomics.config import AtomicsSettings
-from atomics.doctor import run_doctor
+from atomics.doctor import run_doctor, suggest_next_step
 
 
 def test_doctor_exits_zero(monkeypatch, tmp_path):
@@ -42,7 +42,7 @@ def test_doctor_anthropic_key_is_optional_for_local_provider_test(
     out = capsys.readouterr().out
     assert "ANTHROPIC_API_KEY" in out
     assert "not set" in out
-    assert "provider-test" not in out
+    assert "required for provider-test" not in out.lower()
     assert "optional" in out.lower()
     assert "Claude" in out
 
@@ -210,3 +210,47 @@ def test_doctor_scheduler_systemd_missing_systemctl(capsys, tmp_path):
         run_doctor(settings=settings)
     captured = capsys.readouterr()
     assert "systemd" in captured.out or "systemctl" in captured.out
+
+
+def test_suggest_next_step_prefers_reachable_ollama():
+    step = suggest_next_step(errors=0, ollama_reachable=True, has_claude_key=True)
+    assert step is not None
+    assert step.command == "atomics provider-test --provider ollama --no-thinking"
+    assert "Ollama" in step.reason
+
+
+def test_suggest_next_step_uses_claude_when_ollama_is_down():
+    step = suggest_next_step(errors=0, ollama_reachable=False, has_claude_key=True)
+    assert step is not None
+    assert step.command == "atomics provider-test"
+    assert "Claude" in step.reason
+
+
+def test_suggest_next_step_points_at_localhost_ollama_when_nothing_is_ready():
+    step = suggest_next_step(errors=0, ollama_reachable=False, has_claude_key=False)
+    assert step is not None
+    assert "--provider ollama" in step.command
+    assert "localhost:11434" in step.reason
+
+
+def test_suggest_next_step_is_silent_when_doctor_has_errors():
+    assert suggest_next_step(errors=1, ollama_reachable=True, has_claude_key=True) is None
+
+
+def test_doctor_prints_next_step_when_ollama_answers(capsys, tmp_path):
+    settings = AtomicsSettings(db_path=tmp_path / "doc.db")
+    mock_response = MagicMock()
+    mock_response.json.return_value = {"models": [{"name": "qwen2.5:7b"}]}
+    with patch("httpx.get", return_value=mock_response):
+        assert run_doctor(settings=settings) == 0
+    out = capsys.readouterr().out
+    assert "Next:" in out
+    assert "atomics provider-test --provider ollama --no-thinking" in out
+
+
+def test_doctor_omits_next_step_when_the_database_is_unusable(capsys, tmp_path):
+    settings = AtomicsSettings(db_path=tmp_path / "doc.db")
+    with patch("sqlite3.connect", side_effect=OSError("permission denied")):
+        assert run_doctor(settings=settings) == 1
+    out = capsys.readouterr().out
+    assert "Next:" not in out

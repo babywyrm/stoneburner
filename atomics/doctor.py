@@ -7,12 +7,51 @@ import platform
 import shutil
 import sqlite3
 import sys
+from dataclasses import dataclass
 
 from rich.console import Console
 
 from atomics.config import AtomicsSettings
 from atomics.paths import default_data_dir, default_db_path
 from atomics.scheduler.cron import detect_best_scheduler
+
+
+@dataclass(frozen=True)
+class NextStep:
+    """One command a healthy install should run next. Never carries secrets."""
+
+    command: str
+    reason: str
+
+
+def suggest_next_step(
+    *,
+    errors: int,
+    ollama_reachable: bool,
+    has_claude_key: bool,
+) -> NextStep | None:
+    """Pick a first-run command from what doctor already observed.
+
+    Ollama wins when it answers: that is the no-key path the listing sells.
+    A Claude key is the fallback. Blocking errors suppress the suggestion.
+    The default provider is not changed.
+    """
+    if errors:
+        return None
+    if ollama_reachable:
+        return NextStep(
+            command="atomics provider-test --provider ollama --no-thinking",
+            reason="Ollama is reachable.",
+        )
+    if has_claude_key:
+        return NextStep(
+            command="atomics provider-test",
+            reason="Claude key is set. Default provider is Claude.",
+        )
+    return NextStep(
+        command="atomics provider-test --provider ollama --no-thinking",
+        reason="No cloud key. Start Ollama on http://localhost:11434, then run this.",
+    )
 
 
 def run_doctor(settings: AtomicsSettings | None = None) -> int:
@@ -95,6 +134,7 @@ def run_doctor(settings: AtomicsSettings | None = None) -> int:
         )
 
     ollama_host = settings.ollama_host
+    ollama_reachable = False
     console.print(f"[dim]Ollama endpoint:[/dim] {ollama_host}")
     try:
         import httpx
@@ -102,6 +142,7 @@ def run_doctor(settings: AtomicsSettings | None = None) -> int:
         r = httpx.get(f"{ollama_host.rstrip('/')}/api/tags", timeout=5)
         models = r.json().get("models", [])
         names = [m["name"] for m in models[:5]]
+        ollama_reachable = True
         console.print(
             f"[green]Ollama[/green] reachable — {len(models)} model(s): {', '.join(names)}"
         )
@@ -142,5 +183,15 @@ def run_doctor(settings: AtomicsSettings | None = None) -> int:
             console.print("[dim]OS keychain: available, no secrets stored (use 'atomics secrets set' to add)[/dim]")
     else:
         console.print("[yellow]OS keychain: not available (secrets fallback disabled)[/yellow]")
+
+    step = suggest_next_step(
+        errors=errors,
+        ollama_reachable=ollama_reachable,
+        has_claude_key=bool(settings.anthropic_api_key),
+    )
+    if step is not None:
+        console.print()
+        console.print(f"[bold]Next:[/bold] {step.command}")
+        console.print(f"[dim]{step.reason}[/dim]")
 
     return 1 if errors else 0

@@ -41,7 +41,7 @@ Full command reference for `atomics`. See also [QUICKSTART.md](../QUICKSTART.md)
 | `atomics provider-test -p llamacpp` | Health check llama.cpp |
 | `atomics models` | List available models on Ollama host with class/thinking annotations |
 | `atomics models --provider vllm` | List models on a vLLM-compatible endpoint |
-| `atomics doctor` | Check installation health, config, and `inference.env` (never prints the API key) |
+| `atomics doctor` | Check installation health, config, and `inference.env` (never prints the API key). Prints one next command when the check is healthy. |
 
 ## Evaluation Suites
 
