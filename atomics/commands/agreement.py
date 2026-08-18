@@ -35,7 +35,7 @@ def _no_parent_finalize(_repository: MetricsRepository, _run_id: str) -> None:
     "--suite",
     type=click.Choice(list(STUDY_SUITES), case_sensitive=False),
     required=True,
-    help="Security suite whose judge headline to study.",
+    help="Suite whose judge headline to study. rag is included; probe and archreview are not (no fixture catalog).",
 )
 @click.option(
     "--judges",

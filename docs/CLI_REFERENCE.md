@@ -51,6 +51,7 @@ Full command reference for `atomics`. See also [QUICKSTART.md](../QUICKSTART.md)
 | `atomics eval --fixtures ev-19` | Run a fixture subset for a fast spot-check |
 | `atomics eval --extra-judges ollama:mistral:7b` | Multi-judge consensus scoring |
 | `atomics judge-agreement --suite refusal --judges ollama:a,ollama:b` | Generate once, judge N times; report pairwise agreement and majority-flip rate |
+| `atomics judge-agreement --suite rag --judges ollama:a,ollama:b` | Same study on the RAG rubric (numeric mean / flip) |
 | `atomics adversarial` | Adversarial resilience eval — resistance to manipulation (72 fixtures) |
 | `atomics adversarial --category tool_desc_injection` | Run one suite/group |
 | `atomics adversarial --runs 3` | Variance-aware scoring (mean ± stddev). Live `run 2/3` lines print each pass so a 1/3 comply is visible |
