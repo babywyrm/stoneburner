@@ -53,3 +53,17 @@ def test_readme_leads_with_pypi_install():
     assert "uv tool install stoneburner-atomics" in text
     assert "once a release has been uploaded" not in text
     assert "http://localhost:11434" in text
+
+
+def test_readme_landing_is_a_storefront_not_only_a_manual():
+    """A stranger on GitHub or PyPI should see what it is in one scroll."""
+    text = Path("README.md").read_text()
+    assert "https://img.shields.io/pypi/v/stoneburner-atomics" in text
+    assert "https://pypi.org/project/stoneburner-atomics/" in text
+    assert "n/a (scored/total scored)" in text
+    assert "atomics doctor" in text
+    assert "atomics toolcall" in text
+    lowered = text.lower()
+    assert "brainbox" not in lowered
+    assert "garak" not in lowered
+    assert "promptfoo" not in lowered

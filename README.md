@@ -1,10 +1,52 @@
 # Stoneburner
 
-Local-first LLM evaluation: token cost, quality, and security suites.
+[![PyPI](https://img.shields.io/pypi/v/stoneburner-atomics.svg)](https://pypi.org/project/stoneburner-atomics/)
+[![Python](https://img.shields.io/pypi/pyversions/stoneburner-atomics.svg)](https://pypi.org/project/stoneburner-atomics/)
+[![License: MIT](https://img.shields.io/pypi/l/stoneburner-atomics.svg)](https://github.com/babywyrm/stoneburner/blob/main/LICENSE)
+[![CI](https://github.com/babywyrm/stoneburner/actions/workflows/ci.yml/badge.svg)](https://github.com/babywyrm/stoneburner/actions/workflows/ci.yml)
 
-The PyPI listing is **[stoneburner-atomics](https://pypi.org/project/stoneburner-atomics/)**.
+Local-first LLM evaluation: token cost, quality, and security suites.
+The same commands cover a laptop Ollama box and a cloud API.
+
+Install **[stoneburner-atomics](https://pypi.org/project/stoneburner-atomics/)**.
 The CLI and the import stay **`atomics`**. (`atomics` on PyPI is a different
 package; `stoneburner` is too similar to an existing `stone-burner`.)
+
+This is a desk tool, not a research harness and not an unsupervised agent.
+It records cost, quality, and security-suite results in SQLite. A
+finished-looking percentage on a partial run is the failure mode it is
+built to avoid: incomplete coverage prints `n/a (scored/total scored)`
+and JSON nulls the headline.
+
+Typical first-run output (Ollama on localhost, no cloud key):
+
+```text
+$ atomics doctor
+Python 3.13.11 OK
+Platform: Darwin (arm64)
+Database path: data/atomics.db
+SQLite database OK (readable / creatable)
+ANTHROPIC_API_KEY not set (optional; needed for Claude)
+OPENAI_API_KEY not set (optional; needed for OpenAI)
+inference.env: not found (optional; $INFERENCE_ENV or /etc/agentic/inference.env)
+Ollama endpoint: http://localhost:11434
+Ollama reachable — 3 model(s): qwen2.5:7b, gemma3:4b, llama3.2:3b
+```
+
+```text
+$ atomics toolcall --provider ollama --channel tools --runs 3 --no-thinking
+
+Summary
+  tool-capable: yes
+  outcomes: safe call=6  no call=14
+  channel divergence (resisted in prose, complied with tools): not measured (no qualifying fixtures)
+  response divergence (dangerous call, refusing text): not measured (no qualifying fixtures)
+  cost: $0.0000
+```
+
+A tools-only first run is valid. Channel divergence needs a second model
+as judge. Thinking models that spend the token budget on hidden reasoning
+are recorded as `thinking_budget`, not as a mystery generation failure.
 
 > **New here?** [QUICKSTART](https://github.com/babywyrm/stoneburner/blob/main/QUICKSTART.md)
 > — copy-pasteable commands grouped by goal.

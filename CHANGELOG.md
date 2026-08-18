@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Changed
+- **README is a landing page.** Badges, a one-scroll pitch, and a captured
+  `doctor` / `toolcall` first run sit above the reference manual. Incomplete
+  coverage is described as `n/a (scored/total scored)`. No CLI change.
+
 ## 0.18.1 (2026-08-16) — Storefront, inference.env, and dashboard script test
 
 ### Upgrade notes
