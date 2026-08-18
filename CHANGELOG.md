@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## 0.18.2 (2026-08-17) — Landing page, doctor next step, and extra judges
+
+### Upgrade notes
+- Install is still `stoneburner-atomics`. The import and CLI stay `atomics`.
+- `rag`, `probe`, and `archreview` now take `--extra-judges` (numeric mean).
+  Extra judges share the spend ceiling.
+- `atomics judge-agreement --suite rag` is available. Probe and archreview
+  stay out of the study command.
+- `atomics doctor` prints one `Next:` command after a healthy check.
+- No breaking API or CLI changes.
+
 ### Added
 - **`judge-agreement --suite rag`.** Generate each RAG fixture once and score
   it with every judge. Probe and archreview stay out: they need live
