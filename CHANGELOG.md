@@ -3,6 +3,9 @@
 ## Unreleased
 
 ### Added
+- **`judge-agreement --suite rag`.** Generate each RAG fixture once and score
+  it with every judge. Probe and archreview stay out: they need live
+  artifacts or a repo pack, not a fixture catalog.
 - **`--extra-judges` on `rag`, `probe`, and `archreview`.** Same numeric
   mean as redblue / multiturn. Extra judges share the spend ceiling. The
   headline score is the panel mean; RAG also records `score_stdev`.

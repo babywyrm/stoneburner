@@ -28,6 +28,7 @@ def test_judge_agreement_help_requires_suite_and_judges() -> None:
     assert "--suite" in result.output
     assert "--judges" in result.output
     assert "required" in result.output.lower()
+    assert "rag" in result.output
 
 
 def test_judge_agreement_rejects_a_single_judge(monkeypatch, tmp_path) -> None:

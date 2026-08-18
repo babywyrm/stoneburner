@@ -195,7 +195,8 @@ Not scheduled, roughly in order of how often they come up.
   (eval, adversarial, redblue, multiturn, rag, probe, archreview) or
   categorical majority (refusal, codereview, toolcall prose).
   `atomics judge-agreement` measures how often a single judge would flip the
-  headline.
+  headline, including `--suite rag`. Probe and archreview stay out of the
+  study command: they need live artifacts or a repo pack.
 - **Interactive REPL.** Tab-completion over the existing Click tree is cheap;
   the useful part is session state (selected provider/model, last result set)
   for exploratory work. Heavy ops (`soak`, `sweep`) should submit jobs, not

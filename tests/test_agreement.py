@@ -136,7 +136,7 @@ def test_study_rejects_unknown_suite_and_one_judge() -> None:
     with pytest.raises(ValueError, match="unsupported"):
         asyncio.run(
             run_agreement_study(
-                suite="rag",
+                suite="probe",
                 provider=_Named("model"),
                 judges=[(_Named("a"), None), (_Named("b"), None)],
             )
@@ -315,5 +315,34 @@ async def test_multiturn_study_numeric_flip(monkeypatch):
         fixture_ids=[ALL_MULTITURN_FIXTURES[0].id],
     )
     row = summary.fixtures[0]
+    assert row.combined_score == pytest.approx(0.6)
+    assert row.flipped is True
+
+
+@pytest.mark.asyncio
+async def test_rag_study_numeric_flip(monkeypatch):
+    from atomics.eval.rag.fixtures import ALL_RAG_FIXTURES
+    from atomics.eval.rag.judge import RAGJudgeResult
+
+    async def fake_rag(response, fixture, judge, *, judge_model=None, max_response_chars=4000):
+        score = 0.9 if judge.name == "high" else 0.3
+        return RAGJudgeResult(
+            grounding=4 if score > 0.5 else 1,
+            faithfulness=3 if score > 0.5 else 1,
+            abstention=3 if score > 0.5 else 1,
+            score=score,
+            rationale="ok",
+        )
+
+    monkeypatch.setattr("atomics.eval.rag.judge.score_rag_response", fake_rag)
+    provider = _Named("model")
+    summary = await run_agreement_study(
+        suite="rag",
+        provider=provider,
+        judges=[(_Named("high"), None), (_Named("low"), None)],
+        fixture_ids=[ALL_RAG_FIXTURES[0].id],
+    )
+    row = summary.fixtures[0]
+    assert provider.generates == 1
     assert row.combined_score == pytest.approx(0.6)
     assert row.flipped is True

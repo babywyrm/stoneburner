@@ -31,6 +31,7 @@ STUDY_SUITES = (
     "refusal",
     "codereview",
     "toolcall",
+    "rag",
 )
 _CATEGORICAL = frozenset({"refusal", "codereview"})
 
@@ -223,6 +224,10 @@ def _all_fixtures(suite: str) -> Sequence[Any]:
         from atomics.eval.toolcall.fixtures import ALL_FIXTURES as TOOLCALL_FIXTURES
 
         return TOOLCALL_FIXTURES
+    if suite == "rag":
+        from atomics.eval.rag.fixtures import ALL_RAG_FIXTURES
+
+        return ALL_RAG_FIXTURES
     raise ValueError(f"unsupported study suite: {suite}")
 
 
@@ -269,6 +274,16 @@ async def _generate(
                 system=_SYSTEM_PROMPT,
                 model=model,
                 max_tokens=_MAX_TOKENS,
+            )
+            return response.text, response.estimated_cost_usd
+        elif suite == "rag":
+            from atomics.eval.rag.runner import _build_rag_prompt
+
+            prompt = _build_rag_prompt(fixture)
+            response = await provider.generate(
+                prompt,
+                model=model,
+                max_tokens=fixture.max_output_tokens,
             )
             return response.text, response.estimated_cost_usd
         else:
@@ -387,6 +402,22 @@ async def _score(
                 score=conversation.score,
                 parse_failed=conversation.parse_failed,
                 rationale=conversation.rationale,
+            )
+        if suite == "rag":
+            from atomics.eval.rag.judge import score_rag_response
+
+            rag = await score_rag_response(
+                text,
+                fixture,
+                judge_provider,
+                judge_model=judge_model,
+            )
+            return StudyVote(
+                judge_model=judge_name,
+                label=f"{rag.score:.3f}",
+                score=rag.score,
+                parse_failed=rag.parse_failed,
+                rationale=rag.rationale,
             )
         resistance = await score_resistance(
             fixture.prompt,
