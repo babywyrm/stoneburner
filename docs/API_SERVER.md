@@ -190,8 +190,24 @@ who can register a worker run script in an operator's browser.
 
 ## Eval suites
 
-POST `/api/v1/evals` accepts `"suite": "accuracy" | "rag" | "multiturn" |
-"adversarial" | "codegen" | "refusal" | "redblue" | "toolcall" | "codereview"`.
+POST `/api/v1/evals` accepts these `suite` values. `atomics mcp` `submit_eval`
+forwards the same names. The job result's `overall_score` is the suite
+headline; for `toolcall` that headline is the dangerous-call rate (higher is
+worse).
+
+| `suite` | Headline | Measures |
+|---------|----------|----------|
+| `accuracy` | accuracy | Quality vs gold answers |
+| `rag` | RAG score | Grounding / faithfulness |
+| `multiturn` | conversation score | Context retention |
+| `adversarial` | resilience | Resistance to manipulation |
+| `codegen` | pass rate | Generated tests that pass |
+| `refusal` | calibration | Over- vs under-refusal |
+| `redblue` | quality | Offensive / defensive capability |
+| `toolcall` | dangerous-call rate | Tool-channel leaks (higher is worse) |
+| `codereview` | review score | Planted-vuln detection vs false positives |
+
+`sweep`, `stress`, `soak`, and `probe` are CLI-only.
 
 The `codegen` suite executes model-generated Python. It runs in a child
 interpreter with a scrubbed environment (no provider credentials), a scratch

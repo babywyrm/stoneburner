@@ -15,6 +15,9 @@
   Same budget ceiling, same job id. `sweep` / `stress` / `soak` stay off
   the API: those are overnight or load campaigns, not a single eval, and
   an agent launching them would need bounds we have not designed yet.
+  Docs (`MCP_SERVER.md`, `API_SERVER.md`, `SECURITY_SUITES.md`) list every
+  suite and the agent loop; `get_job` now says `completed`, which is the
+  status the API actually writes.
 
 ## 0.18.2 (2026-08-17) — Landing page, doctor next step, and extra judges
 

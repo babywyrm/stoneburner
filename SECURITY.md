@@ -181,10 +181,11 @@ iteration/fixture bounds already documented above. See
   MCP-layer credential guards while this process holds an API key with spend
   authority.
 - The tool surface is bounded by the API. `sweep`, `stress`, `soak`, and
-  `probe` stay CLI-only until they are endpoints. `list_models` and
-  `provider_test` are endpoints first, then MCP tools.
+  `probe` stay CLI-only until they are endpoints. `list_models`,
+  `provider_test`, `list_jobs`, `get_run`, and `trends` are endpoints
+  first, then MCP tools.
 - `submit_run`, `submit_eval`, and `provider_test` are annotated as not
-  read-only. The five remaining tools are annotated read-only.
+  read-only. The rest are annotated read-only.
 - On stdio, stdout is the JSON-RPC channel. Status and logs go to stderr.
 
 ## Logging

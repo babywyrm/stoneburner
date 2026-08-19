@@ -79,10 +79,9 @@ def test_submit_eval_is_accepted_by_the_real_api(app_client):
     assert response.json()["kind"] == "eval"
 
 
-def test_submit_eval_refusal_is_accepted_by_the_real_api(app_client):
-    request = captured_request(
-        lambda c: c.submit_eval(suite="refusal", provider="ollama")
-    )
+@pytest.mark.parametrize("suite", ["refusal", "redblue", "toolcall", "codereview"])
+def test_submit_eval_security_suite_is_accepted_by_the_real_api(app_client, suite):
+    request = captured_request(lambda c: c.submit_eval(suite=suite, provider="ollama"))
     assert replay(app_client, request).status_code == 202
 
 
