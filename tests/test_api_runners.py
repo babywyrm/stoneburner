@@ -189,6 +189,42 @@ async def test_run_eval_suite_accuracy_dispatches_to_run_eval():
             "fixture_results",
             0.5,
         ),
+        (
+            "refusal",
+            "run_refusal",
+            SimpleNamespace(
+                calibration_score=0.81,
+                fixture_results=[1, 2],
+                total_tokens=22,
+                total_cost_usd=0.002,
+            ),
+            "fixture_results",
+            0.81,
+        ),
+        (
+            "redblue",
+            "run_redblue",
+            SimpleNamespace(
+                overall_quality=0.77,
+                fixture_results=[1, 2, 3],
+                total_tokens=33,
+                total_cost_usd=0.003,
+            ),
+            "fixture_results",
+            0.77,
+        ),
+        (
+            "codereview",
+            "run_codereview",
+            SimpleNamespace(
+                review_score=0.64,
+                fixture_results=[1],
+                total_tokens=18,
+                total_cost_usd=0.001,
+            ),
+            "fixture_results",
+            0.64,
+        ),
     ],
 )
 async def test_run_eval_suite_dispatches(
@@ -232,6 +268,41 @@ async def test_run_eval_suite_dispatches(
     assert result["fixtures_run"] == len(getattr(summary, fixtures_attr))
     assert result["total_tokens"] == summary.total_tokens
     assert result["total_cost_usd"] == summary.total_cost_usd
+
+
+@pytest.mark.asyncio
+async def test_run_eval_suite_dispatches_toolcall():
+    """toolcall's runner is keyword-only and takes a fixture catalog."""
+    payload = EvalRequest(
+        suite="toolcall", provider="ollama", model="m1", judge_model="j1"
+    )
+    provider = MagicMock(name="provider")
+    judge = MagicMock(name="judge")
+    summary = SimpleNamespace(
+        dangerous_call_rate=0.1,
+        fixtures=[1, 2],
+        total_tokens=12,
+        total_cost_usd=0.001,
+    )
+
+    with (
+        patch.object(runners, "_provider_for", side_effect=[provider, judge]),
+        patch.object(
+            runners, "run_toolcall_suite", new_callable=AsyncMock, return_value=summary
+        ) as mock_run,
+    ):
+        result = await runners.run_eval_suite(payload)
+
+    kwargs = mock_run.await_args.kwargs
+    assert isinstance(kwargs["provider"], GuardedProvider)
+    assert kwargs["provider"].inner is provider
+    assert isinstance(kwargs["judge_provider"], GuardedProvider)
+    assert kwargs["model"] == "m1"
+    assert kwargs["judge_model"] == "j1"
+    assert len(kwargs["fixtures"]) > 0
+    assert result["suite"] == "toolcall"
+    assert result["overall_score"] == 0.1
+    assert result["fixtures_run"] == 2
 
 
 @pytest.mark.asyncio

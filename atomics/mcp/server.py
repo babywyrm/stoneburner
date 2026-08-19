@@ -127,8 +127,9 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
         """Start an eval suite and return its job id immediately.
 
         Spends provider tokens, for the judge as well as the model under test.
-        `suite` is one of `accuracy`, `rag`, `multiturn`, `adversarial`, or
-        `codegen`. `budget_usd` caps the combined spend; leave it unset to accept
+        `suite` is one of `accuracy`, `rag`, `multiturn`, `adversarial`,
+        `codegen`, `refusal`, `redblue`, `toolcall`, or `codereview`.
+        `budget_usd` caps the combined spend; leave it unset to accept
         the server's default ceiling. Poll `get_job` for the result.
         """
         return api.submit_eval(

@@ -53,6 +53,25 @@ async def test_post_evals_rag(client):
 
 
 @pytest.mark.asyncio
+async def test_post_evals_refusal_is_accepted(client):
+    with patch("atomics.api._runners.run_refusal", new_callable=AsyncMock) as mock_run:
+        mock_run.return_value = type(
+            "S",
+            (),
+            {
+                "calibration_score": 0.8,
+                "fixture_results": [1],
+                "total_tokens": 10,
+                "total_cost_usd": 0.001,
+            },
+        )()
+        resp = client.post(
+            "/api/v1/evals", json={"suite": "refusal", "provider": "ollama"}
+        )
+    assert resp.status_code == 202
+
+
+@pytest.mark.asyncio
 async def test_post_evals_unsupported_suite(client):
     resp = client.post(
         "/api/v1/evals", json={"suite": "unknown", "provider": "ollama"}

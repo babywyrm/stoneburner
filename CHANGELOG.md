@@ -9,6 +9,12 @@
   open a persisted run, or read the hourly series. All three are annotated
   read-only. Still no new attack surface: the proxy only forwards what the
   API already serves.
+- **`POST /evals` accepts the four security suites the CLI already ran.**
+  `refusal`, `redblue`, `toolcall`, and `codereview` were CLI-only, so an MCP
+  agent could launch `adversarial` but not the rest of the security set.
+  Same budget ceiling, same job id. `sweep` / `stress` / `soak` stay off
+  the API: those are overnight or load campaigns, not a single eval, and
+  an agent launching them would need bounds we have not designed yet.
 
 ## 0.18.2 (2026-08-17) — Landing page, doctor next step, and extra judges
 

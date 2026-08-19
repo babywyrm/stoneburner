@@ -79,6 +79,13 @@ def test_submit_eval_is_accepted_by_the_real_api(app_client):
     assert response.json()["kind"] == "eval"
 
 
+def test_submit_eval_refusal_is_accepted_by_the_real_api(app_client):
+    request = captured_request(
+        lambda c: c.submit_eval(suite="refusal", provider="ollama")
+    )
+    assert replay(app_client, request).status_code == 202
+
+
 def test_submit_eval_without_budget_is_accepted(app_client):
     """Omitting the budget must satisfy the server's default, not fail validation."""
     request = captured_request(lambda c: c.submit_eval(suite="accuracy", provider="ollama"))

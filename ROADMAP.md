@@ -162,6 +162,10 @@ whether it answered. Endpoints first, then the proxy.
 - [x] MCP `list_jobs`, `get_run`, and `trends` — the remaining read
       endpoints the dashboard already used, so an agent can list in-flight
       jobs and open a recorded run without inventing new HTTP surface
+- [x] `POST /evals` for `refusal`, `redblue`, `toolcall`, and `codereview`.
+      An agent that could only run `adversarial` was not using the security
+      product. Same metered job path. `sweep` / `stress` / `soak` stay off
+      until they have their own bounds.
 
 ## v0.22.0 — Dashboard drill-in
 
