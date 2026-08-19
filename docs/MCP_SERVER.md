@@ -2,7 +2,7 @@
 
 `atomics mcp` exposes atomics to LLM agents over the [Model Context
 Protocol](https://modelcontextprotocol.io/). It is a proxy: every tool call is
-one authenticated HTTP request to a running `atomics server` server.
+one authenticated HTTP request to a running `atomics server`.
 
 ```bash
 uv sync --extra mcp --extra api
@@ -86,15 +86,18 @@ ATOMICS_API_URL="https://atomics.internal:8000" uv run atomics mcp
 |------|-----------|--------------|
 | `health` | yes | Check the API server is reachable |
 | `list_models` | yes | List tags on Ollama or vLLM |
+| `list_jobs` | yes | In-memory API jobs (no `result`; poll `get_job`) |
 | `get_job` | yes | Status, and result once finished, for a submitted job |
+| `get_run` | yes | One persisted run and its fixtures (prompts omitted) |
 | `compare` | yes | Compare recorded results by provider or model |
 | `recent_runs` | yes | List recent recorded runs |
+| `trends` | yes | Hourly token and cost series |
 | `provider_test` | **no** | Health + a fixed 2+2 generate — spends a few tokens |
 | `submit_run` | **no** | Start a benchmark run — spends tokens |
 | `submit_eval` | **no** | Start an eval suite — spends tokens |
 
 The spending tools are annotated as not read-only so a client can treat them
-as costly. The five read tools are annotated read-only so an agent is not
+as costly. The read tools are annotated read-only so an agent is not
 discouraged from the cheap calls.
 
 ### Asynchronous by design

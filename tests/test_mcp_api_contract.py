@@ -103,6 +103,25 @@ def test_recent_runs_is_reachable(app_client):
     assert replay(app_client, request).status_code == 200
 
 
+def test_list_jobs_is_reachable(app_client):
+    request = captured_request(lambda c: c.list_jobs())
+    response = replay(app_client, request)
+    assert response.status_code == 200
+    assert response.json()["jobs"] == []
+
+
+def test_unknown_run_is_a_404_not_a_routing_error(app_client):
+    request = captured_request(lambda c: c.get_run("no-such-run"))
+    assert replay(app_client, request).status_code == 404
+
+
+def test_trends_is_reachable(app_client):
+    request = captured_request(lambda c: c.trends(hours=6))
+    response = replay(app_client, request)
+    assert response.status_code == 200
+    assert response.json()["hours"] == 6
+
+
 def test_unknown_job_is_a_404_not_a_routing_error(app_client):
     """404 proves the path shape matched a route. A 405 or 422 would mean the
     client is building `/jobs/{id}` in a way the server does not recognize."""

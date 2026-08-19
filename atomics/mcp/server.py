@@ -32,8 +32,9 @@ INSTRUCTIONS = """Evaluate and benchmark language models through a running atomi
 Runs and evals are asynchronous. `submit_run` and `submit_eval` return a job id;
 poll `get_job` with that id until its status is finished, then read the result.
 
-Read-only tools (`health`, `list_models`, `get_job`, `compare`, `recent_runs`)
-are safe to call freely. `provider_test` spends a few tokens on a fixed probe.
+Read-only tools (`health`, `list_models`, `list_jobs`, `get_job`, `get_run`,
+`compare`, `recent_runs`, `trends`) are safe to call freely. `provider_test`
+spends a few tokens on a fixed probe.
 `submit_run` and `submit_eval` spend real provider tokens and money, so treat
 them as costly: the server enforces a per-eval dollar ceiling, but staying well
 inside it is the caller's job.
@@ -144,6 +145,25 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
     def get_job(job_id: str) -> Any:
         """Fetch a submitted job's status and, once finished, its result."""
         return api.get_job(job_id)
+
+    @server.tool(annotations=READ_ONLY)
+    def list_jobs() -> Any:
+        """List in-memory API jobs. Results are omitted; poll `get_job` for those."""
+        return api.list_jobs()
+
+    @server.tool(annotations=READ_ONLY)
+    def get_run(run_id: str) -> Any:
+        """Fetch one persisted run and its fixtures.
+
+        Prompts and raw JSON are omitted by the API. This is a recorded run,
+        not an in-memory job — use `get_job` for a submission still in flight.
+        """
+        return api.get_run(run_id)
+
+    @server.tool(annotations=READ_ONLY)
+    def trends(hours: int = 24) -> Any:
+        """Hourly token and cost series for the last `hours` (1–168)."""
+        return api.trends(hours=hours)
 
     @server.tool(annotations=READ_ONLY)
     def compare(

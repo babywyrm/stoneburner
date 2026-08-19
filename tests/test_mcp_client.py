@@ -118,6 +118,32 @@ def test_get_job_uses_job_id_in_path():
     assert requests[0].url.path == "/api/v1/jobs/abc-123"
 
 
+def test_list_jobs_hits_the_collection_path():
+    requests: list[httpx.Request] = []
+    with client_recording(requests) as client:
+        client.list_jobs()
+
+    assert requests[0].method == "GET"
+    assert requests[0].url.path == "/api/v1/jobs"
+
+
+def test_get_run_uses_run_id_in_path():
+    requests: list[httpx.Request] = []
+    with client_recording(requests) as client:
+        client.get_run("run-99")
+
+    assert requests[0].url.path == "/api/v1/runs/run-99"
+
+
+def test_trends_passes_hours():
+    requests: list[httpx.Request] = []
+    with client_recording(requests) as client:
+        client.trends(hours=48)
+
+    assert requests[0].url.path == "/api/v1/reports/trends"
+    assert requests[0].url.params["hours"] == "48"
+
+
 def test_compare_omits_unset_filters():
     requests: list[httpx.Request] = []
     with client_recording(requests) as client:

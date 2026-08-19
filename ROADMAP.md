@@ -159,6 +159,9 @@ whether it answered. Endpoints first, then the proxy.
 - [x] `GET /api/v1/models` and `POST /api/v1/provider-test` (auth, no
       caller prompt)
 - [x] MCP `list_models` (read-only) and `provider_test` (spends)
+- [x] MCP `list_jobs`, `get_run`, and `trends` — the remaining read
+      endpoints the dashboard already used, so an agent can list in-flight
+      jobs and open a recorded run without inventing new HTTP surface
 
 ## v0.22.0 — Dashboard drill-in
 
