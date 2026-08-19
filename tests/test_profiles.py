@@ -23,16 +23,12 @@ from atomics.profiles import (
 
 class TestTargetProfile:
     def test_ollama_valid(self):
-        p = TargetProfile(
-            name="test", type="ollama", ollama_host="http://localhost:11434"
-        )
+        p = TargetProfile(name="test", type="ollama", ollama_host="http://localhost:11434")
         assert p.type == "ollama"
         assert p.num_predict == 2048
 
     def test_http_valid(self):
-        p = TargetProfile(
-            name="test", type="http", http_url="http://localhost:5000/classify"
-        )
+        p = TargetProfile(name="test", type="http", http_url="http://localhost:5000/classify")
         assert p.type == "http"
         assert p.http_method == "POST"
 
@@ -49,9 +45,7 @@ class TestTargetProfile:
             TargetProfile(name="bad", type="http")
 
     def test_defaults(self):
-        p = TargetProfile(
-            name="t", type="ollama", ollama_host="http://h:11434"
-        )
+        p = TargetProfile(name="t", type="ollama", ollama_host="http://h:11434")
         assert p.model == ""
         assert p.prompts == []
         assert p.classify is None
@@ -69,7 +63,9 @@ class TestLoadProfile:
         return str(f)
 
     def test_load_ollama_profile(self, tmp_path):
-        path = self._write_yaml(tmp_path, """
+        path = self._write_yaml(
+            tmp_path,
+            """
 name: test-gk
 type: ollama
 ollama:
@@ -84,7 +80,8 @@ prompts:
 classify:
   approved: ["APPROVE", "ALLOW"]
   blocked: ["DENY", "BLOCK"]
-""")
+""",
+        )
         p = load_profile(path)
         assert p.name == "test-gk"
         assert p.type == "ollama"
@@ -99,7 +96,9 @@ classify:
         assert "blocked" in p.classify
 
     def test_load_http_profile(self, tmp_path):
-        path = self._write_yaml(tmp_path, """
+        path = self._write_yaml(
+            tmp_path,
+            """
 name: test-http
 type: http
 model: qwen2.5:3b
@@ -120,7 +119,8 @@ response:
 classify:
   approved: ["APPROVE"]
   blocked: ["DENY"]
-""")
+""",
+        )
         p = load_profile(path)
         assert p.name == "test-http"
         assert p.type == "http"
@@ -141,25 +141,31 @@ classify:
             load_profile(path)
 
     def test_load_model_from_ollama_section(self, tmp_path):
-        path = self._write_yaml(tmp_path, """
+        path = self._write_yaml(
+            tmp_path,
+            """
 name: t
 type: ollama
 ollama:
   host: "http://h:11434"
   model: mistral:7b
-""")
+""",
+        )
         p = load_profile(path)
         assert p.model == "mistral:7b"
 
     def test_top_level_model_overrides_ollama(self, tmp_path):
-        path = self._write_yaml(tmp_path, """
+        path = self._write_yaml(
+            tmp_path,
+            """
 name: t
 type: ollama
 model: qwen2.5:7b
 ollama:
   host: "http://h:11434"
   model: qwen2.5:3b
-""")
+""",
+        )
         p = load_profile(path)
         assert p.model == "qwen2.5:7b"
 
@@ -176,33 +182,41 @@ ollama:
     def test_prompts_from_file(self, tmp_path):
         prompts_file = tmp_path / "prompts.txt"
         prompts_file.write_text("# comment\nPrompt one\nPrompt two\n\n  \nPrompt three\n")
-        path = self._write_yaml(tmp_path, f"""
+        path = self._write_yaml(
+            tmp_path,
+            f"""
 name: t
 type: ollama
 ollama:
   host: "http://h:11434"
 prompts_file: "{prompts_file}"
-""")
+""",
+        )
         p = load_profile(path)
         assert p.prompts == ["Prompt one", "Prompt two", "Prompt three"]
 
     def test_prompts_file_relative(self, tmp_path):
         prompts_file = tmp_path / "my_prompts.txt"
         prompts_file.write_text("A\nB\n")
-        path = self._write_yaml(tmp_path, """
+        path = self._write_yaml(
+            tmp_path,
+            """
 name: t
 type: ollama
 ollama:
   host: "http://h:11434"
 prompts_file: my_prompts.txt
-""")
+""",
+        )
         p = load_profile(path)
         assert p.prompts == ["A", "B"]
 
     def test_inline_prompts_override_prompts_file(self, tmp_path):
         prompts_file = tmp_path / "prompts.txt"
         prompts_file.write_text("from file")
-        path = self._write_yaml(tmp_path, f"""
+        path = self._write_yaml(
+            tmp_path,
+            f"""
 name: t
 type: ollama
 ollama:
@@ -210,7 +224,8 @@ ollama:
 prompts:
   - "inline prompt"
 prompts_file: "{prompts_file}"
-""")
+""",
+        )
         p = load_profile(path)
         assert p.prompts == ["inline prompt"]
 
@@ -262,7 +277,8 @@ class TestCommittedExamples:
 class TestRenderBody:
     def test_basic_substitution(self):
         p = TargetProfile(
-            name="t", type="http",
+            name="t",
+            type="http",
             http_url="http://h",
             http_body_template='{"prompt": "{{ prompt }}", "model": "{{ model }}"}',
             model="qwen2.5:3b",
@@ -274,7 +290,8 @@ class TestRenderBody:
 
     def test_model_override(self):
         p = TargetProfile(
-            name="t", type="http",
+            name="t",
+            type="http",
             http_url="http://h",
             http_body_template='{"model": "{{ model }}"}',
             model="default",
@@ -284,7 +301,8 @@ class TestRenderBody:
 
     def test_num_predict(self):
         p = TargetProfile(
-            name="t", type="http",
+            name="t",
+            type="http",
             http_url="http://h",
             http_body_template='{"n": {{ num_predict }}}',
         )
@@ -293,7 +311,8 @@ class TestRenderBody:
 
     def test_no_template_returns_default(self):
         p = TargetProfile(
-            name="t", type="http",
+            name="t",
+            type="http",
             http_url="http://h",
         )
         result = render_body(p, "hello")
@@ -302,18 +321,20 @@ class TestRenderBody:
 
     def test_unknown_variable_preserved(self):
         p = TargetProfile(
-            name="t", type="http",
+            name="t",
+            type="http",
             http_url="http://h",
-            http_body_template='{{ unknown_var }}',
+            http_body_template="{{ unknown_var }}",
         )
         result = render_body(p, "x")
         assert "{{ unknown_var }}" in result
 
     def test_whitespace_in_braces(self):
         p = TargetProfile(
-            name="t", type="http",
+            name="t",
+            type="http",
             http_url="http://h",
-            http_body_template='{{  prompt  }}',
+            http_body_template="{{  prompt  }}",
         )
         result = render_body(p, "spaced")
         assert result == "spaced"
@@ -325,41 +346,53 @@ class TestRenderBody:
 class TestClassifyResponse:
     def test_approved(self):
         p = TargetProfile(
-            name="t", type="ollama", ollama_host="http://h:11434",
+            name="t",
+            type="ollama",
+            ollama_host="http://h:11434",
             classify={"approved": ["APPROVE", "ALLOW"], "blocked": ["DENY"]},
         )
         assert classify_response(p, "APPROVE: pod is safe") == "approved"
 
     def test_blocked(self):
         p = TargetProfile(
-            name="t", type="ollama", ollama_host="http://h:11434",
+            name="t",
+            type="ollama",
+            ollama_host="http://h:11434",
             classify={"approved": ["APPROVE"], "blocked": ["DENY", "BLOCK"]},
         )
         assert classify_response(p, "DENY - dangerous image") == "blocked"
 
     def test_case_insensitive(self):
         p = TargetProfile(
-            name="t", type="ollama", ollama_host="http://h:11434",
+            name="t",
+            type="ollama",
+            ollama_host="http://h:11434",
             classify={"approved": ["approve"]},
         )
         assert classify_response(p, "APPROVE") == "approved"
 
     def test_unknown_when_no_match(self):
         p = TargetProfile(
-            name="t", type="ollama", ollama_host="http://h:11434",
+            name="t",
+            type="ollama",
+            ollama_host="http://h:11434",
             classify={"approved": ["YES"], "blocked": ["NO"]},
         )
         assert classify_response(p, "maybe later") == "unknown"
 
     def test_no_classify_rules(self):
         p = TargetProfile(
-            name="t", type="ollama", ollama_host="http://h:11434",
+            name="t",
+            type="ollama",
+            ollama_host="http://h:11434",
         )
         assert classify_response(p, "anything") is None
 
     def test_empty_text(self):
         p = TargetProfile(
-            name="t", type="ollama", ollama_host="http://h:11434",
+            name="t",
+            type="ollama",
+            ollama_host="http://h:11434",
             classify={"approved": ["YES"]},
         )
         assert classify_response(p, "") is None
@@ -371,7 +404,9 @@ class TestClassifyResponse:
 class TestExtractText:
     def test_configured_field(self):
         p = TargetProfile(
-            name="t", type="http", http_url="http://h",
+            name="t",
+            type="http",
+            http_url="http://h",
             response_text_field="decision",
         )
         assert _extract_text(p, {"decision": "APPROVE"}) == "APPROVE"
@@ -397,7 +432,9 @@ class TestExtractText:
 class TestExtractLatency:
     def test_configured_field(self):
         p = TargetProfile(
-            name="t", type="http", http_url="http://h",
+            name="t",
+            type="http",
+            http_url="http://h",
             response_latency_field="elapsed_ms",
         )
         assert _extract_latency(p, {"elapsed_ms": 42.5}) == 42.5
@@ -408,14 +445,18 @@ class TestExtractLatency:
 
     def test_missing_field(self):
         p = TargetProfile(
-            name="t", type="http", http_url="http://h",
+            name="t",
+            type="http",
+            http_url="http://h",
             response_latency_field="elapsed_ms",
         )
         assert _extract_latency(p, {"other": 10}) is None
 
     def test_non_numeric(self):
         p = TargetProfile(
-            name="t", type="http", http_url="http://h",
+            name="t",
+            type="http",
+            http_url="http://h",
             response_latency_field="elapsed_ms",
         )
         assert _extract_latency(p, {"elapsed_ms": "not a number"}) is None
@@ -442,7 +483,8 @@ class TestSingleRequestProfile:
         mock_client.post = AsyncMock(return_value=mock_resp)
 
         profile = TargetProfile(
-            name="t", type="ollama",
+            name="t",
+            type="ollama",
             ollama_host="http://localhost:11434",
             model="qwen2.5:3b",
             system_prompt="You are a gate.",
@@ -481,7 +523,8 @@ class TestSingleRequestProfile:
         mock_client.request = AsyncMock(return_value=mock_resp)
 
         profile = TargetProfile(
-            name="t", type="http",
+            name="t",
+            type="http",
             http_url="http://vm:5000/classify",
             http_body_template='{"prompt": "{{ prompt }}"}',
             http_timeout=10,
@@ -491,9 +534,7 @@ class TestSingleRequestProfile:
             classify={"approved": ["APPROVE"], "blocked": ["DENY"]},
         )
 
-        text, latency, classification = await _single_request_profile(
-            mock_client, profile, "test"
-        )
+        text, latency, classification = await _single_request_profile(mock_client, profile, "test")
 
         assert text == "DENY"
         assert latency == 150.0
@@ -512,15 +553,14 @@ class TestSingleRequestProfile:
         mock_client.request = AsyncMock(return_value=mock_resp)
 
         profile = TargetProfile(
-            name="t", type="http",
+            name="t",
+            type="http",
             http_url="http://vm:5000/gate",
             response_format="text",
             classify={"approved": ["approved"]},
         )
 
-        text, latency, classification = await _single_request_profile(
-            mock_client, profile, "test"
-        )
+        text, latency, classification = await _single_request_profile(mock_client, profile, "test")
 
         assert text == "OK: approved"
         assert classification == "approved"
@@ -539,15 +579,14 @@ class TestSingleRequestProfile:
         mock_client.get = AsyncMock(return_value=mock_resp)
 
         profile = TargetProfile(
-            name="t", type="http",
+            name="t",
+            type="http",
             http_url="http://vm:5000/health",
             http_method="GET",
             response_format="text",
         )
 
-        text, latency, _ = await _single_request_profile(
-            mock_client, profile, "test"
-        )
+        text, latency, _ = await _single_request_profile(mock_client, profile, "test")
 
         assert text == "pong"
         mock_client.get.assert_called_once()
@@ -565,13 +604,12 @@ class TestSingleRequestProfile:
         mock_client.post = AsyncMock(return_value=mock_resp)
 
         profile = TargetProfile(
-            name="t", type="ollama",
+            name="t",
+            type="ollama",
             ollama_host="http://localhost:11434",
             model="test",
         )
 
-        _, _, classification = await _single_request_profile(
-            mock_client, profile, "test"
-        )
+        _, _, classification = await _single_request_profile(mock_client, profile, "test")
 
         assert classification is None

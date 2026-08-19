@@ -449,15 +449,9 @@ def _scratch_schema() -> tuple[dict[str, list[tuple]], dict[str, str]]:
     try:
         scratch.executescript(SCHEMA_SQL)
         tables = [
-            row[0]
-            for row in scratch.execute(
-                "SELECT name FROM sqlite_master WHERE type = 'table'"
-            )
+            row[0] for row in scratch.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
         ]
-        columns = {
-            table: list(scratch.execute(f"PRAGMA table_info({table})"))
-            for table in tables
-        }
+        columns = {table: list(scratch.execute(f"PRAGMA table_info({table})")) for table in tables}
         ddl: dict[str, str] = {}
         for table in tables:
             row = scratch.execute(
@@ -540,9 +534,7 @@ def _rebuild_table(
     conn.execute("PRAGMA foreign_keys=OFF")
     conn.execute(_rename_create_table(create_sql, table, tmp))
     cols = ", ".join(_ident(name) for name in common)
-    conn.execute(
-        f"INSERT INTO {_ident(tmp)} ({cols}) SELECT {cols} FROM {_ident(table)}"
-    )
+    conn.execute(f"INSERT INTO {_ident(tmp)} ({cols}) SELECT {cols} FROM {_ident(table)}")
     conn.execute(f"DROP TABLE {_ident(table)}")
     conn.execute(f"ALTER TABLE {_ident(tmp)} RENAME TO {_ident(table)}")
     conn.execute("PRAGMA foreign_keys=ON")

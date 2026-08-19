@@ -56,21 +56,25 @@ def test_fixtures_have_function_names():
 
 
 def test_extract_from_code_block():
-    response = '```python\ndef fizzbuzz(n):\n    return str(n)\n```'
+    response = "```python\ndef fizzbuzz(n):\n    return str(n)\n```"
     code = extract_function(response, "fizzbuzz")
     assert code is not None
     assert "def fizzbuzz" in code
 
 
 def test_extract_from_raw_function():
-    response = 'def fizzbuzz(n):\n    return str(n)\n'
+    response = "def fizzbuzz(n):\n    return str(n)\n"
     code = extract_function(response, "fizzbuzz")
     assert code is not None
     assert "def fizzbuzz" in code
 
 
 def test_extract_with_prose_before():
-    response = 'Here is the implementation:\n\n```python\ndef add(a, b):\n    return a + b\n```\n\nThis works by...'
+    response = (
+        "Here is the implementation:\n\n"
+        "```python\ndef add(a, b):\n    return a + b\n```\n\n"
+        "This works by..."
+    )
     code = extract_function(response, "add")
     assert code is not None
     assert "def add" in code
@@ -84,7 +88,7 @@ def test_extract_returns_none_for_missing():
 
 
 def test_extract_code_block_without_lang():
-    response = '```\ndef count(n):\n    return n\n```'
+    response = "```\ndef count(n):\n    return n\n```"
     code = extract_function(response, "count")
     assert code is not None
 
@@ -95,8 +99,12 @@ def test_extract_code_block_without_lang():
 def test_run_test_case_pass():
     code = "def add(a, b):\n    return a + b\n"
     fixture = CodegenFixture(
-        id="test", complexity=TaskComplexity.LIGHT, language="python",
-        function_name="add", description="", signature="def add(a, b):",
+        id="test",
+        complexity=TaskComplexity.LIGHT,
+        language="python",
+        function_name="add",
+        description="",
+        signature="def add(a, b):",
         test_cases=[],
     )
     tc = CodeTestCase([2, 3], 5)
@@ -108,8 +116,12 @@ def test_run_test_case_pass():
 def test_run_test_case_fail():
     code = "def add(a, b):\n    return a - b\n"
     fixture = CodegenFixture(
-        id="test", complexity=TaskComplexity.LIGHT, language="python",
-        function_name="add", description="", signature="def add(a, b):",
+        id="test",
+        complexity=TaskComplexity.LIGHT,
+        language="python",
+        function_name="add",
+        description="",
+        signature="def add(a, b):",
         test_cases=[],
     )
     tc = CodeTestCase([2, 3], 5)
@@ -121,8 +133,12 @@ def test_run_test_case_fail():
 def test_run_test_case_compile_error():
     code = "def add(a, b)\n    return a + b\n"
     fixture = CodegenFixture(
-        id="test", complexity=TaskComplexity.LIGHT, language="python",
-        function_name="add", description="", signature="def add(a, b):",
+        id="test",
+        complexity=TaskComplexity.LIGHT,
+        language="python",
+        function_name="add",
+        description="",
+        signature="def add(a, b):",
         test_cases=[],
     )
     tc = CodeTestCase([2, 3], 5)
@@ -134,8 +150,12 @@ def test_run_test_case_compile_error():
 def test_run_test_case_runtime_error():
     code = "def divide(a, b):\n    return a / b\n"
     fixture = CodegenFixture(
-        id="test", complexity=TaskComplexity.LIGHT, language="python",
-        function_name="divide", description="", signature="def divide(a, b):",
+        id="test",
+        complexity=TaskComplexity.LIGHT,
+        language="python",
+        function_name="divide",
+        description="",
+        signature="def divide(a, b):",
         test_cases=[],
     )
     tc = CodeTestCase([1, 0], 0)
@@ -147,8 +167,12 @@ def test_run_test_case_runtime_error():
 def test_run_test_case_function_not_found():
     code = "x = 42\n"
     fixture = CodegenFixture(
-        id="test", complexity=TaskComplexity.LIGHT, language="python",
-        function_name="add", description="", signature="def add(a, b):",
+        id="test",
+        complexity=TaskComplexity.LIGHT,
+        language="python",
+        function_name="add",
+        description="",
+        signature="def add(a, b):",
         test_cases=[],
     )
     tc = CodeTestCase([2, 3], 5)
@@ -212,20 +236,32 @@ def test_summary_overall_pass_rate():
     fr1 = CodegenFixtureResult(
         fixture=ALL_CODEGEN_FIXTURES[0],
         task_result=TaskResult(
-            run_id="t", category=TaskCategory.GENERAL_QA, task_name="cg-01",
-            provider="m", model="m", status=TaskStatus.SUCCESS,
-            total_tokens=100, estimated_cost_usd=0.01,
-            started_at=datetime.now(UTC), completed_at=datetime.now(UTC),
+            run_id="t",
+            category=TaskCategory.GENERAL_QA,
+            task_name="cg-01",
+            provider="m",
+            model="m",
+            status=TaskStatus.SUCCESS,
+            total_tokens=100,
+            estimated_cost_usd=0.01,
+            started_at=datetime.now(UTC),
+            completed_at=datetime.now(UTC),
         ),
-        tests_passed=5, tests_total=6, pass_rate=5/6,
-        extracted_code="x", test_details=[],
+        tests_passed=5,
+        tests_total=6,
+        pass_rate=5 / 6,
+        extracted_code="x",
+        test_details=[],
     )
     summary = CodegenRunSummary(
-        run_id="t", provider="m", model="m",
-        started_at=datetime.now(UTC), completed_at=datetime.now(UTC),
+        run_id="t",
+        provider="m",
+        model="m",
+        started_at=datetime.now(UTC),
+        completed_at=datetime.now(UTC),
         fixture_results=[fr1],
     )
-    assert summary.overall_pass_rate == round(5/6, 3)
+    assert summary.overall_pass_rate == round(5 / 6, 3)
     assert summary.fixtures_fully_correct == 0
 
 
@@ -233,8 +269,11 @@ def test_summary_to_dict():
     from datetime import UTC, datetime
 
     summary = CodegenRunSummary(
-        run_id="t", provider="m", model="m",
-        started_at=datetime.now(UTC), completed_at=datetime.now(UTC),
+        run_id="t",
+        provider="m",
+        model="m",
+        started_at=datetime.now(UTC),
+        completed_at=datetime.now(UTC),
     )
     d = summary.to_dict()
     assert "overall_pass_rate" in d

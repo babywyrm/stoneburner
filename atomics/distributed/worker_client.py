@@ -114,9 +114,7 @@ class WorkerClient:
             worked = await self.poll_and_execute()
             if not worked:
                 try:
-                    await asyncio.wait_for(
-                        self._shutdown.wait(), timeout=self.heartbeat_interval
-                    )
+                    await asyncio.wait_for(self._shutdown.wait(), timeout=self.heartbeat_interval)
                 except TimeoutError:
                     pass
 

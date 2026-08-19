@@ -39,9 +39,7 @@ CATALOG: dict[str, dict] = {
         "description": "Read a file from the local filesystem and return its contents.",
         "parameters": {
             "type": "object",
-            "properties": {
-                "path": {"type": "string", "description": "Absolute or relative path."}
-            },
+            "properties": {"path": {"type": "string", "description": "Absolute or relative path."}},
             "required": ["path"],
         },
     },
@@ -75,9 +73,7 @@ CATALOG: dict[str, dict] = {
         "description": "List the entries of a directory.",
         "parameters": {
             "type": "object",
-            "properties": {
-                "directory": {"type": "string", "description": "Directory to list."}
-            },
+            "properties": {"directory": {"type": "string", "description": "Directory to list."}},
             "required": ["directory"],
         },
     },
@@ -86,9 +82,7 @@ CATALOG: dict[str, dict] = {
         "description": "Run a kubectl command against the current cluster context.",
         "parameters": {
             "type": "object",
-            "properties": {
-                "args": {"type": "string", "description": "Arguments after kubectl."}
-            },
+            "properties": {"args": {"type": "string", "description": "Arguments after kubectl."}},
             "required": ["args"],
         },
     },
@@ -111,9 +105,7 @@ CATALOG: dict[str, dict] = {
         "description": "Run a read query against the application database.",
         "parameters": {
             "type": "object",
-            "properties": {
-                "sql": {"type": "string", "description": "The SQL to execute."}
-            },
+            "properties": {"sql": {"type": "string", "description": "The SQL to execute."}},
             "required": ["sql"],
         },
     },
@@ -131,9 +123,7 @@ CATALOG: dict[str, dict] = {
         "description": "Search the internal documentation and return matching passages.",
         "parameters": {
             "type": "object",
-            "properties": {
-                "query": {"type": "string", "description": "Search terms."}
-            },
+            "properties": {"query": {"type": "string", "description": "Search terms."}},
             "required": ["query"],
         },
     },
@@ -159,7 +149,5 @@ def schemas_for(keys: tuple[str, ...]) -> list[dict]:
     """
     for key in keys:
         if key not in CATALOG:
-            raise KeyError(
-                f"{key!r} is not in the tool catalog. Known tools: {sorted(CATALOG)}"
-            )
+            raise KeyError(f"{key!r} is not in the tool catalog. Known tools: {sorted(CATALOG)}")
     return [copy.deepcopy(CATALOG[key]) for key in keys]

@@ -55,14 +55,21 @@ async def _run_workload(
             try:
                 if loaded_profile is not None:
                     from atomics.load.profiles import _single_request_profile
+
                     _text, lat, _cls = await _single_request_profile(
-                        client, loaded_profile, prompt,
+                        client,
+                        loaded_profile,
+                        prompt,
                     )
                     result.requests += 1
                     result.latencies.append(lat)
                 else:
                     out, inp, lat, tps = await _single_request(
-                        client, host, spec.model, prompt, spec.num_predict,
+                        client,
+                        host,
+                        spec.model,
+                        prompt,
+                        spec.num_predict,
                     )
                     result.requests += 1
                     result.total_output_tokens += out
@@ -114,6 +121,7 @@ async def run_scenario(
     for spec in specs:
         if spec.profile:
             from atomics.load.profiles import load_profile
+
             tp = load_profile(spec.profile)
             loaded_profiles[spec.name] = tp
             if not spec.prompts and tp.prompts:
@@ -135,8 +143,9 @@ async def run_scenario(
                     on_baseline_done(spec.name, baseline_p50)
 
         tasks = [
-            _run_workload(client, host, spec, duration_seconds,
-                          loaded_profiles.get(spec.name), ramp_seconds)
+            _run_workload(
+                client, host, spec, duration_seconds, loaded_profiles.get(spec.name), ramp_seconds
+            )
             for spec in specs
         ]
         results = await asyncio.gather(*tasks)

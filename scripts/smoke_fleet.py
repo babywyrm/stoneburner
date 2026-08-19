@@ -107,25 +107,37 @@ class Fleet:
 
     def _spawn(self, argv: list[str]) -> subprocess.Popen:
         proc = subprocess.Popen(
-            argv, cwd=self.work, env=self.env,
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            argv,
+            cwd=self.work,
+            env=self.env,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
         )
         self.procs.append(proc)
         return proc
 
     def wait_healthy(self) -> bool:
         return bool(
-            wait_for(
-                lambda: httpx.get(f"{self.url}/api/v1/health", timeout=2).status_code == 200
-            )
+            wait_for(lambda: httpx.get(f"{self.url}/api/v1/health", timeout=2).status_code == 200)
         )
 
     def add_worker(self, *labels: str, heartbeat: int = 5) -> subprocess.Popen:
         label_flags = [f for label in labels for f in ("--label", label)]
-        return self._spawn([
-            ATOMICS, "worker", "--coordinator", self.url, "--api-key", KEY,
-            *label_flags, "-p", "vllm", "--heartbeat-interval", str(heartbeat),
-        ])
+        return self._spawn(
+            [
+                ATOMICS,
+                "worker",
+                "--coordinator",
+                self.url,
+                "--api-key",
+                KEY,
+                *label_flags,
+                "-p",
+                "vllm",
+                "--heartbeat-interval",
+                str(heartbeat),
+            ]
+        )
 
     def wait_for_workers(self, count: int) -> bool:
         return bool(wait_for(lambda: len(worker_rows(self.db)) >= count, timeout=45))
@@ -139,13 +151,16 @@ class Fleet:
             payload["worker_selector"] = selector
         return httpx.post(
             f"{self.url}/api/v1/distributed/runs",
-            json=payload, headers=self.auth, timeout=15,
+            json=payload,
+            headers=self.auth,
+            timeout=15,
         )
 
     def job(self, job_id: str) -> dict:
         return httpx.get(
             f"{self.url}/api/v1/distributed/runs/{job_id}",
-            headers=self.auth, timeout=10,
+            headers=self.auth,
+            timeout=10,
         ).json()
 
     def wait_terminal(self, job_id: str, timeout=120.0) -> dict | None:
@@ -159,9 +174,12 @@ class Fleet:
 
     def status_output(self, job_id: str) -> subprocess.CompletedProcess:
         return subprocess.run(
-            [ATOMICS, "distributed", "status", job_id,
-             "--coordinator", self.url, "--api-key", KEY],
-            cwd=self.work, env=self.env, capture_output=True, text=True, timeout=60,
+            [ATOMICS, "distributed", "status", job_id, "--coordinator", self.url, "--api-key", KEY],
+            cwd=self.work,
+            env=self.env,
+            capture_output=True,
+            text=True,
+            timeout=60,
         )
 
     def stop(self) -> None:
@@ -183,7 +201,8 @@ def phase_happy_path(stub: StubInferenceServer) -> None:
 
         anon = httpx.post(
             f"{fleet.url}/api/v1/distributed/runs",
-            json={"mode": "split", "run_request": {"iterations": 1}}, timeout=10,
+            json={"mode": "split", "run_request": {"iterations": 1}},
+            timeout=10,
         )
         check("anonymous submit rejected", anon.status_code == 401, f"got {anon.status_code}")
 
@@ -192,35 +211,46 @@ def phase_happy_path(stub: StubInferenceServer) -> None:
         check("both worker processes registered", fleet.wait_for_workers(2))
 
         submit = fleet.submit_fleet(2, selector={"site": "lab"})
-        check("fleet run accepted", submit.status_code == 202,
-              f"got {submit.status_code}: {submit.text[:160]}")
+        check(
+            "fleet run accepted",
+            submit.status_code == 202,
+            f"got {submit.status_code}: {submit.text[:160]}",
+        )
         if submit.status_code != 202:
             return
         job_id = submit.json()["job_id"]
 
         done = fleet.wait_terminal(job_id, timeout=90)
-        check("job reached a terminal status", bool(done),
-              (done or {}).get("status", "timed out"))
+        check("job reached a terminal status", bool(done), (done or {}).get("status", "timed out"))
         if not done:
             return
         check("job completed cleanly", done["status"] == "completed", done["status"])
-        check("stub served real inference over HTTP", len(stub.chat_completions()) >= 4,
-              f"{len(stub.chat_completions())} chat completions")
+        check(
+            "stub served real inference over HTTP",
+            len(stub.chat_completions()) >= 4,
+            f"{len(stub.chat_completions())} chat completions",
+        )
 
         summary = json.loads(done["summary_json"])
         hosts = {w["labels"].get("box"): w for w in summary["workers"]}
         check("rollup has a row per host", set(hosts) == {"alpha", "beta"}, str(set(hosts)))
-        check("each host ran the full task set",
-              all(h["completed"] == 2 for h in hosts.values()),
-              str({k: v["completed"] for k, v in hosts.items()}))
+        check(
+            "each host ran the full task set",
+            all(h["completed"] == 2 for h in hosts.values()),
+            str({k: v["completed"] for k, v in hosts.items()}),
+        )
 
         table = fleet.status_output(job_id)
         check("distributed status exits 0", table.returncode == 0, table.stderr[-160:])
         # Full ids, not "5b5fc...": a truncated table cannot say which host won.
-        check("both worker ids readable in the table",
-              all(w["worker_id"] in table.stdout for w in summary["workers"]))
-        check("labels readable in the table",
-              "box=alpha" in table.stdout and "box=beta" in table.stdout)
+        check(
+            "both worker ids readable in the table",
+            all(w["worker_id"] in table.stdout for w in summary["workers"]),
+        )
+        check(
+            "labels readable in the table",
+            "box=alpha" in table.stdout and "box=beta" in table.stdout,
+        )
         print("\n" + table.stdout)
     finally:
         fleet.stop()
@@ -234,7 +264,8 @@ def phase_host_loss(stub: StubInferenceServer) -> None:
     # heartbeat and a 120s window, which would make the same assertions a
     # three-minute wait.
     fleet = Fleet(
-        "host-loss", stub,
+        "host-loss",
+        stub,
         **{"--worker-absent-after": str(absent_after)},
     )
     try:
@@ -245,8 +276,11 @@ def phase_host_loss(stub: StubInferenceServer) -> None:
 
         before = {wid for wid, _ in worker_rows(fleet.db)}
         submit = fleet.submit_fleet(6)
-        check("fleet run accepted", submit.status_code == 202,
-              f"got {submit.status_code}: {submit.text[:160]}")
+        check(
+            "fleet run accepted",
+            submit.status_code == 202,
+            f"got {submit.status_code}: {submit.text[:160]}",
+        )
         if submit.status_code != 202:
             return
         job_id = submit.json()["job_id"]
@@ -262,33 +296,46 @@ def phase_host_loss(stub: StubInferenceServer) -> None:
             lambda: [wid for wid, status in worker_rows(fleet.db) if status == "offline"],
             timeout=absent_after + 40,
         )
-        check("the silent host is marked offline", bool(offline),
-              f"offline: {offline[0]}" if offline
-              else "still online after the threshold elapsed")
+        check(
+            "the silent host is marked offline",
+            bool(offline),
+            f"offline: {offline[0]}" if offline else "still online after the threshold elapsed",
+        )
 
         done = fleet.wait_terminal(job_id, timeout=120)
-        check("the job resolves instead of waiting on a dead host", bool(done),
-              (done or {}).get("status", "timed out"))
+        check(
+            "the job resolves instead of waiting on a dead host",
+            bool(done),
+            (done or {}).get("status", "timed out"),
+        )
         if not done:
             return
         check("job resolved to partial", done["status"] == "partial", done["status"])
 
         summary = json.loads(done["summary_json"])
         hosts = {w["labels"].get("box"): w for w in summary["workers"]}
-        check("the surviving host finished its whole slice",
-              hosts.get("survivor", {}).get("completed") == 6,
-              str(hosts.get("survivor", {}).get("completed")))
-        check("the dead host's losses are recorded, not hidden",
-              summary["failed"] >= 1, f"{summary['failed']} failed")
-        check("every assignment is accounted for",
-              summary["completed"] + summary["failed"] == 12,
-              f"{summary['completed']} + {summary['failed']}")
-        check("no worker vanished from the registry",
-              {wid for wid, _ in worker_rows(fleet.db)} == before)
+        check(
+            "the surviving host finished its whole slice",
+            hosts.get("survivor", {}).get("completed") == 6,
+            str(hosts.get("survivor", {}).get("completed")),
+        )
+        check(
+            "the dead host's losses are recorded, not hidden",
+            summary["failed"] >= 1,
+            f"{summary['failed']} failed",
+        )
+        check(
+            "every assignment is accounted for",
+            summary["completed"] + summary["failed"] == 12,
+            f"{summary['completed']} + {summary['failed']}",
+        )
+        check(
+            "no worker vanished from the registry",
+            {wid for wid, _ in worker_rows(fleet.db)} == before,
+        )
 
         table = fleet.status_output(job_id)
-        check("status renders a partial fleet run", table.returncode == 0,
-              table.stderr[-160:])
+        check("status renders a partial fleet run", table.returncode == 0, table.stderr[-160:])
         print("\n" + table.stdout)
     finally:
         fleet.stop()

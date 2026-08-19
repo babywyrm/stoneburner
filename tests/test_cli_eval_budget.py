@@ -56,9 +56,7 @@ def test_no_eval_running_command_is_missing_a_budget():
     }
 
     covered = {
-        path.stem
-        for path in commands_dir.glob("*.py")
-        if "budget_option" in path.read_text()
+        path.stem for path in commands_dir.glob("*.py") if "budget_option" in path.read_text()
     }
     assert spending_modules <= covered, (
         f"modules that run eval suites without a --budget: {spending_modules - covered}"

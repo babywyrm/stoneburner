@@ -74,8 +74,8 @@ every item here is a refactor with the test suite as the contract.
       share one lifetime
 - [x] Group the 30 flat top-level modules into `load/`, `benchmark/`, and
       `reporting/` packages. Old `atomics.<name>` imports stay as shims.
-- [ ] Enforce the configured line length instead of `--ignore E501`, which
-      currently suppresses ~396 violations and makes the setting inert
+- [x] Enforce the configured line length instead of `--ignore E501`.
+      Fixture payload files stay exempt so scored prompts are not rewritten.
 - [x] Decide the fate of `inference.py` and `workers/bridge.py`.
       `doctor` and `make_provider` consume the control file (host/model
       overlay only; provider name stays with the caller). `bridge.py` was

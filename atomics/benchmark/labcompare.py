@@ -43,9 +43,7 @@ def parse_host_specs(raw: list[str]) -> list[HostSpec]:
     return specs
 
 
-def vram_fit_from_ps(
-    ps_payload: dict, model: str
-) -> tuple[float | None, str | None]:
+def vram_fit_from_ps(ps_payload: dict, model: str) -> tuple[float | None, str | None]:
     """Compute VRAM fit ratio for a model from an Ollama /api/ps payload.
 
     Returns (fit_pct, gpu_name). fit_pct is size_vram/size in [0,1]; 1.0 means
@@ -209,13 +207,9 @@ async def run_labcompare(
                     cell.vram_fit_pct = tp.vram_fit_pct
                     cell.gpu_name = tp.gpu_name
                 if "quality" in dimensions:
-                    cell.quality_score = await quality_fn(
-                        provider, judge_host, judge_model, model
-                    )
+                    cell.quality_score = await quality_fn(provider, judge_host, judge_model, model)
             except Exception as exc:
                 cell.error = sanitize_error(exc)[:200]
-                logger.warning(
-                    "labcompare: cell %s/%s failed: %s", host.name, model, cell.error
-                )
+                logger.warning("labcompare: cell %s/%s failed: %s", host.name, model, cell.error)
             cells.append(cell)
     return cells

@@ -46,7 +46,7 @@ SECURE_CODE_FIXTURES: list[SecureCodeFixture] = [
         is_vulnerable=True,
         code=(
             "def get_user(db, username):\n"
-            "    query = \"SELECT * FROM users WHERE name = '\" + username + \"'\"\n"
+            '    query = "SELECT * FROM users WHERE name = \'" + username + "\'"\n'
             "    return db.execute(query).fetchone()\n"
         ),
         expected_findings=[
@@ -63,11 +63,7 @@ SECURE_CODE_FIXTURES: list[SecureCodeFixture] = [
         cwe="CWE-78 OS Command Injection",
         severity="CRITICAL",
         is_vulnerable=True,
-        code=(
-            "import os\n"
-            "def ping(host):\n"
-            "    os.system('ping -c 1 ' + host)\n"
-        ),
+        code=("import os\ndef ping(host):\n    os.system('ping -c 1 ' + host)\n"),
         expected_findings=[
             "command injection",
             "unsanitized input passed to os.system/shell",
@@ -125,11 +121,7 @@ SECURE_CODE_FIXTURES: list[SecureCodeFixture] = [
         cwe="CWE-502 Insecure Deserialization",
         severity="HIGH",
         is_vulnerable=True,
-        code=(
-            "import pickle\n"
-            "def load_session(data: bytes):\n"
-            "    return pickle.loads(data)\n"
-        ),
+        code=("import pickle\ndef load_session(data: bytes):\n    return pickle.loads(data)\n"),
         expected_findings=[
             "insecure deserialization",
             "pickle.loads on untrusted data enables code execution",

@@ -28,7 +28,7 @@ DEFAULT_TIMEOUT_SECONDS = 5.0
 # Runs in the child with no atomics imports, so it stays independent of how the
 # parent was installed. Results go out as a repr so tuples and sets survive the
 # round trip that JSON would flatten.
-_CHILD_PROGRAM = r'''
+_CHILD_PROGRAM = r"""
 import ast, json, sys
 
 # Generated code may print. Hand it stderr so stdout carries only our result.
@@ -97,7 +97,7 @@ except BaseException as exc:
     _emit({"status": "unrepresentable", "detail": type(exc).__name__ + ": " + str(exc)})
 
 _emit({"status": "ok", "result_repr": encoded})
-'''
+"""
 
 
 @dataclass(frozen=True)
@@ -164,9 +164,7 @@ def execute(
             return SandboxOutcome("timeout")
 
     if not stdout.strip():
-        return SandboxOutcome(
-            "crashed", detail=f"child exited with code {proc.returncode}"
-        )
+        return SandboxOutcome("crashed", detail=f"child exited with code {proc.returncode}")
 
     try:
         reported = json.loads(stdout)
@@ -182,9 +180,7 @@ def execute(
     try:
         value = ast.literal_eval(reported["result_repr"])
     except (ValueError, SyntaxError):
-        return SandboxOutcome(
-            "unrepresentable", detail=f"returned {reported['result_repr']}"
-        )
+        return SandboxOutcome("unrepresentable", detail=f"returned {reported['result_repr']}")
     return SandboxOutcome("ok", result=value)
 
 

@@ -27,9 +27,7 @@ def test_brain_gateway_defaults():
 
 
 def test_brain_gateway_custom_url():
-    provider = BrainGatewayProvider(
-        url="http://gpu-host:30080", default_model="claude-haiku-4-5"
-    )
+    provider = BrainGatewayProvider(url="http://gpu-host:30080", default_model="claude-haiku-4-5")
     assert provider._url == "http://gpu-host:30080"
     assert provider._default_model == "claude-haiku-4-5"
 
@@ -44,16 +42,18 @@ async def test_brain_gateway_generate_success(
     scripted_clock: Callable[[ModuleType, float], None],
 ):
     scripted_clock(brain_gateway, 0.5)
-    inner_text = json.dumps({
-        "answer": "4",
-        "prompt_source": "default",
-        "_usage": {
-            "input_tokens": 12,
-            "output_tokens": 3,
-            "cost_usd": 0.000081,
-            "model": "claude-sonnet-4-6",
-        },
-    })
+    inner_text = json.dumps(
+        {
+            "answer": "4",
+            "prompt_source": "default",
+            "_usage": {
+                "input_tokens": 12,
+                "output_tokens": 3,
+                "cost_usd": 0.000081,
+                "model": "claude-sonnet-4-6",
+            },
+        }
+    )
 
     mock_response = MagicMock()
     mock_response.status_code = 200
@@ -93,10 +93,17 @@ async def test_brain_gateway_generate_success(
 
 @pytest.mark.asyncio
 async def test_brain_gateway_generate_with_model_switch():
-    inner_text = json.dumps({
-        "answer": "test",
-        "_usage": {"input_tokens": 5, "output_tokens": 2, "cost_usd": 0.0, "model": "llama3.2:3b"},
-    })
+    inner_text = json.dumps(
+        {
+            "answer": "test",
+            "_usage": {
+                "input_tokens": 5,
+                "output_tokens": 2,
+                "cost_usd": 0.0,
+                "model": "llama3.2:3b",
+            },
+        }
+    )
 
     mock_response = MagicMock()
     mock_response.status_code = 200

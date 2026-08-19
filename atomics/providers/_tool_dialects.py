@@ -44,9 +44,7 @@ def parse_openai_tool_calls(message: dict[str, Any]) -> tuple[ToolCall, ...]:
         if not name:
             continue
         arguments, malformed = parse_arguments(function.get("arguments"))
-        calls.append(
-            ToolCall(name=name, arguments=arguments, malformed=malformed, raw=entry)
-        )
+        calls.append(ToolCall(name=name, arguments=arguments, malformed=malformed, raw=entry))
     return tuple(calls)
 
 
@@ -71,9 +69,7 @@ def anthropic_tool_payload(schemas: list[dict]) -> list[dict]:
         {
             "name": schema["name"],
             "description": schema.get("description", ""),
-            "input_schema": schema.get(
-                "parameters", {"type": "object", "properties": {}}
-            ),
+            "input_schema": schema.get("parameters", {"type": "object", "properties": {}}),
         }
         for schema in schemas
     ]

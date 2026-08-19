@@ -53,7 +53,10 @@ def _build_slack_payload(
                     {"type": "mrkdwn", "text": f"*Run ID:* `{summary.run_id}`"},
                     {"type": "mrkdwn", "text": f"*Provider:* {provider}"},
                     {"type": "mrkdwn", "text": f"*Tier:* {tier}"},
-                    {"type": "mrkdwn", "text": f"*Tasks:* {summary.successful_tasks}/{summary.total_tasks} OK"},
+                    {
+                        "type": "mrkdwn",
+                        "text": f"*Tasks:* {summary.successful_tasks}/{summary.total_tasks} OK",
+                    },
                     {"type": "mrkdwn", "text": f"*Tokens:* {summary.total_tokens:,}"},
                     {"type": "mrkdwn", "text": f"*Cost:* ${summary.total_cost_usd:.4f}"},
                 ],
@@ -83,7 +86,11 @@ def _build_discord_payload(
                     {"name": "Run ID", "value": f"`{summary.run_id}`", "inline": True},
                     {"name": "Provider", "value": provider, "inline": True},
                     {"name": "Tier", "value": tier, "inline": True},
-                    {"name": "Tasks", "value": f"{summary.successful_tasks}/{summary.total_tasks}", "inline": True},
+                    {
+                        "name": "Tasks",
+                        "value": f"{summary.successful_tasks}/{summary.total_tasks}",
+                        "inline": True,
+                    },
                     {"name": "Tokens", "value": f"{summary.total_tokens:,}", "inline": True},
                     {"name": "Cost", "value": f"${summary.total_cost_usd:.4f}", "inline": True},
                 ],
@@ -163,17 +170,20 @@ def check_regression(
     alerts: list[str] = []
 
     if previous_avg_latency is not None and current.avg_latency_ms > 0:
-        increase_pct = (
-            (current.avg_latency_ms - previous_avg_latency) / previous_avg_latency * 100
-        )
+        increase_pct = (current.avg_latency_ms - previous_avg_latency) / previous_avg_latency * 100
         if increase_pct > latency_threshold_pct:
-            alerts.append(f"Latency +{increase_pct:.0f}% ({previous_avg_latency:.0f}ms -> {current.avg_latency_ms:.0f}ms)")
+            alerts.append(
+                f"Latency +{increase_pct:.0f}% "
+                f"({previous_avg_latency:.0f}ms -> {current.avg_latency_ms:.0f}ms)"
+            )
 
     if previous_success_rate is not None and current.total_tasks > 0:
         current_rate = current.successful_tasks / current.total_tasks * 100
         drop = previous_success_rate - current_rate
         if drop > success_threshold_pct:
-            alerts.append(f"Success rate -{drop:.0f}% ({previous_success_rate:.0f}% -> {current_rate:.0f}%)")
+            alerts.append(
+                f"Success rate -{drop:.0f}% ({previous_success_rate:.0f}% -> {current_rate:.0f}%)"
+            )
 
     if current.total_tasks > 0 and current.failed_tasks / current.total_tasks > 0.2:
         alerts.append(f"High failure rate: {current.failed_tasks}/{current.total_tasks}")

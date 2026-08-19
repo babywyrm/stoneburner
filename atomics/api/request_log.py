@@ -61,9 +61,7 @@ async def request_log_middleware(
     call_next: Callable[[Request], Awaitable[Response]],
 ) -> Response:
     """Assign a correlation ID, then log one line describing the request."""
-    request_id = sanitize_request_id(
-        request.headers.get(REQUEST_ID_HEADER)
-    ) or new_request_id()
+    request_id = sanitize_request_id(request.headers.get(REQUEST_ID_HEADER)) or new_request_id()
     token = _request_id.set(request_id)
     request.state.request_id = request_id
 

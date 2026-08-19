@@ -229,9 +229,7 @@ def _collect_policy_fields(
     if isinstance(value, dict):
         for key, nested in value.items():
             normalized_key = str(key).lower()
-            if normalized_key in {"code", "reason", "type"} and isinstance(
-                nested, (str, int)
-            ):
+            if normalized_key in {"code", "reason", "type"} and isinstance(nested, (str, int)):
                 codes.append(str(nested))
             elif normalized_key in {"message", "detail", "error_description"} and isinstance(
                 nested, str

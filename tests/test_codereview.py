@@ -11,6 +11,7 @@ from atomics.providers.base import ProviderResponse
 
 # ── Fixture set sanity ─────────────────────────────────────────────────────
 
+
 def test_fixtures_have_vulnerable_and_clean():
     vuln = [f for f in SECURE_CODE_FIXTURES if f.is_vulnerable]
     clean = [f for f in SECURE_CODE_FIXTURES if not f.is_vulnerable]
@@ -45,14 +46,29 @@ def test_diff_fixtures_look_like_diffs():
 
 # ── Runner + rollups (mocked providers) ────────────────────────────────────
 
+
 class _FakeProvider:
     name = "fake"
 
-    async def generate(self, prompt, *, system=None, model=None, max_tokens=256,
-                       thinking=None, thinking_budget=None, temperature=None):
+    async def generate(
+        self,
+        prompt,
+        *,
+        system=None,
+        model=None,
+        max_tokens=256,
+        thinking=None,
+        thinking_budget=None,
+        temperature=None,
+    ):
         return ProviderResponse(
-            text="my review", input_tokens=5, output_tokens=5, total_tokens=10,
-            model=model or "m", latency_ms=100.0, estimated_cost_usd=0.0,
+            text="my review",
+            input_tokens=5,
+            output_tokens=5,
+            total_tokens=10,
+            model=model or "m",
+            latency_ms=100.0,
+            estimated_cost_usd=0.0,
         )
 
 
@@ -62,13 +78,23 @@ class _FakeJudge:
     perfect=True → always grades correctly (detected on vuln, clean on clean).
     perfect=False → always grades incorrectly (missed on vuln, false_positive on clean).
     """
+
     name = "judge"
 
     def __init__(self, perfect: bool):
         self._perfect = perfect
 
-    async def generate(self, prompt, *, system=None, model=None, max_tokens=256,
-                       thinking=None, thinking_budget=None, temperature=None):
+    async def generate(
+        self,
+        prompt,
+        *,
+        system=None,
+        model=None,
+        max_tokens=256,
+        thinking=None,
+        thinking_budget=None,
+        temperature=None,
+    ):
         # The vuln-judge prompt contains "GROUND TRUTH: the reviewed code contains"
         is_vuln_prompt = "contains this vulnerability" in prompt
         if is_vuln_prompt:
@@ -76,8 +102,12 @@ class _FakeJudge:
         else:
             verdict = "CLEAN" if self._perfect else "FALSE_POSITIVE"
         return ProviderResponse(
-            text=f"VERDICT: {verdict}\nRATIONALE: x", input_tokens=5,
-            output_tokens=5, total_tokens=10, model="judge", latency_ms=50.0,
+            text=f"VERDICT: {verdict}\nRATIONALE: x",
+            input_tokens=5,
+            output_tokens=5,
+            total_tokens=10,
+            model="judge",
+            latency_ms=50.0,
             estimated_cost_usd=0.0,
         )
 
@@ -96,8 +126,13 @@ class _EmptyProvider:
 
     async def generate(self, *_args, **_kwargs):
         return ProviderResponse(
-            text="", input_tokens=2, output_tokens=0, total_tokens=2,
-            model="empty-model", latency_ms=10.0, estimated_cost_usd=0.0,
+            text="",
+            input_tokens=2,
+            output_tokens=0,
+            total_tokens=2,
+            model="empty-model",
+            latency_ms=10.0,
+            estimated_cost_usd=0.0,
         )
 
 
@@ -111,8 +146,10 @@ class _CleanFixtureFailingJudge(_FakeJudge):
 @pytest.mark.asyncio
 async def test_perfect_reviewer_scores_high():
     summary = await run_codereview(
-        _FakeProvider(), judge_provider=_FakeJudge(perfect=True),
-        model="m", judge_model="judge",
+        _FakeProvider(),
+        judge_provider=_FakeJudge(perfect=True),
+        model="m",
+        judge_model="judge",
     )
     assert summary.detection_rate == 1.0
     assert summary.false_positive_rate == 0.0
@@ -122,8 +159,10 @@ async def test_perfect_reviewer_scores_high():
 @pytest.mark.asyncio
 async def test_bad_reviewer_scores_low():
     summary = await run_codereview(
-        _FakeProvider(), judge_provider=_FakeJudge(perfect=False),
-        model="m", judge_model="judge",
+        _FakeProvider(),
+        judge_provider=_FakeJudge(perfect=False),
+        model="m",
+        judge_model="judge",
     )
     assert summary.detection_rate == 0.0
     assert summary.false_positive_rate == 1.0
@@ -133,8 +172,11 @@ async def test_bad_reviewer_scores_low():
 @pytest.mark.asyncio
 async def test_summary_to_dict_shape():
     summary = await run_codereview(
-        _FakeProvider(), judge_provider=_FakeJudge(perfect=True),
-        model="m", judge_model="judge", fixtures=SECURE_CODE_FIXTURES[:2],
+        _FakeProvider(),
+        judge_provider=_FakeJudge(perfect=True),
+        model="m",
+        judge_model="judge",
+        fixtures=SECURE_CODE_FIXTURES[:2],
     )
     d = summary.to_dict()
     assert {"detection_rate", "false_positive_rate", "review_score"} <= d.keys()
@@ -144,8 +186,11 @@ async def test_summary_to_dict_shape():
 @pytest.mark.asyncio
 async def test_codereview_summary_exposes_complete_integrity_and_alias():
     summary = await run_codereview(
-        _FakeProvider(), judge_provider=_FakeJudge(perfect=True),
-        model="m", judge_model="judge", fixtures=SECURE_CODE_FIXTURES[:2],
+        _FakeProvider(),
+        judge_provider=_FakeJudge(perfect=True),
+        model="m",
+        judge_model="judge",
+        fixtures=SECURE_CODE_FIXTURES[:2],
     )
 
     assert summary.fixture_results is summary.results
@@ -159,7 +204,8 @@ async def test_codereview_summary_exposes_complete_integrity_and_alias():
 @pytest.mark.asyncio
 async def test_codereview_judge_failure_is_indeterminate():
     summary = await run_codereview(
-        _FakeProvider(), judge_provider=_FailingProvider(),
+        _FakeProvider(),
+        judge_provider=_FailingProvider(),
         fixtures=SECURE_CODE_FIXTURES[:1],
     )
 
@@ -174,7 +220,8 @@ async def test_codereview_judge_failure_is_indeterminate():
 @pytest.mark.asyncio
 async def test_codereview_provider_timeout_retains_failed_attempt():
     summary = await run_codereview(
-        _FailingProvider(), judge_provider=_FakeJudge(perfect=True),
+        _FailingProvider(),
+        judge_provider=_FakeJudge(perfect=True),
         fixtures=SECURE_CODE_FIXTURES[:1],
     )
 
@@ -187,7 +234,9 @@ async def test_codereview_provider_timeout_retains_failed_attempt():
 async def test_empty_review_is_indeterminate():
     clean = [f for f in SECURE_CODE_FIXTURES if not f.is_vulnerable][:1]
     summary = await run_codereview(
-        _EmptyProvider(), judge_provider=_FakeJudge(perfect=True), fixtures=clean,
+        _EmptyProvider(),
+        judge_provider=_FakeJudge(perfect=True),
+        fixtures=clean,
     )
 
     assert summary.review_score is None
@@ -238,8 +287,17 @@ class _FixedVerdictJudge:
     def __init__(self, verdict: str) -> None:
         self._verdict = verdict
 
-    async def generate(self, prompt, *, system=None, model=None, max_tokens=256,
-                       thinking=None, thinking_budget=None, temperature=None):
+    async def generate(
+        self,
+        prompt,
+        *,
+        system=None,
+        model=None,
+        max_tokens=256,
+        thinking=None,
+        thinking_budget=None,
+        temperature=None,
+    ):
         return ProviderResponse(
             text=f"VERDICT: {self._verdict}\nRATIONALE: fixed",
             input_tokens=5,
@@ -275,6 +333,7 @@ async def test_thinking_flag_is_forwarded_to_generate():
 @pytest.mark.asyncio
 async def test_self_judge_is_logged(caplog):
     """Code review must warn when the model under test is also the judge."""
+
     class _Same(_FakeProvider):
         name = "ollama"
 

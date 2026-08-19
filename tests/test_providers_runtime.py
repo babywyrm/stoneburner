@@ -87,6 +87,7 @@ async def test_claude_generate_captures_cache_tokens():
 @pytest.mark.asyncio
 async def test_claude_generate_without_cache_fields_defaults_zero():
     """A usage object lacking cache fields must not crash and reports 0."""
+
     class FakeMessages:
         async def create(self, **_kwargs):
             return _FakeClaudeResp()
@@ -192,9 +193,7 @@ async def test_openai_health_failure():
         async def create(self, **_kwargs):
             raise RuntimeError("boom")
 
-    fake_client = type(
-        "Bad", (), {"chat": type("Chat", (), {"completions": BadCompletions()})()}
-    )()
+    fake_client = type("Bad", (), {"chat": type("Chat", (), {"completions": BadCompletions()})()})()
 
     from atomics.providers.openai import OpenAIProvider
 
@@ -206,6 +205,7 @@ async def test_openai_health_failure():
 async def test_openai_health_passes_on_empty_reasoning_response():
     """A reasoning model can burn the whole budget and return empty visible text
     (finish_reason='length'); a token-consuming round-trip still means healthy."""
+
     class _EmptyChoice:
         def __init__(self):
             self.message = type("Msg", (), {"content": ""})()

@@ -15,7 +15,8 @@ def _harmonic(a: float, b: float) -> float:
 
 
 def score_objective(
-    findings: list[Finding], answer_key: AnswerKey,
+    findings: list[Finding],
+    answer_key: AnswerKey,
 ) -> tuple[float, float, float, list[str]]:
     """Return (weighted_recall, precision, f, matched_categories).
 
@@ -43,7 +44,8 @@ def _jaccard(a: set[str], b: set[str]) -> float:
 
 
 def compute_robustness(
-    round_category_sets: list[set[str]], round_recalls: list[float],
+    round_category_sets: list[set[str]],
+    round_recalls: list[float],
 ) -> tuple[float, float]:
     """Return (mean_pairwise_jaccard_stability, recall_stdev) across rounds.
 
@@ -55,7 +57,8 @@ def compute_robustness(
         return 1.0, 0.0
     sims = [
         _jaccard(round_category_sets[i], round_category_sets[j])
-        for i in range(n) for j in range(i + 1, n)
+        for i in range(n)
+        for j in range(i + 1, n)
     ]
     stability = round(sum(sims) / len(sims), 4)
     recall_sd = round(statistics.pstdev(round_recalls), 4) if len(round_recalls) > 1 else 0.0
@@ -80,18 +83,25 @@ ANALYSIS:
 {analysis}
 """
 
-_REASONING_RE = re.compile(
-    r"REASONING\W{0,4}(\d+)[\s\S]*?RATIONALE\W{0,4}([\s\S]+)", re.IGNORECASE)
+_REASONING_RE = re.compile(r"REASONING\W{0,4}(\d+)[\s\S]*?RATIONALE\W{0,4}([\s\S]+)", re.IGNORECASE)
 
 
 async def score_reasoning(
-    analysis_text: str, *, judge: BaseProvider, judge_model: str | None,
+    analysis_text: str,
+    *,
+    judge: BaseProvider,
+    judge_model: str | None,
 ) -> tuple[float, str]:
     """Judge architectural reasoning 0-10 → normalized 0.0-1.0. (0.5 on parse fail)."""
     prompt = _REASONING_TEMPLATE.format(analysis=analysis_text[:8000])
-    resp = await judge.generate(prompt, system=_REASONING_SYSTEM,
-                                model=judge_model, max_tokens=256,
-                                thinking=False, temperature=0.0)
+    resp = await judge.generate(
+        prompt,
+        system=_REASONING_SYSTEM,
+        model=judge_model,
+        max_tokens=256,
+        thinking=False,
+        temperature=0.0,
+    )
     m = _REASONING_RE.search(resp.text)
     if not m:
         return 0.5, "(unparseable judge reply)"

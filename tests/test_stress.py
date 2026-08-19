@@ -83,8 +83,12 @@ async def test_run_stress_with_mock():
     mock_client.post = mock_post
 
     result = await _run_phase(
-        mock_client, "http://fake:11434", "test-model",
-        concurrency=2, duration_seconds=1.0, num_predict=512,
+        mock_client,
+        "http://fake:11434",
+        "test-model",
+        concurrency=2,
+        duration_seconds=1.0,
+        num_predict=512,
     )
 
     assert result.concurrency == 2
@@ -121,6 +125,7 @@ async def test_run_stress_e2e_with_mock(monkeypatch):
     monkeypatch.setattr("atomics.stress._get_vram_used_mb", lambda: 4000.0)
 
     import httpx
+
     monkeypatch.setattr(httpx, "AsyncClient", lambda: mock_client)
 
     phase_log: list[int] = []
@@ -173,8 +178,12 @@ async def test_run_phase_handles_failures():
     mock_client.post = flaky_post
 
     result = await _run_phase(
-        mock_client, "http://fake:11434", "test-model",
-        concurrency=2, duration_seconds=0.5, num_predict=64,
+        mock_client,
+        "http://fake:11434",
+        "test-model",
+        concurrency=2,
+        duration_seconds=0.5,
+        num_predict=64,
     )
 
     assert result.requests >= 1
@@ -191,9 +200,13 @@ def test_cli_stress_command_with_save(monkeypatch, tmp_path):
     async def fake_run_stress(**kwargs):
         on_phase = kwargs.get("on_phase")
         phase = ConcurrencyResult(
-            concurrency=1, requests=5, total_output_tokens=500,
-            aggregate_tps=25.0, avg_request_tps=25.0,
-            avg_latency_ms=200.0, p95_latency_ms=300.0,
+            concurrency=1,
+            requests=5,
+            total_output_tokens=500,
+            aggregate_tps=25.0,
+            avg_request_tps=25.0,
+            avg_latency_ms=200.0,
+            p95_latency_ms=300.0,
         )
         if on_phase:
             on_phase(phase)
@@ -201,18 +214,30 @@ def test_cli_stress_command_with_save(monkeypatch, tmp_path):
             model=kwargs.get("model", "test"),
             host=kwargs.get("host", "http://fake:11434"),
             phases=[phase],
-            peak_tps=25.0, saturation_concurrency=1,
-            duration_seconds=15.0, total_tokens=500, total_requests=5,
+            peak_tps=25.0,
+            saturation_concurrency=1,
+            duration_seconds=15.0,
+            total_tokens=500,
+            total_requests=5,
         )
 
     monkeypatch.setattr("atomics.stress.run_stress", fake_run_stress)
     monkeypatch.setenv("ATOMICS_DB_PATH", str(tmp_path / "test.db"))
 
     runner = CliRunner()
-    result = runner.invoke(cli, [
-        "stress", "--model", "test-model", "--max-concurrency", "1",
-        "--phase-seconds", "1", "--save",
-    ])
+    result = runner.invoke(
+        cli,
+        [
+            "stress",
+            "--model",
+            "test-model",
+            "--max-concurrency",
+            "1",
+            "--phase-seconds",
+            "1",
+            "--save",
+        ],
+    )
     assert result.exit_code == 0
     assert "Peak throughput" in result.output or "peak" in result.output.lower()
     assert "saved" in result.output.lower()
@@ -226,9 +251,13 @@ def test_cli_stress_command_no_save(monkeypatch, tmp_path):
 
     async def fake_run_stress(**kwargs):
         phase = ConcurrencyResult(
-            concurrency=1, requests=5, total_output_tokens=500,
-            aggregate_tps=25.0, avg_request_tps=25.0,
-            avg_latency_ms=200.0, p95_latency_ms=300.0,
+            concurrency=1,
+            requests=5,
+            total_output_tokens=500,
+            aggregate_tps=25.0,
+            avg_request_tps=25.0,
+            avg_latency_ms=200.0,
+            p95_latency_ms=300.0,
         )
         on_phase = kwargs.get("on_phase")
         if on_phase:
@@ -237,18 +266,30 @@ def test_cli_stress_command_no_save(monkeypatch, tmp_path):
             model=kwargs.get("model", "test"),
             host=kwargs.get("host", "http://fake:11434"),
             phases=[phase],
-            peak_tps=25.0, saturation_concurrency=1,
-            duration_seconds=15.0, total_tokens=500, total_requests=5,
+            peak_tps=25.0,
+            saturation_concurrency=1,
+            duration_seconds=15.0,
+            total_tokens=500,
+            total_requests=5,
         )
 
     monkeypatch.setattr("atomics.stress.run_stress", fake_run_stress)
     monkeypatch.setenv("ATOMICS_DB_PATH", str(tmp_path / "test.db"))
 
     runner = CliRunner()
-    result = runner.invoke(cli, [
-        "stress", "--model", "test-model", "--max-concurrency", "1",
-        "--phase-seconds", "1", "--no-save",
-    ])
+    result = runner.invoke(
+        cli,
+        [
+            "stress",
+            "--model",
+            "test-model",
+            "--max-concurrency",
+            "1",
+            "--phase-seconds",
+            "1",
+            "--no-save",
+        ],
+    )
     assert result.exit_code == 0
     assert "saved" not in result.output.lower()
 
@@ -262,14 +303,22 @@ def test_cli_stress_throttling_detected(monkeypatch, tmp_path):
     async def fake_run_stress(**kwargs):
         phases = [
             ConcurrencyResult(
-                concurrency=1, requests=5, total_output_tokens=500,
-                aggregate_tps=50.0, avg_request_tps=50.0,
-                avg_latency_ms=200.0, p95_latency_ms=300.0,
+                concurrency=1,
+                requests=5,
+                total_output_tokens=500,
+                aggregate_tps=50.0,
+                avg_request_tps=50.0,
+                avg_latency_ms=200.0,
+                p95_latency_ms=300.0,
             ),
             ConcurrencyResult(
-                concurrency=2, requests=10, total_output_tokens=800,
-                aggregate_tps=40.0, avg_request_tps=20.0,
-                avg_latency_ms=400.0, p95_latency_ms=600.0,
+                concurrency=2,
+                requests=10,
+                total_output_tokens=800,
+                aggregate_tps=40.0,
+                avg_request_tps=20.0,
+                avg_latency_ms=400.0,
+                p95_latency_ms=600.0,
             ),
         ]
         on_phase = kwargs.get("on_phase")
@@ -280,18 +329,30 @@ def test_cli_stress_throttling_detected(monkeypatch, tmp_path):
             model=kwargs.get("model", "test"),
             host=kwargs.get("host", "http://fake:11434"),
             phases=phases,
-            peak_tps=50.0, saturation_concurrency=1,
-            duration_seconds=30.0, total_tokens=1300, total_requests=15,
+            peak_tps=50.0,
+            saturation_concurrency=1,
+            duration_seconds=30.0,
+            total_tokens=1300,
+            total_requests=15,
         )
 
     monkeypatch.setattr("atomics.stress.run_stress", fake_run_stress)
     monkeypatch.setenv("ATOMICS_DB_PATH", str(tmp_path / "test.db"))
 
     runner = CliRunner()
-    result = runner.invoke(cli, [
-        "stress", "--model", "test-model", "--max-concurrency", "2",
-        "--phase-seconds", "1", "--no-save",
-    ])
+    result = runner.invoke(
+        cli,
+        [
+            "stress",
+            "--model",
+            "test-model",
+            "--max-concurrency",
+            "2",
+            "--phase-seconds",
+            "1",
+            "--no-save",
+        ],
+    )
     assert result.exit_code == 0
     assert "Possible" in result.output  # throttling detected
 
@@ -320,8 +381,9 @@ async def test_run_stress_provider_basic():
 
     call_count = 0
 
-    async def fake_generate(prompt, *, system="", model=None, max_tokens=1024,
-                            thinking=None, thinking_budget=None):
+    async def fake_generate(
+        prompt, *, system="", model=None, max_tokens=1024, thinking=None, thinking_budget=None
+    ):
         nonlocal call_count
         call_count += 1
         return ProviderResponse(
@@ -364,9 +426,14 @@ async def test_run_stress_provider_on_phase_callback():
 
     async def fake_generate(prompt, **kwargs):
         return ProviderResponse(
-            text="ok", input_tokens=10, output_tokens=50,
-            total_tokens=60, model="m", latency_ms=200.0,
-            estimated_cost_usd=0.0005, tokens_per_second=250.0,
+            text="ok",
+            input_tokens=10,
+            output_tokens=50,
+            total_tokens=60,
+            model="m",
+            latency_ms=200.0,
+            estimated_cost_usd=0.0005,
+            tokens_per_second=250.0,
         )
 
     mock_provider = MagicMock()
@@ -400,9 +467,14 @@ async def test_run_stress_provider_handles_failures():
         if call_count % 2 == 0:
             raise ConnectionError("timeout")
         return ProviderResponse(
-            text="ok", input_tokens=10, output_tokens=50,
-            total_tokens=60, model="m", latency_ms=100.0,
-            estimated_cost_usd=0.0002, tokens_per_second=500.0,
+            text="ok",
+            input_tokens=10,
+            output_tokens=50,
+            total_tokens=60,
+            model="m",
+            latency_ms=100.0,
+            estimated_cost_usd=0.0002,
+            tokens_per_second=500.0,
         )
 
     mock_provider = MagicMock()
@@ -410,8 +482,10 @@ async def test_run_stress_provider_handles_failures():
     mock_provider.generate = flaky_generate
 
     result = await run_stress_provider(
-        provider=mock_provider, model="m",
-        max_concurrency=1, phase_seconds=0.5,
+        provider=mock_provider,
+        model="m",
+        max_concurrency=1,
+        phase_seconds=0.5,
     )
 
     assert result.total_requests >= 1
@@ -426,9 +500,14 @@ async def test_run_stress_provider_tps_fallback():
 
     async def fake_generate(prompt, **kwargs):
         return ProviderResponse(
-            text="ok", input_tokens=10, output_tokens=100,
-            total_tokens=110, model="m", latency_ms=1000.0,
-            estimated_cost_usd=0.001, tokens_per_second=None,
+            text="ok",
+            input_tokens=10,
+            output_tokens=100,
+            total_tokens=110,
+            model="m",
+            latency_ms=1000.0,
+            estimated_cost_usd=0.001,
+            tokens_per_second=None,
         )
 
     mock_provider = MagicMock()
@@ -436,8 +515,10 @@ async def test_run_stress_provider_tps_fallback():
     mock_provider.generate = fake_generate
 
     result = await run_stress_provider(
-        provider=mock_provider, model="m",
-        max_concurrency=1, phase_seconds=0.3,
+        provider=mock_provider,
+        model="m",
+        max_concurrency=1,
+        phase_seconds=0.3,
     )
 
     assert result.phases[0].per_request_tps
@@ -457,21 +538,29 @@ def test_cli_stress_with_provider(monkeypatch, tmp_path):
     async def fake_run_stress_provider(**kwargs):
         captured_kwargs.update(kwargs)
         phase = ConcurrencyResult(
-            concurrency=1, requests=5, total_output_tokens=500,
-            aggregate_tps=100.0, avg_request_tps=100.0,
-            avg_latency_ms=200.0, p95_latency_ms=300.0,
+            concurrency=1,
+            requests=5,
+            total_output_tokens=500,
+            aggregate_tps=100.0,
+            avg_request_tps=100.0,
+            avg_latency_ms=200.0,
+            p95_latency_ms=300.0,
             total_cost_usd=0.005,
         )
         on_phase = kwargs.get("on_phase")
         if on_phase:
             on_phase(phase)
         return StressResult(
-            model="gpt-4o-mini", host="api",
+            model="gpt-4o-mini",
+            host="api",
             provider="openai",
-            phases=[phase], peak_tps=100.0,
+            phases=[phase],
+            peak_tps=100.0,
             saturation_concurrency=1,
-            duration_seconds=15.0, total_tokens=500,
-            total_requests=5, total_cost_usd=0.005,
+            duration_seconds=15.0,
+            total_tokens=500,
+            total_requests=5,
+            total_cost_usd=0.005,
         )
 
     monkeypatch.setattr("atomics.stress.run_stress_provider", fake_run_stress_provider)
@@ -479,10 +568,19 @@ def test_cli_stress_with_provider(monkeypatch, tmp_path):
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test-fake")
 
     runner = CliRunner()
-    result = runner.invoke(cli, [
-        "stress", "--provider", "openai", "--model", "gpt-4o-mini",
-        "--max-concurrency", "2", "--no-save",
-    ])
+    result = runner.invoke(
+        cli,
+        [
+            "stress",
+            "--provider",
+            "openai",
+            "--model",
+            "gpt-4o-mini",
+            "--max-concurrency",
+            "2",
+            "--no-save",
+        ],
+    )
     assert result.exit_code == 0, result.output
     assert "Peak throughput" in result.output or "peak" in result.output.lower()
 
@@ -495,21 +593,29 @@ def test_cli_stress_provider_claude(monkeypatch, tmp_path):
 
     async def fake_run_stress_provider(**kwargs):
         phase = ConcurrencyResult(
-            concurrency=1, requests=3, total_output_tokens=300,
-            aggregate_tps=80.0, avg_request_tps=80.0,
-            avg_latency_ms=400.0, p95_latency_ms=600.0,
+            concurrency=1,
+            requests=3,
+            total_output_tokens=300,
+            aggregate_tps=80.0,
+            avg_request_tps=80.0,
+            avg_latency_ms=400.0,
+            p95_latency_ms=600.0,
             total_cost_usd=0.008,
         )
         on_phase = kwargs.get("on_phase")
         if on_phase:
             on_phase(phase)
         return StressResult(
-            model="claude-haiku-4-5-20251001", host="api",
+            model="claude-haiku-4-5-20251001",
+            host="api",
             provider="claude",
-            phases=[phase], peak_tps=80.0,
+            phases=[phase],
+            peak_tps=80.0,
             saturation_concurrency=1,
-            duration_seconds=15.0, total_tokens=300,
-            total_requests=3, total_cost_usd=0.008,
+            duration_seconds=15.0,
+            total_tokens=300,
+            total_requests=3,
+            total_cost_usd=0.008,
         )
 
     monkeypatch.setattr("atomics.stress.run_stress_provider", fake_run_stress_provider)
@@ -517,10 +623,19 @@ def test_cli_stress_provider_claude(monkeypatch, tmp_path):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test-fake")
 
     runner = CliRunner()
-    result = runner.invoke(cli, [
-        "stress", "--provider", "claude", "--model", "claude-haiku-4-5-20251001",
-        "--max-concurrency", "4", "--no-save",
-    ])
+    result = runner.invoke(
+        cli,
+        [
+            "stress",
+            "--provider",
+            "claude",
+            "--model",
+            "claude-haiku-4-5-20251001",
+            "--max-concurrency",
+            "4",
+            "--no-save",
+        ],
+    )
     assert result.exit_code == 0, result.output
 
 
@@ -533,21 +648,29 @@ def test_cli_stress_provider_save_cost(monkeypatch, tmp_path):
 
     async def fake_run_stress_provider(**kwargs):
         phase = ConcurrencyResult(
-            concurrency=1, requests=5, total_output_tokens=500,
-            aggregate_tps=50.0, avg_request_tps=50.0,
-            avg_latency_ms=300.0, p95_latency_ms=500.0,
+            concurrency=1,
+            requests=5,
+            total_output_tokens=500,
+            aggregate_tps=50.0,
+            avg_request_tps=50.0,
+            avg_latency_ms=300.0,
+            p95_latency_ms=500.0,
             total_cost_usd=0.010,
         )
         on_phase = kwargs.get("on_phase")
         if on_phase:
             on_phase(phase)
         return StressResult(
-            model="gpt-4o-mini", host="api",
+            model="gpt-4o-mini",
+            host="api",
             provider="openai",
-            phases=[phase], peak_tps=50.0,
+            phases=[phase],
+            peak_tps=50.0,
             saturation_concurrency=1,
-            duration_seconds=15.0, total_tokens=500,
-            total_requests=5, total_cost_usd=0.010,
+            duration_seconds=15.0,
+            total_tokens=500,
+            total_requests=5,
+            total_cost_usd=0.010,
         )
 
     monkeypatch.setattr("atomics.stress.run_stress_provider", fake_run_stress_provider)
@@ -555,10 +678,19 @@ def test_cli_stress_provider_save_cost(monkeypatch, tmp_path):
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test-fake")
 
     runner = CliRunner()
-    result = runner.invoke(cli, [
-        "stress", "--provider", "openai", "--model", "gpt-4o-mini",
-        "--max-concurrency", "1", "--save",
-    ])
+    result = runner.invoke(
+        cli,
+        [
+            "stress",
+            "--provider",
+            "openai",
+            "--model",
+            "gpt-4o-mini",
+            "--max-concurrency",
+            "1",
+            "--save",
+        ],
+    )
     assert result.exit_code == 0, result.output
     assert "saved" in result.output.lower()
     assert "cost" in result.output.lower() or "$" in result.output
@@ -570,6 +702,7 @@ def test_cli_stress_provider_save_cost(monkeypatch, tmp_path):
 class TestGPUInfo:
     def test_get_gpu_info_no_nvidia_smi(self):
         from atomics.stress import _get_gpu_info
+
         with patch("shutil.which", return_value=None):
             name, total = _get_gpu_info()
         assert name == ""
@@ -577,61 +710,80 @@ class TestGPUInfo:
 
     def test_get_gpu_info_success(self):
         from atomics.stress import _get_gpu_info
+
         mock_result = MagicMock()
         mock_result.returncode = 0
         mock_result.stdout = "NVIDIA RTX 4090, 24576"
-        with patch("shutil.which", return_value="/usr/bin/nvidia-smi"), \
-             patch("subprocess.run", return_value=mock_result):
+        with (
+            patch("shutil.which", return_value="/usr/bin/nvidia-smi"),
+            patch("subprocess.run", return_value=mock_result),
+        ):
             name, total = _get_gpu_info()
         assert name == "NVIDIA RTX 4090"
         assert total == 24576.0
 
     def test_get_gpu_info_nonzero_returncode(self):
         from atomics.stress import _get_gpu_info
+
         mock_result = MagicMock()
         mock_result.returncode = 1
         mock_result.stdout = ""
-        with patch("shutil.which", return_value="/usr/bin/nvidia-smi"), \
-             patch("subprocess.run", return_value=mock_result):
+        with (
+            patch("shutil.which", return_value="/usr/bin/nvidia-smi"),
+            patch("subprocess.run", return_value=mock_result),
+        ):
             name, total = _get_gpu_info()
         assert name == ""
         assert total is None
 
     def test_get_gpu_info_exception(self):
         from atomics.stress import _get_gpu_info
-        with patch("shutil.which", return_value="/usr/bin/nvidia-smi"), \
-             patch("subprocess.run", side_effect=OSError("no smi")):
+
+        with (
+            patch("shutil.which", return_value="/usr/bin/nvidia-smi"),
+            patch("subprocess.run", side_effect=OSError("no smi")),
+        ):
             name, total = _get_gpu_info()
         assert name == ""
         assert total is None
 
     def test_get_vram_used_no_smi(self):
         from atomics.stress import _get_vram_used_mb
+
         with patch("shutil.which", return_value=None):
             assert _get_vram_used_mb() is None
 
     def test_get_vram_used_success(self):
         from atomics.stress import _get_vram_used_mb
+
         mock_result = MagicMock()
         mock_result.returncode = 0
         mock_result.stdout = "8192"
-        with patch("shutil.which", return_value="/usr/bin/nvidia-smi"), \
-             patch("subprocess.run", return_value=mock_result):
+        with (
+            patch("shutil.which", return_value="/usr/bin/nvidia-smi"),
+            patch("subprocess.run", return_value=mock_result),
+        ):
             assert _get_vram_used_mb() == 8192.0
 
     def test_get_vram_used_nonzero_returncode(self):
         from atomics.stress import _get_vram_used_mb
+
         mock_result = MagicMock()
         mock_result.returncode = 1
         mock_result.stdout = ""
-        with patch("shutil.which", return_value="/usr/bin/nvidia-smi"), \
-             patch("subprocess.run", return_value=mock_result):
+        with (
+            patch("shutil.which", return_value="/usr/bin/nvidia-smi"),
+            patch("subprocess.run", return_value=mock_result),
+        ):
             assert _get_vram_used_mb() is None
 
     def test_get_vram_used_exception(self):
         from atomics.stress import _get_vram_used_mb
-        with patch("shutil.which", return_value="/usr/bin/nvidia-smi"), \
-             patch("subprocess.run", side_effect=ValueError("bad")):
+
+        with (
+            patch("shutil.which", return_value="/usr/bin/nvidia-smi"),
+            patch("subprocess.run", side_effect=ValueError("bad")),
+        ):
             assert _get_vram_used_mb() is None
 
 
@@ -640,19 +792,29 @@ class TestGPUInfo:
 
 def _make_stress_ollama_profile():
     from types import SimpleNamespace
+
     return SimpleNamespace(
-        type="ollama", name="test-gate", model="qwen2.5:3b",
-        ollama_host="http://localhost:11434", http_url="",
-        http_timeout=30, prompts=["probe 1", "probe 2"],
+        type="ollama",
+        name="test-gate",
+        model="qwen2.5:3b",
+        ollama_host="http://localhost:11434",
+        http_url="",
+        http_timeout=30,
+        prompts=["probe 1", "probe 2"],
     )
 
 
 def _make_stress_http_profile():
     from types import SimpleNamespace
+
     return SimpleNamespace(
-        type="http", name="http-gate", model="",
-        ollama_host="", http_url="http://localhost:8080/gate",
-        http_timeout=30, prompts=[],
+        type="http",
+        name="http-gate",
+        model="",
+        ollama_host="",
+        http_url="http://localhost:8080/gate",
+        http_timeout=30,
+        prompts=[],
     )
 
 
@@ -667,8 +829,8 @@ class TestRunStressProfile:
     @pytest.mark.asyncio
     async def test_run_stress_profile_ollama(self):
         from atomics.stress import run_stress_profile
-        with patch("atomics.profiles._single_request_profile",
-                   side_effect=_instant_profile_req):
+
+        with patch("atomics.profiles._single_request_profile", side_effect=_instant_profile_req):
             result = await run_stress_profile(
                 profile=_make_stress_ollama_profile(),
                 max_concurrency=2,
@@ -683,8 +845,8 @@ class TestRunStressProfile:
     @pytest.mark.asyncio
     async def test_run_stress_profile_http(self):
         from atomics.stress import run_stress_profile
-        with patch("atomics.profiles._single_request_profile",
-                   side_effect=_instant_profile_req):
+
+        with patch("atomics.profiles._single_request_profile", side_effect=_instant_profile_req):
             result = await run_stress_profile(
                 profile=_make_stress_http_profile(),
                 max_concurrency=1,
@@ -696,13 +858,13 @@ class TestRunStressProfile:
     @pytest.mark.asyncio
     async def test_run_stress_profile_on_phase_callback(self):
         from atomics.stress import run_stress_profile
+
         phases_received: list[ConcurrencyResult] = []
 
         def on_phase(p: ConcurrencyResult) -> None:
             phases_received.append(p)
 
-        with patch("atomics.profiles._single_request_profile",
-                   side_effect=_instant_profile_req):
+        with patch("atomics.profiles._single_request_profile", side_effect=_instant_profile_req):
             result = await run_stress_profile(
                 profile=_make_stress_ollama_profile(),
                 max_concurrency=2,
@@ -714,6 +876,7 @@ class TestRunStressProfile:
     @pytest.mark.asyncio
     async def test_run_stress_profile_failure_in_phase(self):
         from atomics.stress import run_stress_profile
+
         call_n = [0]
 
         async def _sometimes_fail(client, profile, prompt):
@@ -733,8 +896,8 @@ class TestRunStressProfile:
     @pytest.mark.asyncio
     async def test_run_stress_profile_saturation_concurrency_set(self):
         from atomics.stress import run_stress_profile
-        with patch("atomics.profiles._single_request_profile",
-                   side_effect=_instant_profile_req):
+
+        with patch("atomics.profiles._single_request_profile", side_effect=_instant_profile_req):
             result = await run_stress_profile(
                 profile=_make_stress_ollama_profile(),
                 max_concurrency=4,
@@ -745,8 +908,8 @@ class TestRunStressProfile:
     @pytest.mark.asyncio
     async def test_run_stress_profile_no_prompts_uses_stress_prompts(self):
         from atomics.stress import run_stress_profile
-        with patch("atomics.profiles._single_request_profile",
-                   side_effect=_instant_profile_req):
+
+        with patch("atomics.profiles._single_request_profile", side_effect=_instant_profile_req):
             result = await run_stress_profile(
                 profile=_make_stress_http_profile(),
                 max_concurrency=1,

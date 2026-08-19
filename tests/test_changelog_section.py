@@ -105,7 +105,10 @@ def test_the_real_changelog_parses():
 def _released_tags() -> list[str]:
     out = subprocess.run(
         ["git", "tag", "--list", "v[0-9]*.[0-9]*.[0-9]*"],
-        cwd=REPO, capture_output=True, text=True, check=True,
+        cwd=REPO,
+        capture_output=True,
+        text=True,
+        check=True,
     )
     return sorted(t for t in out.stdout.split() if t)
 
@@ -123,7 +126,10 @@ def _require_full_history() -> None:
         pytest.skip("no tags in this checkout; needs fetch-depth: 0 and fetch-tags")
     shallow = subprocess.run(
         ["git", "rev-parse", "--is-shallow-repository"],
-        cwd=REPO, capture_output=True, text=True, check=True,
+        cwd=REPO,
+        capture_output=True,
+        text=True,
+        check=True,
     )
     if shallow.stdout.strip() == "true":
         pytest.skip("shallow checkout; needs fetch-depth: 0")
@@ -166,10 +172,7 @@ class TestPlaceholderDetection:
         assert self._is_placeholder("   \n\n  ")
 
     def test_a_bare_compare_link_is_a_placeholder(self):
-        body = (
-            "**Full Changelog**: "
-            "https://github.com/babywyrm/stoneburner/compare/v0...v0.13.1"
-        )
+        body = "**Full Changelog**: https://github.com/babywyrm/stoneburner/compare/v0...v0.13.1"
         assert self._is_placeholder(body)
         assert self._is_placeholder(f"\n{body}\n\n")
 
@@ -189,7 +192,10 @@ def _versions_ever_declared() -> set[str]:
     """Every version that has appeared in pyproject.toml, from git history."""
     out = subprocess.run(
         ["git", "log", "-p", "--", "pyproject.toml"],
-        cwd=REPO, capture_output=True, text=True, check=True,
+        cwd=REPO,
+        capture_output=True,
+        text=True,
+        check=True,
     )
     return {
         line.split("=", 1)[1].strip().strip('"')
@@ -223,9 +229,7 @@ def _pyproject_version() -> str:
     raise AssertionError("pyproject.toml declares no version")
 
 
-def _release_in_progress(
-    documented: list[str], tagged: set[str], current: str
-) -> str | None:
+def _release_in_progress(documented: list[str], tagged: set[str], current: str) -> str | None:
     """The version being cut right now, if that is what we are looking at.
 
     RELEASING.md has you write the changelog and bump the version, *then* run
@@ -251,16 +255,10 @@ class TestReleaseInProgress:
     """The exemption is load-bearing in both directions, so both are pinned."""
 
     def test_the_version_being_cut_is_exempt(self):
-        assert (
-            _release_in_progress(["0.14.0", "0.13.1"], {"0.13.1"}, "0.14.0")
-            == "0.14.0"
-        )
+        assert _release_in_progress(["0.14.0", "0.13.1"], {"0.13.1"}, "0.14.0") == "0.14.0"
 
     def test_nothing_is_exempt_once_the_newest_is_tagged(self):
-        assert (
-            _release_in_progress(["0.14.0", "0.13.1"], {"0.14.0", "0.13.1"}, "0.14.0")
-            is None
-        )
+        assert _release_in_progress(["0.14.0", "0.13.1"], {"0.14.0", "0.13.1"}, "0.14.0") is None
 
     def test_an_abandoned_bump_is_not_exempt(self):
         """Documented, untagged, and no longer what pyproject declares."""

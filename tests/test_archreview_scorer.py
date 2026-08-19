@@ -83,12 +83,28 @@ class _StubProvider:
     def __init__(self, reply):
         self._reply = reply
 
-    async def generate(self, prompt, *, system="", model=None, max_tokens=1024,
-                       thinking=None, thinking_budget=None, temperature=None):
+    async def generate(
+        self,
+        prompt,
+        *,
+        system="",
+        model=None,
+        max_tokens=1024,
+        thinking=None,
+        thinking_budget=None,
+        temperature=None,
+    ):
         from atomics.providers.base import ProviderResponse
-        return ProviderResponse(text=self._reply, input_tokens=10, output_tokens=5,
-                                total_tokens=15, model="stub-judge", latency_ms=1.0,
-                                estimated_cost_usd=0.0)
+
+        return ProviderResponse(
+            text=self._reply,
+            input_tokens=10,
+            output_tokens=5,
+            total_tokens=15,
+            model="stub-judge",
+            latency_ms=1.0,
+            estimated_cost_usd=0.0,
+        )
 
     async def health_check(self):
         return True
@@ -98,7 +114,8 @@ class _StubProvider:
 async def test_score_reasoning_parses_rating():
     judge = _StubProvider("REASONING: 8\nRATIONALE: solid trust-boundary analysis")
     score, rationale = await score_reasoning(
-        "arch summary text", judge=judge, judge_model="stub-judge")
+        "arch summary text", judge=judge, judge_model="stub-judge"
+    )
     assert score == 0.8
     assert "trust" in rationale.lower()
 
@@ -106,6 +123,5 @@ async def test_score_reasoning_parses_rating():
 @pytest.mark.asyncio
 async def test_score_reasoning_unparseable_returns_half():
     judge = _StubProvider("I think it's pretty good overall")
-    score, rationale = await score_reasoning(
-        "arch summary", judge=judge, judge_model="stub-judge")
+    score, rationale = await score_reasoning("arch summary", judge=judge, judge_model="stub-judge")
     assert score == 0.5

@@ -94,9 +94,7 @@ def _patch_study(monkeypatch, tmp_path, *, fail: bool = False) -> None:
         "atomics.commands.agreement.load_settings",
         lambda: SimpleNamespace(db_path=tmp_path / "atomics.db"),
     )
-    monkeypatch.setattr(
-        "atomics.commands.agreement.run_agreement_study", fake_study
-    )
+    monkeypatch.setattr("atomics.commands.agreement.run_agreement_study", fake_study)
 
 
 def test_judge_agreement_prints_flip_rate(monkeypatch, tmp_path) -> None:
@@ -117,9 +115,7 @@ def test_judge_agreement_prints_flip_rate(monkeypatch, tmp_path) -> None:
     assert "3 of 1 would change the headline" in result.output or "3 of" in result.output
 
 
-def test_judge_agreement_no_save_opens_no_repository(
-    monkeypatch, tmp_path
-) -> None:
+def test_judge_agreement_no_save_opens_no_repository(monkeypatch, tmp_path) -> None:
     opened: list[MetricsRepository] = []
     _patch_study(monkeypatch, tmp_path)
     monkeypatch.setattr(
@@ -141,9 +137,7 @@ def test_judge_agreement_no_save_opens_no_repository(
     assert opened == []
 
 
-def test_judge_agreement_json_out_writes_the_table(
-    monkeypatch, tmp_path
-) -> None:
+def test_judge_agreement_json_out_writes_the_table(monkeypatch, tmp_path) -> None:
     _patch_study(monkeypatch, tmp_path)
     out = tmp_path / "agreement.json"
     result = CliRunner().invoke(
@@ -164,9 +158,7 @@ def test_judge_agreement_json_out_writes_the_table(
     assert "rc-b01" in payload
 
 
-def test_judge_agreement_save_writes_study_rows_without_a_parent_run(
-    monkeypatch, tmp_path
-) -> None:
+def test_judge_agreement_save_writes_study_rows_without_a_parent_run(monkeypatch, tmp_path) -> None:
     opened: list[MetricsRepository] = []
     _patch_study(monkeypatch, tmp_path)
     monkeypatch.setattr(
@@ -233,9 +225,7 @@ class _Named:
         )
 
 
-def test_cli_refusal_study_generates_once_and_classifies_n_times(
-    monkeypatch, tmp_path
-) -> None:
+def test_cli_refusal_study_generates_once_and_classifies_n_times(monkeypatch, tmp_path) -> None:
     providers: dict[str, _Named] = {}
     classifies: list[str] = []
 

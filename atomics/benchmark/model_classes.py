@@ -109,30 +109,52 @@ MODEL_CLASS_MAP: dict[str, ModelClass] = {
 }
 
 
-THINKING_CAPABLE: frozenset[str] = frozenset({
-    # Claude — extended thinking via API
-    "claude-opus-4-6",
-    "claude-opus-4-7",
-    "claude-sonnet-4-6",
-    "claude-sonnet-4-20250514",
-    "claude-opus-4-5",
-    "claude-sonnet-4-5-20250929",
-    "claude-sonnet-4-5",
-    # Claude via Bedrock
-    "us.anthropic.claude-sonnet-4-6",
-    "us.anthropic.claude-sonnet-4-20250514-v1:0",
-    "us.anthropic.claude-opus-4-6-v1",
-    # OpenAI reasoning models
-    "o3", "o3-mini", "o3-pro", "o4-mini",
-    "gpt-5", "gpt-5-turbo", "gpt-5.3", "gpt-5.5",
-    # Ollama — qwen3 family and deepseek-r1 use <think> tags
-    "qwen3:0.6b", "qwen3:1.7b", "qwen3:4b", "qwen3:8b", "qwen3:14b", "qwen3:32b", "qwen3:72b",
-    "qwen3.5:0.8b", "qwen3.5:2b", "qwen3.5:4b", "qwen3.5:9b",
-    "qwen3.6:27b", "qwen3.6:35b-a3b", "qwen3.8:27b",
-    "deepseek-r1:7b", "deepseek-r1:14b", "deepseek-r1:32b", "deepseek-r1:70b",
-    "phi4-reasoning:14b",
-    "phi4-mini-reasoning:3.8b",
-})
+THINKING_CAPABLE: frozenset[str] = frozenset(
+    {
+        # Claude — extended thinking via API
+        "claude-opus-4-6",
+        "claude-opus-4-7",
+        "claude-sonnet-4-6",
+        "claude-sonnet-4-20250514",
+        "claude-opus-4-5",
+        "claude-sonnet-4-5-20250929",
+        "claude-sonnet-4-5",
+        # Claude via Bedrock
+        "us.anthropic.claude-sonnet-4-6",
+        "us.anthropic.claude-sonnet-4-20250514-v1:0",
+        "us.anthropic.claude-opus-4-6-v1",
+        # OpenAI reasoning models
+        "o3",
+        "o3-mini",
+        "o3-pro",
+        "o4-mini",
+        "gpt-5",
+        "gpt-5-turbo",
+        "gpt-5.3",
+        "gpt-5.5",
+        # Ollama — qwen3 family and deepseek-r1 use <think> tags
+        "qwen3:0.6b",
+        "qwen3:1.7b",
+        "qwen3:4b",
+        "qwen3:8b",
+        "qwen3:14b",
+        "qwen3:32b",
+        "qwen3:72b",
+        "qwen3.5:0.8b",
+        "qwen3.5:2b",
+        "qwen3.5:4b",
+        "qwen3.5:9b",
+        "qwen3.6:27b",
+        "qwen3.6:35b-a3b",
+        "qwen3.8:27b",
+        "deepseek-r1:7b",
+        "deepseek-r1:14b",
+        "deepseek-r1:32b",
+        "deepseek-r1:70b",
+        "phi4-reasoning:14b",
+        "phi4-mini-reasoning:3.8b",
+    }
+)
 
 # Default thinking budget (tokens) per provider family
 THINKING_BUDGET_DEFAULTS: dict[str, int] = {

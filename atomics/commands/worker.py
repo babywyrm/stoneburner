@@ -11,12 +11,22 @@ from atomics.distributed.worker_client import WorkerClient
 
 
 @click.command()
-@click.option("--coordinator", default="http://127.0.0.1:8000", show_default=True, help="Coordinator URL")
+@click.option(
+    "--coordinator", default="http://127.0.0.1:8000", show_default=True, help="Coordinator URL"
+)
 @click.option("--api-key", envvar="ATOMICS_WORKER_API_KEY", help="Worker API key")
 @click.option("--label", "labels", multiple=True, help="Worker label as key=value")
 @click.option("--endpoint", help="Push endpoint URL for this worker")
-@click.option("--heartbeat-interval", default=30, show_default=True, help="Heartbeat interval in seconds")
-@click.option("--provider", "-p", default="ollama", show_default=True, help="Provider used by this worker (ollama, brain-gateway, vllm, ...)")
+@click.option(
+    "--heartbeat-interval", default=30, show_default=True, help="Heartbeat interval in seconds"
+)
+@click.option(
+    "--provider",
+    "-p",
+    default="ollama",
+    show_default=True,
+    help="Provider used by this worker (ollama, brain-gateway, vllm, ...)",
+)
 @click.option("--model", "-m", help="Model override for this worker")
 @click.option("--host", "-h", help="Provider host/URL override (e.g. http://gpu-host:30080)")
 def worker(

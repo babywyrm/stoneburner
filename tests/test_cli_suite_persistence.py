@@ -87,9 +87,7 @@ def _patch_redblue(monkeypatch, db_path, *, fail: bool = False) -> list[MetricsR
         lambda: _settings(db_path),
     )
     monkeypatch.setattr(redblue_runner, "run_redblue", fake_run_redblue)
-    monkeypatch.setattr(
-        repository_module, "MetricsRepository", _tracking_repository(opened)
-    )
+    monkeypatch.setattr(repository_module, "MetricsRepository", _tracking_repository(opened))
     return opened
 
 
@@ -162,9 +160,7 @@ def test_redblue_no_save_writes_nothing(monkeypatch, tmp_path) -> None:
 # ── multiturn ─────────────────────────────────────────────────────────────────
 
 
-def _patch_multiturn(
-    monkeypatch, db_path, *, fail: bool = False
-) -> list[MetricsRepository]:
+def _patch_multiturn(monkeypatch, db_path, *, fail: bool = False) -> list[MetricsRepository]:
     from atomics.eval.multiturn import runner as multiturn_runner
     from atomics.eval.multiturn.runner import MultiturnRunSummary
     from atomics.storage import repository as repository_module
@@ -195,9 +191,7 @@ def _patch_multiturn(
         lambda: _settings(db_path),
     )
     monkeypatch.setattr(multiturn_runner, "run_multiturn", fake_run_multiturn)
-    monkeypatch.setattr(
-        repository_module, "MetricsRepository", _tracking_repository(opened)
-    )
+    monkeypatch.setattr(repository_module, "MetricsRepository", _tracking_repository(opened))
     return opened
 
 
@@ -239,9 +233,7 @@ def test_multiturn_runner_failure_closes_connection(monkeypatch, tmp_path) -> No
     _assert_closed(opened[0])
 
 
-def test_multiturn_runner_failure_is_reported_and_sanitized(
-    monkeypatch, tmp_path
-) -> None:
+def test_multiturn_runner_failure_is_reported_and_sanitized(monkeypatch, tmp_path) -> None:
     db_path = tmp_path / "multiturn-sanitize.db"
     _patch_multiturn(monkeypatch, db_path, fail=True)
 
@@ -287,9 +279,7 @@ def _patch_eval(monkeypatch, db_path, *, fail: bool = False) -> list[MetricsRepo
         lambda: _settings(db_path),
     )
     monkeypatch.setattr(eval_runner, "run_eval", fake_run_eval)
-    monkeypatch.setattr(
-        repository_module, "MetricsRepository", _tracking_repository(opened)
-    )
+    monkeypatch.setattr(repository_module, "MetricsRepository", _tracking_repository(opened))
     return opened
 
 
@@ -377,9 +367,7 @@ def _patch_rag(monkeypatch, db_path, *, fail: bool = False) -> list[MetricsRepos
         lambda: _settings(db_path),
     )
     monkeypatch.setattr(rag_runner, "run_rag", fake_run_rag)
-    monkeypatch.setattr(
-        repository_module, "MetricsRepository", _tracking_repository(opened)
-    )
+    monkeypatch.setattr(repository_module, "MetricsRepository", _tracking_repository(opened))
     return opened
 
 
@@ -413,9 +401,7 @@ def test_rag_runner_failure_finalizes_and_closes(monkeypatch, tmp_path) -> None:
 # ── codegen ───────────────────────────────────────────────────────────────────
 
 
-def _patch_codegen(
-    monkeypatch, db_path, *, fail: bool = False
-) -> list[MetricsRepository]:
+def _patch_codegen(monkeypatch, db_path, *, fail: bool = False) -> list[MetricsRepository]:
     from atomics.eval.codegen import runner as codegen_runner
     from atomics.eval.codegen.runner import CodegenRunSummary
     from atomics.storage import repository as repository_module
@@ -445,9 +431,7 @@ def _patch_codegen(
         lambda: _settings(db_path),
     )
     monkeypatch.setattr(codegen_runner, "run_codegen", fake_run_codegen)
-    monkeypatch.setattr(
-        repository_module, "MetricsRepository", _tracking_repository(opened)
-    )
+    monkeypatch.setattr(repository_module, "MetricsRepository", _tracking_repository(opened))
     return opened
 
 
@@ -503,9 +487,7 @@ def _patch_probe(monkeypatch, db_path, *, fail: bool = False) -> list[MetricsRep
         lambda: _settings(db_path),
     )
     monkeypatch.setattr(probe_runner, "run_probe", fake_run_probe)
-    monkeypatch.setattr(
-        repository_module, "MetricsRepository", _tracking_repository(opened)
-    )
+    monkeypatch.setattr(repository_module, "MetricsRepository", _tracking_repository(opened))
     return opened
 
 
@@ -609,9 +591,7 @@ def _patch_archreview(
         lambda: _settings(db_path),
     )
     monkeypatch.setattr(archreview_runner, "run_archreview", fake_run_archreview)
-    monkeypatch.setattr(
-        repository_module, "MetricsRepository", _tracking_repository(opened)
-    )
+    monkeypatch.setattr(repository_module, "MetricsRepository", _tracking_repository(opened))
     return opened
 
 
@@ -668,9 +648,7 @@ def test_multiturn_json_out_writes_the_summary(monkeypatch, tmp_path) -> None:
     assert payload["run_id"]
 
 
-def test_redblue_unwritable_json_is_reported_and_still_finalizes(
-    monkeypatch, tmp_path
-) -> None:
+def test_redblue_unwritable_json_is_reported_and_still_finalizes(monkeypatch, tmp_path) -> None:
     db_path = tmp_path / "redblue-json-fail.db"
     opened = _patch_redblue(monkeypatch, db_path)
     unwritable = tmp_path / "no-such-directory" / "out.json"

@@ -55,9 +55,7 @@ def attempt_to_dict(attempt: AttemptResult) -> dict[str, object]:
         "provider_finish_reason": attempt.provider.finish_reason,
         "provider_safety_reason": attempt.provider.safety_reason,
         "provider_error_class": attempt.provider.error_class,
-        "provider_error_message": _sanitize_error_message(
-            attempt.provider.error_message
-        ),
+        "provider_error_message": _sanitize_error_message(attempt.provider.error_message),
         "response_text": attempt.response_text,
         "latency_ms": attempt.latency_ms,
         "estimated_cost_usd": attempt.estimated_cost_usd,
@@ -75,9 +73,7 @@ def attempt_to_dict(attempt: AttemptResult) -> dict[str, object]:
         "judges_expected": judge.judges_expected if judge is not None else 0,
         "judges_scored": judge.judges_scored if judge is not None else 0,
         "panel_complete": judge.panel_complete if judge is not None else True,
-        "judge_cost_usd": (
-            round(judge.judge_cost_usd, 6) if judge is not None else 0.0
-        ),
+        "judge_cost_usd": (round(judge.judge_cost_usd, 6) if judge is not None else 0.0),
         "judge_calls": (
             [
                 {
@@ -129,8 +125,7 @@ def representative_error(
 def has_parse_failure(attempts: Sequence[AttemptResult]) -> bool:
     """Return whether any retained judge operation failed to parse."""
     return any(
-        attempt.judge is not None
-        and attempt.judge.status is JudgeOutcomeStatus.PARSE_FAILED
+        attempt.judge is not None and attempt.judge.status is JudgeOutcomeStatus.PARSE_FAILED
         for attempt in attempts
     )
 

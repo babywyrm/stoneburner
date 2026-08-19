@@ -40,7 +40,9 @@ class CapacityProjection:
 
 
 def estimate_concurrency(
-    users: int, think_time_s: float, avg_response_s: float,
+    users: int,
+    think_time_s: float,
+    avg_response_s: float,
 ) -> float:
     """Fraction of users actively waiting for a response at any moment.
 
@@ -88,7 +90,9 @@ def interpolate_latency(
 
 
 def _solve_steady_state(
-    users: float, think_time_s: float, phases: list[dict],
+    users: float,
+    think_time_s: float,
+    phases: list[dict],
 ) -> float:
     """Find steady-state concurrency via fixed-point iteration.
 
@@ -125,7 +129,10 @@ def _verdict(p50_ms: float, peak_tps: float, concurrent: float) -> str:
 
 
 def _estimate_response_time_s(
-    response_tokens: int, peak_tps: float, phases: list[dict], concurrent: float,
+    response_tokens: int,
+    peak_tps: float,
+    phases: list[dict],
+    concurrent: float,
 ) -> float:
     """Estimate per-request response time at a given concurrency level."""
     if not phases:
@@ -147,13 +154,18 @@ def project_capacity(
     depends on concurrency. Converges in a few iterations.
     """
     projection = CapacityProjection(
-        model=model, peak_tps=peak_tps, profile=profile,
+        model=model,
+        peak_tps=peak_tps,
+        profile=profile,
     )
 
     scenarios_spec = [
         ("Normal", 1.0),
         ("Peak hour (1.5x)", 1.5),
-        (f"Burst ({profile.burst_factor:.0%} spike)", 1.0 + profile.burst_factor * profile.users / max(profile.users, 1) * 3),
+        (
+            f"Burst ({profile.burst_factor:.0%} spike)",
+            1.0 + profile.burst_factor * profile.users / max(profile.users, 1) * 3,
+        ),
         ("Monday morning (2x)", 2.0),
     ]
 
@@ -164,7 +176,9 @@ def project_capacity(
         effective_users = profile.users * load_mult
 
         concurrent = _solve_steady_state(
-            effective_users, profile.think_time_s, phases,
+            effective_users,
+            profile.think_time_s,
+            phases,
         )
 
         p50 = interpolate_latency(max(concurrent, 0.5), phases)
@@ -174,17 +188,21 @@ def project_capacity(
 
         verdict = _verdict(p50, peak_tps, concurrent)
 
-        projection.scenarios.append(CapacityScenario(
-            name=name,
-            concurrent=round(concurrent, 1),
-            p50_latency_ms=round(p50, 0),
-            p95_latency_ms=round(p95, 0),
-            queue_depth=round(queue_depth, 1),
-            verdict=verdict,
-        ))
+        projection.scenarios.append(
+            CapacityScenario(
+                name=name,
+                concurrent=round(concurrent, 1),
+                p50_latency_ms=round(p50, 0),
+                p95_latency_ms=round(p95, 0),
+                queue_depth=round(queue_depth, 1),
+                verdict=verdict,
+            )
+        )
 
     worst = max(projection.scenarios, key=lambda s: s.p50_latency_ms)
-    best_normal = next((s for s in projection.scenarios if s.name == "Normal"), projection.scenarios[0])
+    best_normal = next(
+        (s for s in projection.scenarios if s.name == "Normal"), projection.scenarios[0]
+    )
 
     if best_normal.verdict == "OK":
         projection.recommendation = (
@@ -198,7 +216,8 @@ def project_capacity(
         )
     elif best_normal.verdict == "SLOW":
         projection.recommendation = (
-            f"{profile.users} users will experience slow responses (P50 ~{best_normal.p50_latency_ms / 1000:.0f}s). "
+            f"{profile.users} users will experience slow responses "
+            f"(P50 ~{best_normal.p50_latency_ms / 1000:.0f}s). "
             f"Add a second GPU or switch to a smaller model."
         )
     else:

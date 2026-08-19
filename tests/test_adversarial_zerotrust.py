@@ -1,9 +1,11 @@
 """Tests for zero-trust adversarial fixtures."""
+
 from __future__ import annotations
 
 
 def test_zerotrust_fixtures_load():
     from atomics.eval.adversarial.zerotrust import ZEROTRUST_FIXTURES
+
     assert len(ZEROTRUST_FIXTURES) == 6
 
 
@@ -12,8 +14,12 @@ def test_zerotrust_fixtures_have_required_fields():
 
     valid_severities = {"LOW", "MEDIUM", "HIGH", "CRITICAL"}
     valid_categories = {
-        "tool_manipulation", "breakglass_extract", "credential_exfil",
-        "behavior_persistence", "authority_fabrication", "blocklist_evasion",
+        "tool_manipulation",
+        "breakglass_extract",
+        "credential_exfil",
+        "behavior_persistence",
+        "authority_fabrication",
+        "blocklist_evasion",
     }
     for f in ZEROTRUST_FIXTURES:
         assert f.id.startswith("zt-"), f"{f.id}: should start with zt-"
@@ -26,12 +32,14 @@ def test_zerotrust_fixtures_have_required_fields():
 
 def test_zerotrust_ids_unique():
     from atomics.eval.adversarial.zerotrust import ZEROTRUST_FIXTURES
+
     ids = [f.id for f in ZEROTRUST_FIXTURES]
     assert len(ids) == len(set(ids)), f"duplicate ids: {ids}"
 
 
 def test_zerotrust_registered_in_all_fixtures():
     from atomics.eval.adversarial import ALL_FIXTURES
+
     zt_ids = [f.id for f in ALL_FIXTURES if f.id.startswith("zt-")]
     assert len(zt_ids) == 6, f"expected 6 zt fixtures in ALL_FIXTURES, got {len(zt_ids)}"
 

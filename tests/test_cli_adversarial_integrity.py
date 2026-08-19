@@ -216,9 +216,7 @@ def _invalid_summary() -> AdversarialSummary:
         (_invalid_summary(), 1),
     ],
 )
-def test_cli_default_exit_reflects_integrity(
-    monkeypatch, tmp_path, summary, expected_exit
-):
+def test_cli_default_exit_reflects_integrity(monkeypatch, tmp_path, summary, expected_exit):
     _mock_cli(monkeypatch, [summary], tmp_path)
 
     result = CliRunner().invoke(cli, ["adversarial", "--no-save"])
@@ -251,9 +249,7 @@ def test_cli_default_exit_rejects_incomplete_scored_judge_panel(
             judges_scored=1,
         ),
     )
-    summary = _summary(
-        fixture_results=[_fixture_result(attempts=[attempt])]
-    )
+    summary = _summary(fixture_results=[_fixture_result(attempts=[attempt])])
     _mock_cli(monkeypatch, [summary], tmp_path)
 
     result = CliRunner().invoke(cli, ["adversarial", "--no-save"])
@@ -266,9 +262,7 @@ def test_cli_default_exit_rejects_incomplete_scored_judge_panel(
 def test_cli_allow_partial_overrides_integrity_exit(monkeypatch, tmp_path):
     _mock_cli(monkeypatch, [_partial_summary()], tmp_path)
 
-    result = CliRunner().invoke(
-        cli, ["adversarial", "--no-save", "--allow-partial"]
-    )
+    result = CliRunner().invoke(cli, ["adversarial", "--no-save", "--allow-partial"])
 
     assert result.exit_code == 0
     assert "partial" in result.output.lower()
@@ -289,9 +283,7 @@ def test_cli_writes_json_before_integrity_exit(monkeypatch, tmp_path):
     )
 
 
-def test_cli_resilience_gate_remains_independent_with_allow_partial(
-    monkeypatch, tmp_path
-):
+def test_cli_resilience_gate_remains_independent_with_allow_partial(monkeypatch, tmp_path):
     _mock_cli(monkeypatch, [_partial_summary()], tmp_path)
 
     result = CliRunner().invoke(
@@ -312,9 +304,7 @@ def test_cli_resilience_gate_remains_independent_with_allow_partial(
 def test_cli_compare_partial_triggers_nonzero(monkeypatch, tmp_path):
     _mock_cli(monkeypatch, [_complete_summary(), _partial_summary()], tmp_path)
 
-    result = CliRunner().invoke(
-        cli, ["adversarial", "--no-save", "--compare", "model-b"]
-    )
+    result = CliRunner().invoke(cli, ["adversarial", "--no-save", "--compare", "model-b"])
 
     assert result.exit_code == 1
     assert "model b" in result.output.lower()
@@ -324,9 +314,7 @@ def test_cli_compare_partial_triggers_nonzero(monkeypatch, tmp_path):
 def test_cli_summary_prints_complete_integrity_ledger(monkeypatch, tmp_path):
     _mock_cli(monkeypatch, [_partial_summary()], tmp_path)
 
-    result = CliRunner().invoke(
-        cli, ["adversarial", "--no-save", "--allow-partial"]
-    )
+    result = CliRunner().invoke(cli, ["adversarial", "--no-save", "--allow-partial"])
 
     for label in (
         "Integrity Status",
@@ -352,9 +340,7 @@ def _response(text: str) -> ProviderResponse:
     )
 
 
-def test_callback_persists_success_and_timeout_with_honest_parent(
-    monkeypatch, tmp_path
-):
+def test_callback_persists_success_and_timeout_with_honest_parent(monkeypatch, tmp_path):
     from atomics.eval.adversarial import runner
     from atomics.eval.adversarial.runner import run_adversarial
 
@@ -365,9 +351,7 @@ def test_callback_persists_success_and_timeout_with_honest_parent(
     provider.generate.side_effect = [_response("no"), httpx.ReadTimeout("slow")]
     judge = AsyncMock()
     judge.name = "judge-provider"
-    judge.generate.return_value = _response(
-        "RESISTANCE: 8\nLABEL: resisted\nRATIONALE: refused"
-    )
+    judge.generate.return_value = _response("RESISTANCE: 8\nLABEL: resisted\nRATIONALE: refused")
     repo = MetricsRepository(tmp_path / "callback.db")
     try:
         repo.create_run(
@@ -397,9 +381,7 @@ def test_callback_persists_success_and_timeout_with_honest_parent(
         repo.complete_adversarial_run("run-callback")
 
         rows = repo.get_adversarial_results(run_id="run-callback")
-        parent = repo._conn.execute(
-            "SELECT * FROM runs WHERE run_id = 'run-callback'"
-        ).fetchone()
+        parent = repo._conn.execute("SELECT * FROM runs WHERE run_id = 'run-callback'").fetchone()
         assert len(rows) == 2
         assert {(row["provider"], row["model"]) for row in rows} == {
             ("actual-provider", "actual-model")
@@ -409,9 +391,9 @@ def test_callback_persists_success_and_timeout_with_honest_parent(
         assert by_fixture["timeout"]["status"] == "infrastructure_invalid"
         assert by_fixture["timeout"]["error_class"] == "ReadTimeout"
         assert by_fixture["timeout"]["error_message"]
-        assert json.loads(by_fixture["timeout"]["attempts_json"])[0][
-            "generation_status"
-        ] == "timeout"
+        assert (
+            json.loads(by_fixture["timeout"]["attempts_json"])[0]["generation_status"] == "timeout"
+        )
         assert parent["total_tasks"] == 2
         assert parent["successful_tasks"] == 1
         assert parent["failed_tasks"] == 1
@@ -434,9 +416,7 @@ def test_all_failure_result_is_persisted(tmp_path):
         repo.close()
 
 
-def test_compare_save_creates_and_completes_both_parent_rows(
-    monkeypatch, tmp_path
-):
+def test_compare_save_creates_and_completes_both_parent_rows(monkeypatch, tmp_path):
     model_a = _complete_summary()
     model_b = _summary(
         fixture_results=[_fixture_result("model-b")],
@@ -456,16 +436,17 @@ def test_compare_save_creates_and_completes_both_parent_rows(
         assert len(parents) == 2
         assert all(row["completed_at"] is not None for row in parents)
         assert [row["total_tasks"] for row in parents] == [1, 1]
-        assert repo._conn.execute(
-            "SELECT COUNT(*) FROM adversarial_results"
-        ).fetchone()[0] == 2
-        assert repo._conn.execute(
-            """
+        assert repo._conn.execute("SELECT COUNT(*) FROM adversarial_results").fetchone()[0] == 2
+        assert (
+            repo._conn.execute(
+                """
             SELECT COUNT(*) FROM adversarial_results ar
             LEFT JOIN runs r ON r.run_id = ar.run_id
             WHERE r.run_id IS NULL
             """
-        ).fetchone()[0] == 0
+            ).fetchone()[0]
+            == 0
+        )
     finally:
         repo.close()
 
@@ -475,8 +456,7 @@ def test_schema_v19_has_adversarial_attempt_ledger_and_foreign_key(tmp_path):
     try:
         assert SCHEMA_VERSION == 21
         column_info = {
-            row["name"]: row
-            for row in conn.execute("PRAGMA table_info(adversarial_results)")
+            row["name"]: row for row in conn.execute("PRAGMA table_info(adversarial_results)")
         }
         assert {
             "status",
@@ -499,28 +479,20 @@ def test_schema_v19_has_adversarial_attempt_ledger_and_foreign_key(tmp_path):
             assert column_info[name]["type"] == "INTEGER"
             assert column_info[name]["notnull"] == 1
             assert column_info[name]["dflt_value"] == "0"
-        foreign_keys = conn.execute(
-            "PRAGMA foreign_key_list(adversarial_results)"
-        ).fetchall()
+        foreign_keys = conn.execute("PRAGMA foreign_key_list(adversarial_results)").fetchall()
         assert any(
-            row["table"] == "runs"
-            and row["from"] == "run_id"
-            and row["to"] == "run_id"
+            row["table"] == "runs" and row["from"] == "run_id" and row["to"] == "run_id"
             for row in foreign_keys
         )
         unique_indexes = [
             row
-            for row in conn.execute(
-                "PRAGMA index_list(adversarial_results)"
-            ).fetchall()
+            for row in conn.execute("PRAGMA index_list(adversarial_results)").fetchall()
             if row["unique"]
         ]
         assert any(
             [
                 column["name"]
-                for column in conn.execute(
-                    f"PRAGMA index_info({index['name']})"
-                ).fetchall()
+                for column in conn.execute(f"PRAGMA index_info({index['name']})").fetchall()
             ]
             == ["run_id", "fixture_id"]
             for index in unique_indexes
@@ -597,18 +569,17 @@ def test_v18_database_migrates_in_place_before_adversarial_upsert(tmp_path):
 
     migrated = init_db(db_path)
     try:
-        assert migrated.execute(
-            "SELECT MAX(version) FROM schema_version"
-        ).fetchone()[0] == SCHEMA_VERSION
+        assert (
+            migrated.execute("SELECT MAX(version) FROM schema_version").fetchone()[0]
+            == SCHEMA_VERSION
+        )
     finally:
         migrated.close()
     backups = list(tmp_path.glob("v18.db.v18.*.bak"))
     assert len(backups) == 1
     backup = sqlite3.connect(backups[0])
     try:
-        assert backup.execute(
-            "SELECT MAX(version) FROM schema_version"
-        ).fetchone()[0] == 18
+        assert backup.execute("SELECT MAX(version) FROM schema_version").fetchone()[0] == 18
     finally:
         backup.close()
 
@@ -681,12 +652,8 @@ def test_repository_uses_shared_fixture_serialization_and_sanitizes_errors(tmp_p
     expected_json = json.dumps(expected)
     assert provider_secret not in expected_json
     assert judge_secret not in expected_json
-    assert expected["attempts"][0]["provider_error_message"] == (
-        "api_key=[REDACTED]"
-    )
-    assert expected["attempts"][1]["judge_calls"][0]["error_message"] == (
-        "password=[REDACTED]"
-    )
+    assert expected["attempts"][0]["provider_error_message"] == ("api_key=[REDACTED]")
+    assert expected["attempts"][1]["judge_calls"][0]["error_message"] == ("password=[REDACTED]")
     repo = MetricsRepository(tmp_path / "sanitize.db")
     try:
         repo.create_run("sanitize", tier="adversarial")
@@ -740,16 +707,12 @@ def test_adversarial_result_upsert_keeps_latest_fixture_aggregate(tmp_path):
             rows[0]["output_tokens"],
             rows[0]["total_tokens"],
         ) == (9, 4, 13)
-        assert json.loads(rows[0]["attempts_json"])[0][
-            "generation_status"
-        ] == "timeout"
+        assert json.loads(rows[0]["attempts_json"])[0]["generation_status"] == "timeout"
     finally:
         repo.close()
 
 
-def test_cli_uses_adapter_name_and_default_model_without_model_flag(
-    monkeypatch, tmp_path
-):
+def test_cli_uses_adapter_name_and_default_model_without_model_flag(monkeypatch, tmp_path):
     output_path = tmp_path / "effective.json"
 
     class Provider:
@@ -800,18 +763,14 @@ def test_cli_uses_adapter_name_and_default_model_without_model_flag(
     repo = MetricsRepository(tmp_path / "effective.db")
     try:
         parent = repo._conn.execute("SELECT provider, model FROM runs").fetchone()
-        stored = repo._conn.execute(
-            "SELECT provider, model FROM adversarial_results"
-        ).fetchone()
+        stored = repo._conn.execute("SELECT provider, model FROM adversarial_results").fetchone()
         assert tuple(parent) == ("actual-adapter", "effective-default-model")
         assert tuple(stored) == ("actual-adapter", "effective-default-model")
     finally:
         repo.close()
 
 
-def test_compare_uses_actual_adapter_and_effective_default_model(
-    monkeypatch, tmp_path
-):
+def test_compare_uses_actual_adapter_and_effective_default_model(monkeypatch, tmp_path):
     providers = iter(
         [
             SimpleNamespace(name="actual-main", default_model="main-default"),
@@ -864,9 +823,7 @@ def test_compare_uses_actual_adapter_and_effective_default_model(
         }
         stored = {
             (row["provider"], row["model"])
-            for row in repo._conn.execute(
-                "SELECT provider, model FROM adversarial_results"
-            )
+            for row in repo._conn.execute("SELECT provider, model FROM adversarial_results")
         }
         expected = {
             ("actual-main", "main-default"),
@@ -878,9 +835,7 @@ def test_compare_uses_actual_adapter_and_effective_default_model(
         repo.close()
 
 
-def test_callback_save_exception_finalizes_parent_and_closes_repo(
-    monkeypatch, tmp_path
-):
+def test_callback_save_exception_finalizes_parent_and_closes_repo(monkeypatch, tmp_path):
     from atomics.storage import repository as repository_module
 
     captured = []
@@ -911,9 +866,7 @@ def test_callback_save_exception_finalizes_parent_and_closes_repo(
         repo.close()
 
 
-def test_compare_runner_exception_finalizes_all_parents_and_closes_repo(
-    monkeypatch, tmp_path
-):
+def test_compare_runner_exception_finalizes_all_parents_and_closes_repo(monkeypatch, tmp_path):
     from atomics.storage import repository as repository_module
 
     captured = []
@@ -944,9 +897,7 @@ def test_compare_runner_exception_finalizes_all_parents_and_closes_repo(
     )
     monkeypatch.setattr(repository_module, "MetricsRepository", CapturingRepo)
 
-    result = CliRunner().invoke(
-        cli, ["adversarial", "--save", "--compare", "model-b"]
-    )
+    result = CliRunner().invoke(cli, ["adversarial", "--save", "--compare", "model-b"])
 
     assert isinstance(result.exception, RuntimeError)
     assert str(result.exception) == "compare failed"
@@ -961,12 +912,9 @@ def test_compare_runner_exception_finalizes_all_parents_and_closes_repo(
         assert len(parents) == 2
         assert all(row["completed_at"] is not None for row in parents)
         assert {
-            (row["total_tasks"], row["successful_tasks"], row["failed_tasks"])
-            for row in parents
+            (row["total_tasks"], row["successful_tasks"], row["failed_tasks"]) for row in parents
         } == {(1, 1, 0)}
-        stored = repo._conn.execute(
-            "SELECT fixture_id FROM adversarial_results"
-        ).fetchall()
+        stored = repo._conn.execute("SELECT fixture_id FROM adversarial_results").fetchall()
         assert {row["fixture_id"] for row in stored} == {
             "adv-test",
             "compare-saved",
@@ -975,9 +923,7 @@ def test_compare_runner_exception_finalizes_all_parents_and_closes_repo(
         repo.close()
 
 
-def test_cli_uses_default_label_but_executes_with_none_model(
-    monkeypatch, tmp_path
-):
+def test_cli_uses_default_label_but_executes_with_none_model(monkeypatch, tmp_path):
     providers = iter(
         [
             SimpleNamespace(name="brain-gateway", default_model=None),
@@ -1025,9 +971,7 @@ def test_cli_uses_default_label_but_executes_with_none_model(
         repo.close()
 
 
-def test_normal_finalization_failure_exits_nonzero_and_closes(
-    monkeypatch, tmp_path
-):
+def test_normal_finalization_failure_exits_nonzero_and_closes(monkeypatch, tmp_path):
     from atomics.storage import repository as repository_module
 
     captured = []
@@ -1114,10 +1058,7 @@ def test_adversarial_parent_rolls_up_all_provider_attempt_tokens(tmp_path):
         )
         repo.complete_adversarial_run("tokens")
 
-        results = {
-            row["fixture_id"]: row
-            for row in repo.get_adversarial_results(run_id="tokens")
-        }
+        results = {row["fixture_id"]: row for row in repo.get_adversarial_results(run_id="tokens")}
         assert (
             results["success"]["input_tokens"],
             results["success"]["output_tokens"],
@@ -1142,9 +1083,7 @@ def test_complete_adversarial_run_handles_zero_rows(tmp_path):
     try:
         repo.create_run("zero", tier="adversarial")
         repo.complete_adversarial_run("zero")
-        row = repo._conn.execute(
-            "SELECT * FROM runs WHERE run_id = 'zero'"
-        ).fetchone()
+        row = repo._conn.execute("SELECT * FROM runs WHERE run_id = 'zero'").fetchone()
         assert row["completed_at"] is not None
         assert row["total_tasks"] == 0
         assert row["successful_tasks"] == 0

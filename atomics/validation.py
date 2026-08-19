@@ -21,14 +21,10 @@ def validate_endpoint_url(url: str, *, label: str = "URL") -> str:
     parsed = urlparse(url)
 
     if parsed.scheme not in ("http", "https"):
-        raise ValueError(
-            f"{label}: unsupported scheme {parsed.scheme!r} — only http/https allowed"
-        )
+        raise ValueError(f"{label}: unsupported scheme {parsed.scheme!r} — only http/https allowed")
 
     if parsed.username or parsed.password:
-        raise ValueError(
-            f"{label}: embedded credentials not allowed in endpoint URLs"
-        )
+        raise ValueError(f"{label}: embedded credentials not allowed in endpoint URLs")
 
     if not parsed.hostname:
         raise ValueError(f"{label}: missing hostname")
@@ -88,10 +84,7 @@ _UNQUOTED_SECRET_PATTERN = re.compile(
 
 
 def _redact_quoted_secret(match: re.Match[str]) -> str:
-    return (
-        f"{match.group('prefix')}{match.group('quote')}"
-        f"[REDACTED]{match.group('quote')}"
-    )
+    return f"{match.group('prefix')}{match.group('quote')}[REDACTED]{match.group('quote')}"
 
 
 def _redact_unquoted_secret(match: re.Match[str]) -> str:

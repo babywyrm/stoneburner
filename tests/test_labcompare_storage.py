@@ -1,4 +1,5 @@
 """Tests for labcompare_results storage."""
+
 from __future__ import annotations
 
 import tempfile

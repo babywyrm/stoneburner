@@ -128,8 +128,7 @@ class Coordinator:
     def list_workers(self) -> list[Worker]:
         """Return all registered workers, newest first."""
         rows = self._conn.execute(
-            f"SELECT {self.WORKER_COLUMNS} FROM workers "
-            "ORDER BY registered_at DESC"
+            f"SELECT {self.WORKER_COLUMNS} FROM workers ORDER BY registered_at DESC"
         ).fetchall()
         return [self._row_to_worker(row) for row in rows]
 
@@ -171,9 +170,7 @@ class Coordinator:
             registered_at=datetime.fromisoformat(row[7]),
         )
 
-    def _insert_job(
-        self, request: DistributedRunRequest, mode: JobMode
-    ) -> DistributedJob:
+    def _insert_job(self, request: DistributedRunRequest, mode: JobMode) -> DistributedJob:
         """Insert the job row. Caller adds assignments, then commits."""
         parent_run_id = None
         if request.run_request:
@@ -251,9 +248,7 @@ class Coordinator:
         job = self._insert_job(request, JobMode.FLEET)
         for worker in workers:
             for spec in task_specs:
-                self._insert_assignment(
-                    job.job_id, spec, target_worker_id=worker.worker_id
-                )
+                self._insert_assignment(job.job_id, spec, target_worker_id=worker.worker_id)
         self._conn.commit()
         return job
 
@@ -270,7 +265,11 @@ class Coordinator:
         """
         job = self._insert_job(request, JobMode.FULL)
         target = workers[0].worker_id if workers else None
-        spec = task_spec if task_spec is not None else {"mode": "full", "run_request": request.run_request}
+        spec = (
+            task_spec
+            if task_spec is not None
+            else {"mode": "full", "run_request": request.run_request}
+        )
         self._insert_assignment(job.job_id, spec, target_worker_id=target)
         self._conn.commit()
         return job
@@ -362,8 +361,7 @@ class Coordinator:
             self._conn.commit()
             return None
         self._conn.execute(
-            "UPDATE distributed_jobs SET status = ? "
-            "WHERE job_id = ? AND status = ?",
+            "UPDATE distributed_jobs SET status = ? WHERE job_id = ? AND status = ?",
             (JobStatus.RUNNING.value, row[1], JobStatus.PENDING.value),
         )
         self._conn.commit()
@@ -403,11 +401,7 @@ class Coordinator:
         late submission cannot overwrite an assignment that already finished or
         was requeued to someone else.
         """
-        status = (
-            AssignmentStatus.FAILED.value
-            if error
-            else AssignmentStatus.COMPLETED.value
-        )
+        status = AssignmentStatus.FAILED.value if error else AssignmentStatus.COMPLETED.value
         cursor = self._conn.execute(
             "UPDATE distributed_assignments "
             "SET status = ?, result_json = ?, completed_at = ? "
@@ -505,11 +499,7 @@ class Coordinator:
         ).fetchone()
         total, completed, failed = rows[0], rows[1] or 0, rows[2] or 0
         if total > 0 and completed + failed == total:
-            new_status = (
-                JobStatus.COMPLETED.value
-                if failed == 0
-                else JobStatus.PARTIAL.value
-            )
+            new_status = JobStatus.COMPLETED.value if failed == 0 else JobStatus.PARTIAL.value
             self._conn.execute(
                 "UPDATE distributed_jobs "
                 "SET status = ?, completed_at = ?, summary_json = ? WHERE job_id = ?",
@@ -660,9 +650,7 @@ class Coordinator:
             request_json,
             worker_status,
         ) in rows:
-            worker_gone = (
-                worker_status is None or worker_status == WorkerStatus.OFFLINE.value
-            )
+            worker_gone = worker_status is None or worker_status == WorkerStatus.OFFLINE.value
             timed_out = False
             if not worker_gone and started_at:
                 started = datetime.fromisoformat(started_at)

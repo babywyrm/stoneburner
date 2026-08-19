@@ -60,6 +60,6 @@ def ndcg_at_k(relevance_scores: dict[str, float], retrieved: list[str], k: int) 
         )
 
     ideal = sorted(relevance_scores.values(), reverse=True)[:k]
-    ideal_dcg = sum((2 ** score - 1) / math.log2(i + 2) for i, score in enumerate(ideal))
+    ideal_dcg = sum((2**score - 1) / math.log2(i + 2) for i, score in enumerate(ideal))
     actual_dcg = dcg(retrieved_k)
     return actual_dcg / ideal_dcg if ideal_dcg > 0 else 0.0

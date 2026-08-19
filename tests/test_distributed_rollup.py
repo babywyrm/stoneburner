@@ -69,9 +69,7 @@ def test_rollup_reports_mean_and_p95_latency_from_known_inputs():
 
 
 def test_p95_picks_the_nearest_rank_over_twenty_samples():
-    rollup = build_rollup(
-        [_record("host-a", latency_ms=float(value)) for value in range(1, 21)]
-    )
+    rollup = build_rollup([_record("host-a", latency_ms=float(value)) for value in range(1, 21)])
 
     # ceil(0.95 * 20) = 19, so the 19th value.
     assert rollup.workers[0].p95_latency_ms == 19.0
@@ -111,9 +109,7 @@ def test_rollup_totals_tokens_and_cost():
 
 def test_a_worker_with_only_failures_reports_zeros_not_an_error():
     """A host that failed everything is exactly the case worth reporting on."""
-    rollup = build_rollup(
-        [_record("host-a", status="failed"), _record("host-a", status="failed")]
-    )
+    rollup = build_rollup([_record("host-a", status="failed"), _record("host-a", status="failed")])
 
     worker = rollup.workers[0]
     assert worker.completed == 0

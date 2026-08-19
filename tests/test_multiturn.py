@@ -125,9 +125,7 @@ def test_security_multiturn_fixtures_present():
 def test_long_context_fixtures_have_min_turns():
     long_context_ids = _ids_in_range("mt-eval", 25, 28)
     long_fixtures = [f for f in ALL_MULTITURN_FIXTURES if f.id in long_context_ids]
-    assert any(len(f.turns) >= 8 for f in long_fixtures), (
-        "No long-context fixture has 8+ turns"
-    )
+    assert any(len(f.turns) >= 8 for f in long_fixtures), "No long-context fixture has 8+ turns"
 
 
 # ── Turn judge parse tests ───────────────────────────────────────────────────
@@ -219,11 +217,17 @@ def _make_conversation_result(
     turn_results = []
     if turn_scores:
         for i, s in enumerate(turn_scores):
-            turn_results.append(TurnResult(
-                turn_index=i, user_message="q", response="a",
-                latency_ms=100.0, tokens=50, cost=0.001,
-                judge=TurnJudgeResult(3, 2, 2, s, "ok"),
-            ))
+            turn_results.append(
+                TurnResult(
+                    turn_index=i,
+                    user_message="q",
+                    response="a",
+                    latency_ms=100.0,
+                    tokens=50,
+                    cost=0.001,
+                    judge=TurnJudgeResult(3, 2, 2, s, "ok"),
+                )
+            )
 
     conv_judge = None
     if conv_score is not None:
@@ -263,9 +267,13 @@ def test_summary_avg_turn_score():
 
     results = [_make_conversation_result(turn_scores=[0.8, 0.9], conv_score=0.85)]
     summary = MultiturnRunSummary(
-        run_id="test", provider="mock", model="mock",
-        judge_provider="mock", judge_model="mock",
-        started_at=datetime.now(UTC), completed_at=datetime.now(UTC),
+        run_id="test",
+        provider="mock",
+        model="mock",
+        judge_provider="mock",
+        judge_model="mock",
+        started_at=datetime.now(UTC),
+        completed_at=datetime.now(UTC),
         conversation_results=results,
     )
     assert summary.avg_turn_score == 0.85
@@ -276,9 +284,13 @@ def test_summary_to_dict():
 
     results = [_make_conversation_result(turn_scores=[0.7], conv_score=0.8)]
     summary = MultiturnRunSummary(
-        run_id="test", provider="mock", model="mock",
-        judge_provider="mock", judge_model="mock",
-        started_at=datetime.now(UTC), completed_at=datetime.now(UTC),
+        run_id="test",
+        provider="mock",
+        model="mock",
+        judge_provider="mock",
+        judge_model="mock",
+        started_at=datetime.now(UTC),
+        completed_at=datetime.now(UTC),
         conversation_results=results,
     )
     d = summary.to_dict()
@@ -293,9 +305,13 @@ def test_summary_empty():
     from datetime import UTC, datetime
 
     summary = MultiturnRunSummary(
-        run_id="test", provider="mock", model="mock",
-        judge_provider="mock", judge_model="mock",
-        started_at=datetime.now(UTC), completed_at=datetime.now(UTC),
+        run_id="test",
+        provider="mock",
+        model="mock",
+        judge_provider="mock",
+        judge_model="mock",
+        started_at=datetime.now(UTC),
+        completed_at=datetime.now(UTC),
     )
     assert summary.avg_turn_score is None
     assert summary.avg_conversation_score is None

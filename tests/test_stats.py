@@ -1,4 +1,5 @@
 """Tests for the shared statistics helpers."""
+
 from __future__ import annotations
 
 import pytest
@@ -39,6 +40,7 @@ def test_percentile_sorts_internally():
 
 def test_percentile_matches_legacy_algorithm():
     """Guard: the shared impl matches the original inline formula."""
+
     def _legacy(values, pct):
         s = sorted(values)
         if not s:
@@ -51,6 +53,7 @@ def test_percentile_matches_legacy_algorithm():
         return s[f] + (k - f) * (s[c] - s[f])
 
     import random
+
     rng = random.Random(1234)
     for _ in range(50):
         data = [rng.uniform(0, 1000) for _ in range(rng.randint(1, 40))]

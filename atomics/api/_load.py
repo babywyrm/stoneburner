@@ -14,9 +14,9 @@ from fastapi import HTTPException
 from atomics.api._runners import _provider_for
 from atomics.api.models import MAX_LOAD_PREDICT, SoakRequest, StressRequest
 from atomics.eval.budget import BudgetMeter, EvalBudget, EvalBudgetExceededError
-from atomics.providers.base import BaseProvider
 from atomics.load.soak import SoakResult, run_soak_provider
 from atomics.load.stress import StressResult, run_stress_provider
+from atomics.providers.base import BaseProvider
 
 
 def _metered(provider_name: str, model: str, budget_usd: float) -> BaseProvider:

@@ -22,6 +22,7 @@ from atomics.regression import (
 
 def _make_db() -> sqlite3.Connection:
     from atomics.storage.schema import init_db
+
     with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
         path = Path(f.name)
     return init_db(path)
@@ -29,9 +30,17 @@ def _make_db() -> sqlite3.Connection:
 
 def _stable_baseline(**kwargs) -> BaselineRecord:
     defaults = dict(
-        name="test", suite="soak", model="qwen2.5:3b", host="http://gpu:11434",
-        avg_tps=150.0, peak_tps=200.0, avg_p95_ms=10000.0,
-        error_rate=0.0, verdict="STABLE", concurrency=4, notes="",
+        name="test",
+        suite="soak",
+        model="qwen2.5:3b",
+        host="http://gpu:11434",
+        avg_tps=150.0,
+        peak_tps=200.0,
+        avg_p95_ms=10000.0,
+        error_rate=0.0,
+        verdict="STABLE",
+        concurrency=4,
+        notes="",
         timestamp="2026-01-01T00:00:00+00:00",
     )
     defaults.update(kwargs)
@@ -124,10 +133,17 @@ class TestSaveAndLoadBaseline:
     def test_save_and_load(self):
         conn = _make_db()
         bl = save_baseline(
-            conn, name="gpu-host-3b", suite="soak",
-            model="qwen2.5:3b", host="http://gpu:11434",
-            avg_tps=140.0, peak_tps=160.0, avg_p95_ms=14000.0,
-            error_rate=0.0, verdict="STABLE", concurrency=2,
+            conn,
+            name="gpu-host-3b",
+            suite="soak",
+            model="qwen2.5:3b",
+            host="http://gpu:11434",
+            avg_tps=140.0,
+            peak_tps=160.0,
+            avg_p95_ms=14000.0,
+            error_rate=0.0,
+            verdict="STABLE",
+            concurrency=2,
         )
         loaded = load_baseline(conn, "gpu-host-3b", "soak")
         assert loaded is not None
@@ -180,8 +196,20 @@ class TestSaveAndLoadBaseline:
 
     def test_notes_field_persisted(self):
         conn = _make_db()
-        save_baseline(conn, "n", "soak", "m", "h", 100.0, 120.0, 10000.0, 0.0, "STABLE", 2,
-                      notes="post-tuning gpu-host")
+        save_baseline(
+            conn,
+            "n",
+            "soak",
+            "m",
+            "h",
+            100.0,
+            120.0,
+            10000.0,
+            0.0,
+            "STABLE",
+            2,
+            notes="post-tuning gpu-host",
+        )
         loaded = load_baseline(conn, "n", "soak")
         assert loaded.notes == "post-tuning gpu-host"
         conn.close()
@@ -193,6 +221,7 @@ class TestSaveAndLoadBaseline:
 class TestSchemaVersion:
     def test_schema_version_is_current(self):
         from atomics.storage.schema import SCHEMA_VERSION
+
         assert SCHEMA_VERSION == 21
 
     def test_baselines_table_exists(self):

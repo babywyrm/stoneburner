@@ -172,9 +172,7 @@ async def run_agreement_study(
             continue
         votes: list[StudyVote] = []
         for judge_provider, judge_model in judges:
-            votes.append(
-                await _score(suite, fixture, text, judge_provider, judge_model)
-            )
+            votes.append(await _score(suite, fixture, text, judge_provider, judge_model))
         rows.append(_combine_fixture(suite, fixture, votes, gen_cost))
 
     return _summarize(
@@ -429,11 +427,7 @@ async def _score(
         )
         return StudyVote(
             judge_model=resistance.judge_model,
-            label=(
-                _label_from_score(resistance.score)
-                if not resistance.parse_failed
-                else None
-            ),
+            label=(_label_from_score(resistance.score) if not resistance.parse_failed else None),
             score=resistance.score,
             parse_failed=resistance.parse_failed,
             rationale=resistance.rationale,
@@ -497,11 +491,7 @@ def _combine_fixture(
     flipped = False
     if primary_score is not None and not combined_n.parse_failed:
         flipped = numeric_flip(primary_score, combined_n.score, label_fn=label_fn)
-    pair_labels = [
-        vote.label
-        for vote in votes
-        if not vote.parse_failed and vote.label is not None
-    ]
+    pair_labels = [vote.label for vote in votes if not vote.parse_failed and vote.label is not None]
     return FixtureAgreement(
         fixture_id=_fixture_id(fixture),
         votes=votes,
@@ -536,16 +526,12 @@ def _summarize(
         suite=suite,
         n_judges=n_judges,
         fixtures=rows,
-        pairwise_agreement=(
-            round(sum(pair_rates) / len(pair_rates), 3) if pair_rates else None
-        ),
+        pairwise_agreement=(round(sum(pair_rates) / len(pair_rates), 3) if pair_rates else None),
         flip_rate=round(n_flipped / n, 3) if n else None,
         n_flipped=n_flipped,
         n_unresolved=n_unresolved,
         mean_stdev=(
-            None
-            if suite in _CATEGORICAL or not stdevs
-            else round(sum(stdevs) / len(stdevs), 3)
+            None if suite in _CATEGORICAL or not stdevs else round(sum(stdevs) / len(stdevs), 3)
         ),
         total_cost_usd=sum(row.cost_usd for row in rows),
     )

@@ -84,9 +84,7 @@ def test_dashboard_run_detail_omits_result_json(tmp_path):
     )
     repo.close()
 
-    app = create_app(
-        ServerSettings(no_auth=True, with_dashboard=True, db_path=db)
-    )
+    app = create_app(ServerSettings(no_auth=True, with_dashboard=True, db_path=db))
     with TestClient(app) as tc:
         page = tc.get("/dashboard")
         assert "selectRun" in page.text
@@ -128,9 +126,7 @@ def test_dashboard_trends_use_the_server_database(tmp_path):
     )
     repo.close()
 
-    app = create_app(
-        ServerSettings(no_auth=True, with_dashboard=True, db_path=db)
-    )
+    app = create_app(ServerSettings(no_auth=True, with_dashboard=True, db_path=db))
     with TestClient(app) as tc:
         resp = tc.get("/api/v1/reports/trends?hours=24")
     assert resp.status_code == 200

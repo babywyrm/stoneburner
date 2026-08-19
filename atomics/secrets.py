@@ -24,13 +24,15 @@ logger = logging.getLogger("atomics.secrets")
 SERVICE_NAME = "atomics"
 
 # Known secret keys that load_settings() will check
-KNOWN_KEYS = frozenset({
-    "ANTHROPIC_API_KEY",
-    "OPENAI_API_KEY",
-    "OLLAMA_API_KEY",
-    "BEDROCK_ACCESS_KEY",
-    "BEDROCK_SECRET_KEY",
-})
+KNOWN_KEYS = frozenset(
+    {
+        "ANTHROPIC_API_KEY",
+        "OPENAI_API_KEY",
+        "OLLAMA_API_KEY",
+        "BEDROCK_ACCESS_KEY",
+        "BEDROCK_SECRET_KEY",
+    }
+)
 
 
 def set_secret(key: str, value: str) -> None:

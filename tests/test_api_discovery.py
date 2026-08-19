@@ -67,9 +67,7 @@ def test_get_models_rejects_bad_host(client):
 
 
 def test_get_models_connection_failure_is_502(client):
-    fake = SimpleNamespace(
-        list_models=AsyncMock(side_effect=ConnectionError("down"))
-    )
+    fake = SimpleNamespace(list_models=AsyncMock(side_effect=ConnectionError("down")))
     with patch("atomics.api._discovery.make_provider", return_value=fake):
         resp = client.get("/api/v1/models", params={"provider": "ollama"})
     assert resp.status_code == 502

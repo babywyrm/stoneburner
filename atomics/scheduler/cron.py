@@ -34,6 +34,10 @@ def generate_systemd_timer(
 ) -> tuple[str, str]:
     wd = working_dir or str(Path.cwd())
     py = shutil.which("python3") or sys.executable
+    exec_start = (
+        f"{py} -m atomics run --tier {tier} --provider {provider} "
+        f"--trigger scheduled --max-iterations {max_iterations}"
+    )
 
     service = f"""[Unit]
 Description=Atomics token usage benchmark run ({tier})
@@ -42,7 +46,7 @@ After=network.target
 [Service]
 Type=oneshot
 WorkingDirectory={wd}
-ExecStart={py} -m atomics run --tier {tier} --provider {provider} --trigger scheduled --max-iterations {max_iterations}
+ExecStart={exec_start}
 StandardOutput=append:{wd}/logs/atomics.log
 StandardError=append:{wd}/logs/atomics.log
 """
@@ -262,19 +266,22 @@ def check_schedule_health(
     if fmt == "launchd":
         result = run_cmd(
             ["launchctl", "list", f"{label}.{tier}"],
-            capture_output=True, text=True,
+            capture_output=True,
+            text=True,
         )
         return result.returncode == 0
     elif fmt == "systemd":
         result = run_cmd(
             ["systemctl", "--user", "is-active", f"atomics-{tier}.timer"],
-            capture_output=True, text=True,
+            capture_output=True,
+            text=True,
         )
         return result.returncode == 0 and "active" in result.stdout
     elif fmt == "crontab":
         result = run_cmd(
             ["crontab", "-l"],
-            capture_output=True, text=True,
+            capture_output=True,
+            text=True,
         )
         if result.returncode != 0:
             return False

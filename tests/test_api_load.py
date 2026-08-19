@@ -123,9 +123,7 @@ async def test_run_stress_meters_the_provider_and_caps_predict():
         peak_tps=12.5,
         saturation_concurrency=4,
         phases=[
-            ConcurrencyResult(
-                concurrency=1, requests=3, aggregate_tps=10.0, avg_latency_ms=100
-            )
+            ConcurrencyResult(concurrency=1, requests=3, aggregate_tps=10.0, avg_latency_ms=100)
         ],
     )
 

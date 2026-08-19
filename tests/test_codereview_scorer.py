@@ -82,9 +82,7 @@ def _result(verdict: str, status: JudgeOutcomeStatus) -> ReviewVerdictResult:
     [("detected", 1.0), ("clean", 1.0), ("missed", 0.0), ("false_positive", 0.0)],
 )
 def test_verdict_to_outcome_maps_domain_score(verdict: str, score: float) -> None:
-    outcome = verdict_to_judge_outcome(
-        _result(verdict, JudgeOutcomeStatus.SCORED)
-    )
+    outcome = verdict_to_judge_outcome(_result(verdict, JudgeOutcomeStatus.SCORED))
 
     assert outcome.status is JudgeOutcomeStatus.SCORED
     assert outcome.score == score
@@ -92,9 +90,7 @@ def test_verdict_to_outcome_maps_domain_score(verdict: str, score: float) -> Non
 
 
 def test_unknown_verdict_is_not_scored() -> None:
-    outcome = verdict_to_judge_outcome(
-        _result("unknown", JudgeOutcomeStatus.PARSE_FAILED)
-    )
+    outcome = verdict_to_judge_outcome(_result("unknown", JudgeOutcomeStatus.PARSE_FAILED))
 
     assert outcome.status is JudgeOutcomeStatus.PARSE_FAILED
     assert outcome.score is None

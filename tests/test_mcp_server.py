@@ -148,9 +148,7 @@ async def test_list_models_forwards_arguments_to_the_api():
 
 async def test_provider_test_forwards_arguments_to_the_api():
     api = FakeApi(result={"ok": True, "health": True})
-    await build_server(api).call_tool(
-        "provider_test", {"provider": "ollama", "model": "qwen3:14b"}
-    )
+    await build_server(api).call_tool("provider_test", {"provider": "ollama", "model": "qwen3:14b"})
     name, kwargs = api.calls[0]
     assert name == "provider_test"
     assert kwargs["provider"] == "ollama"

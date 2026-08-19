@@ -393,17 +393,19 @@ class TestRunnerThinkingPassthrough:
 
         mock_provider = AsyncMock()
         mock_provider.name = "claude"
-        mock_provider.generate = AsyncMock(return_value=ProviderResponse(
-            text="answer",
-            input_tokens=10,
-            output_tokens=50,
-            total_tokens=60,
-            model="claude-sonnet-4-6",
-            latency_ms=500.0,
-            estimated_cost_usd=0.001,
-            thinking_tokens=30,
-            thinking_text="reasoning...",
-        ))
+        mock_provider.generate = AsyncMock(
+            return_value=ProviderResponse(
+                text="answer",
+                input_tokens=10,
+                output_tokens=50,
+                total_tokens=60,
+                model="claude-sonnet-4-6",
+                latency_ms=500.0,
+                estimated_cost_usd=0.001,
+                thinking_tokens=30,
+                thinking_text="reasoning...",
+            )
+        )
 
         result = await execute_task(
             task,

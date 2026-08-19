@@ -160,7 +160,9 @@ def test_send_webhook_success():
     summary = _make_summary()
     result = send_webhook(
         "https://example.com/webhook",
-        summary, tier="ez", provider="claude",
+        summary,
+        tier="ez",
+        provider="claude",
         client=client,
     )
     assert result is True
@@ -172,7 +174,9 @@ def test_send_webhook_failure():
     summary = _make_summary()
     result = send_webhook(
         "https://example.com/webhook",
-        summary, tier="ez", provider="claude",
+        summary,
+        tier="ez",
+        provider="claude",
         client=client,
     )
     assert result is False
@@ -183,7 +187,9 @@ def test_send_webhook_slack_format():
     summary = _make_summary()
     send_webhook(
         "https://hooks.slack.com/services/T00/B00/xxx",
-        summary, tier="ez", provider="claude",
+        summary,
+        tier="ez",
+        provider="claude",
         client=client,
     )
     payload = client.calls[0]["json"]
@@ -195,7 +201,9 @@ def test_send_webhook_discord_format():
     summary = _make_summary()
     send_webhook(
         "https://discord.com/api/webhooks/123/abc",
-        summary, tier="ez", provider="claude",
+        summary,
+        tier="ez",
+        provider="claude",
         client=client,
     )
     payload = client.calls[0]["json"]
@@ -207,7 +215,9 @@ def test_send_webhook_generic_format():
     summary = _make_summary()
     send_webhook(
         "https://example.com/my-hook",
-        summary, tier="ez", provider="claude",
+        summary,
+        tier="ez",
+        provider="claude",
         client=client,
     )
     payload = client.calls[0]["json"]

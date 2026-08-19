@@ -107,9 +107,7 @@ def test_ollama_uses_control_file_when_host_and_model_unset(tmp_path, monkeypatc
 
     env_path = tmp_path / "inference.env"
     env_path.write_text(
-        "INFERENCE_BACKEND=ollama\n"
-        "INFERENCE_URL=http://127.0.0.1:9999\n"
-        "INFERENCE_MODEL=from-file\n"
+        "INFERENCE_BACKEND=ollama\nINFERENCE_URL=http://127.0.0.1:9999\nINFERENCE_MODEL=from-file\n"
     )
     monkeypatch.setenv("INFERENCE_ENV", str(env_path))
     monkeypatch.delenv("BRAIN_ENV", raising=False)
@@ -127,14 +125,10 @@ def test_ollama_cli_host_wins_over_control_file(tmp_path, monkeypatch):
 
     env_path = tmp_path / "inference.env"
     env_path.write_text(
-        "INFERENCE_BACKEND=ollama\n"
-        "INFERENCE_URL=http://127.0.0.1:9999\n"
-        "INFERENCE_MODEL=from-file\n"
+        "INFERENCE_BACKEND=ollama\nINFERENCE_URL=http://127.0.0.1:9999\nINFERENCE_MODEL=from-file\n"
     )
     monkeypatch.setenv("INFERENCE_ENV", str(env_path))
     monkeypatch.delenv("BRAIN_ENV", raising=False)
-    provider = make_provider(
-        "ollama", None, "http://localhost:11434", AtomicsSettings()
-    )
+    provider = make_provider("ollama", None, "http://localhost:11434", AtomicsSettings())
     assert isinstance(provider, OllamaProvider)
     assert provider._host == "http://localhost:11434"

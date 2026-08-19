@@ -132,14 +132,10 @@ class AdversarialFixtureResult:
             "generation_status_counts": generation_counts,
             "judge_status": judge_status,
             "judge_status_counts": judge_counts,
-            "judge_scores": (
-                self.resistance.judge_scores if self.resistance else []
-            ),
+            "judge_scores": (self.resistance.judge_scores if self.resistance else []),
             "run_scores": self.run_scores,
             "attempt_scores": [
-                attempt.judge.score
-                for attempt in scored_attempts
-                if attempt.judge is not None
+                attempt.judge.score for attempt in scored_attempts if attempt.judge is not None
             ],
             "attempt_judge_models": [
                 attempt.judge.judge_model
@@ -147,9 +143,7 @@ class AdversarialFixtureResult:
                 if attempt.judge is not None
             ],
             "attempt_rationales": [
-                attempt.judge.rationale
-                for attempt in scored_attempts
-                if attempt.judge is not None
+                attempt.judge.rationale for attempt in scored_attempts if attempt.judge is not None
             ],
             "rationale": self.resistance.rationale if self.resistance else "",
             "latency_ms": round(self.latency_ms, 1),
@@ -162,6 +156,7 @@ class AdversarialFixtureResult:
             "error_class": error_class,
             "error_message": error_message,
         }
+
 
 @dataclass
 class AdversarialSummary:
@@ -222,7 +217,8 @@ class AdversarialSummary:
     @property
     def critical_failures(self) -> list[AdversarialFixtureResult]:
         return [
-            fr for fr in self.fixture_results
+            fr
+            for fr in self.fixture_results
             if fr.resistance
             and fr.resistance.label == "complied"
             and fr.fixture.severity in ("HIGH", "CRITICAL")
@@ -247,9 +243,7 @@ class AdversarialSummary:
             "integrity": integrity_to_dict(integrity),
             "critical_failures": [fr.fixture.id for fr in self.critical_failures],
             "category_scores": self.category_scores,
-            "total_cost_usd": round(
-                sum(fr.estimated_cost_usd for fr in self.fixture_results), 6
-            ),
+            "total_cost_usd": round(sum(fr.estimated_cost_usd for fr in self.fixture_results), 6),
             "fixtures": [fr.to_dict() for fr in self.fixture_results],
         }
 
@@ -268,7 +262,8 @@ async def _score_with_all_judges(
     all_results: list[ResistanceResult] = []
 
     primary = await score_resistance(
-        prompt, response,
+        prompt,
+        response,
         attack_goal=attack_goal,
         resistance_criteria=resistance_criteria,
         judge_provider=primary_judge,
@@ -278,7 +273,8 @@ async def _score_with_all_judges(
 
     for judge_provider, judge_model in extra_judges:
         r = await score_resistance(
-            prompt, response,
+            prompt,
+            response,
             attack_goal=attack_goal,
             resistance_criteria=resistance_criteria,
             judge_provider=judge_provider,
@@ -287,9 +283,7 @@ async def _score_with_all_judges(
         all_results.append(r)
 
     total_judge_cost = sum(r.judge_cost_usd for r in all_results)
-    all_judge_calls = tuple(
-        call for result in all_results for call in result.judge_calls
-    )
+    all_judge_calls = tuple(call for result in all_results for call in result.judge_calls)
     combined = combine_numeric(
         [
             NumericVote(
@@ -303,8 +297,7 @@ async def _score_with_all_judges(
     )
     if combined.parse_failed:
         provider_failed = any(
-            call.status is JudgeOutcomeStatus.PROVIDER_ERROR
-            for call in all_judge_calls
+            call.status is JudgeOutcomeStatus.PROVIDER_ERROR for call in all_judge_calls
         )
         representative = next(
             (result for result in all_results if result.provider_failed),
@@ -396,9 +389,7 @@ def _judge_processing_error(
     started: float,
 ) -> JudgeOutcome:
     error_message = sanitize_error(exc)
-    rationale = (
-        f"Judge processing failed ({type(exc).__name__}): {error_message}"
-    )
+    rationale = f"Judge processing failed ({type(exc).__name__}): {error_message}"
     call = JudgeCallResult(
         status=JudgeOutcomeStatus.PROVIDER_ERROR,
         judge_model=judge_model,
@@ -444,9 +435,7 @@ def _aggregate_resistance(attempts: list[AttemptResult]) -> ResistanceResult | N
         ),
         judge_model=f"aggregate: {len(run_scores)} scored attempts",
         judge_cost_usd=sum(
-            attempt.judge.judge_cost_usd
-            for attempt in attempts
-            if attempt.judge is not None
+            attempt.judge.judge_cost_usd for attempt in attempts if attempt.judge is not None
         ),
         judge_scores=list(run_scores),
         judges_expected=sum(judge.judges_expected for judge in scored_judges),
@@ -493,7 +482,9 @@ async def run_adversarial(
     extra_judges = extra_judges or []
 
     _collisions = detect_self_judge(
-        provider, model, [(judge_provider, judge_model), *extra_judges],
+        provider,
+        model,
+        [(judge_provider, judge_model), *extra_judges],
     )
     if _collisions:
         logger.warning(
@@ -514,10 +505,7 @@ async def run_adversarial(
             judge_model,
             fallback_to_provider=True,
         )
-    ] + [
-        _attribution_model(p, m, fallback_to_provider=True)
-        for p, m in extra_judges
-    ]
+    ] + [_attribution_model(p, m, fallback_to_provider=True) for p, m in extra_judges]
 
     for idx, fixture in enumerate(fixtures):
         if on_fixture_start:
@@ -528,8 +516,12 @@ async def run_adversarial(
 
         logger.info(
             "[adversarial] %s (%s/%s) runs=%d judges=%d — %s",
-            fixture.id, fixture.category, fixture.severity,
-            runs, 1 + len(extra_judges), fixture.prompt[:60],
+            fixture.id,
+            fixture.category,
+            fixture.severity,
+            runs,
+            1 + len(extra_judges),
+            fixture.prompt[:60],
         )
 
         attempts: list[AttemptResult] = []
@@ -570,7 +562,9 @@ async def run_adversarial(
                 )
                 logger.warning(
                     "[adversarial] %s run %d generate failed: %s",
-                    fixture.id, run_num + 1, sanitize_error(exc),
+                    fixture.id,
+                    run_num + 1,
+                    sanitize_error(exc),
                 )
                 await _emit_run_done(
                     on_run_done,
@@ -609,12 +603,16 @@ async def run_adversarial(
                     and not response_text.strip()
                 ):
                     judge_outcome = _safety_block_judge(provider_outcome)
-                elif provider_outcome.kind in {
-                    ProviderOutcomeKind.COMPLETED,
-                    ProviderOutcomeKind.REFUSED,
-                    ProviderOutcomeKind.SAFETY_BLOCKED,
-                    ProviderOutcomeKind.TRUNCATED,
-                } and response_text.strip():
+                elif (
+                    provider_outcome.kind
+                    in {
+                        ProviderOutcomeKind.COMPLETED,
+                        ProviderOutcomeKind.REFUSED,
+                        ProviderOutcomeKind.SAFETY_BLOCKED,
+                        ProviderOutcomeKind.TRUNCATED,
+                    }
+                    and response_text.strip()
+                ):
                     resistance = await _score_with_all_judges(
                         prompt_text,
                         response_text,
@@ -690,10 +688,7 @@ async def run_adversarial(
                 if len(response_text.splitlines()) > 30:
                     print(f"  │ ... ({len(response_text.splitlines()) - 30} more lines)")
                 print("  └─")
-                print(
-                    f"\n  ┌─ JUDGE VERDICT: {judge_outcome.label} "
-                    f"({judge_outcome.score:.2f})"
-                )
+                print(f"\n  ┌─ JUDGE VERDICT: {judge_outcome.label} ({judge_outcome.score:.2f})")
                 print(f"  │ Rationale: {judge_outcome.rationale[:300]}")
                 print("  └─")
                 print("\n  RESISTANCE CRITERIA (what 'resisted' looks like):")

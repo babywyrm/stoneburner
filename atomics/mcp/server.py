@@ -78,9 +78,7 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
         Spends a few tokens. The prompt is fixed server-side. Use this after
         `list_models` to confirm a tag answers before submitting an eval.
         """
-        return api.provider_test(
-            provider=provider, model=model, host=host, thinking=thinking
-        )
+        return api.provider_test(provider=provider, model=model, host=host, thinking=thinking)
 
     @server.tool(annotations=READ_ONLY)
     def health() -> Any:

@@ -17,6 +17,7 @@ from atomics.providers.base import ProviderResponse
 
 # ── Fixture set sanity ─────────────────────────────────────────────────────
 
+
 def test_fixtures_have_all_three_expected_kinds():
     kinds = {f.expected for f in REFUSAL_FIXTURES}
     assert kinds == {"comply", "refuse", "clarify"}
@@ -33,6 +34,7 @@ def test_fixtures_have_rationale():
 
 
 # ── Scoring math ───────────────────────────────────────────────────────────
+
 
 def test_score_comply_expected():
     assert _classification_to_score("comply", "comply") == 1.0
@@ -58,29 +60,58 @@ def test_score_unknown_is_zero():
 
 # ── Runner + rollups (mocked providers) ────────────────────────────────────
 
+
 class _FakeProvider:
     name = "fake"
 
-    async def generate(self, prompt, *, system=None, model=None, max_tokens=256,
-                        thinking=None, thinking_budget=None, temperature=None):
+    async def generate(
+        self,
+        prompt,
+        *,
+        system=None,
+        model=None,
+        max_tokens=256,
+        thinking=None,
+        thinking_budget=None,
+        temperature=None,
+    ):
         return ProviderResponse(
-            text="some response", input_tokens=5, output_tokens=5, total_tokens=10,
-            model=model or "m", latency_ms=100.0, estimated_cost_usd=0.0,
+            text="some response",
+            input_tokens=5,
+            output_tokens=5,
+            total_tokens=10,
+            model=model or "m",
+            latency_ms=100.0,
+            estimated_cost_usd=0.0,
         )
 
 
 class _FakeJudge:
     """Judge that always returns a fixed classification."""
+
     name = "judge"
 
     def __init__(self, classification: str):
         self._c = classification
 
-    async def generate(self, prompt, *, system=None, model=None, max_tokens=256,
-                       thinking=None, thinking_budget=None, temperature=None):
+    async def generate(
+        self,
+        prompt,
+        *,
+        system=None,
+        model=None,
+        max_tokens=256,
+        thinking=None,
+        thinking_budget=None,
+        temperature=None,
+    ):
         return ProviderResponse(
-            text=f"CLASS: {self._c}\nRATIONALE: fixed", input_tokens=5,
-            output_tokens=5, total_tokens=10, model="judge", latency_ms=50.0,
+            text=f"CLASS: {self._c}\nRATIONALE: fixed",
+            input_tokens=5,
+            output_tokens=5,
+            total_tokens=10,
+            model="judge",
+            latency_ms=50.0,
             estimated_cost_usd=0.0,
         )
 
@@ -104,9 +135,15 @@ class _SafetyBlockedProvider:
             safety_reason="content_filter",
         )
         return ProviderResponse(
-            text="", input_tokens=5, output_tokens=0, total_tokens=5,
-            model="blocked-model", latency_ms=10.0, estimated_cost_usd=0.0,
-            outcome=outcome, finish_reason="content_filter",
+            text="",
+            input_tokens=5,
+            output_tokens=0,
+            total_tokens=5,
+            model="blocked-model",
+            latency_ms=10.0,
+            estimated_cost_usd=0.0,
+            outcome=outcome,
+            finish_reason="content_filter",
         )
 
 
@@ -116,8 +153,11 @@ async def test_perfect_calibration_when_judge_matches_expected():
     # Run only the comply fixtures with a judge that always says COMPLIED
     comply_only = [f for f in REFUSAL_FIXTURES if f.expected == "comply"]
     summary = await run_refusal(
-        _FakeProvider(), judge_provider=_FakeJudge("COMPLIED"),
-        model="m", judge_model="judge", fixtures=comply_only,
+        _FakeProvider(),
+        judge_provider=_FakeJudge("COMPLIED"),
+        model="m",
+        judge_model="judge",
+        fixtures=comply_only,
     )
     assert summary.calibration_score == 1.0
     assert summary.over_refusal_rate == 0.0
@@ -128,8 +168,11 @@ async def test_over_refusal_detected():
     """A model that refuses benign requests shows over-refusal."""
     comply_only = [f for f in REFUSAL_FIXTURES if f.expected == "comply"]
     summary = await run_refusal(
-        _FakeProvider(), judge_provider=_FakeJudge("REFUSED"),
-        model="m", judge_model="judge", fixtures=comply_only,
+        _FakeProvider(),
+        judge_provider=_FakeJudge("REFUSED"),
+        model="m",
+        judge_model="judge",
+        fixtures=comply_only,
     )
     assert summary.over_refusal_rate == 1.0
     assert summary.calibration_score == 0.0
@@ -140,8 +183,11 @@ async def test_under_refusal_detected():
     """A model that complies with harmful requests shows under-refusal."""
     refuse_only = [f for f in REFUSAL_FIXTURES if f.expected == "refuse"]
     summary = await run_refusal(
-        _FakeProvider(), judge_provider=_FakeJudge("COMPLIED"),
-        model="m", judge_model="judge", fixtures=refuse_only,
+        _FakeProvider(),
+        judge_provider=_FakeJudge("COMPLIED"),
+        model="m",
+        judge_model="judge",
+        fixtures=refuse_only,
     )
     assert summary.under_refusal_rate == 1.0
     assert summary.calibration_score == 0.0
@@ -150,8 +196,11 @@ async def test_under_refusal_detected():
 @pytest.mark.asyncio
 async def test_summary_to_dict_shape():
     summary = await run_refusal(
-        _FakeProvider(), judge_provider=_FakeJudge("CLARIFIED"),
-        model="m", judge_model="judge", fixtures=REFUSAL_FIXTURES[:2],
+        _FakeProvider(),
+        judge_provider=_FakeJudge("CLARIFIED"),
+        model="m",
+        judge_model="judge",
+        fixtures=REFUSAL_FIXTURES[:2],
     )
     d = summary.to_dict()
     assert "calibration_score" in d
@@ -164,8 +213,11 @@ async def test_summary_to_dict_shape():
 async def test_refusal_summary_exposes_complete_integrity_and_alias():
     fixtures = [f for f in REFUSAL_FIXTURES if f.expected == "comply"][:1]
     summary = await run_refusal(
-        _FakeProvider(), judge_provider=_FakeJudge("COMPLIED"),
-        model="m", judge_model="judge", fixtures=fixtures,
+        _FakeProvider(),
+        judge_provider=_FakeJudge("COMPLIED"),
+        model="m",
+        judge_model="judge",
+        fixtures=fixtures,
     )
 
     assert summary.fixture_results is summary.results
@@ -191,8 +243,13 @@ async def test_partial_run_does_not_publish_a_bare_calibration():
             self.n += 1
             if self.n == 1:
                 return ProviderResponse(
-                    text="ok", input_tokens=5, output_tokens=5, total_tokens=10,
-                    model="m", latency_ms=10.0, estimated_cost_usd=0.0,
+                    text="ok",
+                    input_tokens=5,
+                    output_tokens=5,
+                    total_tokens=10,
+                    model="m",
+                    latency_ms=10.0,
+                    estimated_cost_usd=0.0,
                 )
             raise httpx.ReadTimeout("second fixture timed out")
 
@@ -215,8 +272,11 @@ async def test_partial_run_does_not_publish_a_bare_calibration():
 @pytest.mark.asyncio
 async def test_refusal_judge_failure_is_indeterminate():
     summary = await run_refusal(
-        _FakeProvider(), judge_provider=_FailingProvider(),
-        model="m", judge_model="judge", fixtures=REFUSAL_FIXTURES[:1],
+        _FakeProvider(),
+        judge_provider=_FailingProvider(),
+        model="m",
+        judge_model="judge",
+        fixtures=REFUSAL_FIXTURES[:1],
     )
 
     assert summary.calibration_score is None
@@ -230,7 +290,8 @@ async def test_refusal_judge_failure_is_indeterminate():
 @pytest.mark.asyncio
 async def test_refusal_provider_timeout_retains_failed_attempt():
     summary = await run_refusal(
-        _FailingProvider(), judge_provider=_FakeJudge("COMPLIED"),
+        _FailingProvider(),
+        judge_provider=_FakeJudge("COMPLIED"),
         fixtures=REFUSAL_FIXTURES[:1],
     )
 
@@ -274,7 +335,8 @@ async def test_refusal_runner_calls_start_and_done_callbacks():
 @pytest.mark.asyncio
 async def test_self_judge_is_logged(caplog):
     """Refusal must warn when the model under test is also the judge."""
-    class _Same( _FakeProvider):
+
+    class _Same(_FakeProvider):
         name = "ollama"
 
     fixture = [f for f in REFUSAL_FIXTURES if f.expected == "comply"][:1]

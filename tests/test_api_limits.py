@@ -152,9 +152,7 @@ class TestSecurityHeaders:
     @pytest.fixture
     def client(self, tmp_path):
         app = create_app(
-            ServerSettings(
-                no_auth=True, with_dashboard=True, db_path=tmp_path / "hdr.db"
-            )
+            ServerSettings(no_auth=True, with_dashboard=True, db_path=tmp_path / "hdr.db")
         )
         with TestClient(app) as tc:
             yield tc
@@ -167,9 +165,7 @@ class TestSecurityHeaders:
             ("Referrer-Policy", "no-referrer"),
         ],
     )
-    def test_baseline_headers_are_present_on_json_routes(
-        self, client, header, expected
-    ):
+    def test_baseline_headers_are_present_on_json_routes(self, client, header, expected):
         res = client.get("/api/v1/health")
         assert res.headers[header] == expected
 

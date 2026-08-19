@@ -15,6 +15,7 @@ git clone https://github.com/babywyrm/stoneburner.git
 cd stoneburner
 uv sync --extra dev --extra api --extra mcp
 uv run atomics doctor      # checks providers, credentials, and state paths
+# atomics mcp needs the extras above and a running `atomics server`
 ```
 
 No provider credentials are needed to run the test suite; every test either
@@ -28,13 +29,13 @@ a local pass means a green build:
 ```bash
 uv run pytest -q --cov-fail-under=85
 uv run mypy atomics/
-uv run ruff check atomics/ tests/ scripts/ --ignore E501
+uv run ruff check atomics/ tests/ scripts/
 gitleaks detect --config .gitleaks.toml --no-banner --redact
 ```
 
-`--ignore E501` is not optional — there are several hundred pre-existing
-line-length reports, and CI ignores them too. Coverage is enforced at 85%; the
-project currently sits near 88%, so new code is expected to arrive tested.
+Line length is 100 and is enforced. Fixture payload files are exempt so gold
+prompts stay as written. Coverage is enforced at 85%; the project currently
+sits near 88%, so new code is expected to arrive tested.
 
 ## Conventions worth knowing before you write code
 

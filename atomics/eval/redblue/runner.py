@@ -14,6 +14,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
+from atomics.benchmark.model_classes import supports_thinking
 from atomics.eval.attempt_serialization import integrity_to_dict
 from atomics.eval.judge import (
     JudgeResult,
@@ -24,7 +25,6 @@ from atomics.eval.judge import (
 from atomics.eval.outcomes import RunIntegrity
 from atomics.eval.redblue.fixtures import ALL_FIXTURES, BLUE_FIXTURES, RED_FIXTURES, RedBlueFixture
 from atomics.eval.suite_integrity import fixture_outcome, headline_rate, integrity_of
-from atomics.benchmark.model_classes import supports_thinking
 from atomics.models import TaskCategory, TaskResult, TaskStatus
 from atomics.providers.base import BaseProvider
 from atomics.validation import sanitize_error
@@ -49,8 +49,8 @@ def _output_budget(
     base = fixture.max_output_tokens
     if min_output_tokens is not None:
         base = max(base, min_output_tokens)
-    use_thinking = thinking if thinking is not None else (
-        supports_thinking(model) if model else False
+    use_thinking = (
+        thinking if thinking is not None else (supports_thinking(model) if model else False)
     )
     if use_thinking:
         return max(base, _THINKING_MIN_OUTPUT_TOKENS)
@@ -172,9 +172,7 @@ class RedBlueSummary:
                     "parse_failed": r.judge.parse_failed if r.judge else True,
                     "run_scores": r.run_scores,
                     "rationale": r.judge.rationale if r.judge else "",
-                    "criteria_coverage": (
-                        r.judge.criteria_coverage if r.judge else None
-                    ),
+                    "criteria_coverage": (r.judge.criteria_coverage if r.judge else None),
                     "latency_ms": round(r.task_result.latency_ms, 1),
                     "output_tokens": r.task_result.output_tokens,
                     "thinking_tokens": r.task_result.thinking_tokens,
@@ -237,7 +235,10 @@ async def run_redblue(
 
         logger.info(
             "[redblue] %s (%s/%s) %s",
-            fixture.id, fixture.team, fixture.category, fixture.prompt[:60],
+            fixture.id,
+            fixture.team,
+            fixture.category,
+            fixture.prompt[:60],
         )
         run_scores: list[float] = []
         last_task_result: TaskResult | None = None
@@ -286,7 +287,9 @@ async def run_redblue(
                 err = sanitize_error(exc)
                 logger.warning(
                     "[redblue] %s run %d generate failed: %s",
-                    fixture.id, run_num + 1, err,
+                    fixture.id,
+                    run_num + 1,
+                    err,
                 )
                 task_result.status = TaskStatus.FAILED
                 task_result.error_class = type(exc).__name__
@@ -324,7 +327,11 @@ async def run_redblue(
 
             logger.info(
                 "[redblue] %s run %d/%d → %.3f — %s",
-                fixture.id, run_num + 1, runs, judge.score, judge.rationale[:80],
+                fixture.id,
+                run_num + 1,
+                runs,
+                judge.score,
+                judge.rationale[:80],
             )
             await _emit_run_done(
                 on_run_done,

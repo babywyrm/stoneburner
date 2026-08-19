@@ -60,4 +60,3 @@ class TasksMixin(RepositoryBase):
             ),
         )
         self._conn.commit()
-

@@ -279,8 +279,12 @@ class SecurityMixin(RepositoryBase):
         now = datetime.now(UTC).isoformat()
 
         findings_data = [
-            {"category": f.category, "location": f.location,
-             "severity": f.severity, "rationale": f.rationale}
+            {
+                "category": f.category,
+                "location": f.location,
+                "severity": f.severity,
+                "rationale": f.rationale,
+            }
             for f in r.findings
         ]
 
@@ -297,15 +301,31 @@ class SecurityMixin(RepositoryBase):
                     ?, ?, ?, ?, ?, ?)
             """,
             (
-                result_id, r.run_id, r.repo, r.tier, r.model, r.provider, r.round,
-                r.objective_recall, r.objective_precision, r.objective_f,
-                r.judge_score, r.judge_rematch_recall, len(r.findings),
-                1 if r.parse_failed else 0, r.tokens_in, r.tokens_out,
-                r.cost_usd, r.latency_ms, r.judge_model, r.pack_hash,
+                result_id,
+                r.run_id,
+                r.repo,
+                r.tier,
+                r.model,
+                r.provider,
+                r.round,
+                r.objective_recall,
+                r.objective_precision,
+                r.objective_f,
+                r.judge_score,
+                r.judge_rematch_recall,
+                len(r.findings),
+                1 if r.parse_failed else 0,
+                r.tokens_in,
+                r.tokens_out,
+                r.cost_usd,
+                r.latency_ms,
+                r.judge_model,
+                r.pack_hash,
                 _json.dumps(findings_data),
                 _json.dumps(r.matched_categories),
-                r.error_class or "", r.error_message or "", now,
+                r.error_class or "",
+                r.error_message or "",
+                now,
             ),
         )
         self._conn.commit()
-

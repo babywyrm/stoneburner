@@ -75,6 +75,7 @@ List any security vulnerabilities you find, name the vulnerability class (e.g.
 CWE / OWASP category), and recommend a fix. If it is secure, state that clearly.
 """
 
+
 @dataclass
 class CodeReviewResult:
     fixture: SecureCodeFixture
@@ -142,28 +143,18 @@ class CodeReviewSummary:
 
     @property
     def integrity(self) -> RunIntegrity:
-        return RunIntegrity.from_fixture_attempts(
-            [result.attempts for result in self.results]
-        )
+        return RunIntegrity.from_fixture_attempts([result.attempts for result in self.results])
 
     @property
     def detection_rate(self) -> float | None:
-        vuln = [
-            r
-            for r in self.results
-            if r.fixture.is_vulnerable and _is_scored_result(r)
-        ]
+        vuln = [r for r in self.results if r.fixture.is_vulnerable and _is_scored_result(r)]
         if not vuln:
             return None
         return round(sum(1 for r in vuln if r.verdict == "detected") / len(vuln), 3)
 
     @property
     def false_positive_rate(self) -> float | None:
-        clean = [
-            r
-            for r in self.results
-            if not r.fixture.is_vulnerable and _is_scored_result(r)
-        ]
+        clean = [r for r in self.results if not r.fixture.is_vulnerable and _is_scored_result(r)]
         if not clean:
             return None
         return round(sum(1 for r in clean if r.verdict == "false_positive") / len(clean), 3)
@@ -221,7 +212,9 @@ async def run_codereview(
     """Run secure-code-review fixtures and score detection vs false positives."""
     extra_judges = extra_judges or []
     collisions = detect_self_judge(
-        provider, model, [(judge_provider, judge_model), *extra_judges],
+        provider,
+        model,
+        [(judge_provider, judge_model), *extra_judges],
     )
     if collisions:
         logger.warning(
@@ -241,10 +234,14 @@ async def run_codereview(
         try:
             unit = "unified diff" if fx.mode == "diff" else "code snippet"
             review_prompt = _REVIEW_TEMPLATE.format(
-                language=fx.language, unit=unit, code=fx.code,
+                language=fx.language,
+                unit=unit,
+                code=fx.code,
             )
             response = await provider.generate(
-                review_prompt, system=_REVIEW_SYSTEM, model=model,
+                review_prompt,
+                system=_REVIEW_SYSTEM,
+                model=model,
                 max_tokens=fx.max_output_tokens,
                 thinking=thinking,
                 thinking_budget=thinking_budget,

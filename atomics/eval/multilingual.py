@@ -96,10 +96,7 @@ MULTILINGUAL_FIXTURES: list[EvalFixture] = [
     EvalFixture(
         id="ml-06",
         complexity=TaskComplexity.MODERATE,
-        prompt=(
-            "请解释零信任安全模型的核心原则。"
-            "与传统的边界安全模型相比，零信任有哪些优势？"
-        ),
+        prompt=("请解释零信任安全模型的核心原则。与传统的边界安全模型相比，零信任有哪些优势？"),
         gold_criteria=[
             "never trust always verify or 永不信任始终验证",
             "no implicit trust or 无隐式信任",
@@ -113,8 +110,7 @@ MULTILINGUAL_FIXTURES: list[EvalFixture] = [
         id="ml-07",
         complexity=TaskComplexity.LIGHT,
         prompt=(
-            "API 보안에서 OAuth 2.0의 역할을 설명하세요. "
-            "주요 흐름(flow)을 간단히 설명해 주세요."
+            "API 보안에서 OAuth 2.0의 역할을 설명하세요. 주요 흐름(flow)을 간단히 설명해 주세요."
         ),
         gold_criteria=[
             "OAuth 2.0 authorization framework",
@@ -127,10 +123,7 @@ MULTILINGUAL_FIXTURES: list[EvalFixture] = [
     EvalFixture(
         id="ml-08",
         complexity=TaskComplexity.LIGHT,
-        prompt=(
-            "ما هو هجوم التصيد الاحتيالي (Phishing)؟ "
-            "اذكر ثلاث طرق للحماية منه."
-        ),
+        prompt=("ما هو هجوم التصيد الاحتيالي (Phishing)؟ اذكر ثلاث طرق للحماية منه."),
         gold_criteria=[
             "phishing or social engineering",
             "fake emails or fraudulent links",

@@ -22,8 +22,10 @@ def _run_server(tmp_path, *extra):
         result = CliRunner().invoke(
             server,
             [
-                "--api-key", "k",
-                "--db-path", str(tmp_path / "s.db"),
+                "--api-key",
+                "k",
+                "--db-path",
+                str(tmp_path / "s.db"),
                 *extra,
             ],
         )
@@ -50,9 +52,7 @@ class TestServerLogHandler:
         The access log and every job line vanished silently, so a correlation
         ID correlated nothing.
         """
-        with patch("uvicorn.run"), patch(
-            "atomics.commands.common.setup_logging"
-        ) as mock_setup:
+        with patch("uvicorn.run"), patch("atomics.commands.common.setup_logging") as mock_setup:
             result = CliRunner().invoke(
                 server, ["--api-key", "k", "--db-path", str(tmp_path / "s.db")]
             )
@@ -62,15 +62,16 @@ class TestServerLogHandler:
         assert mock_setup.call_args.kwargs["plain"] is True
 
     def test_the_requested_level_is_honored(self, tmp_path):
-        with patch("uvicorn.run"), patch(
-            "atomics.commands.common.setup_logging"
-        ) as mock_setup:
+        with patch("uvicorn.run"), patch("atomics.commands.common.setup_logging") as mock_setup:
             CliRunner().invoke(
                 server,
                 [
-                    "--api-key", "k",
-                    "--db-path", str(tmp_path / "s.db"),
-                    "--log-level", "debug",
+                    "--api-key",
+                    "k",
+                    "--db-path",
+                    str(tmp_path / "s.db"),
+                    "--log-level",
+                    "debug",
                 ],
             )
 

@@ -85,9 +85,7 @@ class RunsMixin(RepositoryBase):
         return [dict(r) for r in rows]
 
     def get_run(self, run_id: str) -> dict | None:
-        row = self._conn.execute(
-            "SELECT * FROM runs WHERE run_id = ?", (run_id,)
-        ).fetchone()
+        row = self._conn.execute("SELECT * FROM runs WHERE run_id = ?", (run_id,)).fetchone()
         return dict(row) if row is not None else None
 
     def get_run_tasks(self, run_id: str) -> list[dict]:
@@ -123,4 +121,3 @@ class RunsMixin(RepositoryBase):
         """
         rows = self._conn.execute(sql, params).fetchall()
         return [dict(r) for r in rows]
-

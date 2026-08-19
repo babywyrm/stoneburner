@@ -10,6 +10,7 @@ from atomics import inference
 
 # ── parse_env ─────────────────────────────────────────────────────────────────
 
+
 def test_parse_env_ignores_comments_and_blanks():
     text = "# a comment\n\nINFERENCE_MODEL=gemma3:4b\nINFERENCE_THINK=false\n"
     assert inference.parse_env(text) == {
@@ -27,9 +28,14 @@ def test_parse_env_keeps_value_with_equals_and_colon():
 
 # ── normalize_legacy ──────────────────────────────────────────────────────────
 
+
 def test_normalize_canonical_passthrough():
-    raw = {"INFERENCE_BACKEND": "ollama", "INFERENCE_URL": "http://h:11434",
-           "INFERENCE_MODEL": "m", "INFERENCE_THINK": "true"}
+    raw = {
+        "INFERENCE_BACKEND": "ollama",
+        "INFERENCE_URL": "http://h:11434",
+        "INFERENCE_MODEL": "m",
+        "INFERENCE_THINK": "true",
+    }
     norm = inference.normalize_legacy(raw)
     assert norm["INFERENCE_BACKEND"] == "ollama"
     assert norm["INFERENCE_URL"] == "http://h:11434"
@@ -37,8 +43,12 @@ def test_normalize_canonical_passthrough():
 
 
 def test_normalize_legacy_ollama_keys():
-    raw = {"INFERENCE_API": "ollama", "OLLAMA_URL": "http://h:11434",
-           "OLLAMA_MODEL": "qwen2.5:3b", "OLLAMA_THINK": "false"}
+    raw = {
+        "INFERENCE_API": "ollama",
+        "OLLAMA_URL": "http://h:11434",
+        "OLLAMA_MODEL": "qwen2.5:3b",
+        "OLLAMA_THINK": "false",
+    }
     norm = inference.normalize_legacy(raw)
     assert norm["INFERENCE_BACKEND"] == "ollama"
     assert norm["INFERENCE_URL"] == "http://h:11434"
@@ -47,8 +57,12 @@ def test_normalize_legacy_ollama_keys():
 
 
 def test_normalize_legacy_openai_maps_to_vllm_local_gateway():
-    raw = {"INFERENCE_API": "openai", "OPENAI_BASE_URL": "http://gpu:8000/v1",
-           "OPENAI_MODEL": "qwen2.5:3b", "OPENAI_API_KEY": "dummy"}
+    raw = {
+        "INFERENCE_API": "openai",
+        "OPENAI_BASE_URL": "http://gpu:8000/v1",
+        "OPENAI_MODEL": "qwen2.5:3b",
+        "OPENAI_API_KEY": "dummy",
+    }
     norm = inference.normalize_legacy(raw)
     assert norm["INFERENCE_BACKEND"] == "vllm"
     assert norm["INFERENCE_URL"] == "http://gpu:8000/v1"
@@ -57,14 +71,19 @@ def test_normalize_legacy_openai_maps_to_vllm_local_gateway():
 
 
 def test_normalize_canonical_wins_over_legacy():
-    raw = {"INFERENCE_BACKEND": "ollama", "INFERENCE_MODEL": "canonical",
-           "INFERENCE_API": "openai", "OPENAI_MODEL": "legacy"}
+    raw = {
+        "INFERENCE_BACKEND": "ollama",
+        "INFERENCE_MODEL": "canonical",
+        "INFERENCE_API": "openai",
+        "OPENAI_MODEL": "legacy",
+    }
     norm = inference.normalize_legacy(raw)
     assert norm["INFERENCE_BACKEND"] == "ollama"
     assert norm["INFERENCE_MODEL"] == "canonical"
 
 
 # ── InferenceTarget / load_control_file ───────────────────────────────────────
+
 
 def test_target_from_text_full():
     text = textwrap.dedent("""\
@@ -119,8 +138,7 @@ def test_load_control_file_none_when_no_paths(tmp_path, monkeypatch):
     monkeypatch.delenv("INFERENCE_ENV", raising=False)
     monkeypatch.delenv("BRAIN_ENV", raising=False)
     # point the default search paths at nonexistent files
-    monkeypatch.setattr(inference, "_DEFAULT_PATHS",
-                        (str(tmp_path / "a"), str(tmp_path / "b")))
+    monkeypatch.setattr(inference, "_DEFAULT_PATHS", (str(tmp_path / "a"), str(tmp_path / "b")))
     assert inference.load_control_file() is None
 
 
@@ -134,6 +152,7 @@ def test_load_control_file_normalizes_legacy(tmp_path):
 
 
 # ── resolver (agnostic) ───────────────────────────────────────────────────────
+
 
 def test_resolve_model_picks_tier():
     machine = {"difficulty_models": {"easy": "gemma3:4b", "hard": "qwen2.5:1.5b"}}
@@ -165,11 +184,16 @@ def test_check_model_compat_grouped():
 
 
 def test_resolve_and_render_roundtrip():
-    machine = {"difficulty_models": {"easy": "gemma3:4b"}, "think_default": False,
-               "supported_backends": ["ollama"],
-               "model_compatibility": {"compatible": ["gemma3:4b"]}}
-    profile = {"endpoint": {"host": "h", "port": 11434, "url": "http://h:11434"},
-               "backend": "ollama"}
+    machine = {
+        "difficulty_models": {"easy": "gemma3:4b"},
+        "think_default": False,
+        "supported_backends": ["ollama"],
+        "model_compatibility": {"compatible": ["gemma3:4b"]},
+    }
+    profile = {
+        "endpoint": {"host": "h", "port": 11434, "url": "http://h:11434"},
+        "backend": "ollama",
+    }
     out = inference.resolve(machine, profile, "easy", "local-gpu", "stoneburner")
     assert out["resolved"]["model"] == "gemma3:4b"
     assert out["backend_ok"] is True
@@ -184,6 +208,7 @@ def test_resolve_and_render_roundtrip():
 
 # ── provider_from_target (auto-load integration point) ────────────────────────
 
+
 def test_provider_from_target_ollama():
     t = inference.InferenceTarget(backend="ollama", url="http://h:11434", model="m")
     p = inference.provider_from_target(t, client=object())
@@ -191,15 +216,15 @@ def test_provider_from_target_ollama():
 
 
 def test_provider_from_target_vllm():
-    t = inference.InferenceTarget(backend="vllm", url="http://g:8000/v1",
-                                  model="m", api_key="dummy")
+    t = inference.InferenceTarget(
+        backend="vllm", url="http://g:8000/v1", model="m", api_key="dummy"
+    )
     p = inference.provider_from_target(t, client=object())
     assert p.name == "vllm"
 
 
 def test_provider_from_target_openai():
-    t = inference.InferenceTarget(backend="openai", url="", model="gpt-4o",
-                                  api_key="sk-x")
+    t = inference.InferenceTarget(backend="openai", url="", model="gpt-4o", api_key="sk-x")
     p = inference.provider_from_target(t, client=object())
     assert p.name == "openai"
 
@@ -211,6 +236,7 @@ def test_provider_from_target_unknown_backend_raises():
 
 
 # ── inspect / overlay (CLI + factory consumers) ───────────────────────────────
+
 
 def test_inspect_control_file_omits_api_key(tmp_path, monkeypatch):
     p = tmp_path / "inference.env"
@@ -244,7 +270,11 @@ def test_overlay_fills_ollama_host_and_model_from_file():
         backend="ollama", url="http://127.0.0.1:11434", model="gemma3:4b"
     )
     name, model, host, vllm_host = inference.overlay_provider_defaults(
-        name="ollama", model=None, host=None, target=target, env={},
+        name="ollama",
+        model=None,
+        host=None,
+        target=target,
+        env={},
     )
     assert name == "ollama"
     assert host == "http://127.0.0.1:11434"
@@ -288,7 +318,11 @@ def test_overlay_ignores_file_when_provider_differs():
         backend="ollama", url="http://127.0.0.1:11434", model="gemma3:4b"
     )
     name, model, host, vllm_host = inference.overlay_provider_defaults(
-        name="claude", model=None, host=None, target=target, env={},
+        name="claude",
+        model=None,
+        host=None,
+        target=target,
+        env={},
     )
     assert name == "claude"
     assert host is None
@@ -301,7 +335,12 @@ def test_overlay_fills_vllm_host_from_file():
         backend="vllm", url="http://127.0.0.1:8000/v1", model="qwen2.5:3b"
     )
     name, model, host, vllm_host = inference.overlay_provider_defaults(
-        name="vllm", model=None, host=None, vllm_host=None, target=target, env={},
+        name="vllm",
+        model=None,
+        host=None,
+        vllm_host=None,
+        target=target,
+        env={},
     )
     assert name == "vllm"
     assert vllm_host == "http://127.0.0.1:8000/v1"

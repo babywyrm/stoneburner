@@ -107,14 +107,16 @@ def load_qa_suite(path: str) -> tuple[str, str, list[QAFixture]]:
         raise QAError(f"No fixtures found in {path}")
     fixtures: list[QAFixture] = []
     for item in raw_fixtures:
-        fixtures.append(QAFixture(
-            id=str(item.get("id", "unknown")),
-            prompt=str(item.get("prompt", "")),
-            must_match=str(item.get("must_match", "pass")),
-            pass_patterns=[str(p) for p in item.get("pass_patterns", [])],
-            fail_patterns=[str(p) for p in item.get("fail_patterns", [])],
-            notes=str(item.get("notes", "")),
-        ))
+        fixtures.append(
+            QAFixture(
+                id=str(item.get("id", "unknown")),
+                prompt=str(item.get("prompt", "")),
+                must_match=str(item.get("must_match", "pass")),
+                pass_patterns=[str(p) for p in item.get("pass_patterns", [])],
+                fail_patterns=[str(p) for p in item.get("fail_patterns", [])],
+                notes=str(item.get("notes", "")),
+            )
+        )
     return model, host, fixtures
 
 
@@ -179,6 +181,7 @@ async def _query_profile(
 ) -> tuple[str, float]:
     """Fire a single prompt via a TargetProfile. Returns (response_text, latency_ms)."""
     from atomics.load.profiles import _single_request_profile
+
     text, lat, _cls = await _single_request_profile(client, profile, prompt)
     return text, lat
 
@@ -207,7 +210,9 @@ async def run_qa_suite(
                 if profile is not None:
                     text, lat = await _query_profile(client, profile, fixture.prompt)
                 else:
-                    text, lat = await _query_ollama(client, host, model, fixture.prompt, num_predict)
+                    text, lat = await _query_ollama(
+                        client, host, model, fixture.prompt, num_predict
+                    )
                 status, mp, mf = evaluate_fixture(fixture, text)
                 qa_result = QAResult(
                     fixture=fixture,

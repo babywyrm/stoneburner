@@ -136,9 +136,7 @@ class ClaudeProvider(BaseProvider):
             total_tokens=inp + out,
             model=model,
             latency_ms=round(latency, 2),
-            estimated_cost_usd=round(
-                _estimate_cost(model, inp, out, cache_read, cache_write), 6
-            ),
+            estimated_cost_usd=round(_estimate_cost(model, inp, out, cache_read, cache_write), 6),
             tokens_per_second=round(tps, 2) if tps is not None else None,
             thinking_tokens=thinking_tokens,
             thinking_text=thinking_text,
@@ -170,23 +168,31 @@ class ClaudeProvider(BaseProvider):
             # Indirect injection: the attack arrives as the result of a tool the
             # model appears to have already called. Anthropic requires the
             # tool_result to sit in a user message.
-            messages.append({
-                "role": "assistant",
-                "content": [{
-                    "type": "tool_use",
-                    "id": _INJECTED_CALL_ID,
-                    "name": "list_files",
-                    "input": {"directory": "."},
-                }],
-            })
-            messages.append({
-                "role": "user",
-                "content": [{
-                    "type": "tool_result",
-                    "tool_use_id": _INJECTED_CALL_ID,
-                    "content": injected_tool_output,
-                }],
-            })
+            messages.append(
+                {
+                    "role": "assistant",
+                    "content": [
+                        {
+                            "type": "tool_use",
+                            "id": _INJECTED_CALL_ID,
+                            "name": "list_files",
+                            "input": {"directory": "."},
+                        }
+                    ],
+                }
+            )
+            messages.append(
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": _INJECTED_CALL_ID,
+                            "content": injected_tool_output,
+                        }
+                    ],
+                }
+            )
 
         t0 = time.monotonic()
         response = await self._client.messages.create(
@@ -211,9 +217,7 @@ class ClaudeProvider(BaseProvider):
             total_tokens=inp + out,
             model=model,
             latency_ms=round(latency, 2),
-            estimated_cost_usd=round(
-                _estimate_cost(model, inp, out, cache_read, cache_write), 6
-            ),
+            estimated_cost_usd=round(_estimate_cost(model, inp, out, cache_read, cache_write), 6),
             tokens_per_second=compute_tps(out, latency / 1000),
             cache_read_tokens=cache_read,
             cache_write_tokens=cache_write,

@@ -69,8 +69,6 @@ class ContentionResult:
         return round(mixed / solo, 3)
 
 
-
-
 async def _run_model_phase(
     client: httpx.AsyncClient,
     host: str,

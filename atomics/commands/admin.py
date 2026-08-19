@@ -22,12 +22,14 @@ from atomics.providers.base import BaseProvider
 
 TIER_CHOICES = click.Choice([t.value for t in BurnTier], case_sensitive=False)
 
+
 @click.command()
 def doctor() -> None:
     """Check Python, database, API keys, optional deps, and scheduler tooling."""
     from atomics.doctor import run_doctor
 
     sys.exit(run_doctor())
+
 
 @click.command()
 @click.option("--tier", "-t", type=TIER_CHOICES, default="baseline", help="Burn tier")
@@ -105,9 +107,13 @@ def schedule(
             msg = install_crontab(entry)
             repo = MetricsRepository(settings.db_path)
             repo.save_schedule(
-                schedule_id=schedule_id, format=fmt, tier=tier,
-                provider=provider_name, model=None,
-                interval_minutes=interval, max_iterations=max_iterations,
+                schedule_id=schedule_id,
+                format=fmt,
+                tier=tier,
+                provider=provider_name,
+                model=None,
+                interval_minutes=interval,
+                max_iterations=max_iterations,
             )
             repo.close()
             console.print(f"[green]{msg}[/green]")
@@ -122,9 +128,13 @@ def schedule(
             msg = install_systemd(service, timer, tier=tier)
             repo = MetricsRepository(settings.db_path)
             repo.save_schedule(
-                schedule_id=schedule_id, format=fmt, tier=tier,
-                provider=provider_name, model=None,
-                interval_minutes=interval, max_iterations=max_iterations,
+                schedule_id=schedule_id,
+                format=fmt,
+                tier=tier,
+                provider=provider_name,
+                model=None,
+                interval_minutes=interval,
+                max_iterations=max_iterations,
             )
             repo.close()
             console.print(f"[green]{msg}[/green]")
@@ -136,16 +146,18 @@ def schedule(
             click.echo("atomics.timer:")
             click.echo(timer)
     elif fmt == "launchd":
-        plist = generate_launchd_plist(
-            interval, max_iterations, tier=tier, provider=provider_name
-        )
+        plist = generate_launchd_plist(interval, max_iterations, tier=tier, provider=provider_name)
         if install:
             msg = install_launchd(plist, tier=tier)
             repo = MetricsRepository(settings.db_path)
             repo.save_schedule(
-                schedule_id=schedule_id, format=fmt, tier=tier,
-                provider=provider_name, model=None,
-                interval_minutes=interval, max_iterations=max_iterations,
+                schedule_id=schedule_id,
+                format=fmt,
+                tier=tier,
+                provider=provider_name,
+                model=None,
+                interval_minutes=interval,
+                max_iterations=max_iterations,
             )
             repo.close()
             console.print(f"[green]{msg}[/green]")
@@ -154,6 +166,7 @@ def schedule(
                 "[bold]Save to ~/Library/LaunchAgents/com.babywyrm.atomics.plist:[/bold]\n"
             )
             click.echo(plist)
+
 
 @click.command("schedule-status")
 def schedule_status() -> None:
@@ -167,7 +180,9 @@ def schedule_status() -> None:
     try:
         schedules = repo.get_schedules()
         if not schedules:
-            console.print("[dim]No schedules installed. Use [bold]atomics schedule --install[/bold].[/dim]")
+            console.print(
+                "[dim]No schedules installed. Use [bold]atomics schedule --install[/bold].[/dim]"
+            )
             return
 
         table = Table(title="Installed Schedules", show_lines=True)
@@ -184,17 +199,17 @@ def schedule_status() -> None:
 
         for s in schedules:
             health = check_schedule_health(
-                s["format"], s["tier"],
+                s["format"],
+                s["tier"],
             )
             status_style = (
-                "[green]success[/green]" if s.get("last_status") == "success"
-                else "[red]failed[/red]" if s.get("last_status") == "failed"
+                "[green]success[/green]"
+                if s.get("last_status") == "success"
+                else "[red]failed[/red]"
+                if s.get("last_status") == "failed"
                 else "[dim]—[/dim]"
             )
-            health_style = (
-                "[green]alive[/green]" if health
-                else "[red]missing[/red]"
-            )
+            health_style = "[green]alive[/green]" if health else "[red]missing[/red]"
             table.add_row(
                 s["schedule_id"],
                 s["format"],
@@ -211,16 +226,16 @@ def schedule_status() -> None:
     finally:
         repo.close()
 
+
 @click.command("export")
 @click.option(
     "--suite",
     type=click.Choice(
-        ["tasks", "eval", "redblue", "stress", "sweep", "soak", "adversarial",
-         "toolcall", "all"]
+        ["tasks", "eval", "redblue", "stress", "sweep", "soak", "adversarial", "toolcall", "all"]
     ),
     default="tasks",
     help="Which suite to export: tasks (all task_results), eval, redblue, stress, "
-         "sweep, soak, adversarial, toolcall, or all",
+    "sweep, soak, adversarial, toolcall, or all",
 )
 @click.option(
     "--since-hours",
@@ -273,7 +288,9 @@ def export(
             rows = repo.query_task_results(since_hours=since_hours, limit=limit, suite="eval")
             write_tasks_export(rows, fmt, out_file)
         elif suite == "redblue":
-            rows = repo.query_task_results(since_hours=since_hours, limit=limit, suite_prefix="redblue-")
+            rows = repo.query_task_results(
+                since_hours=since_hours, limit=limit, suite_prefix="redblue-"
+            )
             write_tasks_export(rows, fmt, out_file)
         elif suite == "stress":
             rows = repo.get_stress_results()
@@ -320,6 +337,7 @@ def export(
     finally:
         repo.close()
 
+
 def _write_generic_export(rows: list[dict], fmt: str, out_file) -> None:
     """Write arbitrary row dicts to jsonl or csv."""
     import csv as _csv
@@ -335,9 +353,12 @@ def _write_generic_export(rows: list[dict], fmt: str, out_file) -> None:
         writer.writeheader()
         writer.writerows(rows)
 
+
 @click.command("models")
 @click.option(
-    "--provider", "-p", "provider_name",
+    "--provider",
+    "-p",
+    "provider_name",
     type=click.Choice(["ollama", "vllm"], case_sensitive=False),
     default="ollama",
     help="Backend to list models from (default: ollama)",
@@ -348,7 +369,8 @@ def _write_generic_export(rows: list[dict], fmt: str, out_file) -> None:
     help="Ollama host URL (default: ATOMICS_OLLAMA_HOST or http://localhost:11434)",
 )
 @click.option(
-    "--vllm-host", "vllm_host",
+    "--vllm-host",
+    "vllm_host",
     default=None,
     help="vLLM/OpenAI-compatible base URL (default: ATOMICS_VLLM_HOST or http://localhost:8000/v1)",
 )
@@ -360,11 +382,13 @@ def models(provider_name: str, host: str | None, vllm_host: str | None) -> None:
     provider: BaseProvider
     if provider_name == "vllm":
         from atomics.providers.vllm import VllmProvider
+
         base_url = vllm_host or settings.vllm_host
         provider = VllmProvider(base_url=base_url)
         title = f"vLLM Models — {base_url}"
     else:
         from atomics.providers.ollama import OllamaProvider
+
         effective_host = host or settings.ollama_host
         provider = OllamaProvider(host=effective_host)
         title = f"Ollama Models — {effective_host}"
@@ -405,6 +429,7 @@ def models(provider_name: str, host: str | None, vllm_host: str | None) -> None:
             f"add to model_classes.py for accurate comparison[/yellow]"
         )
 
+
 @click.command("provider-test")
 @click.option(
     "--provider",
@@ -419,9 +444,20 @@ def models(provider_name: str, host: str | None, vllm_host: str | None) -> None:
 @click.option("--ollama-host", type=str, default=None, help="Ollama endpoint")
 @click.option("--vllm-host", type=str, default=None, help="vLLM/OpenAI-compatible base URL")
 @click.option("--gateway-url", type=str, default=None, help="Brain-gateway endpoint")
-@click.option("--thinking/--no-thinking", "thinking_flag", default=None, help="Enable/disable thinking mode")
+@click.option(
+    "--thinking/--no-thinking", "thinking_flag", default=None, help="Enable/disable thinking mode"
+)
 @click.option("--thinking-budget", type=int, default=None, help="Max thinking tokens")
-def provider_test(provider_name: str, model: str | None, region: str, ollama_host: str | None, vllm_host: str | None, gateway_url: str | None, thinking_flag: bool | None, thinking_budget: int | None) -> None:
+def provider_test(
+    provider_name: str,
+    model: str | None,
+    region: str,
+    ollama_host: str | None,
+    vllm_host: str | None,
+    gateway_url: str | None,
+    thinking_flag: bool | None,
+    thinking_budget: int | None,
+) -> None:
     """Quick health check against the configured provider."""
     settings = load_settings()
     setup_logging(settings.log_level)
@@ -462,6 +498,7 @@ def provider_test(provider_name: str, model: str | None, region: str, ollama_hos
     eff_thinking = thinking_flag
     if eff_thinking is None and model:
         from atomics.benchmark.model_classes import supports_thinking
+
         if supports_thinking(model):
             eff_thinking = True
 
@@ -501,17 +538,15 @@ def provider_test(provider_name: str, model: str | None, region: str, ollama_hos
             console.print(f"Thinking tokens: {resp.thinking_tokens}")
         if resp.cache_read_tokens or resp.cache_write_tokens:
             console.print(
-                f"Cache tokens: read={resp.cache_read_tokens} "
-                f"write={resp.cache_write_tokens}"
+                f"Cache tokens: read={resp.cache_read_tokens} write={resp.cache_write_tokens}"
             )
         console.print(f"Latency: {resp.latency_ms:.0f}ms")
         console.print(f"Cost: ${resp.estimated_cost_usd:.6f}")
         if resp.tokens_per_second is not None:
-            console.print(
-                f"Throughput: {resp.tokens_per_second:.1f} tok/s ({resp.tps_basis})"
-            )
+            console.print(f"Throughput: {resp.tokens_per_second:.1f} tok/s ({resp.tps_basis})")
 
     asyncio.run(_test())
+
 
 @click.command()
 @click.argument("shell", type=click.Choice(["bash", "zsh", "fish"]))

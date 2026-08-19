@@ -16,9 +16,7 @@ def client():
 
 @pytest.mark.asyncio
 async def test_post_runs_creates_job(client):
-    with patch(
-        "atomics.api.routes.run_benchmark_from_request", new_callable=AsyncMock
-    ) as mock_run:
+    with patch("atomics.api.routes.run_benchmark_from_request", new_callable=AsyncMock) as mock_run:
         mock_run.return_value = {"run_id": "abc123", "tasks": 3, "success": 3}
         resp = client.post("/api/v1/runs", json={"provider": "ollama"})
         assert resp.status_code == 202
@@ -38,21 +36,18 @@ async def test_post_runs_creates_job(client):
 
 @pytest.mark.asyncio
 async def test_post_evals_creates_job(client):
-    with patch(
-        "atomics.api.routes.run_eval_suite", new_callable=AsyncMock
-    ) as mock_run:
+    with patch("atomics.api.routes.run_eval_suite", new_callable=AsyncMock) as mock_run:
         mock_run.return_value = {
             "suite": "accuracy",
             "overall_accuracy": 0.85,
             "fixtures_run": 5,
         }
-        resp = client.post(
-            "/api/v1/evals", json={"suite": "accuracy", "provider": "ollama"}
-        )
+        resp = client.post("/api/v1/evals", json={"suite": "accuracy", "provider": "ollama"})
     assert resp.status_code == 202
     body = resp.json()
     assert body["kind"] == "eval"
     assert body["status"] in ("pending", "running", "completed")
+
 
 @pytest.mark.asyncio
 async def test_poll_slow_job_returns_running(client):
@@ -90,4 +85,3 @@ async def test_poll_slow_job_returns_running(client):
                 break
         assert poll.json()["status"] == "completed"
         assert poll.json()["result"]["run_id"] == "slow-job"
-

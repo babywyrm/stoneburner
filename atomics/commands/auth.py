@@ -113,12 +113,18 @@ def whoami() -> None:
                 email = claims.get("email", "")
                 name = claims.get("name", "")
                 if name or email:
-                    console.print(f"[dim]Identity:[/dim] {name} ({email})" if name else f"[dim]Identity:[/dim] {email}")
+                    console.print(
+                        f"[dim]Identity:[/dim] {name} ({email})"
+                        if name
+                        else f"[dim]Identity:[/dim] {email}"
+                    )
             except Exception:
                 pass
         return
 
-    console.print("[yellow]Not authenticated.[/yellow] Run [bold]atomics login[/bold] or set OPENAI_API_KEY.")
+    console.print(
+        "[yellow]Not authenticated.[/yellow] Run [bold]atomics login[/bold] or set OPENAI_API_KEY."
+    )
 
 
 @click.group("secrets")
@@ -137,8 +143,9 @@ def secrets_group():
 
 @secrets_group.command("set")
 @click.argument("key")
-@click.option("--force", is_flag=True, default=False,
-              help="Allow storing keys not in the standard set.")
+@click.option(
+    "--force", is_flag=True, default=False, help="Allow storing keys not in the standard set."
+)
 def secrets_set(key: str, force: bool):
     """Store a secret in the OS keychain.
 
@@ -172,9 +179,12 @@ def secrets_set(key: str, force: bool):
 
 @secrets_group.command("get")
 @click.argument("key")
-@click.option("--show", is_flag=True,
-              help="Print the secret value to stdout. Off by default so keys are "
-                   "not exposed in terminal scrollback, logs, or shell history.")
+@click.option(
+    "--show",
+    is_flag=True,
+    help="Print the secret value to stdout. Off by default so keys are "
+    "not exposed in terminal scrollback, logs, or shell history.",
+)
 def secrets_get(key: str, show: bool):
     """Check a secret in the OS keychain. Prints the value only with --show.
 

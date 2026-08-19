@@ -15,19 +15,37 @@ from atomics.config import load_settings
 
 @click.command()
 @click.option(
-    "--provider", "-p", "provider_name",
+    "--provider",
+    "-p",
+    "provider_name",
     type=PROVIDER_CHOICES,
     default="ollama",
     help="Provider to stress test (default: ollama for raw GPU stress)",
 )
-@click.option("--model", "-m", type=str, default=None, help="Model to stress (default: ATOMICS_OLLAMA_MODEL)")
-@click.option("--models", "models_csv", type=str, default=None,
-              help="Comma-separated list of models for contention testing (e.g. qwen2.5:3b,qwen2.5:7b).")
+@click.option(
+    "--model", "-m", type=str, default=None, help="Model to stress (default: ATOMICS_OLLAMA_MODEL)"
+)
+@click.option(
+    "--models",
+    "models_csv",
+    type=str,
+    default=None,
+    help="Comma-separated list of models for contention testing (e.g. qwen2.5:3b,qwen2.5:7b).",
+)
 @click.option("--ollama-host", type=str, default=None, help="Ollama endpoint")
-@click.option("--profile", "profile_path", type=click.Path(exists=True), default=None,
-              help="Target profile YAML (replaces --model/--ollama-host).")
-@click.option("--max-concurrency", "-c", type=int, default=8, help="Max parallel requests (ramps 1→2→4→...)")
-@click.option("--phase-seconds", "-s", type=float, default=15.0, help="Seconds at each concurrency level")
+@click.option(
+    "--profile",
+    "profile_path",
+    type=click.Path(exists=True),
+    default=None,
+    help="Target profile YAML (replaces --model/--ollama-host).",
+)
+@click.option(
+    "--max-concurrency", "-c", type=int, default=8, help="Max parallel requests (ramps 1→2→4→...)"
+)
+@click.option(
+    "--phase-seconds", "-s", type=float, default=15.0, help="Seconds at each concurrency level"
+)
 @click.option("--num-predict", type=int, default=2048, help="Max output tokens per request")
 @click.option("--save/--no-save", "save_results", default=True, help="Persist results to database")
 def stress(
@@ -57,12 +75,14 @@ def stress(
     settings = load_settings()
     setup_logging(settings.log_level)
     import logging as _logging
+
     _logging.getLogger("httpx").setLevel(_logging.WARNING)
     _logging.getLogger("httpcore").setLevel(_logging.WARNING)
     console = Console()
 
     if models_csv:
         from atomics.load.contention import run_contention
+
         host = ollama_host or settings.ollama_host
         model_list = [m.strip() for m in models_csv.split(",") if m.strip()]
         console.print(
@@ -70,13 +90,15 @@ def stress(
             f"Models: {', '.join(model_list)}\n"
             f"Phase: {phase_seconds}s solo + {phase_seconds}s mixed\n"
         )
-        contention = asyncio.run(run_contention(
-            host=host,
-            models=model_list,
-            concurrency=1,
-            phase_seconds=phase_seconds,
-            num_predict=min(num_predict, 512),
-        ))
+        contention = asyncio.run(
+            run_contention(
+                host=host,
+                models=model_list,
+                concurrency=1,
+                phase_seconds=phase_seconds,
+                num_predict=min(num_predict, 512),
+            )
+        )
         ctable = Table(title="Contention Results", show_lines=True)
         ctable.add_column("Model", style="cyan")
         ctable.add_column("Solo tok/s", justify="right")
@@ -88,13 +110,17 @@ def stress(
             solo = contention.solo_tps.get(mr.model, 0.0)
             factor = contention.contention_factor(mr.model)
             factor_str = f"{factor:.2f}x" if factor is not None else "n/a"
-            factor_color = "green" if (factor or 1.0) >= 0.9 else ("yellow" if (factor or 1.0) >= 0.7 else "red")
+            factor_color = (
+                "green"
+                if (factor or 1.0) >= 0.9
+                else ("yellow" if (factor or 1.0) >= 0.7 else "red")
+            )
             ctable.add_row(
                 mr.model,
                 f"{solo:.1f}",
                 f"{mr.avg_tps:.1f}",
                 f"[{factor_color}]{factor_str}[/{factor_color}]",
-                f"{mr.p95_ms/1000:.1f}s",
+                f"{mr.p95_ms / 1000:.1f}s",
                 str(mr.failed),
             )
         console.print(ctable)
@@ -103,13 +129,16 @@ def stress(
 
     if profile_path:
         from atomics.load.profiles import load_profile
+
         tp = load_profile(profile_path)
         effective_model = tp.model
         target_label = f"profile:{tp.name} ({tp.type})"
         use_provider_mode = False
     elif provider_name != "ollama":
         use_provider_mode = True
-        effective_model = model or ("gpt-4o" if provider_name == "openai" else settings.default_model)
+        effective_model = model or (
+            "gpt-4o" if provider_name == "openai" else settings.default_model
+        )
         target_label = f"{provider_name} / {effective_model}"
     else:
         use_provider_mode = False
@@ -149,33 +178,42 @@ def stress(
 
     if profile_path:
         from atomics.load.stress import run_stress_profile
-        result = asyncio.run(run_stress_profile(
-            profile=tp,
-            max_concurrency=max_concurrency,
-            phase_seconds=phase_seconds,
-            on_phase=_on_phase,
-        ))
+
+        result = asyncio.run(
+            run_stress_profile(
+                profile=tp,
+                max_concurrency=max_concurrency,
+                phase_seconds=phase_seconds,
+                on_phase=_on_phase,
+            )
+        )
     elif use_provider_mode:
         provider = _make_provider(provider_name, effective_model, ollama_host, settings)
         from atomics.load.stress import run_stress_provider
-        result = asyncio.run(run_stress_provider(
-            provider=provider,
-            model=effective_model,
-            max_concurrency=max_concurrency,
-            phase_seconds=phase_seconds,
-            num_predict=num_predict,
-            on_phase=_on_phase,
-        ))
+
+        result = asyncio.run(
+            run_stress_provider(
+                provider=provider,
+                model=effective_model,
+                max_concurrency=max_concurrency,
+                phase_seconds=phase_seconds,
+                num_predict=num_predict,
+                on_phase=_on_phase,
+            )
+        )
     else:
         from atomics.load.stress import run_stress
-        result = asyncio.run(run_stress(
-            host=host,
-            model=effective_model,
-            max_concurrency=max_concurrency,
-            phase_seconds=phase_seconds,
-            num_predict=num_predict,
-            on_phase=_on_phase,
-        ))
+
+        result = asyncio.run(
+            run_stress(
+                host=host,
+                model=effective_model,
+                max_concurrency=max_concurrency,
+                phase_seconds=phase_seconds,
+                num_predict=num_predict,
+                on_phase=_on_phase,
+            )
+        )
 
     console.print()
 
@@ -191,7 +229,10 @@ def stress(
     summary.add_row("Duration", f"{result.duration_seconds:.0f}s")
     summary.add_row("Total requests", f"{result.total_requests} ({result.total_failed} failed)")
     summary.add_row("Total tokens", f"{result.total_tokens:,}")
-    summary.add_row("Peak throughput", f"{result.peak_tps:.1f} tok/s @ concurrency={result.saturation_concurrency}")
+    summary.add_row(
+        "Peak throughput",
+        f"{result.peak_tps:.1f} tok/s @ concurrency={result.saturation_concurrency}",
+    )
 
     if result.total_cost_usd > 0:
         summary.add_row("Total cost", f"[yellow]${result.total_cost_usd:.4f}[/yellow]")
@@ -212,7 +253,9 @@ def stress(
 
     last = result.phases[-1] if result.phases else None
     if last and last.aggregate_tps < result.peak_tps * 0.95:
-        summary.add_row("Throttling", "[yellow]Possible — throughput dropped at max concurrency[/yellow]")
+        summary.add_row(
+            "Throttling", "[yellow]Possible — throughput dropped at max concurrency[/yellow]"
+        )
     else:
         summary.add_row("Throttling", "[green]None detected[/green]")
 
@@ -220,25 +263,52 @@ def stress(
 
     if save_results:
         from atomics.storage.repository import MetricsRepository
+
         repo = MetricsRepository(settings.db_path)
         repo.save_stress_result(result)
         repo.close()
         console.print("\n[dim]Results saved to database.[/dim]")
 
+
 @click.command()
 @click.option("--users", "-u", type=int, required=True, help="Number of semi-active users")
-@click.option("--think-time", "--think", type=float, default=300.0, show_default=True,
-              help="Avg seconds between requests per user")
-@click.option("--response-tokens", type=int, default=400, show_default=True,
-              help="Avg output tokens per response")
-@click.option("--burst", type=float, default=0.2, show_default=True,
-              help="Burst factor — fraction of users spiking simultaneously")
-@click.option("--model", "-m", type=str, default=None,
-              help="Pull stress data from DB for this model")
-@click.option("--peak-tps", type=float, default=None,
-              help="Manual peak throughput (tok/s) — used if no DB data")
-@click.option("--single-latency", type=float, default=None,
-              help="Manual single-request latency in ms — used if no DB data")
+@click.option(
+    "--think-time",
+    "--think",
+    type=float,
+    default=300.0,
+    show_default=True,
+    help="Avg seconds between requests per user",
+)
+@click.option(
+    "--response-tokens",
+    type=int,
+    default=400,
+    show_default=True,
+    help="Avg output tokens per response",
+)
+@click.option(
+    "--burst",
+    type=float,
+    default=0.2,
+    show_default=True,
+    help="Burst factor — fraction of users spiking simultaneously",
+)
+@click.option(
+    "--model", "-m", type=str, default=None, help="Pull stress data from DB for this model"
+)
+@click.option(
+    "--peak-tps",
+    type=float,
+    default=None,
+    help="Manual peak throughput (tok/s) — used if no DB data",
+)
+@click.option(
+    "--single-latency",
+    type=float,
+    default=None,
+    help="Manual single-request latency in ms — used if no DB data",
+)
 def capacity(
     users: int,
     think_time: float,
@@ -269,18 +339,23 @@ def capacity(
 
     if model:
         from atomics.storage.repository import MetricsRepository
+
         repo = MetricsRepository(settings.db_path)
         rows = repo.get_stress_results(model=model)
         repo.close()
 
         if not rows:
-            console.print(f"[red]No stress data for model '{model}'. Run atomics stress first, or use --peak-tps.[/red]")
+            console.print(
+                f"[red]No stress data for model '{model}'. "
+                f"Run atomics stress first, or use --peak-tps.[/red]"
+            )
             raise SystemExit(1)
 
         latest = rows[-1]
         effective_peak_tps = latest["peak_tps"]
 
         import json
+
         phases_json = latest.get("phases_json")
         if phases_json:
             raw_phases = json.loads(phases_json) if isinstance(phases_json, str) else phases_json
@@ -293,29 +368,44 @@ def capacity(
                 }
                 for p in raw_phases
             ]
-        console.print(f"[dim]Using stress data for {model} (peak {effective_peak_tps:.1f} tok/s)[/dim]\n")
+        console.print(
+            f"[dim]Using stress data for {model} (peak {effective_peak_tps:.1f} tok/s)[/dim]\n"
+        )
 
     elif peak_tps and single_latency:
         effective_peak_tps = peak_tps
         phases = [
-            {"concurrency": 1, "aggregate_tps": peak_tps, "avg_latency_ms": single_latency, "p95_latency_ms": single_latency * 1.5},
+            {
+                "concurrency": 1,
+                "aggregate_tps": peak_tps,
+                "avg_latency_ms": single_latency,
+                "p95_latency_ms": single_latency * 1.5,
+            },
         ]
 
     else:
-        console.print("[red]Specify --model (pulls from DB) or both --peak-tps and --single-latency[/red]")
+        console.print(
+            "[red]Specify --model (pulls from DB) or both --peak-tps and --single-latency[/red]"
+        )
         raise SystemExit(1)
 
     profile = LoadProfile(
-        users=users, think_time_s=think_time,
-        response_tokens=response_tokens, burst_factor=burst,
+        users=users,
+        think_time_s=think_time,
+        response_tokens=response_tokens,
+        burst_factor=burst,
     )
 
     result = project_capacity(
-        profile=profile, phases=phases,
-        peak_tps=effective_peak_tps, model=effective_model,
+        profile=profile,
+        phases=phases,
+        peak_tps=effective_peak_tps,
+        model=effective_model,
     )
 
-    title = f"Capacity Projection: {effective_model or 'custom'} ({effective_peak_tps:.0f} tok/s peak)"
+    title = (
+        f"Capacity Projection: {effective_model or 'custom'} ({effective_peak_tps:.0f} tok/s peak)"
+    )
     table = Table(title=title, show_lines=True)
     table.add_column("Scenario", style="cyan bold")
     table.add_column("Concurrent", justify="right")
@@ -324,8 +414,12 @@ def capacity(
     table.add_column("Queue", justify="right", style="dim")
     table.add_column("Verdict", justify="center")
 
-    verdict_style = {"OK": "[green]OK[/green]", "CAUTION": "[yellow]CAUTION[/yellow]",
-                     "SLOW": "[red]SLOW[/red]", "OVERLOAD": "[bold red]OVERLOAD[/bold red]"}
+    verdict_style = {
+        "OK": "[green]OK[/green]",
+        "CAUTION": "[yellow]CAUTION[/yellow]",
+        "SLOW": "[red]SLOW[/red]",
+        "OVERLOAD": "[bold red]OVERLOAD[/bold red]",
+    }
 
     for s in result.scenarios:
         table.add_row(
@@ -340,36 +434,96 @@ def capacity(
     console.print(table)
     console.print(f"\n[bold]Recommendation:[/bold] {result.recommendation}")
 
+
 @click.command("soak")
 @click.option("--model", "-m", type=str, default=None, help="Model to soak test.")
 @click.option(
-    "--provider", "-p", "provider_name",
+    "--provider",
+    "-p",
+    "provider_name",
     type=PROVIDER_CHOICES,
     default="ollama",
     help="Provider to use (default: ollama for raw GPU soak).",
 )
-@click.option("--ollama-host", type=str, default=None,
-              help="Ollama endpoint (default: ATOMICS_OLLAMA_HOST or http://localhost:11434)")
-@click.option("--profile", "profile_path", type=click.Path(exists=True), default=None,
-              help="Target profile YAML (replaces --model/--ollama-host).")
-@click.option("--duration", "-d", type=str, default="30m", show_default=True,
-              help="Test duration: e.g. '30m', '2h', '1h30m', or bare minutes like '90'.")
-@click.option("--concurrency", "-c", type=int, default=4, show_default=True,
-              help="Fixed concurrent request count.")
-@click.option("--sample-interval", "-s", type=int, default=30, show_default=True,
-              help="Seconds between metric snapshots.")
-@click.option("--num-predict", type=int, default=2048, show_default=True,
-              help="Max output tokens per request.")
-@click.option("--save/--no-save", "save_results", default=True, show_default=True,
-              help="Persist results to the database.")
-@click.option("--verbose", "-v", is_flag=True, default=False,
-              help="Show every HTTP request (httpx debug output).")
-@click.option("--think-time", type=float, default=0.0, show_default=True,
-              help="Seconds to wait between requests per worker (simulates user think time).")
-@click.option("--save-baseline", "save_baseline_name", type=str, default=None,
-              help="Save this run as a named baseline for future regression checks.")
-@click.option("--compare-baseline", "compare_baseline_name", type=str, default=None,
-              help="Compare this run against a previously saved baseline.")
+@click.option(
+    "--ollama-host",
+    type=str,
+    default=None,
+    help="Ollama endpoint (default: ATOMICS_OLLAMA_HOST or http://localhost:11434)",
+)
+@click.option(
+    "--profile",
+    "profile_path",
+    type=click.Path(exists=True),
+    default=None,
+    help="Target profile YAML (replaces --model/--ollama-host).",
+)
+@click.option(
+    "--duration",
+    "-d",
+    type=str,
+    default="30m",
+    show_default=True,
+    help="Test duration: e.g. '30m', '2h', '1h30m', or bare minutes like '90'.",
+)
+@click.option(
+    "--concurrency",
+    "-c",
+    type=int,
+    default=4,
+    show_default=True,
+    help="Fixed concurrent request count.",
+)
+@click.option(
+    "--sample-interval",
+    "-s",
+    type=int,
+    default=30,
+    show_default=True,
+    help="Seconds between metric snapshots.",
+)
+@click.option(
+    "--num-predict",
+    type=int,
+    default=2048,
+    show_default=True,
+    help="Max output tokens per request.",
+)
+@click.option(
+    "--save/--no-save",
+    "save_results",
+    default=True,
+    show_default=True,
+    help="Persist results to the database.",
+)
+@click.option(
+    "--verbose",
+    "-v",
+    is_flag=True,
+    default=False,
+    help="Show every HTTP request (httpx debug output).",
+)
+@click.option(
+    "--think-time",
+    type=float,
+    default=0.0,
+    show_default=True,
+    help="Seconds to wait between requests per worker (simulates user think time).",
+)
+@click.option(
+    "--save-baseline",
+    "save_baseline_name",
+    type=str,
+    default=None,
+    help="Save this run as a named baseline for future regression checks.",
+)
+@click.option(
+    "--compare-baseline",
+    "compare_baseline_name",
+    type=str,
+    default=None,
+    help="Compare this run against a previously saved baseline.",
+)
 def soak(
     model: str | None,
     provider_name: str,
@@ -430,6 +584,7 @@ def soak(
 
     if profile_path:
         from atomics.load.profiles import load_profile
+
         tp = load_profile(profile_path)
         target_label = f"profile:{tp.name} ({tp.type})"
         console.print(
@@ -451,6 +606,7 @@ def soak(
         )
 
     import logging as _logging
+
     if not verbose:
         _logging.getLogger("httpx").setLevel(_logging.WARNING)
         _logging.getLogger("httpcore").setLevel(_logging.WARNING)
@@ -483,38 +639,44 @@ def soak(
     console.print("[bold]Live samples:[/bold]")
 
     if profile_path:
-        result = asyncio.run(run_soak_profile(
-            profile=tp,
-            concurrency=concurrency,
-            duration_seconds=duration_seconds,
-            sample_interval=sample_interval,
-            think_time_seconds=think_time,
-            on_sample=_on_sample,
-        ))
+        result = asyncio.run(
+            run_soak_profile(
+                profile=tp,
+                concurrency=concurrency,
+                duration_seconds=duration_seconds,
+                sample_interval=sample_interval,
+                think_time_seconds=think_time,
+                on_sample=_on_sample,
+            )
+        )
     elif provider_name != "ollama":
         provider = _make_provider(provider_name, model, ollama_host, settings)
-        result = asyncio.run(run_soak_provider(
-            provider=provider,
-            model=model or "",
-            concurrency=concurrency,
-            duration_seconds=duration_seconds,
-            sample_interval=sample_interval,
-            num_predict=num_predict,
-            think_time_seconds=think_time,
-            on_sample=_on_sample,
-        ))
+        result = asyncio.run(
+            run_soak_provider(
+                provider=provider,
+                model=model or "",
+                concurrency=concurrency,
+                duration_seconds=duration_seconds,
+                sample_interval=sample_interval,
+                num_predict=num_predict,
+                think_time_seconds=think_time,
+                on_sample=_on_sample,
+            )
+        )
     else:
         host = ollama_host or settings.ollama_host
-        result = asyncio.run(run_soak(
-            host=host,
-            model=model or settings.ollama_model,
-            concurrency=concurrency,
-            duration_seconds=duration_seconds,
-            sample_interval=sample_interval,
-            num_predict=num_predict,
-            think_time_seconds=think_time,
-            on_sample=_on_sample,
-        ))
+        result = asyncio.run(
+            run_soak(
+                host=host,
+                model=model or settings.ollama_model,
+                concurrency=concurrency,
+                duration_seconds=duration_seconds,
+                sample_interval=sample_interval,
+                num_predict=num_predict,
+                think_time_seconds=think_time,
+                on_sample=_on_sample,
+            )
+        )
 
     console.print()
 
@@ -531,7 +693,9 @@ def soak(
     summary.add_row("Model", result.model)
     if result.provider and result.provider != "ollama":
         summary.add_row("Provider", result.provider)
-    summary.add_row("Duration", f"{_dur_label(result.actual_duration_seconds)} (target: {dur_label})")
+    summary.add_row(
+        "Duration", f"{_dur_label(result.actual_duration_seconds)} (target: {dur_label})"
+    )
     summary.add_row("Concurrency", str(result.concurrency))
     summary.add_row("Samples", str(len(result.samples)))
     summary.add_row("Total requests", f"{result.total_requests} ({result.total_failed} failed)")
@@ -542,18 +706,32 @@ def soak(
     summary.add_row("Min throughput", f"{result.min_tps:.1f} tok/s")
     summary.add_row("Avg P95 latency", f"{result.avg_p95_ms / 1000:.1f}s")
 
-    drift_color = "green" if abs(result.throughput_drift_pct) < 5 else ("yellow" if abs(result.throughput_drift_pct) < 15 else "red")
-    summary.add_row("Throughput drift", f"[{drift_color}]{result.throughput_drift_pct:+.1f}%[/{drift_color}]")
+    drift_color = (
+        "green"
+        if abs(result.throughput_drift_pct) < 5
+        else ("yellow" if abs(result.throughput_drift_pct) < 15 else "red")
+    )
+    summary.add_row(
+        "Throughput drift", f"[{drift_color}]{result.throughput_drift_pct:+.1f}%[/{drift_color}]"
+    )
 
-    lat_color = "green" if result.latency_drift_pct < 10 else ("yellow" if result.latency_drift_pct < 25 else "red")
+    lat_color = (
+        "green"
+        if result.latency_drift_pct < 10
+        else ("yellow" if result.latency_drift_pct < 25 else "red")
+    )
     summary.add_row("Latency drift", f"[{lat_color}]{result.latency_drift_pct:+.1f}%[/{lat_color}]")
 
-    err_color = "green" if result.error_rate < 0.005 else ("yellow" if result.error_rate < 0.05 else "red")
+    err_color = (
+        "green" if result.error_rate < 0.005 else ("yellow" if result.error_rate < 0.05 else "red")
+    )
     summary.add_row("Error rate", f"[{err_color}]{result.error_rate * 100:.2f}%[/{err_color}]")
 
     if result.vram_drift_mb is not None:
         vram_color = "green" if abs(result.vram_drift_mb) < 100 else "yellow"
-        summary.add_row("VRAM drift", f"[{vram_color}]{result.vram_drift_mb:+.0f} MB[/{vram_color}]")
+        summary.add_row(
+            "VRAM drift", f"[{vram_color}]{result.vram_drift_mb:+.0f} MB[/{vram_color}]"
+        )
 
     if result.total_cost_usd > 0:
         summary.add_row("Total cost", f"[yellow]${result.total_cost_usd:.4f}[/yellow]")
@@ -564,6 +742,7 @@ def soak(
 
     if save_results:
         from atomics.storage.repository import MetricsRepository
+
         repo = MetricsRepository(settings.db_path)
         repo.save_soak_result(result)
         repo.close()
@@ -572,18 +751,26 @@ def soak(
     if save_baseline_name or compare_baseline_name:
         from atomics.load.regression import compute_regression, load_baseline, save_baseline
         from atomics.storage.schema import init_db
+
         conn = init_db(settings.db_path)
 
     if save_baseline_name:
         from atomics.load.regression import save_baseline
         from atomics.storage.schema import init_db
+
         conn = init_db(settings.db_path)
         save_baseline(
-            conn, name=save_baseline_name, suite="soak",
-            model=result.model, host=result.host,
-            avg_tps=result.avg_tps, peak_tps=result.peak_tps,
-            avg_p95_ms=result.avg_p95_ms, error_rate=result.error_rate,
-            verdict=result.verdict, concurrency=result.concurrency,
+            conn,
+            name=save_baseline_name,
+            suite="soak",
+            model=result.model,
+            host=result.host,
+            avg_tps=result.avg_tps,
+            peak_tps=result.peak_tps,
+            avg_p95_ms=result.avg_p95_ms,
+            error_rate=result.error_rate,
+            verdict=result.verdict,
+            concurrency=result.concurrency,
         )
         conn.close()
         console.print(f"\n[green]Baseline '[bold]{save_baseline_name}[/bold]' saved.[/green]")
@@ -591,12 +778,15 @@ def soak(
     if compare_baseline_name:
         from atomics.load.regression import compute_regression, load_baseline
         from atomics.storage.schema import init_db
+
         conn = init_db(settings.db_path)
         bl = load_baseline(conn, compare_baseline_name, "soak")
         conn.close()
         if bl is None:
-            console.print(f"\n[red]Baseline '[bold]{compare_baseline_name}[/bold]' not found. "
-                          f"Run with --save-baseline first.[/red]")
+            console.print(
+                f"\n[red]Baseline '[bold]{compare_baseline_name}[/bold]' not found. "
+                f"Run with --save-baseline first.[/red]"
+            )
         else:
             report = compute_regression(
                 bl,
@@ -613,7 +803,8 @@ def soak(
             }
             rtable = Table(
                 title=f"Regression vs baseline '{compare_baseline_name}'",
-                show_lines=True, title_style="bold",
+                show_lines=True,
+                title_style="bold",
             )
             rtable.add_column("Metric", style="dim")
             rtable.add_column("Baseline", justify="right")
@@ -626,33 +817,52 @@ def soak(
                 sign = "+" if v >= 0 else ""
                 return f"[{tag}]{sign}{v:.1f}%[/{tag}]"
 
-            rtable.add_row("Avg tok/s",
-                f"{bl.avg_tps:.1f}", f"{result.avg_tps:.1f}",
-                _delta_style(report.avg_tps_delta_pct))
-            rtable.add_row("Peak tok/s",
-                f"{bl.peak_tps:.1f}", f"{result.peak_tps:.1f}",
-                _delta_style(report.peak_tps_delta_pct))
-            rtable.add_row("Avg P95 latency",
-                f"{bl.avg_p95_ms/1000:.1f}s", f"{result.avg_p95_ms/1000:.1f}s",
-                _delta_style(report.p95_delta_pct, invert=True))
-            rtable.add_row("Error rate",
-                f"{bl.error_rate*100:.2f}%", f"{result.error_rate*100:.2f}%",
-                f"[{'red' if report.error_rate_delta > 0 else 'green'}]"
-                f"{report.error_rate_delta:+.4f}[/{'red' if report.error_rate_delta > 0 else 'green'}]")
-            rtable.add_row("Verdict", bl.verdict, result.verdict,
-                "[yellow]changed[/yellow]" if report.verdict_changed else "[dim]same[/dim]")
+            rtable.add_row(
+                "Avg tok/s",
+                f"{bl.avg_tps:.1f}",
+                f"{result.avg_tps:.1f}",
+                _delta_style(report.avg_tps_delta_pct),
+            )
+            rtable.add_row(
+                "Peak tok/s",
+                f"{bl.peak_tps:.1f}",
+                f"{result.peak_tps:.1f}",
+                _delta_style(report.peak_tps_delta_pct),
+            )
+            rtable.add_row(
+                "Avg P95 latency",
+                f"{bl.avg_p95_ms / 1000:.1f}s",
+                f"{result.avg_p95_ms / 1000:.1f}s",
+                _delta_style(report.p95_delta_pct, invert=True),
+            )
+            rtable.add_row(
+                "Error rate",
+                f"{bl.error_rate * 100:.2f}%",
+                f"{result.error_rate * 100:.2f}%",
+                (
+                    f"[{'red' if report.error_rate_delta > 0 else 'green'}]"
+                    f"{report.error_rate_delta:+.4f}"
+                    f"[/{'red' if report.error_rate_delta > 0 else 'green'}]"
+                ),
+            )
+            rtable.add_row(
+                "Verdict",
+                bl.verdict,
+                result.verdict,
+                "[yellow]changed[/yellow]" if report.verdict_changed else "[dim]same[/dim]",
+            )
 
             console.print()
             console.print(rtable)
-            console.print(
-                f"\nRegression status: {status_style.get(report.status, report.status)}"
-            )
+            console.print(f"\nRegression status: {status_style.get(report.status, report.status)}")
+
 
 @click.command("baselines")
 def baselines() -> None:
     """List all saved baselines."""
     from atomics.load.regression import list_baselines
     from atomics.storage.schema import init_db
+
     settings = load_settings()
     console = Console()
     conn = init_db(settings.db_path)
@@ -674,30 +884,70 @@ def baselines() -> None:
 
     for r in records:
         table.add_row(
-            r.name, r.suite, r.model,
+            r.name,
+            r.suite,
+            r.model,
             f"{r.avg_tps:.1f}",
-            f"{r.avg_p95_ms/1000:.1f}s",
+            f"{r.avg_p95_ms / 1000:.1f}s",
             r.verdict,
             r.timestamp[:10],
         )
     console.print(table)
 
+
 @click.command("scenario")
-@click.option("--file", "-f", "scenario_file", type=click.Path(exists=True), default=None,
-              help="YAML scenario file defining workloads.")
-@click.option("--workload", "-w", "workload_flags", type=str, multiple=True,
-              help="Repeatable CLI shorthand: type:model:concurrency[:sla_ms]. "
-                   "Example: gate:qwen2.5:3b:2:5000")
-@click.option("--ollama-host", type=str, default=None,
-              help="Ollama endpoint (default: ATOMICS_OLLAMA_HOST or http://localhost:11434)")
-@click.option("--duration", "-d", type=float, default=60.0, show_default=True,
-              help="Test duration in seconds for the mixed phase.")
-@click.option("--ramp", "ramp_seconds", type=float, default=0.0, show_default=True,
-              help="Seconds over which to gradually start workers (ramp-up period).")
-@click.option("--skip-baseline", is_flag=True, default=False,
-              help="Skip solo baseline phase (faster, but no interference score).")
-@click.option("--save/--no-save", "save_results", default=True, show_default=True,
-              help="Persist results to the database.")
+@click.option(
+    "--file",
+    "-f",
+    "scenario_file",
+    type=click.Path(exists=True),
+    default=None,
+    help="YAML scenario file defining workloads.",
+)
+@click.option(
+    "--workload",
+    "-w",
+    "workload_flags",
+    type=str,
+    multiple=True,
+    help="Repeatable CLI shorthand: type:model:concurrency[:sla_ms]. "
+    "Example: gate:qwen2.5:3b:2:5000",
+)
+@click.option(
+    "--ollama-host",
+    type=str,
+    default=None,
+    help="Ollama endpoint (default: ATOMICS_OLLAMA_HOST or http://localhost:11434)",
+)
+@click.option(
+    "--duration",
+    "-d",
+    type=float,
+    default=60.0,
+    show_default=True,
+    help="Test duration in seconds for the mixed phase.",
+)
+@click.option(
+    "--ramp",
+    "ramp_seconds",
+    type=float,
+    default=0.0,
+    show_default=True,
+    help="Seconds over which to gradually start workers (ramp-up period).",
+)
+@click.option(
+    "--skip-baseline",
+    is_flag=True,
+    default=False,
+    help="Skip solo baseline phase (faster, but no interference score).",
+)
+@click.option(
+    "--save/--no-save",
+    "save_results",
+    default=True,
+    show_default=True,
+    help="Persist results to the database.",
+)
 def scenario(
     scenario_file: str | None,
     workload_flags: tuple[str, ...],
@@ -759,15 +1009,17 @@ def scenario(
     if not skip_baseline:
         console.print("[bold]Solo baselines:[/bold]")
 
-    result = asyncio.run(run_scenario(
-        host=host,
-        specs=specs,
-        duration_seconds=duration,
-        ramp_seconds=ramp_seconds,
-        skip_baseline=skip_baseline,
-        on_baseline_done=on_baseline,
-        on_workload_done=on_workload,
-    ))
+    result = asyncio.run(
+        run_scenario(
+            host=host,
+            specs=specs,
+            duration_seconds=duration,
+            ramp_seconds=ramp_seconds,
+            skip_baseline=skip_baseline,
+            on_baseline_done=on_baseline,
+            on_workload_done=on_workload,
+        )
+    )
 
     workload_table = Table(title="Scenario Results", show_lines=True)
     workload_table.add_column("Workload", style="cyan bold")
@@ -853,8 +1105,8 @@ def scenario(
 
     if save_results:
         from atomics.storage.repository import MetricsRepository
+
         repo = MetricsRepository(settings.db_path)
         repo.save_scenario_result(result)
         repo.close()
         console.print("\n[dim]Results saved to database.[/dim]")
-

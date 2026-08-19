@@ -103,9 +103,13 @@ def test_parse_numbered_bold_list():
 
 def test_parse_deduplicates_same_category_location():
     """Duplicate (category, location) pairs from looping models are collapsed."""
-    raw = "\n".join([
-        "CATEGORY: improper_input_validation | LOCATION: routes/basketItems.ts | SEVERITY: medium | WHY: repeated finding."
-    ] * 7)
+    raw = "\n".join(
+        [
+            "CATEGORY: improper_input_validation | LOCATION: routes/basketItems.ts | "
+            "SEVERITY: medium | WHY: repeated finding."
+        ]
+        * 7
+    )
     findings = parse_findings(raw)
     assert len(findings) == 1
     assert findings[0].category == "improper_input_validation"

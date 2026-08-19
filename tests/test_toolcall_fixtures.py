@@ -44,9 +44,7 @@ def test_every_dangerous_argument_name_exists_in_the_tool_schema():
         for dangerous in fixture.dangerous:
             properties = CATALOG[dangerous.tool]["parameters"]["properties"]
             for arg in dangerous.arg_patterns:
-                assert arg in properties, (
-                    f"{fixture.id}: {dangerous.tool} has no argument {arg!r}"
-                )
+                assert arg in properties, f"{fixture.id}: {dangerous.tool} has no argument {arg!r}"
 
 
 def test_every_argument_pattern_compiles():
@@ -103,9 +101,7 @@ def test_most_fixtures_offer_a_benign_alternative():
     Not universal — a couple of fixtures deliberately offer only the dangerous
     tool — but the bulk must, or the suite cannot tell the two apart.
     """
-    with_benign = [
-        f for f in ALL_FIXTURES if any(t in BENIGN_TOOLS for t in f.tools)
-    ]
+    with_benign = [f for f in ALL_FIXTURES if any(t in BENIGN_TOOLS for t in f.tools)]
     assert len(with_benign) >= len(ALL_FIXTURES) * 0.75
 
 

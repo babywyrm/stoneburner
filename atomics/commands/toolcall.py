@@ -70,46 +70,84 @@ def _rate(rate: float | None, numerator: int, denominator: int) -> str:
 
 @click.command("toolcall")
 @click.option(
-    "--provider", "-p", "provider_name",
-    type=PROVIDER_CHOICES, default="ollama", show_default=True,
+    "--provider",
+    "-p",
+    "provider_name",
+    type=PROVIDER_CHOICES,
+    default="ollama",
+    show_default=True,
     help="Provider for the model under test. It must support tool calling.",
 )
-@click.option("--model", "-m", type=str, default=None,
-              help="Model override for the provider under test.")
-@click.option("--ollama-host", type=str, default=None,
-              help="Ollama base URL for the model under test.")
-@click.option("--vllm-host", "vllm_host", type=str, default=None,
-              help="vLLM/OpenAI-compatible base URL for the model under test.")
-@click.option("--judge-provider", "judge_provider_name",
-              type=PROVIDER_CHOICES, default=None,
-              help="Judge for the prose channel and the tool-channel text. "
-                   "Omit to skip judging: the tool channel is scored "
-                   "deterministically and needs no judge, but divergence against "
-                   "the prose channel cannot be computed without one.")
+@click.option(
+    "--model", "-m", type=str, default=None, help="Model override for the provider under test."
+)
+@click.option(
+    "--ollama-host", type=str, default=None, help="Ollama base URL for the model under test."
+)
+@click.option(
+    "--vllm-host",
+    "vllm_host",
+    type=str,
+    default=None,
+    help="vLLM/OpenAI-compatible base URL for the model under test.",
+)
+@click.option(
+    "--judge-provider",
+    "judge_provider_name",
+    type=PROVIDER_CHOICES,
+    default=None,
+    help="Judge for the prose channel and the tool-channel text. "
+    "Omit to skip judging: the tool channel is scored "
+    "deterministically and needs no judge, but divergence against "
+    "the prose channel cannot be computed without one.",
+)
 @click.option("--judge-model", type=str, default=None, help="Judge model override.")
-@click.option("--judge-host", type=str, default=None,
-              help="Ollama base URL for the judge.")
+@click.option("--judge-host", type=str, default=None, help="Ollama base URL for the judge.")
 @extra_judges_option
-@click.option("--runs", type=click.IntRange(min=1), default=1, show_default=True,
-              help="Run each fixture N times. Both channels run per pass and pair "
-                   "within it; the reported outcome is the modal one.")
-@click.option("--category", type=str, default=None,
-              help=f"Category or group alias to run (default: all). "
-                   f"Group aliases: {_ALIAS_HELP}.")
-@click.option("--channel", type=click.Choice(["both", "tools", "prose"]),
-              default="both", show_default=True,
-              help="Which channels to run. Divergence needs both; a single-channel "
-                   "run reports the outcome distribution only.")
-@click.option("--skip-incapable/--no-skip-incapable", default=True, show_default=True,
-              help="Exit zero when the model cannot emit tool calls. With "
-                   "--no-skip-incapable that is an error, which is what you want "
-                   "in a sweep where a silently skipped model looks like a pass.")
+@click.option(
+    "--runs",
+    type=click.IntRange(min=1),
+    default=1,
+    show_default=True,
+    help="Run each fixture N times. Both channels run per pass and pair "
+    "within it; the reported outcome is the modal one.",
+)
+@click.option(
+    "--category",
+    type=str,
+    default=None,
+    help=f"Category or group alias to run (default: all). Group aliases: {_ALIAS_HELP}.",
+)
+@click.option(
+    "--channel",
+    type=click.Choice(["both", "tools", "prose"]),
+    default="both",
+    show_default=True,
+    help="Which channels to run. Divergence needs both; a single-channel "
+    "run reports the outcome distribution only.",
+)
+@click.option(
+    "--skip-incapable/--no-skip-incapable",
+    default=True,
+    show_default=True,
+    help="Exit zero when the model cannot emit tool calls. With "
+    "--no-skip-incapable that is an error, which is what you want "
+    "in a sweep where a silently skipped model looks like a pass.",
+)
 @click.option("--save/--no-save", "save_results", default=True, show_default=True)
-@click.option("--json-out", "json_out",
-              type=click.Path(dir_okay=False, writable=True), default=None,
-              help="Write the full run as JSON to this file.")
-@click.option("--verbose", "-v", is_flag=True,
-              help="Show the emitted call arguments and the accompanying text.")
+@click.option(
+    "--json-out",
+    "json_out",
+    type=click.Path(dir_okay=False, writable=True),
+    default=None,
+    help="Write the full run as JSON to this file.",
+)
+@click.option(
+    "--verbose",
+    "-v",
+    is_flag=True,
+    help="Show the emitted call arguments and the accompanying text.",
+)
 @click.option("--thinking/--no-thinking", "thinking_flag", default=None)
 @click.option("--thinking-budget", type=int, default=8000, show_default=True)
 @budget_option
@@ -151,14 +189,15 @@ def toolcall(
     fixtures = fixtures_for_category(category)
 
     settings = load_settings()
-    provider = _make_provider(
-        provider_name, model, ollama_host, settings, vllm_host=vllm_host
-    )
+    provider = _make_provider(provider_name, model, ollama_host, settings, vllm_host=vllm_host)
     judge = None
     extra_judge_pairs: list = []
     if judge_provider_name:
         judge = _make_provider(
-            judge_provider_name, judge_model, judge_host or ollama_host, settings,
+            judge_provider_name,
+            judge_model,
+            judge_host or ollama_host,
+            settings,
             vllm_host=vllm_host,
         )
         extra_judge_pairs = parse_extra_judges(
@@ -175,18 +214,12 @@ def toolcall(
     if judge is None:
         (provider,) = share_budget(budget, provider)
     else:
-        guarded = share_budget(
-            budget, provider, judge, *(p for p, _ in extra_judge_pairs)
-        )
+        guarded = share_budget(budget, provider, judge, *(p for p, _ in extra_judge_pairs))
         provider, judge = guarded[0], guarded[1]
-        extra_judge_pairs = [
-            (guarded[2 + i], mdl) for i, (_, mdl) in enumerate(extra_judge_pairs)
-        ]
+        extra_judge_pairs = [(guarded[2 + i], mdl) for i, (_, mdl) in enumerate(extra_judge_pairs)]
 
     resolved_model = effective_model(model, provider)
-    console.print(
-        f"\n[bold]Tool-call divergence[/bold] — {provider_name}/{resolved_model}"
-    )
+    console.print(f"\n[bold]Tool-call divergence[/bold] — {provider_name}/{resolved_model}")
     console.print(
         f"[dim]{len(fixtures)} fixtures · channel={channel} · runs={runs} · "
         f"judge={judge_provider_name or 'none'} · calls are never executed[/dim]\n"
@@ -206,15 +239,12 @@ def toolcall(
     progress = FixtureProgress(len(fixtures), console, label="toolcall")
 
     def _called(record: dict) -> str:
-        return ", ".join(
-            c.get("name", "") for c in record.get("calls") or []
-        ) or "none"
+        return ", ".join(c.get("name", "") for c in record.get("calls") or []) or "none"
 
     def on_start(index: int, fixture) -> None:
         progress.on_start(index, fixture.id, fixture.category)
         console.print(
-            f"  [{index + 1}/{len(fixtures)}] {fixture.id} ({fixture.category}) "
-            f"— generating..."
+            f"  [{index + 1}/{len(fixtures)}] {fixture.id} ({fixture.category}) — generating..."
         )
 
     def on_run(index: int, fixture, run_number: int, run_count: int, record: dict) -> None:
@@ -325,12 +355,10 @@ def _render_summary(summary) -> None:
 
     counts = payload["outcome_counts"]
     ordered = [
-        (label, counts.get(str(outcome), 0))
-        for outcome, (_, label) in _OUTCOME_STYLE.items()
+        (label, counts.get(str(outcome), 0)) for outcome, (_, label) in _OUTCOME_STYLE.items()
     ]
     console.print(
-        "  outcomes: "
-        + "  ".join(f"{label}={count}" for label, count in ordered if count)
+        "  outcomes: " + "  ".join(f"{label}={count}" for label, count in ordered if count)
     )
 
     dangerous = payload["dangerous_call_rate"]

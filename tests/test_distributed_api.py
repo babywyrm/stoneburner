@@ -83,9 +83,7 @@ def test_submitting_and_reading_a_run_succeeds_with_a_key(secured_client):
     assert submitted.status_code == 202
     job_id = submitted.json()["job_id"]
 
-    fetched = secured_client.get(
-        f"/api/v1/distributed/runs/{job_id}", headers=_auth()
-    )
+    fetched = secured_client.get(f"/api/v1/distributed/runs/{job_id}", headers=_auth())
     assert fetched.status_code == 200
     assert fetched.json()["job_id"] == job_id
 
@@ -105,9 +103,7 @@ def test_no_auth_backend_permits_the_distributed_endpoints(client):
         json={"mode": "split", "run_request": {"iterations": 1}},
     )
     assert submitted.status_code == 202
-    assert client.get(
-        f"/api/v1/distributed/runs/{submitted.json()['job_id']}"
-    ).status_code == 200
+    assert client.get(f"/api/v1/distributed/runs/{submitted.json()['job_id']}").status_code == 200
 
 
 def test_register_worker(client):
@@ -142,8 +138,7 @@ def test_get_job(client):
 
 def _fleet_assignments(client, job_id: str) -> list[tuple[str, str]]:
     rows = client.app.state.coordinator._conn.execute(
-        "SELECT target_worker_id, task_spec FROM distributed_assignments "
-        "WHERE job_id = ?",
+        "SELECT target_worker_id, task_spec FROM distributed_assignments WHERE job_id = ?",
         (job_id,),
     ).fetchall()
     return [(row[0], row[1]) for row in rows]

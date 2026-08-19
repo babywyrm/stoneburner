@@ -49,9 +49,7 @@ def test_create_split_job_creates_assignments(coordinator):
 
 
 def test_claim_assignment(coordinator):
-    job = coordinator.create_split_job(
-        DistributedRunRequest(mode=JobMode.SPLIT), [{"i": 1}]
-    )
+    job = coordinator.create_split_job(DistributedRunRequest(mode=JobMode.SPLIT), [{"i": 1}])
     w = coordinator.register_worker(WorkerRegisterRequest())
     a = coordinator.claim_assignment(w.worker_id)
     assert a is not None
@@ -80,9 +78,7 @@ def _offline(coordinator, worker_id: str) -> None:
 
 
 def test_matching_workers_requires_every_selector_pair(coordinator):
-    both = coordinator.register_worker(
-        WorkerRegisterRequest(labels={"gpu": "4090", "site": "lab"})
-    )
+    both = coordinator.register_worker(WorkerRegisterRequest(labels={"gpu": "4090", "site": "lab"}))
     coordinator.register_worker(WorkerRegisterRequest(labels={"gpu": "4090"}))
     coordinator.register_worker(WorkerRegisterRequest(labels={"site": "lab"}))
 
@@ -112,14 +108,11 @@ def test_offline_workers_are_excluded_from_the_snapshot(coordinator):
 
 def test_fleet_job_creates_one_assignment_per_worker_per_task(coordinator):
     workers = [
-        coordinator.register_worker(WorkerRegisterRequest(labels={"gpu": "4090"}))
-        for _ in range(3)
+        coordinator.register_worker(WorkerRegisterRequest(labels={"gpu": "4090"})) for _ in range(3)
     ]
     specs = [{"prompt": "a"}, {"prompt": "b"}]
 
-    job = coordinator.create_fleet_job(
-        DistributedRunRequest(mode=JobMode.FLEET), specs, workers
-    )
+    job = coordinator.create_fleet_job(DistributedRunRequest(mode=JobMode.FLEET), specs, workers)
 
     assert job.mode == JobMode.FLEET
     rows = _assignments(coordinator, job.job_id)
@@ -139,14 +132,10 @@ def test_every_worker_receives_the_identical_task_set(coordinator):
     would silently give each host different work while still producing the right
     number of assignments.
     """
-    workers = [
-        coordinator.register_worker(WorkerRegisterRequest()) for _ in range(3)
-    ]
+    workers = [coordinator.register_worker(WorkerRegisterRequest()) for _ in range(3)]
     specs = [{"prompt": "alpha"}, {"prompt": "beta"}]
 
-    job = coordinator.create_fleet_job(
-        DistributedRunRequest(mode=JobMode.FLEET), specs, workers
-    )
+    job = coordinator.create_fleet_job(DistributedRunRequest(mode=JobMode.FLEET), specs, workers)
 
     per_worker: dict[str, list[str]] = {}
     for target, spec in _assignments(coordinator, job.job_id):
@@ -181,9 +170,7 @@ def test_a_pinned_assignment_is_not_claimable_by_another_worker(coordinator):
     """Fleet mode's core invariant: work aimed at one host stays on that host."""
     owner = coordinator.register_worker(WorkerRegisterRequest(labels={"host": "a"}))
     other = coordinator.register_worker(WorkerRegisterRequest(labels={"host": "b"}))
-    job = coordinator.create_split_job(
-        DistributedRunRequest(mode=JobMode.SPLIT), [{"i": 1}]
-    )
+    job = coordinator.create_split_job(DistributedRunRequest(mode=JobMode.SPLIT), [{"i": 1}])
     _pin(coordinator, job.job_id, owner.worker_id)
 
     assert coordinator.claim_assignment(other.worker_id) is None
@@ -191,9 +178,7 @@ def test_a_pinned_assignment_is_not_claimable_by_another_worker(coordinator):
 
 def test_a_worker_claims_its_own_pinned_assignment(coordinator):
     owner = coordinator.register_worker(WorkerRegisterRequest())
-    job = coordinator.create_split_job(
-        DistributedRunRequest(mode=JobMode.SPLIT), [{"i": 1}]
-    )
+    job = coordinator.create_split_job(DistributedRunRequest(mode=JobMode.SPLIT), [{"i": 1}])
     _pin(coordinator, job.job_id, owner.worker_id)
 
     claimed = coordinator.claim_assignment(owner.worker_id)
@@ -225,9 +210,7 @@ def test_a_pinned_assignment_does_not_block_an_unpinned_one(coordinator):
         DistributedRunRequest(mode=JobMode.SPLIT), [{"pinned": True}]
     )
     _pin(coordinator, pinned_job.job_id, owner.worker_id)
-    coordinator.create_split_job(
-        DistributedRunRequest(mode=JobMode.SPLIT), [{"pinned": False}]
-    )
+    coordinator.create_split_job(DistributedRunRequest(mode=JobMode.SPLIT), [{"pinned": False}])
 
     claimed = coordinator.claim_assignment(other.worker_id)
     assert claimed is not None
@@ -246,9 +229,7 @@ def _backdate(coordinator, assignment_id: str, seconds: int = 3600) -> None:
 
 def test_pinned_assignment_fails_when_its_worker_goes_offline(coordinator):
     owner = coordinator.register_worker(WorkerRegisterRequest())
-    coordinator.create_fleet_job(
-        DistributedRunRequest(mode=JobMode.FLEET), [{"i": 1}], [owner]
-    )
+    coordinator.create_fleet_job(DistributedRunRequest(mode=JobMode.FLEET), [{"i": 1}], [owner])
     claimed = coordinator.claim_assignment(owner.worker_id)
     assert claimed is not None
 
@@ -501,18 +482,14 @@ def test_a_pinned_assignment_retries_before_it_fails(coordinator):
     assert first is not None
     _backdate(coordinator, first.assignment_id)
     coordinator._requeue_stale_assignments()
-    assert coordinator.get_assignment(first.assignment_id).status == (
-        AssignmentStatus.PENDING
-    )
+    assert coordinator.get_assignment(first.assignment_id).status == (AssignmentStatus.PENDING)
 
     second = coordinator.claim_assignment(owner.worker_id)
     assert second is not None
     _backdate(coordinator, second.assignment_id)
     coordinator._requeue_stale_assignments()
 
-    assert coordinator.get_assignment(first.assignment_id).status == (
-        AssignmentStatus.FAILED
-    )
+    assert coordinator.get_assignment(first.assignment_id).status == (AssignmentStatus.FAILED)
 
 
 def test_job_reports_partial_when_one_host_drops_out(coordinator):
@@ -524,9 +501,7 @@ def test_job_reports_partial_when_one_host_drops_out(coordinator):
 
     finished = coordinator.claim_assignment(good.worker_id)
     assert finished is not None
-    coordinator.submit_assignment(
-        finished.assignment_id, '{"ok": true}', worker_id=good.worker_id
-    )
+    coordinator.submit_assignment(finished.assignment_id, '{"ok": true}', worker_id=good.worker_id)
 
     assert coordinator.claim_assignment(bad.worker_id) is not None
     _offline(coordinator, bad.worker_id)
@@ -606,9 +581,7 @@ def test_a_summary_records_the_host_that_failed(coordinator):
 
 def test_submit_assignment_completes_job(coordinator):
     w = coordinator.register_worker(WorkerRegisterRequest())
-    job = coordinator.create_split_job(
-        DistributedRunRequest(mode=JobMode.SPLIT), [{"i": 1}]
-    )
+    job = coordinator.create_split_job(DistributedRunRequest(mode=JobMode.SPLIT), [{"i": 1}])
     a = coordinator.claim_assignment(w.worker_id)
     assert a is not None
     coordinator.submit_assignment(a.assignment_id, '{"ok": true}', worker_id=w.worker_id)
@@ -619,9 +592,7 @@ def test_submit_assignment_completes_job(coordinator):
 
 def test_requeue_offline_worker_assignment(coordinator):
     w1 = coordinator.register_worker(WorkerRegisterRequest())
-    job = coordinator.create_split_job(
-        DistributedRunRequest(mode=JobMode.SPLIT), [{"i": 1}]
-    )
+    job = coordinator.create_split_job(DistributedRunRequest(mode=JobMode.SPLIT), [{"i": 1}])
     a1 = coordinator.claim_assignment(w1.worker_id)
     assert a1 is not None
     assert a1.worker_id == w1.worker_id
@@ -672,12 +643,8 @@ def test_partial_job_status_on_failure(coordinator):
     a2 = coordinator.claim_assignment(w.worker_id)
     assert a1 is not None and a2 is not None
 
-    coordinator.submit_assignment(
-        a1.assignment_id, '{"ok": true}', worker_id=w.worker_id
-    )
-    coordinator.submit_assignment(
-        a2.assignment_id, None, worker_id=w.worker_id, error="boom"
-    )
+    coordinator.submit_assignment(a1.assignment_id, '{"ok": true}', worker_id=w.worker_id)
+    coordinator.submit_assignment(a2.assignment_id, None, worker_id=w.worker_id, error="boom")
 
     job2 = coordinator.get_job(job.job_id)
     assert job2 is not None
@@ -807,9 +774,7 @@ def test_node_worker_claims_node_assignment(coordinator):
 
 def test_worker_with_no_capabilities_defaults_to_python(coordinator):
     w = coordinator.register_worker(WorkerRegisterRequest())
-    coordinator.create_split_job(
-        DistributedRunRequest(mode=JobMode.SPLIT), [{"task_name": "t"}]
-    )
+    coordinator.create_split_job(DistributedRunRequest(mode=JobMode.SPLIT), [{"task_name": "t"}])
     a = coordinator.claim_assignment(w.worker_id)
     assert a is not None
 

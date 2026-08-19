@@ -20,18 +20,33 @@ _VALID_RUBRIC = "ACCURACY: 4\nCOMPLETENESS: 3\nFORMAT: 3\nRATIONALE: solid answe
 
 class _PromptCapturingJudge:
     """Judge provider that records the prompt it was asked to score."""
+
     name = "fake-judge"
 
     def __init__(self, reply: str = _VALID_RUBRIC):
         self.reply = reply
         self.last_prompt = ""
 
-    async def generate(self, prompt, *, system="", model=None, max_tokens=1024,
-                        thinking=None, thinking_budget=None, temperature=None):
+    async def generate(
+        self,
+        prompt,
+        *,
+        system="",
+        model=None,
+        max_tokens=1024,
+        thinking=None,
+        thinking_budget=None,
+        temperature=None,
+    ):
         self.last_prompt = prompt
         return ProviderResponse(
-            text=self.reply, input_tokens=1, output_tokens=1, total_tokens=2,
-            model="fake-judge", latency_ms=1.0, estimated_cost_usd=0.0,
+            text=self.reply,
+            input_tokens=1,
+            output_tokens=1,
+            total_tokens=2,
+            model="fake-judge",
+            latency_ms=1.0,
+            estimated_cost_usd=0.0,
         )
 
     async def health_check(self):
@@ -63,7 +78,9 @@ async def test_long_response_not_truncated_with_scaled_budget():
     judge = _PromptCapturingJudge()
     long_response = "x" * 7000
     await score_response(
-        "q", long_response, judge_provider=judge,
+        "q",
+        long_response,
+        judge_provider=judge,
         max_response_chars=char_budget_for_tokens(2000),  # 8000 >= 7000
     )
     assert _TRUNCATION_MARKER not in judge.last_prompt
@@ -108,7 +125,8 @@ def test_coverage_is_case_insensitive():
 async def test_score_response_attaches_coverage():
     judge = _PromptCapturingJudge()
     result = await score_response(
-        "q", "polynomial interpolation over a finite field",
+        "q",
+        "polynomial interpolation over a finite field",
         judge_provider=judge,
         gold_criteria=["polynomial interpolation", "finite field"],
     )
@@ -120,7 +138,8 @@ async def test_coverage_survives_judge_parse_failure():
     """Coverage is judge-independent: still computed when parsing fails."""
     judge = _PromptCapturingJudge(reply="garbage that does not match the rubric")
     result = await score_response(
-        "q", "polynomial interpolation and finite field math",
+        "q",
+        "polynomial interpolation and finite field math",
         judge_provider=judge,
         gold_criteria=["polynomial interpolation", "finite field"],
     )
@@ -131,19 +150,35 @@ async def test_coverage_survives_judge_parse_failure():
 # ── Multi-judge consensus + variance ────────────────────────────────────────
 def _fixed_judge(name: str, reply: str):
     """A judge provider that always returns the same rubric reply."""
+
     class _J:
         def __init__(self):
             self.name = name
 
-        async def generate(self, prompt, *, system="", model=None, max_tokens=1024,
-                           thinking=None, thinking_budget=None, temperature=None):
+        async def generate(
+            self,
+            prompt,
+            *,
+            system="",
+            model=None,
+            max_tokens=1024,
+            thinking=None,
+            thinking_budget=None,
+            temperature=None,
+        ):
             return ProviderResponse(
-                text=reply, input_tokens=1, output_tokens=1, total_tokens=2,
-                model=name, latency_ms=1.0, estimated_cost_usd=0.0,
+                text=reply,
+                input_tokens=1,
+                output_tokens=1,
+                total_tokens=2,
+                model=name,
+                latency_ms=1.0,
+                estimated_cost_usd=0.0,
             )
 
         async def health_check(self):
             return True
+
     return _J()
 
 
@@ -161,7 +196,10 @@ async def test_consensus_averages_scores_and_reports_stdev():
     judge_a = _fixed_judge("judge-a", "ACCURACY: 4\nCOMPLETENESS: 3\nFORMAT: 3\nRATIONALE: great.")
     judge_b = _fixed_judge("judge-b", "ACCURACY: 2\nCOMPLETENESS: 1\nFORMAT: 1\nRATIONALE: weak.")
     result = await score_consensus(
-        "q", "a", primary_judge=judge_a, extra_judges=[(judge_b, None)],
+        "q",
+        "a",
+        primary_judge=judge_a,
+        extra_judges=[(judge_b, None)],
     )
     assert result.n_judges == 2
     assert result.score == pytest.approx(0.7)
@@ -175,7 +213,10 @@ async def test_consensus_excludes_failed_judges_from_mean():
     good = _fixed_judge("good", "ACCURACY: 4\nCOMPLETENESS: 3\nFORMAT: 3\nRATIONALE: ok.")
     broken = _fixed_judge("broken", "this is not a rubric")
     result = await score_consensus(
-        "q", "a", primary_judge=good, extra_judges=[(broken, None)],
+        "q",
+        "a",
+        primary_judge=good,
+        extra_judges=[(broken, None)],
     )
     # Only the good judge counts.
     assert result.n_judges == 1
@@ -187,7 +228,10 @@ async def test_consensus_all_failed_returns_flagged_primary():
     broken_a = _fixed_judge("a", "nope")
     broken_b = _fixed_judge("b", "also nope")
     result = await score_consensus(
-        "q", "a", primary_judge=broken_a, extra_judges=[(broken_b, None)],
+        "q",
+        "a",
+        primary_judge=broken_a,
+        extra_judges=[(broken_b, None)],
     )
     assert result.parse_failed is True
     assert result.n_judges == 2
@@ -231,21 +275,36 @@ def test_parse_rubric_missing_rationale_is_tolerated():
 
 class _RetryJudge:
     """Returns a malformed reply first, then a clean one on the reformat retry."""
+
     name = "retry-judge"
 
     def __init__(self):
         self.calls = 0
 
-    async def generate(self, prompt, *, system="", model=None, max_tokens=1024,
-                        thinking=None, thinking_budget=None, temperature=None):
+    async def generate(
+        self,
+        prompt,
+        *,
+        system="",
+        model=None,
+        max_tokens=1024,
+        thinking=None,
+        thinking_budget=None,
+        temperature=None,
+    ):
         self.calls += 1
         if self.calls == 1:
             text = "I think it's quite good overall, maybe four out of five stars."
         else:
             text = "ACCURACY: 4\nCOMPLETENESS: 3\nFORMAT: 3\nRATIONALE: reformatted."
         return ProviderResponse(
-            text=text, input_tokens=1, output_tokens=1, total_tokens=2,
-            model="retry-judge", latency_ms=1.0, estimated_cost_usd=0.0,
+            text=text,
+            input_tokens=1,
+            output_tokens=1,
+            total_tokens=2,
+            model="retry-judge",
+            latency_ms=1.0,
+            estimated_cost_usd=0.0,
         )
 
     async def health_check(self):
@@ -280,15 +339,26 @@ async def test_parse_failure_rate_on_summary():
 
     def _fr(parse_failed: bool):
         jr = JudgeResult(
-            score=0.5 if parse_failed else 0.8, accuracy=0, completeness=0,
-            format_score=0, rationale="", judge_model="m", parse_failed=parse_failed,
+            score=0.5 if parse_failed else 0.8,
+            accuracy=0,
+            completeness=0,
+            format_score=0,
+            rationale="",
+            judge_model="m",
+            parse_failed=parse_failed,
         )
         return FixtureResult(fixture=None, task_result=None, judge=jr)
 
     from datetime import UTC, datetime
+
     summary = EvalRunSummary(
-        run_id="r", provider="p", model="m", judge_provider="j", judge_model="jm",
-        started_at=datetime.now(UTC), completed_at=datetime.now(UTC),
+        run_id="r",
+        provider="p",
+        model="m",
+        judge_provider="j",
+        judge_model="jm",
+        started_at=datetime.now(UTC),
+        completed_at=datetime.now(UTC),
         fixture_results=[_fr(True), _fr(False), _fr(False), _fr(False)],
     )
     assert summary.parse_failure_rate == 0.25
@@ -340,7 +410,9 @@ def test_self_judge_detected_among_consensus_panel():
     safe = _StubProvider("ollama", "mistral:7b")
     colliding = _StubProvider("ollama", "qwen3:4b")
     collisions = detect_self_judge(
-        ut, "qwen3:4b", [(safe, "mistral:7b"), (colliding, "qwen3:4b")],
+        ut,
+        "qwen3:4b",
+        [(safe, "mistral:7b"), (colliding, "qwen3:4b")],
     )
     assert collisions == ["ollama:qwen3:4b"]
 
@@ -354,6 +426,7 @@ def test_no_self_judge_when_model_unknowable():
 
 def test_self_judge_tolerates_providers_without_default_model():
     """Duck-typed judges must not crash the suite on a missing default_model."""
+
     class _Bare:
         name = "ollama"
 

@@ -122,9 +122,7 @@ async def classify_response(
         raw = _effective_text(provider_response)
         parsed = _parse_classification(raw)
         call_status = (
-            JudgeOutcomeStatus.SCORED
-            if parsed[0] != "unknown"
-            else JudgeOutcomeStatus.PARSE_FAILED
+            JudgeOutcomeStatus.SCORED if parsed[0] != "unknown" else JudgeOutcomeStatus.PARSE_FAILED
         )
         score = (
             classification_to_score(expected, parsed[0])

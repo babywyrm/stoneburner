@@ -35,7 +35,10 @@ def _no_parent_finalize(_repository: MetricsRepository, _run_id: str) -> None:
     "--suite",
     type=click.Choice(list(STUDY_SUITES), case_sensitive=False),
     required=True,
-    help="Suite whose judge headline to study. rag is included; probe and archreview are not (no fixture catalog).",
+    help=(
+        "Suite whose judge headline to study. "
+        "rag is included; probe and archreview are not (no fixture catalog)."
+    ),
 )
 @click.option(
     "--judges",
@@ -97,9 +100,7 @@ def judge_agreement(
     console = Console()
     settings = load_settings()
     try:
-        provider = _make_provider(
-            provider_name, model, ollama_host, settings, vllm_host=vllm_host
-        )
+        provider = _make_provider(provider_name, model, ollama_host, settings, vllm_host=vllm_host)
         judge_pairs = parse_extra_judges(
             judges,
             build=lambda name, mdl, host: _make_provider(
@@ -123,15 +124,11 @@ def judge_agreement(
             *(p for p, _ in judge_pairs),
         )
         provider = guarded[0]
-        judge_pairs = [
-            (guarded[1 + i], mdl) for i, (_, mdl) in enumerate(judge_pairs)
-        ]
+        judge_pairs = [(guarded[1 + i], mdl) for i, (_, mdl) in enumerate(judge_pairs)]
     except click.ClickException:
         raise
     except Exception as exc:
-        raise click.ClickException(
-            f"Judge-agreement setup failed: {sanitize_error(exc)}"
-        ) from exc
+        raise click.ClickException(f"Judge-agreement setup failed: {sanitize_error(exc)}") from exc
 
     run_id = uuid.uuid4().hex[:12]
     with suite_run(
@@ -156,9 +153,7 @@ def judge_agreement(
         _render_summary(console, summary)
         if json_out is not None:
             write_summary_json(summary, json_out)
-            console.print(
-                f"\n[dim]Wrote JSON results to {escape(str(json_out))}[/dim]"
-            )
+            console.print(f"\n[dim]Wrote JSON results to {escape(str(json_out))}[/dim]")
 
 
 def _save_rows(run: SuiteRun, summary: AgreementSummary) -> None:
@@ -176,20 +171,12 @@ def _save_rows(run: SuiteRun, summary: AgreementSummary) -> None:
 
 def _render_summary(console: Console, summary: AgreementSummary) -> None:
     n = len(summary.fixtures)
-    pair = (
-        f"{summary.pairwise_agreement:.2f}"
-        if summary.pairwise_agreement is not None
-        else "—"
-    )
-    flip = (
-        f"{summary.flip_rate:.2f}" if summary.flip_rate is not None else "—"
-    )
+    pair = f"{summary.pairwise_agreement:.2f}" if summary.pairwise_agreement is not None else "—"
+    flip = f"{summary.flip_rate:.2f}" if summary.flip_rate is not None else "—"
     stdev = (
         "—      (categorical)"
         if summary.suite in {"refusal", "codereview"}
-        else (
-            f"{summary.mean_stdev:.3f}" if summary.mean_stdev is not None else "—"
-        )
+        else (f"{summary.mean_stdev:.3f}" if summary.mean_stdev is not None else "—")
     )
     console.print(
         f"\n[bold]judge-agreement[/bold]  suite={escape(summary.suite)}  "
@@ -197,8 +184,7 @@ def _render_summary(console: Console, summary: AgreementSummary) -> None:
     )
     console.print(f"  pairwise agreement   {pair}")
     console.print(
-        f"  majority-flip rate   {flip}   "
-        f"({summary.n_flipped} of {n} would change the headline)"
+        f"  majority-flip rate   {flip}   ({summary.n_flipped} of {n} would change the headline)"
     )
     console.print(f"  unresolved (ties)    {summary.n_unresolved}")
     console.print(f"  mean stdev           {stdev}")

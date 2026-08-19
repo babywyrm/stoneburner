@@ -85,9 +85,7 @@ def run_doctor(settings: AtomicsSettings | None = None) -> int:
     if settings.anthropic_api_key:
         console.print("[green]ANTHROPIC_API_KEY[/green] set")
     else:
-        console.print(
-            "[yellow]ANTHROPIC_API_KEY[/yellow] not set (optional; needed for Claude)"
-        )
+        console.print("[yellow]ANTHROPIC_API_KEY[/yellow] not set (optional; needed for Claude)")
 
     if settings.openai_api_key:
         console.print("[green]OPENAI_API_KEY[/green] set")
@@ -129,9 +127,7 @@ def run_doctor(settings: AtomicsSettings | None = None) -> int:
         )
     else:
         console.print(f"[green]inference.env[/green] {view.path}")
-        console.print(
-            f"[dim]  backend={view.backend} url={view.url} model={view.model}[/dim]"
-        )
+        console.print(f"[dim]  backend={view.backend} url={view.url} model={view.model}[/dim]")
 
     ollama_host = settings.ollama_host
     ollama_reachable = False
@@ -175,12 +171,18 @@ def run_doctor(settings: AtomicsSettings | None = None) -> int:
 
     # Keychain secrets
     from atomics.secrets import keychain_available, list_secrets
+
     if keychain_available():
         stored = list_secrets()
         if stored:
-            console.print(f"[green]OS keychain:[/green] {len(stored)} secret(s) stored ({', '.join(stored)})")
+            console.print(
+                f"[green]OS keychain:[/green] {len(stored)} secret(s) stored ({', '.join(stored)})"
+            )
         else:
-            console.print("[dim]OS keychain: available, no secrets stored (use 'atomics secrets set' to add)[/dim]")
+            console.print(
+                "[dim]OS keychain: available, no secrets stored "
+                "(use 'atomics secrets set' to add)[/dim]"
+            )
     else:
         console.print("[yellow]OS keychain: not available (secrets fallback disabled)[/yellow]")
 

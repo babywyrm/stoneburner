@@ -43,6 +43,7 @@ def test_get_job_not_found(client):
     resp = client.get("/api/v1/jobs/invalid")
     assert resp.status_code == 404
 
+
 def test_get_job_returns_running_while_in_progress(client):
     import asyncio
     import threading
@@ -119,4 +120,3 @@ def test_list_jobs_omits_result_payload(client):
         assert "list-secret" not in listed.text
         detail = client.get(f"/api/v1/jobs/{job_id}")
         assert detail.json()["result"]["prompt"] == "list-secret"
-

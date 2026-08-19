@@ -39,16 +39,24 @@ async def run_archreview(
 
     for rnd in range(1, rounds + 1):
         result = ArchReviewResult(
-            run_id=run_id, repo=spec.name, tier=tier,
+            run_id=run_id,
+            repo=spec.name,
+            tier=tier,
             model=under_test_model or (under_test.default_model or ""),
-            provider=under_test.name, round=rnd, findings=[],
-            pack_hash=pack.content_hash, judge_model=judge_model or "",
+            provider=under_test.name,
+            round=rnd,
+            findings=[],
+            pack_hash=pack.content_hash,
+            judge_model=judge_model or "",
         )
         try:
             resp = await under_test.generate(
-                task, system=system, model=under_test_model,
+                task,
+                system=system,
+                model=under_test_model,
                 max_tokens=max_output_tokens,
-                thinking=False, temperature=0.0,
+                thinking=False,
+                temperature=0.0,
             )
         except Exception as exc:  # noqa: BLE001 — record, never abort the batch
             result.error_class = type(exc).__name__
@@ -62,12 +70,9 @@ async def run_archreview(
         result.latency_ms = resp.latency_ms
 
         raw = resp.raw or {}
-        if (
-            raw.get("done_reason") == "length"
-            and (
-                len(resp.text.strip()) <= _CONTEXT_EXHAUSTED_TEXT_CHARS
-                or resp.output_tokens <= _CONTEXT_EXHAUSTED_OUTPUT_TOKENS
-            )
+        if raw.get("done_reason") == "length" and (
+            len(resp.text.strip()) <= _CONTEXT_EXHAUSTED_TEXT_CHARS
+            or resp.output_tokens <= _CONTEXT_EXHAUSTED_OUTPUT_TOKENS
         ):
             result.parse_failed = True
             result.error_class = "ContextExhausted"
@@ -99,8 +104,7 @@ async def run_archreview(
                 )
                 result.judge_score = score
             except Exception as exc:  # noqa: BLE001
-                logger.warning("judge failed on %s round %d: %s",
-                               result.model, rnd, exc)
+                logger.warning("judge failed on %s round %d: %s", result.model, rnd, exc)
 
         results.append(result)
 

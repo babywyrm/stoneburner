@@ -99,9 +99,7 @@ def test_trends_requires_auth():
 
 
 def test_trends_empty(tmp_path):
-    app = create_app(
-        settings=ServerSettings(no_auth=True, db_path=tmp_path / "empty-trends.db")
-    )
+    app = create_app(settings=ServerSettings(no_auth=True, db_path=tmp_path / "empty-trends.db"))
     with TestClient(app) as tc:
         resp = tc.get("/api/v1/reports/trends")
     assert resp.status_code == 200
@@ -110,9 +108,7 @@ def test_trends_empty(tmp_path):
 
 @pytest.mark.parametrize("hours", [0, 169, -1])
 def test_trends_rejects_hours_outside_1_to_168(tmp_path, hours):
-    app = create_app(
-        settings=ServerSettings(no_auth=True, db_path=tmp_path / "bound.db")
-    )
+    app = create_app(settings=ServerSettings(no_auth=True, db_path=tmp_path / "bound.db"))
     with TestClient(app) as tc:
         resp = tc.get(f"/api/v1/reports/trends?hours={hours}")
     assert resp.status_code == 422
@@ -156,4 +152,3 @@ def test_trends_includes_eval_tokens_and_omits_prompts(tmp_path):
     assert body["rows"][0]["task_count"] == 1
     assert "trend-secret-prompt" not in resp.text
     assert "prompt" not in body["rows"][0]
-

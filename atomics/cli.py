@@ -25,8 +25,12 @@ from atomics.commands.common import setup_logging
 @click.group()
 @click.version_option(package_name=DIST_NAME)
 @click.option("-v", "--verbose", is_flag=True, default=False, help="Enable verbose/debug output.")
-@click.option("--progress/--no-progress", default=True, show_default=True,
-              help="Show real-time progress during long runs.")
+@click.option(
+    "--progress/--no-progress",
+    default=True,
+    show_default=True,
+    help="Show real-time progress during long runs.",
+)
 @click.pass_context
 def cli(ctx: click.Context, verbose: bool, progress: bool) -> None:
     """Atomics — local-first LLM eval (cost, quality, security).
@@ -40,6 +44,7 @@ def cli(ctx: click.Context, verbose: bool, progress: bool) -> None:
         setup_logging("DEBUG", rich_tracebacks=True)
     else:
         setup_logging("WARNING")
+
 
 cli.add_command(agreement_commands.judge_agreement)
 cli.add_command(security_commands.refusal)

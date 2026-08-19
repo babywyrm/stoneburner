@@ -57,9 +57,7 @@ class _Summary:
             "id": "ref-characterization",
             "status": self.integrity.status.value,
             "score": None if partial or thinking_budget else 1.0,
-            "generation_status": (
-                "thinking_budget" if thinking_budget else "completed"
-            ),
+            "generation_status": ("thinking_budget" if thinking_budget else "completed"),
             "judge_status": "skipped" if partial else "scored",
             "latency_ms": 1.0,
             "estimated_cost_usd": 0.0,
@@ -259,11 +257,7 @@ def test_refusal_save_persists_and_finalizes_parent(monkeypatch, tmp_path) -> No
     repo = MetricsRepository(db_path)
     rows = repo.get_evaluation_results(suite="refusal")
     assert len(rows) == 1
-    parent = next(
-        run
-        for run in repo.get_recent_runs()
-        if run["run_id"] == rows[0]["run_id"]
-    )
+    parent = next(run for run in repo.get_recent_runs() if run["run_id"] == rows[0]["run_id"])
     assert parent["total_tasks"] == 1
     assert parent["successful_tasks"] == 1
     assert parent["completed_at"] is not None
@@ -302,11 +296,7 @@ def test_refusal_failure_preserves_fixture_and_finalizes_parent(
     assert "Refusal evaluation failed" in result.output
     repo = MetricsRepository(db_path)
     rows = repo.get_evaluation_results(suite="refusal")
-    parent = next(
-        run
-        for run in repo.get_recent_runs()
-        if run["run_id"] == rows[0]["run_id"]
-    )
+    parent = next(run for run in repo.get_recent_runs() if run["run_id"] == rows[0]["run_id"])
     assert len(rows) == 1
     assert parent["total_tasks"] == 1
     assert parent["completed_at"] is not None
@@ -361,11 +351,7 @@ def test_refusal_json_failure_keeps_persisted_fixture(monkeypatch, tmp_path) -> 
     repo = MetricsRepository(db_path)
     rows = repo.get_evaluation_results(suite="refusal")
     assert len(rows) == 1
-    parent = next(
-        run
-        for run in repo.get_recent_runs()
-        if run["run_id"] == rows[0]["run_id"]
-    )
+    parent = next(run for run in repo.get_recent_runs() if run["run_id"] == rows[0]["run_id"])
     assert parent["completed_at"] is not None
     repo.close()
 

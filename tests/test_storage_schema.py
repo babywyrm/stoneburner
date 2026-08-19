@@ -46,13 +46,9 @@ def _column_names(conn: sqlite3.Connection, table: str) -> list[str]:
 def _table_shapes(conn: sqlite3.Connection) -> dict[str, list[tuple]]:
     tables = [
         row[0]
-        for row in conn.execute(
-            "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name"
-        )
+        for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
     ]
-    return {
-        table: list(conn.execute(f"PRAGMA table_info({table})")) for table in tables
-    }
+    return {table: list(conn.execute(f"PRAGMA table_info({table})")) for table in tables}
 
 
 def _write_legacy_db(path: Path) -> None:
@@ -60,9 +56,7 @@ def _write_legacy_db(path: Path) -> None:
     conn = sqlite3.connect(str(path))
     try:
         conn.executescript(_LEGACY_RUNS_SQL)
-        conn.execute(
-            "INSERT INTO schema_version (version) VALUES (?)", (SCHEMA_VERSION,)
-        )
+        conn.execute("INSERT INTO schema_version (version) VALUES (?)", (SCHEMA_VERSION,))
         conn.execute(
             "INSERT INTO runs (run_id, started_at) VALUES (?, ?)",
             ("keep-me", "2026-01-01T00:00:00+00:00"),
@@ -75,9 +69,7 @@ def _write_legacy_db(path: Path) -> None:
 def test_init_db_adds_a_missing_nullable_column_in_place(tmp_path: Path) -> None:
     db_path = tmp_path / "legacy.db"
     _write_legacy_db(db_path)
-    assert MISSING_COLUMN not in _column_names(
-        sqlite3.connect(str(db_path)), "runs"
-    )
+    assert MISSING_COLUMN not in _column_names(sqlite3.connect(str(db_path)), "runs")
 
     conn = init_db(db_path)
     try:
@@ -174,9 +166,7 @@ def test_a_pre_fleet_database_gains_target_worker_id_without_losing_work(
     conn = sqlite3.connect(str(db_path))
     try:
         conn.executescript(_PRE_FLEET_DISTRIBUTED_SQL)
-        conn.execute(
-            "INSERT INTO schema_version (version) VALUES (?)", (SCHEMA_VERSION,)
-        )
+        conn.execute("INSERT INTO schema_version (version) VALUES (?)", (SCHEMA_VERSION,))
         conn.execute(
             "INSERT INTO distributed_jobs (job_id, mode, status, request_json, created_at) "
             "VALUES ('job-1', 'split', 'pending', '{}', '2026-01-01T00:00:00+00:00')"
@@ -226,9 +216,7 @@ def test_reconciliation_backfills_the_column_as_null(tmp_path: Path) -> None:
         conn.close()
 
 
-def test_type_change_rebuilds_the_table_and_keeps_rows(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_type_change_rebuilds_the_table_and_keeps_rows(tmp_path: Path, monkeypatch) -> None:
     """INTEGER → TEXT on a populated column must not wipe the database."""
     from atomics.storage import schema
 
@@ -257,18 +245,13 @@ def test_type_change_rebuilds_the_table_and_keeps_rows(
         ).fetchone()
         assert row[0] == "keep-me"
         assert str(row[1]) == "7"
-        col_type = {
-            info[1]: info[2]
-            for info in conn.execute("PRAGMA table_info(runs)")
-        }
+        col_type = {info[1]: info[2] for info in conn.execute("PRAGMA table_info(runs)")}
         assert col_type["total_tasks"].upper() == "TEXT"
     finally:
         conn.close()
 
 
-def test_dropped_column_rebuilds_and_keeps_other_values(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_dropped_column_rebuilds_and_keeps_other_values(tmp_path: Path, monkeypatch) -> None:
     from atomics.storage import schema
 
     db_path = tmp_path / "drop-col.db"
@@ -281,10 +264,10 @@ def test_dropped_column_rebuilds_and_keeps_other_values(
     first.close()
 
     patched = schema.SCHEMA_SQL.replace(
-            "    avg_latency_ms  REAL DEFAULT 0.0,\n",
-            "",
-            1,
-        )
+        "    avg_latency_ms  REAL DEFAULT 0.0,\n",
+        "",
+        1,
+    )
     monkeypatch.setattr(schema, "SCHEMA_SQL", patched)
     monkeypatch.setattr(schema, "SCHEMA_VERSION", schema.SCHEMA_VERSION + 1)
 
@@ -300,9 +283,7 @@ def test_dropped_column_rebuilds_and_keeps_other_values(
         conn.close()
 
 
-def test_not_null_column_with_default_is_added_without_wipe(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_not_null_column_with_default_is_added_without_wipe(tmp_path: Path, monkeypatch) -> None:
     from atomics.storage import schema
 
     db_path = tmp_path / "notnull.db"
@@ -326,12 +307,8 @@ def test_not_null_column_with_default_is_added_without_wipe(
     try:
         names = _column_names(conn, "runs")
         assert "origin" in names
-        value = conn.execute(
-            "SELECT origin FROM runs WHERE run_id = ?", ("keep-me",)
-        ).fetchone()[0]
+        value = conn.execute("SELECT origin FROM runs WHERE run_id = ?", ("keep-me",)).fetchone()[0]
         assert value == "local"
-        assert [row[0] for row in conn.execute("SELECT run_id FROM runs")] == [
-            "keep-me"
-        ]
+        assert [row[0] for row in conn.execute("SELECT run_id FROM runs")] == ["keep-me"]
     finally:
         conn.close()

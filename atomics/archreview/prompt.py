@@ -19,12 +19,14 @@ First give a SHORT architecture & trust-boundary summary (3-5 sentences).
 
 Then list findings. Output EACH finding on its own line using EXACTLY this \
 format — no markdown, no numbering, no table, no extra punctuation:
-CATEGORY: <value> | LOCATION: <file or area> | SEVERITY: <low|medium|high|critical> | WHY: <1-2 sentences>
+CATEGORY: <value> | LOCATION: <file or area> | \
+SEVERITY: <low|medium|high|critical> | WHY: <1-2 sentences>
 
 Valid CATEGORY values: {categories}
 
 Example (do not copy — write real findings):
-CATEGORY: injection | LOCATION: routes/login.ts | SEVERITY: critical | WHY: unsanitized user input passed directly to SQL query.
+CATEGORY: injection | LOCATION: routes/login.ts | SEVERITY: critical | \
+WHY: unsanitized user input passed directly to SQL query.
 
 REPOSITORY:
 {pack}
@@ -120,8 +122,7 @@ def parse_findings(raw: str) -> list[Finding]:
         loc_raw = m.group("loc").strip()
         if not cat_raw or not loc_raw:
             continue
-        findings.append(_mk_finding(cat_raw, loc_raw,
-                                    m.group("sev"), m.group("why")))
+        findings.append(_mk_finding(cat_raw, loc_raw, m.group("sev"), m.group("why")))
     if findings:
         return _deduplicate(findings)
 
@@ -129,14 +130,17 @@ def parse_findings(raw: str) -> list[Finding]:
     for line in raw.splitlines():
         if "category" not in line.lower():
             continue
-        cat, loc, sev, why = (_FIELD_CAT.search(line), _FIELD_LOC.search(line),
-                              _FIELD_SEV.search(line), _FIELD_WHY.search(line))
+        cat, loc, sev, why = (
+            _FIELD_CAT.search(line),
+            _FIELD_LOC.search(line),
+            _FIELD_SEV.search(line),
+            _FIELD_WHY.search(line),
+        )
         if cat and loc and sev and why:
             # Skip header rows where 'category' is the label, not a category value.
             if normalize_category(_clean(cat.group(1))) is None:
                 continue
-            findings.append(_mk_finding(cat.group(1), loc.group(1),
-                                        sev.group(1), why.group(1)))
+            findings.append(_mk_finding(cat.group(1), loc.group(1), sev.group(1), why.group(1)))
     if findings:
         return _deduplicate(findings)
 
@@ -153,8 +157,7 @@ def parse_findings(raw: str) -> list[Finding]:
         # not a recognizable category value.
         if normalize_category(_clean(m.group("cat"))) is None:
             continue
-        findings.append(_mk_finding(m.group("cat"), m.group("loc"),
-                                    m.group("sev"), m.group("why")))
+        findings.append(_mk_finding(m.group("cat"), m.group("loc"), m.group("sev"), m.group("why")))
     if findings:
         return _deduplicate(findings)
 
@@ -170,12 +173,14 @@ def parse_findings(raw: str) -> list[Finding]:
         cat_norm = normalize_category(_clean(m.group("cat")))
         if cat_norm is None:
             continue  # skip header rows whose first cell isn't a category
-        findings.append(Finding(
-            category=cat_norm.value,
-            location=_clean(m.group("loc")),
-            severity=_clean(m.group("sev")).lower(),
-            rationale=_clean(m.group("why")),
-        ))
+        findings.append(
+            Finding(
+                category=cat_norm.value,
+                location=_clean(m.group("loc")),
+                severity=_clean(m.group("sev")).lower(),
+                rationale=_clean(m.group("why")),
+            )
+        )
     if findings:
         return findings
 
@@ -184,6 +189,5 @@ def parse_findings(raw: str) -> list[Finding]:
         m = _BOLD_LIST_RE.match(line)  # type: ignore[assignment]
         if not m:
             continue
-        findings.append(_mk_finding(m.group("cat"), m.group("loc"),
-                                    m.group("sev"), m.group("why")))
+        findings.append(_mk_finding(m.group("cat"), m.group("loc"), m.group("sev"), m.group("why")))
     return _deduplicate(findings)

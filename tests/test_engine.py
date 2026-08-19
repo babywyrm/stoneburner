@@ -19,7 +19,9 @@ class FailingThenMockProvider(BaseProvider):
     def name(self) -> str:
         return "flaky"
 
-    async def generate(self, prompt, *, system="", model=None, max_tokens=1024, thinking=None, thinking_budget=None):
+    async def generate(
+        self, prompt, *, system="", model=None, max_tokens=1024, thinking=None, thinking_budget=None
+    ):
         self.attempts += 1
         if self.attempts == 1:
             raise RuntimeError("simulated provider failure")
@@ -159,4 +161,3 @@ async def test_engine_saves_with_burn_suite_tag(make_engine):
     for row in rows:
         assert row["suite"] == "burn"
     repo.close()
-

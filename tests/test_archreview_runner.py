@@ -17,29 +17,52 @@ class _Provider:
     def default_model(self):
         return self._model
 
-    async def generate(self, prompt, *, system="", model=None, max_tokens=1024,
-                       thinking=None, thinking_budget=None, temperature=None):
-        self.calls.append({
-            "model": model, "max_tokens": max_tokens,
-            "thinking": thinking, "temperature": temperature,
-        })
-        return ProviderResponse(text=self._reply, input_tokens=100, output_tokens=20,
-                                total_tokens=120, model=self._model, latency_ms=5.0,
-                                estimated_cost_usd=0.0)
+    async def generate(
+        self,
+        prompt,
+        *,
+        system="",
+        model=None,
+        max_tokens=1024,
+        thinking=None,
+        thinking_budget=None,
+        temperature=None,
+    ):
+        self.calls.append(
+            {
+                "model": model,
+                "max_tokens": max_tokens,
+                "thinking": thinking,
+                "temperature": temperature,
+            }
+        )
+        return ProviderResponse(
+            text=self._reply,
+            input_tokens=100,
+            output_tokens=20,
+            total_tokens=120,
+            model=self._model,
+            latency_ms=5.0,
+            estimated_cost_usd=0.0,
+        )
 
     async def health_check(self):
         return True
 
 
-_GOOD = ("Summary: weak boundaries.\n"
-         "CATEGORY: injection | LOCATION: a.ts | SEVERITY: high | WHY: raw sql\n"
-         "CATEGORY: xss | LOCATION: b.html | SEVERITY: medium | WHY: reflected\n")
+_GOOD = (
+    "Summary: weak boundaries.\n"
+    "CATEGORY: injection | LOCATION: a.ts | SEVERITY: high | WHY: raw sql\n"
+    "CATEGORY: xss | LOCATION: b.html | SEVERITY: medium | WHY: reflected\n"
+)
 _JUDGE = "REASONING: 7\nRATIONALE: decent"
 
 
 def _spec():
     return RepoSpec(
-        name="demo", git_ref="abc", path_env="DEMO_PATH",
+        name="demo",
+        git_ref="abc",
+        path_env="DEMO_PATH",
         tiers={"floor": TierConfig(budget_tokens=4000)},
         answer_key=AnswerKey(version=1, weights={"injection": 6.0, "xss": 4.0}),
     )
@@ -51,9 +74,14 @@ async def test_run_archreview_scores_objective_and_judge():
     under_test = _Provider("ollama", _GOOD, model="qwen2.5:14b")
     judge = _Provider("claude", _JUDGE, model="claude-opus-4-7")
     results = await run_archreview(
-        spec=_spec(), tier="floor", pack=pack,
-        under_test=under_test, under_test_model="qwen2.5:14b",
-        judge=judge, judge_model="claude-opus-4-7", rounds=2,
+        spec=_spec(),
+        tier="floor",
+        pack=pack,
+        under_test=under_test,
+        under_test_model="qwen2.5:14b",
+        judge=judge,
+        judge_model="claude-opus-4-7",
+        rounds=2,
     )
     assert len(results) == 2
     r = results[0]
@@ -72,9 +100,15 @@ async def test_run_archreview_uses_custom_max_output_tokens():
     pack = EvidencePack(text="PACK", content_hash="deadbeef", file_count=3, truncated=False)
     under_test = _Provider("ollama", _GOOD, model="qwen2.5:14b")
     results = await run_archreview(
-        spec=_spec(), tier="floor", pack=pack,
-        under_test=under_test, under_test_model="qwen2.5:14b",
-        judge=None, judge_model=None, rounds=1, max_output_tokens=512,
+        spec=_spec(),
+        tier="floor",
+        pack=pack,
+        under_test=under_test,
+        under_test_model="qwen2.5:14b",
+        judge=None,
+        judge_model=None,
+        rounds=1,
+        max_output_tokens=512,
     )
     assert results[0].objective_recall == 1.0
     assert under_test.calls[0]["max_tokens"] == 512
@@ -87,9 +121,13 @@ async def test_run_archreview_extra_judges_averages_reasoning():
     primary = _Provider("claude", "REASONING: 8\nRATIONALE: strong", model="opus")
     extra = _Provider("ollama", "REASONING: 4\nRATIONALE: weak", model="mistral")
     results = await run_archreview(
-        spec=_spec(), tier="floor", pack=pack,
-        under_test=under_test, under_test_model="qwen2.5:14b",
-        judge=primary, judge_model="opus",
+        spec=_spec(),
+        tier="floor",
+        pack=pack,
+        under_test=under_test,
+        under_test_model="qwen2.5:14b",
+        judge=primary,
+        judge_model="opus",
         extra_judges=[(extra, "mistral")],
         rounds=1,
     )
@@ -103,9 +141,15 @@ async def test_run_archreview_judge_only_skips_objective_when_no_key():
     under_test = _Provider("ollama", _GOOD, model="m")
     judge = _Provider("claude", _JUDGE, model="j")
     results = await run_archreview(
-        spec=_spec(), tier="floor", pack=pack,
-        under_test=under_test, under_test_model="m",
-        judge=judge, judge_model="j", rounds=1, objective=False,
+        spec=_spec(),
+        tier="floor",
+        pack=pack,
+        under_test=under_test,
+        under_test_model="m",
+        judge=judge,
+        judge_model="j",
+        rounds=1,
+        objective=False,
     )
     assert results[0].judge_score == 0.7
     assert results[0].objective_recall == 0.0
@@ -119,9 +163,14 @@ async def test_run_archreview_records_provider_error():
 
     pack = EvidencePack(text="P", content_hash="h", file_count=1, truncated=False)
     results = await run_archreview(
-        spec=_spec(), tier="floor", pack=pack,
-        under_test=_Boom("ollama", "", model="m"), under_test_model="m",
-        judge=None, judge_model=None, rounds=1,
+        spec=_spec(),
+        tier="floor",
+        pack=pack,
+        under_test=_Boom("ollama", "", model="m"),
+        under_test_model="m",
+        judge=None,
+        judge_model=None,
+        rounds=1,
     )
     assert results[0].error_message is not None
     assert results[0].error_class == "RuntimeError"
@@ -130,22 +179,46 @@ async def test_run_archreview_records_provider_error():
 @pytest.mark.asyncio
 async def test_run_archreview_marks_tiny_length_response_as_context_exhausted():
     class _LengthStop(_Provider):
-        async def generate(self, prompt, *, system="", model=None, max_tokens=1024,
-                           thinking=None, thinking_budget=None, temperature=None):
-            self.calls.append({
-                "model": model, "max_tokens": max_tokens,
-                "thinking": thinking, "temperature": temperature,
-            })
-            return ProviderResponse(text="Based", input_tokens=132095, output_tokens=1,
-                                    total_tokens=132096, model=self._model,
-                                    latency_ms=5.0, estimated_cost_usd=0.0,
-                                    raw={"done_reason": "length"})
+        async def generate(
+            self,
+            prompt,
+            *,
+            system="",
+            model=None,
+            max_tokens=1024,
+            thinking=None,
+            thinking_budget=None,
+            temperature=None,
+        ):
+            self.calls.append(
+                {
+                    "model": model,
+                    "max_tokens": max_tokens,
+                    "thinking": thinking,
+                    "temperature": temperature,
+                }
+            )
+            return ProviderResponse(
+                text="Based",
+                input_tokens=132095,
+                output_tokens=1,
+                total_tokens=132096,
+                model=self._model,
+                latency_ms=5.0,
+                estimated_cost_usd=0.0,
+                raw={"done_reason": "length"},
+            )
 
     pack = EvidencePack(text="P", content_hash="h", file_count=1, truncated=False)
     results = await run_archreview(
-        spec=_spec(), tier="expanded", pack=pack,
-        under_test=_LengthStop("ollama", "", model="m"), under_test_model="m",
-        judge=_Provider("ollama", _JUDGE, model="j"), judge_model="j", rounds=1,
+        spec=_spec(),
+        tier="expanded",
+        pack=pack,
+        under_test=_LengthStop("ollama", "", model="m"),
+        under_test_model="m",
+        judge=_Provider("ollama", _JUDGE, model="j"),
+        judge_model="j",
+        rounds=1,
     )
     assert results[0].error_class == "ContextExhausted"
     assert results[0].parse_failed is True

@@ -74,27 +74,19 @@ class TestSanitizeError:
         assert result == "Login failed: password=[REDACTED]"
 
     def test_strips_json_api_key_assignment(self):
-        result = sanitize_error(
-            Exception('Request body: {"api_key": "ordinary-looking-secret"}')
-        )
+        result = sanitize_error(Exception('Request body: {"api_key": "ordinary-looking-secret"}'))
         assert result == 'Request body: {"api_key": "[REDACTED]"}'
 
     def test_strips_full_quoted_multiword_secret(self):
-        result = sanitize_error(
-            Exception('client_secret: "two words", status: "denied"')
-        )
+        result = sanitize_error(Exception('client_secret: "two words", status: "denied"'))
         assert result == 'client_secret: "[REDACTED]", status: "denied"'
 
     def test_strips_quoted_secret_with_escaped_quote(self):
-        result = sanitize_error(
-            Exception('{"api_key":"abc\\\"def-secret","status":"denied"}')
-        )
+        result = sanitize_error(Exception('{"api_key":"abc\\"def-secret","status":"denied"}'))
         assert result == '{"api_key":"[REDACTED]","status":"denied"}'
 
     def test_strips_delimiter_bounded_unquoted_multiword_secret(self):
-        result = sanitize_error(
-            Exception("password=correct horse battery staple; status=denied")
-        )
+        result = sanitize_error(Exception("password=correct horse battery staple; status=denied"))
         assert result == "password=[REDACTED]; status=denied"
 
     def test_strips_cloud_credentials_from_signed_s3_url(self):
@@ -119,7 +111,7 @@ class TestSanitizeError:
 
     def test_strips_cloud_credentials_from_headers_and_environment(self):
         message = (
-            'X-API-KEY: "abc\\\"def-secret"\n'
+            'X-API-KEY: "abc\\"def-secret"\n'
             "AWS_SECRET_ACCESS_KEY=aws-secret-value\n"
             "aws_session_token: session-token-value\n"
             "status: denied"
@@ -154,9 +146,7 @@ class TestSanitizeError:
         assert sanitize_error(Exception(message)) == message
 
     def test_preserves_cloud_credential_key_names_in_prose(self):
-        message = (
-            "Rotate AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN, and x-api-key regularly"
-        )
+        message = "Rotate AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN, and x-api-key regularly"
         assert sanitize_error(Exception(message)) == message
 
     def test_does_not_redact_larger_identifier_suffix(self):

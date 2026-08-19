@@ -37,7 +37,14 @@ DEFAULT_PRICING = pricing.OPENAI_DEFAULT
 
 # Models that require max_completion_tokens instead of max_tokens
 _MAX_COMPLETION_TOKENS_MODELS = {
-    "gpt-5", "gpt-5-turbo", "gpt-5.3", "gpt-5.5", "o3", "o3-pro", "o3-mini", "o4-mini",
+    "gpt-5",
+    "gpt-5-turbo",
+    "gpt-5.3",
+    "gpt-5.5",
+    "o3",
+    "o3-pro",
+    "o3-mini",
+    "o4-mini",
 }
 
 # Reasoning models burn internal thinking tokens before producing visible output.
@@ -51,6 +58,7 @@ _NONTERMINAL_RESPONSE_STATUSES = frozenset({"cancelled", "queued", "in_progress"
 # call, so the two have to agree on a constant.
 _INJECTED_CALL_ID = "call_injected"
 
+
 def _estimate_cost(model: str, input_tokens: int, output_tokens: int) -> float:
     return pricing.estimate_cost(
         model, input_tokens, output_tokens, table=MODEL_PRICING, default=DEFAULT_PRICING
@@ -60,9 +68,7 @@ def _estimate_cost(model: str, input_tokens: int, output_tokens: int) -> float:
 def _is_reasoning_model(model: str) -> bool:
     """Return whether OpenAI requires reasoning-model request parameters."""
 
-    return model in _MAX_COMPLETION_TOKENS_MODELS or model.startswith(
-        ("gpt-5.", "gpt-5-")
-    )
+    return model in _MAX_COMPLETION_TOKENS_MODELS or model.startswith(("gpt-5.", "gpt-5-"))
 
 
 def _field(value: object, name: str, default: Any = None) -> Any:
@@ -113,6 +119,7 @@ class OpenAIProvider(BaseProvider):
                     "Install with: uv sync --extra openai"
                 ) from exc
             import httpx
+
             timeout = httpx.Timeout(60.0, connect=10.0)
             if auth is not None:
                 self._client = AsyncOpenAI(api_key="oauth-managed", timeout=timeout, max_retries=2)
@@ -149,19 +156,33 @@ class OpenAIProvider(BaseProvider):
 
         if self._use_responses_api:
             return await self._generate_responses(
-                prompt, system=system, model=model, max_tokens=max_tokens,
-                thinking=thinking, thinking_budget=thinking_budget,
+                prompt,
+                system=system,
+                model=model,
+                max_tokens=max_tokens,
+                thinking=thinking,
+                thinking_budget=thinking_budget,
                 temperature=temperature,
             )
         return await self._generate_completions(
-            prompt, system=system, model=model, max_tokens=max_tokens,
-            thinking=thinking, thinking_budget=thinking_budget,
+            prompt,
+            system=system,
+            model=model,
+            max_tokens=max_tokens,
+            thinking=thinking,
+            thinking_budget=thinking_budget,
             temperature=temperature,
         )
 
     async def _generate_completions(
-        self, prompt: str, *, system: str, model: str, max_tokens: int,
-        thinking: bool | None = None, thinking_budget: int | None = None,
+        self,
+        prompt: str,
+        *,
+        system: str,
+        model: str,
+        max_tokens: int,
+        thinking: bool | None = None,
+        thinking_budget: int | None = None,
         temperature: float | None = None,
     ) -> ProviderResponse:
         """Chat Completions API — used with static API keys."""
@@ -210,6 +231,7 @@ class OpenAIProvider(BaseProvider):
             text = ""
             if not refusal:
                 import logging as _logging
+
                 _logging.getLogger("atomics.providers.openai").warning(
                     "Empty response content for model %s — raw choices: %s",
                     model,
@@ -241,9 +263,7 @@ class OpenAIProvider(BaseProvider):
             kind=outcome_kind,
             finish_reason=finish_reason,
             safety_reason=(
-                finish_reason
-                if outcome_kind is ProviderOutcomeKind.SAFETY_BLOCKED
-                else None
+                finish_reason if outcome_kind is ProviderOutcomeKind.SAFETY_BLOCKED else None
             ),
         )
 
@@ -288,29 +308,33 @@ class OpenAIProvider(BaseProvider):
         model = model or self._default_model
 
         messages: list[dict[str, Any]] = []
-        messages.append(
-            {"role": "system", "content": system or "You are a helpful assistant."}
-        )
+        messages.append({"role": "system", "content": system or "You are a helpful assistant."})
         messages.append({"role": "user", "content": prompt})
         if injected_tool_output is not None:
             # Indirect injection: the attack arrives as the result of a tool the
             # model appears to have already called.
-            messages.append({
-                "role": "assistant",
-                "tool_calls": [{
-                    "id": _INJECTED_CALL_ID,
-                    "type": "function",
-                    "function": {
-                        "name": "list_files",
-                        "arguments": '{"directory": "."}',
-                    },
-                }],
-            })
-            messages.append({
-                "role": "tool",
-                "tool_call_id": _INJECTED_CALL_ID,
-                "content": injected_tool_output,
-            })
+            messages.append(
+                {
+                    "role": "assistant",
+                    "tool_calls": [
+                        {
+                            "id": _INJECTED_CALL_ID,
+                            "type": "function",
+                            "function": {
+                                "name": "list_files",
+                                "arguments": '{"directory": "."}',
+                            },
+                        }
+                    ],
+                }
+            )
+            messages.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": _INJECTED_CALL_ID,
+                    "content": injected_tool_output,
+                }
+            )
 
         is_reasoning = _is_reasoning_model(model)
         if is_reasoning:
@@ -363,8 +387,14 @@ class OpenAIProvider(BaseProvider):
         )
 
     async def _generate_responses(
-        self, prompt: str, *, system: str, model: str, max_tokens: int,
-        thinking: bool | None = None, thinking_budget: int | None = None,
+        self,
+        prompt: str,
+        *,
+        system: str,
+        model: str,
+        max_tokens: int,
+        thinking: bool | None = None,
+        thinking_budget: int | None = None,
         temperature: float | None = None,
     ) -> ProviderResponse:
         """Responses API — used with OAuth tokens (ChatGPT OAuth scopes)."""
@@ -401,9 +431,7 @@ class OpenAIProvider(BaseProvider):
             for item in response.output:
                 item_type = _field(item, "type", "")
                 if item_type == "refusal":
-                    refusal_parts.append(
-                        _field(item, "refusal", "") or _field(item, "text", "")
-                    )
+                    refusal_parts.append(_field(item, "refusal", "") or _field(item, "text", ""))
                 elif item_type == "message":
                     for block in _field(item, "content", []):
                         block_type = _field(block, "type", "")
@@ -411,8 +439,7 @@ class OpenAIProvider(BaseProvider):
                             fallback_text += _field(block, "text", "")
                         elif block_type == "refusal":
                             refusal_parts.append(
-                                _field(block, "refusal", "")
-                                or _field(block, "text", "")
+                                _field(block, "refusal", "") or _field(block, "text", "")
                             )
         refusal = "\n".join(dict.fromkeys(part for part in refusal_parts if part))
         if not text:
@@ -428,11 +455,7 @@ class OpenAIProvider(BaseProvider):
             failure_message = _field(error, "message")
             finish_reason = (
                 _field(error, "code")
-                or (
-                    sanitize_error(ValueError(str(failure_message)))
-                    if failure_message
-                    else None
-                )
+                or (sanitize_error(ValueError(str(failure_message))) if failure_message else None)
                 or "failed"
             )
         else:
@@ -451,11 +474,7 @@ class OpenAIProvider(BaseProvider):
         else:
             reasoning_tokens = getattr(usage, "reasoning_tokens", 0) or 0
         policy_reason = policy_block_reason(
-            code=(
-                finish_reason
-                if status == "incomplete"
-                else error_code
-            ),
+            code=(finish_reason if status == "incomplete" else error_code),
             message=error_message,
         )
         if status == "failed" and policy_reason:
@@ -477,21 +496,15 @@ class OpenAIProvider(BaseProvider):
         else:
             outcome_kind = ProviderOutcomeKind.EMPTY
 
-        diagnostic = " | ".join(
-            str(value) for value in (error_code, error_message) if value
-        )
+        diagnostic = " | ".join(str(value) for value in (error_code, error_message) if value)
         if not diagnostic and status in _NONTERMINAL_RESPONSE_STATUSES:
             diagnostic = status
-        sanitized_diagnostic = (
-            sanitize_error(ValueError(diagnostic)) if diagnostic else None
-        )
+        sanitized_diagnostic = sanitize_error(ValueError(diagnostic)) if diagnostic else None
         outcome = ProviderOutcome(
             kind=outcome_kind,
             finish_reason=finish_reason,
             safety_reason=(
-                policy_reason
-                if outcome_kind is ProviderOutcomeKind.SAFETY_BLOCKED
-                else None
+                policy_reason if outcome_kind is ProviderOutcomeKind.SAFETY_BLOCKED else None
             ),
             error_class=(
                 "OpenAIResponseError"
@@ -499,9 +512,7 @@ class OpenAIProvider(BaseProvider):
                 else None
             ),
             error_message=(
-                sanitized_diagnostic
-                if outcome_kind is ProviderOutcomeKind.PROVIDER_ERROR
-                else None
+                sanitized_diagnostic if outcome_kind is ProviderOutcomeKind.PROVIDER_ERROR else None
             ),
         )
 

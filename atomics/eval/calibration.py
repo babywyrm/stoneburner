@@ -24,6 +24,7 @@ ScoreFn = Callable[..., Awaitable[JudgeResult]]
 @dataclass(frozen=True)
 class CalibrationCase:
     """A prompt with answers ordered from worst (index 0) to best (index -1)."""
+
     id: str
     prompt: str
     graded_answers: tuple[str, ...]
@@ -70,8 +71,8 @@ CALIBRATION_CASES: tuple[CalibrationCase, ...] = (
 class CaseCalibration:
     case_id: str
     scores: list[float]
-    monotonic: bool       # scores never decrease from worst → best
-    separated: bool       # best - worst >= min_separation
+    monotonic: bool  # scores never decrease from worst → best
+    separated: bool  # best - worst >= min_separation
 
 
 @dataclass
@@ -81,9 +82,7 @@ class CalibrationReport:
 
     @property
     def passed(self) -> bool:
-        return bool(self.results) and all(
-            r.monotonic and r.separated for r in self.results
-        )
+        return bool(self.results) and all(r.monotonic and r.separated for r in self.results)
 
     @property
     def pass_rate(self) -> float:

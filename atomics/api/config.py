@@ -58,13 +58,9 @@ class ServerSettings:
                 f"{self.worker_absent_after_seconds}"
             )
         if self.max_active_jobs < 1:
-            raise ValueError(
-                f"max_active_jobs must be positive, got {self.max_active_jobs}"
-            )
+            raise ValueError(f"max_active_jobs must be positive, got {self.max_active_jobs}")
         if self.max_retained_jobs < 1:
-            raise ValueError(
-                f"max_retained_jobs must be positive, got {self.max_retained_jobs}"
-            )
+            raise ValueError(f"max_retained_jobs must be positive, got {self.max_retained_jobs}")
         if self.max_active_jobs_per_caller < 1:
             raise ValueError(
                 "max_active_jobs_per_caller must be positive, got "

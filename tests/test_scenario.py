@@ -25,6 +25,7 @@ from atomics.scenario_prompts import (
 
 # ── WorkloadSpec ──────────────────────────────────────────────────────────────
 
+
 class TestWorkloadSpec:
     def test_valid_gate(self) -> None:
         spec = WorkloadSpec(name="test", type="gate", model="m:1b", concurrency=2)
@@ -48,6 +49,7 @@ class TestWorkloadSpec:
 
 
 # ── WorkloadResult properties ─────────────────────────────────────────────────
+
 
 class TestWorkloadResult:
     def _make(self, **kwargs) -> WorkloadResult:
@@ -91,6 +93,7 @@ class TestWorkloadResult:
 
 # ── parse_workload_flag ───────────────────────────────────────────────────────
 
+
 class TestParseWorkloadFlag:
     def test_basic_three_parts(self) -> None:
         spec = parse_workload_flag("gate:mymodel:3")
@@ -129,6 +132,7 @@ class TestParseWorkloadFlag:
 
 # ── load_scenario_yaml ────────────────────────────────────────────────────────
 
+
 class TestLoadScenarioYaml:
     def test_valid_yaml(self, tmp_path: Path) -> None:
         f = tmp_path / "scenario.yaml"
@@ -161,17 +165,13 @@ class TestLoadScenarioYaml:
 
     def test_missing_model(self, tmp_path: Path) -> None:
         f = tmp_path / "bad2.yaml"
-        f.write_text(
-            "workloads:\n"
-            "  - name: x\n"
-            "    type: gate\n"
-            "    concurrency: 1\n"
-        )
+        f.write_text("workloads:\n  - name: x\n    type: gate\n    concurrency: 1\n")
         with pytest.raises(ValueError, match="missing required 'model'"):
             load_scenario_yaml(str(f))
 
 
 # ── Prompt fixtures ───────────────────────────────────────────────────────────
+
 
 class TestPromptFixtures:
     def test_gate_prompts_count(self) -> None:
@@ -222,6 +222,7 @@ class TestPromptFixtures:
 
 # ── ScenarioResult ────────────────────────────────────────────────────────────
 
+
 class TestScenarioResult:
     def test_defaults(self) -> None:
         sr = ScenarioResult()
@@ -233,6 +234,7 @@ class TestScenarioResult:
 
 # ── Runner (mocked) ──────────────────────────────────────────────────────────
 
+
 async def _fake_single_request(client, host, model, prompt, num_predict):
     """Simulate a fast Ollama response."""
     await asyncio.sleep(0.001)
@@ -242,16 +244,21 @@ async def _fake_single_request(client, host, model, prompt, num_predict):
 class TestRunner:
     def test_single_workload(self) -> None:
         spec = WorkloadSpec(
-            name="test-gate", type="gate", model="m:1b", concurrency=1,
+            name="test-gate",
+            type="gate",
+            model="m:1b",
+            concurrency=1,
             sla_ms=2000.0,
         )
         with patch("atomics.scenario._single_request", side_effect=_fake_single_request):
-            result = asyncio.run(run_scenario(
-                host="http://fake:11434",
-                specs=[spec],
-                duration_seconds=1.0,
-                skip_baseline=True,
-            ))
+            result = asyncio.run(
+                run_scenario(
+                    host="http://fake:11434",
+                    specs=[spec],
+                    duration_seconds=1.0,
+                    skip_baseline=True,
+                )
+            )
         assert len(result.workloads) == 1
         wr = result.workloads[0]
         assert wr.requests > 0
@@ -264,43 +271,55 @@ class TestRunner:
             WorkloadSpec(name="e1", type="eval", model="m:3b", concurrency=1),
         ]
         with patch("atomics.scenario._single_request", side_effect=_fake_single_request):
-            result = asyncio.run(run_scenario(
-                host="http://fake:11434",
-                specs=specs,
-                duration_seconds=1.0,
-                skip_baseline=True,
-            ))
+            result = asyncio.run(
+                run_scenario(
+                    host="http://fake:11434",
+                    specs=specs,
+                    duration_seconds=1.0,
+                    skip_baseline=True,
+                )
+            )
         assert len(result.workloads) == 2
         assert result.total_requests > 0
         assert all(wr.requests > 0 for wr in result.workloads)
 
     def test_interference_scoring(self) -> None:
         spec = WorkloadSpec(
-            name="g1", type="gate", model="m:1b", concurrency=1,
+            name="g1",
+            type="gate",
+            model="m:1b",
+            concurrency=1,
         )
         with patch("atomics.scenario._single_request", side_effect=_fake_single_request):
-            result = asyncio.run(run_scenario(
-                host="http://fake:11434",
-                specs=[spec],
-                duration_seconds=1.0,
-                skip_baseline=False,
-            ))
+            result = asyncio.run(
+                run_scenario(
+                    host="http://fake:11434",
+                    specs=[spec],
+                    duration_seconds=1.0,
+                    skip_baseline=False,
+                )
+            )
         assert "g1" in result.baselines
         assert "g1" in result.interference
         assert result.interference["g1"] > 0
 
     def test_sla_violations_counted(self) -> None:
         spec = WorkloadSpec(
-            name="strict", type="gate", model="m:1b", concurrency=1,
+            name="strict",
+            type="gate",
+            model="m:1b",
+            concurrency=1,
             sla_ms=100.0,
         )
         with patch("atomics.scenario._single_request", side_effect=_fake_single_request):
-            result = asyncio.run(run_scenario(
-                host="http://fake:11434",
-                specs=[spec],
-                duration_seconds=1.0,
-                skip_baseline=True,
-            ))
+            result = asyncio.run(
+                run_scenario(
+                    host="http://fake:11434",
+                    specs=[spec],
+                    duration_seconds=1.0,
+                    skip_baseline=True,
+                )
+            )
         wr = result.workloads[0]
         assert wr.sla_violations == wr.requests
         assert wr.sla_compliance_pct == 0.0
@@ -317,19 +336,22 @@ class TestRunner:
             workloads_seen.append(wr.spec.name)
 
         with patch("atomics.scenario._single_request", side_effect=_fake_single_request):
-            asyncio.run(run_scenario(
-                host="http://fake:11434",
-                specs=[spec],
-                duration_seconds=1.0,
-                skip_baseline=False,
-                on_baseline_done=on_bl,
-                on_workload_done=on_wr,
-            ))
+            asyncio.run(
+                run_scenario(
+                    host="http://fake:11434",
+                    specs=[spec],
+                    duration_seconds=1.0,
+                    skip_baseline=False,
+                    on_baseline_done=on_bl,
+                    on_workload_done=on_wr,
+                )
+            )
         assert "cb" in baselines_seen
         assert "cb" in workloads_seen
 
 
 # ── CLI integration ───────────────────────────────────────────────────────────
+
 
 class TestCLI:
     def test_scenario_help(self) -> None:
@@ -359,14 +381,22 @@ class TestCLI:
         f = tmp_path / "s.yaml"
         f.write_text("workloads:\n  - name: x\n    type: gate\n    model: m\n    concurrency: 1\n")
         runner = CliRunner()
-        result = runner.invoke(cli, [
-            "scenario", "--file", str(f), "--workload", "gate:m:1",
-        ])
+        result = runner.invoke(
+            cli,
+            [
+                "scenario",
+                "--file",
+                str(f),
+                "--workload",
+                "gate:m:1",
+            ],
+        )
         assert result.exit_code != 0
         assert "Cannot use both" in result.output
 
 
 # ── DB persistence ────────────────────────────────────────────────────────────
+
 
 class TestDBPersistence:
     def test_save_scenario_result(self, tmp_path: Path) -> None:
@@ -377,8 +407,11 @@ class TestDBPersistence:
 
         spec = WorkloadSpec(name="g1", type="gate", model="m:1b", concurrency=2, sla_ms=5000.0)
         wr = WorkloadResult(
-            spec=spec, requests=10, failed=1,
-            latencies=[500.0] * 10, per_request_tps=[40.0] * 10,
+            spec=spec,
+            requests=10,
+            failed=1,
+            latencies=[500.0] * 10,
+            per_request_tps=[40.0] * 10,
             total_output_tokens=200,
         )
         sr = ScenarioResult(
@@ -414,6 +447,7 @@ class TestRamp:
         import inspect
 
         from atomics.scenario import run_scenario
+
         sig = inspect.signature(run_scenario)
         assert "ramp_seconds" in sig.parameters
         assert sig.parameters["ramp_seconds"].default == 0.0
@@ -422,6 +456,7 @@ class TestRamp:
         import inspect
 
         from atomics.scenario import _run_workload
+
         sig = inspect.signature(_run_workload)
         assert "ramp_seconds" in sig.parameters
 
@@ -436,18 +471,23 @@ class TestRamp:
             return (10, 5, 200.0, 50.0)
 
         spec = WorkloadSpec(
-            name="gate", type="gate", model="test", concurrency=2,
+            name="gate",
+            type="gate",
+            model="test",
+            concurrency=2,
             prompts=["hello"],
         )
 
         with patch("atomics.scenario._single_request", side_effect=_fake_request):
-            result = asyncio.run(run_scenario(
-                host="http://fake:11434",
-                specs=[spec],
-                duration_seconds=0.05,
-                ramp_seconds=5.0,
-                skip_baseline=True,
-            ))
+            result = asyncio.run(
+                run_scenario(
+                    host="http://fake:11434",
+                    specs=[spec],
+                    duration_seconds=0.05,
+                    ramp_seconds=5.0,
+                    skip_baseline=True,
+                )
+            )
 
         assert result.ramp_seconds == 5.0
 
@@ -455,6 +495,7 @@ class TestRamp:
         from click.testing import CliRunner
 
         from atomics.cli import cli
+
         runner = CliRunner()
         result = runner.invoke(cli, ["scenario", "--help"])
         assert "--ramp" in result.output
@@ -475,7 +516,10 @@ class TestRamp:
             return (10, 5, 1.0, 100.0)
 
         spec = WorkloadSpec(
-            name="g", type="gate", model="test", concurrency=3,
+            name="g",
+            type="gate",
+            model="test",
+            concurrency=3,
             prompts=["p"],
         )
 
@@ -498,6 +542,7 @@ class TestScenarioProfileBranch:
 
     def _make_profile(self):
         from types import SimpleNamespace
+
         return SimpleNamespace(
             type="ollama",
             name="test-gate",
@@ -509,7 +554,8 @@ class TestScenarioProfileBranch:
         )
 
     def test_profile_workload_uses_profile_request(self):
-        """When a WorkloadSpec has a profile path, _run_workload routes via _single_request_profile."""
+        """When a WorkloadSpec has a profile path, _run_workload routes via
+        _single_request_profile."""
         import asyncio
         from unittest.mock import patch
 
@@ -530,15 +576,19 @@ class TestScenarioProfileBranch:
         )
 
         mock_profile = self._make_profile()
-        with patch("atomics.profiles.load_profile", return_value=mock_profile), \
-             patch("atomics.profiles._single_request_profile", side_effect=_fake_profile_req), \
-             patch("atomics.scenario._single_request", side_effect=_fake_single_req):
-            result = asyncio.run(run_scenario(
-                host="http://fake:11434",
-                specs=[spec],
-                duration_seconds=1.0,
-                skip_baseline=True,
-            ))
+        with (
+            patch("atomics.profiles.load_profile", return_value=mock_profile),
+            patch("atomics.profiles._single_request_profile", side_effect=_fake_profile_req),
+            patch("atomics.scenario._single_request", side_effect=_fake_single_req),
+        ):
+            result = asyncio.run(
+                run_scenario(
+                    host="http://fake:11434",
+                    specs=[spec],
+                    duration_seconds=1.0,
+                    skip_baseline=True,
+                )
+            )
 
         assert len(result.workloads) == 1
         assert result.workloads[0].requests > 0
@@ -563,14 +613,18 @@ class TestScenarioProfileBranch:
         )
 
         mock_profile = self._make_profile()
-        with patch("atomics.profiles.load_profile", return_value=mock_profile), \
-             patch("atomics.profiles._single_request_profile", side_effect=_fake_profile_req):
-            result = asyncio.run(run_scenario(
-                host="http://fake:11434",
-                specs=[spec],
-                duration_seconds=1.0,
-                skip_baseline=True,
-            ))
+        with (
+            patch("atomics.profiles.load_profile", return_value=mock_profile),
+            patch("atomics.profiles._single_request_profile", side_effect=_fake_profile_req),
+        ):
+            result = asyncio.run(
+                run_scenario(
+                    host="http://fake:11434",
+                    specs=[spec],
+                    duration_seconds=1.0,
+                    skip_baseline=True,
+                )
+            )
 
         assert result.workloads[0].requests > 0
 
@@ -597,12 +651,14 @@ class TestScenarioProfileBranch:
         )
 
         with patch("atomics.scenario._single_request", side_effect=_fake_single_req):
-            asyncio.run(run_scenario(
-                host="http://fake:11434",
-                specs=[spec],
-                duration_seconds=1.0,
-                skip_baseline=False,
-                on_baseline_done=on_bl,
-            ))
+            asyncio.run(
+                run_scenario(
+                    host="http://fake:11434",
+                    specs=[spec],
+                    duration_seconds=1.0,
+                    skip_baseline=False,
+                    on_baseline_done=on_bl,
+                )
+            )
 
         assert "bl-test" in baselines_seen

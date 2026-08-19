@@ -21,11 +21,20 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
   <title>atomics dashboard</title>
   <style>
     :root { color-scheme: light dark; }
-    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0; padding: 2rem; background: #f5f5f5; color: #111; }
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      margin: 0; padding: 2rem; background: #f5f5f5; color: #111;
+    }
     @media (prefers-color-scheme: dark) { body { background: #0d1117; color: #e6edf3; } }
     h1 { margin-top: 0; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; margin-top: 1.5rem; }
-    .card { background: #fff; border-radius: 8px; padding: 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 1.5rem; margin-top: 1.5rem;
+    }
+    .card {
+      background: #fff; border-radius: 8px; padding: 1.25rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
     @media (prefers-color-scheme: dark) { .card { background: #161b22; } }
     .card h2 { margin-top: 0; font-size: 1.1rem; }
     table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
@@ -39,8 +48,14 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
     .empty { color: #666; font-style: italic; }
     .bar { height: 1.25rem; background: #58a6ff; border-radius: 4px; min-width: 2px; }
     .row { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.4rem; }
-    .row span { width: 8rem; font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    button.link { background: none; border: none; padding: 0; color: #0969da; cursor: pointer; font: inherit; }
+    .row span {
+      width: 8rem; font-size: 0.85rem; white-space: nowrap;
+      overflow: hidden; text-overflow: ellipsis;
+    }
+    button.link {
+      background: none; border: none; padding: 0; color: #0969da;
+      cursor: pointer; font: inherit;
+    }
     @media (prefers-color-scheme: dark) { button.link { color: #58a6ff; } }
     #run-detail, #job-detail { display: none; margin-top: 1.5rem; }
     #run-detail.visible, #job-detail.visible { display: block; }
@@ -49,7 +64,8 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
 <body>
   <h1>atomics dashboard <span class="refresh">refreshes every 10s</span></h1>
   <p id="key-warning" style="display:none;">
-    <label>API key <input id="key-input" type="password" autocomplete="off" placeholder="X-API-Key"></label>
+    <label>API key <input id="key-input" type="password"
+      autocomplete="off" placeholder="X-API-Key"></label>
     <button id="key-save">Connect</button>
   </p>
   <div class="grid">

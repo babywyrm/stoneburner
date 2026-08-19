@@ -44,12 +44,22 @@ def test_save_archreview_result_roundtrip(tmp_path):
 
     repo = MetricsRepository(tmp_path / "m.db")
     r = ArchReviewResult(
-        run_id="run1", repo="juice-shop", tier="floor", model="qwen2.5:14b",
-        provider="ollama", round=1,
+        run_id="run1",
+        repo="juice-shop",
+        tier="floor",
+        model="qwen2.5:14b",
+        provider="ollama",
+        round=1,
         findings=[Finding("injection", "a.ts", "high", "raw sql")],
-        objective_recall=0.7, objective_precision=0.8, objective_f=0.74,
-        judge_score=0.66, matched_categories=["injection"], tokens_in=1200,
-        tokens_out=400, latency_ms=8300.0, pack_hash="abc123",
+        objective_recall=0.7,
+        objective_precision=0.8,
+        objective_f=0.74,
+        judge_score=0.66,
+        matched_categories=["injection"],
+        tokens_in=1200,
+        tokens_out=400,
+        latency_ms=8300.0,
+        pack_hash="abc123",
     )
     repo.save_archreview_result(r)
     row = repo._conn.execute(
@@ -64,9 +74,7 @@ def test_save_archreview_result_roundtrip(tmp_path):
 
 def test_adversarial_results_table_exists(tmp_path):
     conn = init_db(tmp_path / "test.db")
-    conn.execute(
-        "INSERT INTO runs (run_id, started_at) VALUES ('run1', '2026-01-01')"
-    )
+    conn.execute("INSERT INTO runs (run_id, started_at) VALUES ('run1', '2026-01-01')")
     conn.execute(
         "INSERT INTO adversarial_results "
         "(result_id, run_id, fixture_id, category, severity, provider, model, timestamp) "
@@ -163,9 +171,7 @@ def test_schema_migration_backs_up_and_keeps_live_rows(tmp_path):
     assert old == [("keepme",)]
 
 
-def test_schema_migration_aborts_and_closes_when_backup_fails(
-    tmp_path, monkeypatch
-):
+def test_schema_migration_aborts_and_closes_when_backup_fails(tmp_path, monkeypatch):
     import sqlite3
 
     from atomics.storage import schema
@@ -202,13 +208,10 @@ def test_schema_migration_aborts_and_closes_when_backup_fails(
         opened[0].execute("SELECT 1")
     verify = real_connect(db_path)
     try:
-        assert verify.execute(
-            "SELECT version FROM schema_version"
-        ).fetchone()[0] == 17
+        assert verify.execute("SELECT version FROM schema_version").fetchone()[0] == 17
         assert verify.execute("SELECT run_id FROM runs").fetchone()[0] == "sentinel"
         verify.execute(
-            "INSERT INTO runs (run_id, started_at) "
-            "VALUES ('after-failure', '2026-01-02')"
+            "INSERT INTO runs (run_id, started_at) VALUES ('after-failure', '2026-01-02')"
         )
         verify.commit()
     finally:
@@ -240,21 +243,19 @@ def test_schema_migration_rolls_back_mid_reset_failure(tmp_path, monkeypatch):
 
     verify = sqlite3.connect(db_path)
     try:
-        assert verify.execute(
-            "SELECT version FROM schema_version"
-        ).fetchone()[0] == 17
+        assert verify.execute("SELECT version FROM schema_version").fetchone()[0] == 17
         assert verify.execute("SELECT run_id FROM runs").fetchone()[0] == "sentinel"
-        assert verify.execute(
-            "SELECT COUNT(*) FROM sqlite_master "
-            "WHERE type='table' AND name='replacement'"
-        ).fetchone()[0] == 0
+        assert (
+            verify.execute(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='replacement'"
+            ).fetchone()[0]
+            == 0
+        )
     finally:
         verify.close()
 
 
-def test_schema_migration_lock_prevents_post_backup_write_loss(
-    tmp_path, monkeypatch
-):
+def test_schema_migration_lock_prevents_post_backup_write_loss(tmp_path, monkeypatch):
     import sqlite3
     import threading
 
@@ -320,12 +321,10 @@ def test_schema_migration_lock_prevents_post_backup_write_loss(
         in_backup = backup.execute(
             "SELECT COUNT(*) FROM runs WHERE run_id='racing-writer'"
         ).fetchone()[0]
-        in_live = live.execute(
-            "SELECT COUNT(*) FROM runs WHERE run_id='racing-writer'"
-        ).fetchone()[0]
-        sentinel = live.execute(
-            "SELECT run_id FROM runs WHERE run_id='sentinel'"
-        ).fetchone()
+        in_live = live.execute("SELECT COUNT(*) FROM runs WHERE run_id='racing-writer'").fetchone()[
+            0
+        ]
+        sentinel = live.execute("SELECT run_id FROM runs WHERE run_id='sentinel'").fetchone()
     finally:
         backup.close()
         live.close()
@@ -378,10 +377,17 @@ def test_complete_archreview_run_finalizes_parent(tmp_path):
 
     repo = MetricsRepository(tmp_path / "arch.db")
     repo.create_run("a1", tier="archreview", provider="ollama", model="m")
-    repo.save_archreview_result(ArchReviewResult(
-        run_id="a1", repo="juice-shop", tier="floor", model="m",
-        provider="ollama", round=0, findings=[],
-    ))
+    repo.save_archreview_result(
+        ArchReviewResult(
+            run_id="a1",
+            repo="juice-shop",
+            tier="floor",
+            model="m",
+            provider="ollama",
+            round=0,
+            findings=[],
+        )
+    )
     repo.complete_archreview_run("a1")
 
     run = repo._conn.execute(
@@ -426,9 +432,14 @@ def test_query_task_results_suite_filter():
 
     def _mk(name, suite):
         r = TaskResult(
-            run_id="run-suite", category=TaskCategory.GENERAL_QA, task_name=name,
-            provider="ollama", model="m", status=TaskStatus.SUCCESS,
-            started_at=datetime.now(UTC), completed_at=datetime.now(UTC),
+            run_id="run-suite",
+            category=TaskCategory.GENERAL_QA,
+            task_name=name,
+            provider="ollama",
+            model="m",
+            status=TaskStatus.SUCCESS,
+            started_at=datetime.now(UTC),
+            completed_at=datetime.now(UTC),
         )
         repo.save_task_result(r, suite=suite)
 
@@ -449,6 +460,7 @@ def test_cli_export_suite_choices_include_eval_redblue():
     from click.testing import CliRunner
 
     from atomics.cli import cli
+
     result = CliRunner().invoke(cli, ["export", "--help"])
     assert result.exit_code == 0
     assert "redblue" in result.output
@@ -1065,6 +1077,7 @@ def test_compare_latency_percentiles():
 
 # ── Stress result persistence ────────────────────────────────────────────────
 
+
 def test_stress_results_table_exists(tmp_path):
     conn = init_db(tmp_path / "test.db")
     conn.execute(
@@ -1097,14 +1110,22 @@ def test_save_stress_result():
         vram_peak_mb=8500.0,
         phases=[
             ConcurrencyResult(
-                concurrency=1, requests=5, total_output_tokens=1000,
-                aggregate_tps=20.0, avg_request_tps=20.0,
-                avg_latency_ms=200.0, p95_latency_ms=250.0,
+                concurrency=1,
+                requests=5,
+                total_output_tokens=1000,
+                aggregate_tps=20.0,
+                avg_request_tps=20.0,
+                avg_latency_ms=200.0,
+                p95_latency_ms=250.0,
             ),
             ConcurrencyResult(
-                concurrency=4, requests=15, total_output_tokens=4000,
-                aggregate_tps=45.2, avg_request_tps=12.0,
-                avg_latency_ms=800.0, p95_latency_ms=1200.0,
+                concurrency=4,
+                requests=15,
+                total_output_tokens=4000,
+                aggregate_tps=45.2,
+                avg_request_tps=12.0,
+                avg_latency_ms=800.0,
+                p95_latency_ms=1200.0,
             ),
         ],
     )
@@ -1128,9 +1149,13 @@ def test_get_stress_results_multiple_models():
 
     for model in ["qwen2.5:1.5b", "qwen2.5:7b", "mistral:7b"]:
         sr = StressResult(
-            model=model, host="http://localhost:11434",
-            peak_tps=30.0, saturation_concurrency=2,
-            duration_seconds=30.0, total_tokens=1000, total_requests=10,
+            model=model,
+            host="http://localhost:11434",
+            peak_tps=30.0,
+            saturation_concurrency=2,
+            duration_seconds=30.0,
+            total_tokens=1000,
+            total_requests=10,
         )
         repo.save_stress_result(sr)
 
@@ -1149,9 +1174,13 @@ def test_get_stress_results_by_model():
 
     for model in ["qwen2.5:1.5b", "qwen2.5:7b"]:
         sr = StressResult(
-            model=model, host="http://localhost:11434",
-            peak_tps=30.0, saturation_concurrency=2,
-            duration_seconds=30.0, total_tokens=1000, total_requests=10,
+            model=model,
+            host="http://localhost:11434",
+            peak_tps=30.0,
+            saturation_concurrency=2,
+            duration_seconds=30.0,
+            total_tokens=1000,
+            total_requests=10,
         )
         repo.save_stress_result(sr)
 
@@ -1163,9 +1192,12 @@ def test_get_stress_results_by_model():
 
 # ── sweep_results ─────────────────────────────────────────────────────────────
 
-def _mock_sweep_result(model: str = "qwen2.5:7b", quality: float = 0.9,
-                       provider: str = "ollama") -> object:
+
+def _mock_sweep_result(
+    model: str = "qwen2.5:7b", quality: float = 0.9, provider: str = "ollama"
+) -> object:
     from types import SimpleNamespace
+
     return SimpleNamespace(
         model=model,
         provider=provider,
@@ -1209,6 +1241,7 @@ def test_get_sweep_results_by_model():
 
 def test_sweep_results_table_exists(tmp_path):
     from atomics.storage.schema import init_db
+
     conn = init_db(tmp_path / "db.sqlite")
     conn.execute(
         "INSERT INTO sweep_results "
@@ -1257,12 +1290,9 @@ def _evaluation_record(
 def test_evaluation_results_table_exists_with_foreign_key(tmp_path):
     conn = init_db(tmp_path / "evaluation.db")
     table = conn.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' "
-        "AND name='evaluation_results'"
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='evaluation_results'"
     ).fetchone()
-    foreign_keys = conn.execute(
-        "PRAGMA foreign_key_list(evaluation_results)"
-    ).fetchall()
+    foreign_keys = conn.execute("PRAGMA foreign_key_list(evaluation_results)").fetchall()
 
     assert table is not None
     assert any(row["table"] == "runs" for row in foreign_keys)
@@ -1272,9 +1302,7 @@ def test_evaluation_results_table_exists_with_foreign_key(tmp_path):
 def test_save_evaluation_result_upserts_logical_fixture(tmp_path):
     repo = MetricsRepository(tmp_path / "metrics.db")
     repo.create_run("eval-run", tier="refusal", provider="ollama", model="qwen")
-    repo.save_evaluation_result(
-        _evaluation_record(status="infrastructure_invalid", score=None)
-    )
+    repo.save_evaluation_result(_evaluation_record(status="infrastructure_invalid", score=None))
     repo.save_evaluation_result(_evaluation_record())
 
     rows = repo.get_evaluation_results(run_id="eval-run", suite="refusal")
@@ -1290,9 +1318,7 @@ def test_get_evaluation_results_filters_suite_and_orders_timestamp(tmp_path):
     repo = MetricsRepository(tmp_path / "metrics.db")
     repo.create_run("eval-run", tier="eval", provider="ollama", model="qwen")
     repo.save_evaluation_result(_evaluation_record(fixture_id="r1"))
-    repo.save_evaluation_result(
-        _evaluation_record(suite="codereview", fixture_id="c1")
-    )
+    repo.save_evaluation_result(_evaluation_record(suite="codereview", fixture_id="c1"))
 
     rows = repo.get_evaluation_results(run_id="eval-run", suite="codereview")
 
@@ -1334,9 +1360,7 @@ def test_save_evaluation_result_sanitizes_error(tmp_path):
 def test_complete_evaluation_run_rolls_up_honest_counts(tmp_path):
     repo = MetricsRepository(tmp_path / "metrics.db")
     repo.create_run("eval-run", tier="refusal", provider="ollama", model="qwen")
-    repo.save_evaluation_result(
-        _evaluation_record(fixture_id="complete", total_tokens=15)
-    )
+    repo.save_evaluation_result(_evaluation_record(fixture_id="complete", total_tokens=15))
     repo.save_evaluation_result(
         _evaluation_record(
             fixture_id="failed",

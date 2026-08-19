@@ -158,9 +158,7 @@ class ResistanceResult:
     def __post_init__(self):
         if self.judges_expected == 0 and self.judges_scored == 0:
             self.judges_expected = 1
-            self.judges_scored = (
-                0 if self.parse_failed or self.provider_failed else 1
-            )
+            self.judges_scored = 0 if self.parse_failed or self.provider_failed else 1
         if self.judges_expected < 0 or self.judges_scored < 0:
             raise ValueError("judge panel counts must be nonnegative")
         if self.judges_scored > self.judges_expected:
@@ -363,9 +361,7 @@ async def score_resistance(
         latency_ms = safe_metric("latency_ms")
         estimated_cost_usd = safe_metric("estimated_cost_usd")
         processing_error = errors[0] if errors else None
-        error_message = (
-            sanitize_error(processing_error) if processing_error is not None else None
-        )
+        error_message = sanitize_error(processing_error) if processing_error is not None else None
         call = JudgeCallResult(
             status=(
                 JudgeOutcomeStatus.PROVIDER_ERROR
@@ -374,11 +370,7 @@ async def score_resistance(
             ),
             judge_model=model_name,
             response_text=response_text,
-            error_class=(
-                type(processing_error).__name__
-                if processing_error is not None
-                else None
-            ),
+            error_class=(type(processing_error).__name__ if processing_error is not None else None),
             error_message=error_message,
             input_tokens=input_tokens,
             output_tokens=output_tokens,
@@ -428,9 +420,7 @@ async def score_resistance(
             score=0.5,
             label="partial",
             rationale=f"Judge processing failed: {sanitize_error(exc)}",
-            judge_model=(
-                calls[-1].judge_model if calls else judge_model or "unknown"
-            ),
+            judge_model=(calls[-1].judge_model if calls else judge_model or "unknown"),
             parse_failed=True,
             judge_cost_usd=sum(call.estimated_cost_usd for call in calls),
             judge_scores=[],
@@ -493,13 +483,9 @@ async def score_resistance(
         if processing_error is not None:
             return failed_result(processing_error)
         try:
-            raw = _THINK_BLOCK_RE.sub(
-                "", calls[call_index].response_text
-            ).strip()
+            raw = _THINK_BLOCK_RE.sub("", calls[call_index].response_text).strip()
             if not raw and calls[call_index].thinking_text:
-                raw = _THINK_BLOCK_RE.sub(
-                    "", calls[call_index].thinking_text
-                ).strip()
+                raw = _THINK_BLOCK_RE.sub("", calls[call_index].thinking_text).strip()
             calls[call_index] = replace(
                 calls[call_index],
                 effective_text=raw,

@@ -30,7 +30,9 @@ class WorkloadSpec:
 
     def __post_init__(self) -> None:
         if self.type not in WORKLOAD_TYPES:
-            raise ValueError(f"Unknown workload type '{self.type}'. Valid: {sorted(WORKLOAD_TYPES)}")
+            raise ValueError(
+                f"Unknown workload type '{self.type}'. Valid: {sorted(WORKLOAD_TYPES)}"
+            )
         if self.concurrency < 1:
             raise ValueError(f"Concurrency must be >= 1, got {self.concurrency}")
         if self.num_predict <= 0:
@@ -84,8 +86,6 @@ class ScenarioResult:
     total_failed: int = 0
 
 
-
-
 def parse_workload_flag(flag: str) -> WorkloadSpec:
     """Parse CLI shorthand: type:model:concurrency[:sla_ms]
 
@@ -96,8 +96,7 @@ def parse_workload_flag(flag: str) -> WorkloadSpec:
     parts = flag.split(":")
     if len(parts) < 3:
         raise ValueError(
-            f"Invalid workload format '{flag}'. "
-            "Expected type:model:concurrency[:sla_ms]"
+            f"Invalid workload format '{flag}'. Expected type:model:concurrency[:sla_ms]"
         )
 
     wtype = parts[0]
@@ -167,15 +166,17 @@ def load_scenario_yaml(path: str) -> list[WorkloadSpec]:
         if not model and not profile:
             raise ValueError(f"Workload '{name}' missing required 'model' or 'profile' field")
 
-        specs.append(WorkloadSpec(
-            name=name,
-            type=wtype,
-            model=model,
-            concurrency=concurrency,
-            sla_ms=sla_ms,
-            num_predict=num_predict,
-            prompts_file=prompts_file,
-            profile=profile,
-        ))
+        specs.append(
+            WorkloadSpec(
+                name=name,
+                type=wtype,
+                model=model,
+                concurrency=concurrency,
+                sla_ms=sla_ms,
+                num_predict=num_predict,
+                prompts_file=prompts_file,
+                profile=profile,
+            )
+        )
 
     return specs

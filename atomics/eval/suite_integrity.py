@@ -43,9 +43,7 @@ def fixture_outcome(*, generated: bool, scored: bool) -> FixtureOutcome:
         )
     return FixtureOutcome(
         generation=ProviderOutcomeKind.COMPLETED,
-        judge=(
-            JudgeOutcomeStatus.SCORED if scored else JudgeOutcomeStatus.PARSE_FAILED
-        ),
+        judge=(JudgeOutcomeStatus.SCORED if scored else JudgeOutcomeStatus.PARSE_FAILED),
     )
 
 

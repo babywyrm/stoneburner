@@ -23,14 +23,16 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 
-VALID_ARTIFACT_TYPES = frozenset({
-    "json-security-report",
-    "inference-api",
-    "access-log",
-    "k8s-audit-log",
-    "config-file",
-    "api-response",
-})
+VALID_ARTIFACT_TYPES = frozenset(
+    {
+        "json-security-report",
+        "inference-api",
+        "access-log",
+        "k8s-audit-log",
+        "config-file",
+        "api-response",
+    }
+)
 
 
 class ProbeConfigError(ValueError):
@@ -56,7 +58,9 @@ def load_probe_config(config_path: Path) -> list[ProbeTarget]:
     try:
         import yaml  # type: ignore[import]
     except ImportError as exc:
-        raise ProbeConfigError("PyYAML is required for probe config loading. Install it with: pip install pyyaml") from exc
+        raise ProbeConfigError(
+            "PyYAML is required for probe config loading. Install it with: pip install pyyaml"
+        ) from exc
 
     try:
         raw = yaml.safe_load(config_path.read_text())
@@ -76,14 +80,16 @@ def load_probe_config(config_path: Path) -> list[ProbeTarget]:
                 f"Valid types: {sorted(VALID_ARTIFACT_TYPES)}"
             )
         source = entry.get("source", "file")
-        targets.append(ProbeTarget(
-            name=name,
-            artifact_type=artifact_type,
-            source=source,
-            path=entry.get("path"),
-            url=entry.get("url"),
-            headers=entry.get("headers") or {},
-            description=entry.get("description", ""),
-        ))
+        targets.append(
+            ProbeTarget(
+                name=name,
+                artifact_type=artifact_type,
+                source=source,
+                path=entry.get("path"),
+                url=entry.get("url"),
+                headers=entry.get("headers") or {},
+                description=entry.get("description", ""),
+            )
+        )
 
     return targets

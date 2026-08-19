@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Variance sweep — run N iterations of model sweeps and report statistics."""
+
 from __future__ import annotations
 
 import asyncio
@@ -43,7 +44,9 @@ async def main() -> None:
     csv_path = outdir / "results.csv"
     csvfile = open(csv_path, "w", newline="")
     writer = csv.writer(csvfile)
-    writer.writerow(["run", "model", "quality_pct", "avg_latency_ms", "total_tokens", "total_cost", "fixtures"])
+    writer.writerow(
+        ["run", "model", "quality_pct", "avg_latency_ms", "total_tokens", "total_cost", "fixtures"]
+    )
 
     judge = OllamaProvider(host=HOST, default_model="qwen2.5:7b")
 
@@ -63,11 +66,14 @@ async def main() -> None:
         elapsed = time.monotonic() - t0
         eta = (elapsed / max(run_num - 1, 1)) * (RUNS - run_num + 1) if run_num > 1 else 0
         print(f"{'─' * 50}")
-        print(f"RUN {run_num} / {RUNS}  ({datetime.now():%H:%M:%S})  "
-              f"elapsed={elapsed/60:.0f}m  eta={eta/60:.0f}m")
+        print(
+            f"RUN {run_num} / {RUNS}  ({datetime.now():%H:%M:%S})  "
+            f"elapsed={elapsed / 60:.0f}m  eta={eta / 60:.0f}m"
+        )
         print(f"{'─' * 50}")
 
         for model in MODELS:
+
             def provider_factory(model_name: str) -> OllamaProvider:
                 return OllamaProvider(host=HOST, default_model=model_name)
 
@@ -88,10 +94,24 @@ async def main() -> None:
                 all_results[model].append(quality)
                 all_latencies[model].append(latency)
 
-                writer.writerow([run_num, model, f"{quality:.1f}", f"{latency:.0f}", tokens, f"{cost:.6f}", len(FIXTURES)])
+                writer.writerow(
+                    [
+                        run_num,
+                        model,
+                        f"{quality:.1f}",
+                        f"{latency:.0f}",
+                        tokens,
+                        f"{cost:.6f}",
+                        len(FIXTURES),
+                    ]
+                )
                 csvfile.flush()
 
-                print(f"  [{run_num}/{RUNS}] {model:20s} -> quality={quality:.0f}%  latency={latency:.0f}ms  tokens={tokens}")
+                print(
+                    f"  [{run_num}/{RUNS}] {model:20s} -> "
+                    f"quality={quality:.0f}%  latency={latency:.0f}ms  "
+                    f"tokens={tokens}"
+                )
 
             except Exception as exc:
                 print(f"  [{run_num}/{RUNS}] {model:20s} -> ERROR: {exc}")
@@ -104,7 +124,7 @@ async def main() -> None:
 
     print()
     print(f"{'=' * 50}")
-    print(f"VARIANCE SUMMARY  ({total_elapsed/60:.0f} minutes, {RUNS} runs)")
+    print(f"VARIANCE SUMMARY  ({total_elapsed / 60:.0f} minutes, {RUNS} runs)")
     print(f"{'=' * 50}")
 
     summary_lines: list[str] = []
@@ -128,7 +148,9 @@ async def main() -> None:
     print(f"Raw CSV: {csv_path}")
 
     summary_path = outdir / "summary.txt"
-    summary_path.write_text("\n".join(summary_lines) + f"\n\nCompleted: {datetime.now():%Y-%m-%d %H:%M:%S}\n")
+    summary_path.write_text(
+        "\n".join(summary_lines) + f"\n\nCompleted: {datetime.now():%Y-%m-%d %H:%M:%S}\n"
+    )
     print(f"Summary:  {summary_path}")
     print(f"Done at {datetime.now():%H:%M:%S}")
 

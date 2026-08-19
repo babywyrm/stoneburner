@@ -44,7 +44,8 @@ def test_pack_respects_token_budget(tmp_path):
 
 def test_priority_files_come_first(tmp_path):
     repo = _mkrepo(tmp_path)
-    cfg = TierConfig(budget_tokens=4000, priority=("routes/login.ts",),
-                     exclude=("node_modules/**",))
+    cfg = TierConfig(
+        budget_tokens=4000, priority=("routes/login.ts",), exclude=("node_modules/**",)
+    )
     pack = build_pack(repo, cfg)
     assert pack.text.index("login.ts") < pack.text.index("search.ts")

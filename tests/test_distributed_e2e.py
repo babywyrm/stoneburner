@@ -213,7 +213,30 @@ async def test_end_to_end_full_run(client):
         "avg_latency_ms": 100.0,
     }
     fake_rows = [
-        ("t1", "run-full", "general_qa", "q1", "fake", "fake-model", "success", None, "p", "r", 10, 20, 30, 0, 0, 0, 100, 0.0, None, None, None, None),
+        (
+            "t1",
+            "run-full",
+            "general_qa",
+            "q1",
+            "fake",
+            "fake-model",
+            "success",
+            None,
+            "p",
+            "r",
+            10,
+            20,
+            30,
+            0,
+            0,
+            0,
+            100,
+            0.0,
+            None,
+            None,
+            None,
+            None,
+        ),
     ] * 3
 
     with (

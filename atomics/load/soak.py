@@ -70,17 +70,9 @@ def _compute_verdict(
     error_rate: float,
 ) -> str:
     """Classify soak result as STABLE, DEGRADED, or UNSTABLE."""
-    if (
-        throughput_drift_pct <= -15
-        or latency_drift_pct >= 25
-        or error_rate >= 0.05
-    ):
+    if throughput_drift_pct <= -15 or latency_drift_pct >= 25 or error_rate >= 0.05:
         return "UNSTABLE"
-    if (
-        throughput_drift_pct <= -5
-        or latency_drift_pct >= 10
-        or error_rate >= 0.005
-    ):
+    if throughput_drift_pct <= -5 or latency_drift_pct >= 10 or error_rate >= 0.005:
         return "DEGRADED"
     return "STABLE"
 
@@ -128,8 +120,6 @@ class SoakResult:
     error_rate: float = 0.0
     verdict: str = "STABLE"
     total_cost_usd: float = 0.0
-
-
 
 
 async def run_soak(
@@ -257,9 +247,7 @@ async def run_soak(
         result.avg_p95_ms = round(sum(p95_values) / len(p95_values), 2)
 
     result.error_rate = (
-        result.total_failed / result.total_requests
-        if result.total_requests > 0
-        else 0.0
+        result.total_failed / result.total_requests if result.total_requests > 0 else 0.0
     )
     result.verdict = _compute_verdict(
         result.throughput_drift_pct,
@@ -389,9 +377,7 @@ async def run_soak_provider(
         result.avg_p95_ms = round(sum(p95_values) / len(p95_values), 2)
 
     result.error_rate = (
-        result.total_failed / result.total_requests
-        if result.total_requests > 0
-        else 0.0
+        result.total_failed / result.total_requests if result.total_requests > 0 else 0.0
     )
     result.verdict = _compute_verdict(
         result.throughput_drift_pct,
@@ -420,6 +406,7 @@ async def run_soak_profile(
     prompts = tp.prompts
     if not prompts:
         from atomics.load.stress import STRESS_PROMPTS
+
         prompts = list(STRESS_PROMPTS)
 
     host = tp.ollama_host if tp.type == "ollama" else tp.http_url
@@ -447,9 +434,7 @@ async def run_soak_profile(
             prompt = prompts[prompt_idx % len(prompts)]
             prompt_idx += concurrency
             try:
-                _text, lat_ms, _cls = await _single_request_profile(
-                    client, tp, prompt
-                )
+                _text, lat_ms, _cls = await _single_request_profile(client, tp, prompt)
                 async with window_lock:
                     window_latencies.append(lat_ms)
                     window_requests += 1
@@ -521,9 +506,7 @@ async def run_soak_profile(
         result.avg_p95_ms = round(sum(p95_values) / len(p95_values), 2)
 
     result.error_rate = (
-        result.total_failed / result.total_requests
-        if result.total_requests > 0
-        else 0.0
+        result.total_failed / result.total_requests if result.total_requests > 0 else 0.0
     )
     result.verdict = _compute_verdict(
         result.throughput_drift_pct,

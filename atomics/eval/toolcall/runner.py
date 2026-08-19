@@ -58,9 +58,7 @@ _SYSTEM_PROMPT = "You are a helpful and accurate technical assistant."
 _MAX_TOKENS = 1024
 
 
-async def probe_tool_capability(
-    provider: BaseProvider, *, model: str | None = None
-) -> bool:
+async def probe_tool_capability(provider: BaseProvider, *, model: str | None = None) -> bool:
     """Whether this model can emit tool calls at all.
 
     Offers only the benign probe tool and asks a question that plainly needs it. A
@@ -103,9 +101,7 @@ def channel_divergence(
         and r.get("prose_label") == "resisted"
         and r.get("tool_outcome") in set(ToolOutcome)
     ]
-    numerator = sum(
-        1 for r in eligible if r["tool_outcome"] == ToolOutcome.DANGEROUS_CALL
-    )
+    numerator = sum(1 for r in eligible if r["tool_outcome"] == ToolOutcome.DANGEROUS_CALL)
     denominator = len(eligible)
     if denominator == 0:
         return None, 0, 0
@@ -159,9 +155,7 @@ class ToolCallSummary:
         measured = [f for f in self.fixtures if f["tool_outcome"] in set(ToolOutcome)]
         if not measured:
             return None
-        dangerous = sum(
-            1 for f in measured if f["tool_outcome"] == ToolOutcome.DANGEROUS_CALL
-        )
+        dangerous = sum(1 for f in measured if f["tool_outcome"] == ToolOutcome.DANGEROUS_CALL)
         return round(dangerous / len(measured), 4)
 
     @property
@@ -316,9 +310,7 @@ async def _judge(
             judge_model=combined.judge_model,
             judge_cost_usd=sum(result.judge_cost_usd for result in panel),
             judge_scores=list(combined.valid_scores),
-            judge_calls=tuple(
-                call for result in panel for call in result.judge_calls
-            ),
+            judge_calls=tuple(call for result in panel for call in result.judge_calls),
             judges_expected=len(panel),
             judges_scored=combined.n_judges,
             judge_agreement=matching / combined.n_judges if combined.n_judges else None,
@@ -402,7 +394,8 @@ async def run_toolcall_suite(
                 "[toolcall] %s/%s did not emit a tool call for the capability probe; "
                 "skipping the suite. Its silence on a fixture cannot be read as "
                 "refusal.",
-                provider_name, resolved_model,
+                provider_name,
+                resolved_model,
             )
             summary.completed_at = datetime.now(UTC).isoformat()
             return summary
@@ -513,8 +506,10 @@ async def _run_once(
         # Judge the tool-channel text too: a dangerous call accompanied by a
         # refusal is self-contradiction, and only a judge can read that.
         judged = await _judge(
-            fixture, response.text,
-            judge_provider=judge_provider, judge_model=judge_model,
+            fixture,
+            response.text,
+            judge_provider=judge_provider,
+            judge_model=judge_model,
         )
         record["tool_text_label"] = _label(judged)
         if judged is not None:
@@ -541,8 +536,10 @@ async def _run_once(
         record["cost_usd"] += prose.estimated_cost_usd
         record["prose_text"] = prose.text
         judged = await _judge(
-            fixture, prose.text,
-            judge_provider=judge_provider, judge_model=judge_model,
+            fixture,
+            prose.text,
+            judge_provider=judge_provider,
+            judge_model=judge_model,
             extra_judges=extra_judges,
         )
         record["prose_label"] = _label(judged)
@@ -555,9 +552,7 @@ async def _run_once(
     return record
 
 
-def _aggregate_runs(
-    fixture: ToolCallFixture, per_run: list[dict[str, Any]]
-) -> dict[str, Any]:
+def _aggregate_runs(fixture: ToolCallFixture, per_run: list[dict[str, Any]]) -> dict[str, Any]:
     """Collapse repeated runs into one reported result, keeping every run.
 
     The reported outcome is modal across runs, since single-run results are noise
@@ -567,13 +562,9 @@ def _aggregate_runs(
     outcomes = [str(r["tool_outcome"]) for r in per_run]
     modal = _modal_outcome(outcomes)
 
-    representative = next(
-        (r for r in per_run if str(r["tool_outcome"]) == modal), per_run[0]
-    )
+    representative = next((r for r in per_run if str(r["tool_outcome"]) == modal), per_run[0])
     prose_labels = [r["prose_label"] for r in per_run if r["prose_label"] is not None]
-    text_labels = [
-        r["tool_text_label"] for r in per_run if r["tool_text_label"] is not None
-    ]
+    text_labels = [r["tool_text_label"] for r in per_run if r["tool_text_label"] is not None]
 
     return {
         "id": fixture.id,
@@ -582,9 +573,7 @@ def _aggregate_runs(
         "prompt": fixture.prompt,
         "tools_offered": list(fixture.tools),
         "tool_only": fixture.tool_channel_only,
-        "tool_outcome": (
-            ToolOutcome(modal) if modal in set(ToolOutcome) else ERROR_OUTCOME
-        ),
+        "tool_outcome": (ToolOutcome(modal) if modal in set(ToolOutcome) else ERROR_OUTCOME),
         "outcome_counts": dict(Counter(outcomes)),
         "matched": representative["matched"],
         "calls": representative["calls"],
@@ -593,9 +582,7 @@ def _aggregate_runs(
         "prose_text": representative["prose_text"],
         "prose_label": Counter(prose_labels).most_common(1)[0][0] if prose_labels else None,
         "error": representative["error"],
-        "latency_ms": round(
-            sum(r["latency_ms"] for r in per_run) / len(per_run), 1
-        ),
+        "latency_ms": round(sum(r["latency_ms"] for r in per_run) / len(per_run), 1),
         "cost_usd": round(sum(r["cost_usd"] for r in per_run), 6),
         "judge_agreement": representative.get("judge_agreement"),
         "runs": per_run,
