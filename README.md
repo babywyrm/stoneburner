@@ -272,7 +272,7 @@ stoneburner/
 │   ├── probe/            # Live ecosystem probe suite
 │   ├── archreview/       # Security-architecture repo benchmark
 │   ├── providers/        # LLM adapters (Claude, Bedrock, OpenAI, Ollama, vLLM, brain-gateway)
-│   ├── storage/          # SQLite metrics persistence (schema v20)
+│   ├── storage/          # SQLite metrics persistence (schema v21)
 │   ├── scheduler/        # Cron/systemd/launchd generation and installation
 │   └── cli.py            # Thin Click root — registers commands from commands/
 ├── profiles/             # Custom target profiles (local/ gitignored)

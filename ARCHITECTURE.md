@@ -143,8 +143,10 @@ parent even when a later fixture fails. `result_json` preserves raw
 model-under-test and judge evidence; typed columns support filtering and honest
 rollups without reparsing that evidence.
 
-Stoneburner is pre-1.0: opening an older schema creates a timestamped, WAL-safe
-`.bak` beside the database before resetting tables to the current schema.
+Schema v21 still writes a timestamped, WAL-safe `.bak` on a version bump, then
+migrates in place: missing columns are added, and a type or constraint change
+rebuilds only that table while copying rows. Opening an older database no
+longer drops run history.
 
 ### `eval/judge.py` — LLM-as-judge
 

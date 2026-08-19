@@ -46,8 +46,9 @@ the package and fails the build on an import that points the wrong way.
 runner, a CLI command, `--json-out`, `--save/--no-save`, and tests. A suite
 missing one of those is incomplete rather than minimal.
 
-**Persistence is additive.** New columns are nullable and reconciled in place.
-Anything that would rewrite or drop existing data needs to be raised first.
+**Persistence is additive.** Missing columns are added in place. A type change,
+dropped column, or new constraint rebuilds that one table and copies rows. A
+version bump snapshots a `.bak` and no longer drops the database.
 
 **No breaking changes to existing CLI commands.** Add flags, keep defaults.
 

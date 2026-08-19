@@ -75,7 +75,7 @@ every item here is a refactor with the test suite as the contract.
 - [ ] Group the 30 flat top-level modules into `load/`, `benchmark/`, and
       `reporting/` packages
 - [ ] Enforce the configured line length instead of `--ignore E501`, which
-      currently suppresses ~386 violations and makes the setting inert
+      currently suppresses ~396 violations and makes the setting inert
 - [x] Decide the fate of `inference.py` and `workers/bridge.py`.
       `doctor` and `make_provider` consume the control file (host/model
       overlay only; provider name stays with the caller). `bridge.py` was
@@ -192,9 +192,10 @@ had the id.
 
 Not scheduled, roughly in order of how often they come up.
 
-- **Non-destructive migrations.** Only nullable column adds are safe today; a
-  type or constraint change resets the table. Fine pre-1.0, a blocker for
-  anyone treating the database as durable.
+- [x] **Non-destructive migrations.** Schema v21. A version bump snapshots a
+      `.bak` and reconciles in place: `ALTER` for addable columns, a per-table
+      rebuild (copy shared columns) for type changes, dropped columns, and
+      constraints SQLite cannot ADD. The old wipe-on-bump path is gone.
 - **Dashboard depth.** Drill-in, trends, and live API jobs shipped. The
   page script now runs in a Node fake-DOM harness (`tests/test_dashboard_script.py`)
   so `.innerHTML` and `data.result` leaks fail in CI.
@@ -218,7 +219,7 @@ Not scheduled, roughly in order of how often they come up.
 ## Design Principles
 
 - **No breaking changes** to existing CLI commands or persistence
-- **Additive schema migrations** with fresh-start policy pre-1.0
+- **Additive schema migrations** — in-place reconcile, `.bak` on version bump
 - **Every eval suite** gets: fixtures, judge rubric, runner, CLI command,
   `--json-out`, `--save/--no-save`, tests
 - **Security by default** — sanitize errors, validate URLs, no self-judging,
