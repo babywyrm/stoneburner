@@ -135,9 +135,7 @@ class AnalyticsMixin(RepositoryBase):
             clauses.append("started_at >= datetime('now', ?)")
             params.append(f"-{since_hours} hours")
         if tier is not None:
-            clauses.append(
-                "run_id IN (SELECT run_id FROM runs WHERE tier = ?)"
-            )
+            clauses.append("run_id IN (SELECT run_id FROM runs WHERE tier = ?)")
             params.append(tier)
         if category is not None:
             clauses.append("category = ?")
@@ -186,6 +184,7 @@ class AnalyticsMixin(RepositoryBase):
         detail_rows = self._conn.execute(detail_sql, params).fetchall()
 
         from collections import defaultdict
+
         latencies: dict[str, list[float]] = defaultdict(list)
         costs_tokens: dict[str, tuple[float, int]] = defaultdict(lambda: (0.0, 0))
         for dr in detail_rows:
@@ -202,9 +201,7 @@ class AnalyticsMixin(RepositoryBase):
             d["p50_latency_ms"] = _percentile(lats, 50)
             d["p95_latency_ms"] = _percentile(lats, 95)
             total_cost, total_toks = costs_tokens.get(key, (0.0, 0))
-            d["cost_per_1k_tokens"] = (
-                (total_cost / total_toks * 1000) if total_toks > 0 else 0.0
-            )
+            d["cost_per_1k_tokens"] = (total_cost / total_toks * 1000) if total_toks > 0 else 0.0
             # value_score = accuracy / cost_per_1k (ε prevents div-by-zero for free local runs)
             acc = d.get("avg_accuracy_score")
             if acc is not None:
@@ -214,4 +211,3 @@ class AnalyticsMixin(RepositoryBase):
                 d["value_score"] = None
             results.append(d)
         return results
-

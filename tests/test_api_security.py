@@ -101,9 +101,7 @@ class TestAssignmentOwnership:
     def test_another_worker_cannot_submit_your_result(self, coordinator):
         owner = coordinator.register_worker(WorkerRegisterRequest())
         attacker = coordinator.register_worker(WorkerRegisterRequest())
-        coordinator.create_split_job(
-            DistributedRunRequest(mode=JobMode.SPLIT), [{"i": 1}]
-        )
+        coordinator.create_split_job(DistributedRunRequest(mode=JobMode.SPLIT), [{"i": 1}])
         assignment = coordinator.claim_assignment(owner.worker_id)
         assert assignment is not None
 
@@ -120,9 +118,7 @@ class TestAssignmentOwnership:
 
     def test_a_completed_assignment_cannot_be_overwritten(self, coordinator):
         owner = coordinator.register_worker(WorkerRegisterRequest())
-        coordinator.create_split_job(
-            DistributedRunRequest(mode=JobMode.SPLIT), [{"i": 1}]
-        )
+        coordinator.create_split_job(DistributedRunRequest(mode=JobMode.SPLIT), [{"i": 1}])
         assignment = coordinator.claim_assignment(owner.worker_id)
         assert assignment is not None
         coordinator.submit_assignment(
@@ -140,9 +136,7 @@ class TestAssignmentOwnership:
 
     def test_an_unknown_assignment_still_reports_not_found(self, coordinator):
         worker = coordinator.register_worker(WorkerRegisterRequest())
-        result = coordinator.submit_assignment(
-            "does-not-exist", "{}", worker_id=worker.worker_id
-        )
+        result = coordinator.submit_assignment("does-not-exist", "{}", worker_id=worker.worker_id)
         assert result is None
 
     def test_the_route_rejects_a_mismatched_worker_with_409(self, tmp_path):
@@ -154,14 +148,11 @@ class TestAssignmentOwnership:
                 "/api/v1/distributed/runs",
                 json={"mode": "split", "run_request": {"iterations": 1}},
             )
-            claimed = client.get(
-                f"/api/v1/workers/{owner['worker_id']}/jobs/next"
-            ).json()
+            claimed = client.get(f"/api/v1/workers/{owner['worker_id']}/jobs/next").json()
             assert claimed is not None
 
             forged = client.post(
-                f"/api/v1/workers/{attacker['worker_id']}"
-                f"/jobs/{claimed['assignment_id']}/result",
+                f"/api/v1/workers/{attacker['worker_id']}/jobs/{claimed['assignment_id']}/result",
                 json={"status": "completed", "result_json": '{"forged": true}'},
             )
             assert forged.status_code == 409
@@ -174,13 +165,10 @@ class TestAssignmentOwnership:
                 "/api/v1/distributed/runs",
                 json={"mode": "split", "run_request": {"iterations": 1}},
             )
-            claimed = client.get(
-                f"/api/v1/workers/{owner['worker_id']}/jobs/next"
-            ).json()
+            claimed = client.get(f"/api/v1/workers/{owner['worker_id']}/jobs/next").json()
 
             accepted = client.post(
-                f"/api/v1/workers/{owner['worker_id']}"
-                f"/jobs/{claimed['assignment_id']}/result",
+                f"/api/v1/workers/{owner['worker_id']}/jobs/{claimed['assignment_id']}/result",
                 json={"status": "completed", "result_json": '{"ok": true}'},
             )
             assert accepted.status_code == 200
@@ -209,9 +197,7 @@ class TestDashboardEscaping:
     def test_a_scripted_worker_label_is_stored_verbatim_not_rendered(self, tmp_path):
         """The payload round-trips as data; escaping happens at render time."""
         app = create_app(
-            ServerSettings(
-                no_auth=True, with_dashboard=True, db_path=tmp_path / "xss.db"
-            )
+            ServerSettings(no_auth=True, with_dashboard=True, db_path=tmp_path / "xss.db")
         )
         payload = "<script>alert(1)</script>"
         with TestClient(app) as client:

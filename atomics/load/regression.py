@@ -41,9 +41,9 @@ class RegressionReport:
     status: str  # "IMPROVED" | "STABLE" | "REGRESSED"
 
 
-_REGRESSION_THRESHOLD_TPS: float = -10.0   # >10% throughput drop = regression
-_REGRESSION_THRESHOLD_P95: float = 20.0    # >20% latency increase = regression
-_IMPROVEMENT_THRESHOLD_TPS: float = 10.0   # >10% throughput gain = improvement
+_REGRESSION_THRESHOLD_TPS: float = -10.0  # >10% throughput drop = regression
+_REGRESSION_THRESHOLD_P95: float = 20.0  # >20% latency increase = regression
+_IMPROVEMENT_THRESHOLD_TPS: float = 10.0  # >10% throughput gain = improvement
 
 
 def _pct_delta(current: float, baseline: float) -> float:
@@ -70,13 +70,10 @@ def compute_regression(
     regressed = (
         tps_delta <= _REGRESSION_THRESHOLD_TPS
         or p95_delta >= _REGRESSION_THRESHOLD_P95
-        or current_verdict == "UNSTABLE" and baseline.verdict != "UNSTABLE"
+        or current_verdict == "UNSTABLE"
+        and baseline.verdict != "UNSTABLE"
     )
-    improved = (
-        tps_delta >= _IMPROVEMENT_THRESHOLD_TPS
-        and p95_delta <= 0
-        and not regressed
-    )
+    improved = tps_delta >= _IMPROVEMENT_THRESHOLD_TPS and p95_delta <= 0 and not regressed
 
     if regressed:
         status = "REGRESSED"
@@ -133,19 +130,42 @@ def save_baseline(
             notes       = excluded.notes,
             timestamp   = excluded.timestamp
         """,
-        (bid, name, suite, model, host, avg_tps, peak_tps,
-         avg_p95_ms, error_rate, verdict, concurrency, notes, now),
+        (
+            bid,
+            name,
+            suite,
+            model,
+            host,
+            avg_tps,
+            peak_tps,
+            avg_p95_ms,
+            error_rate,
+            verdict,
+            concurrency,
+            notes,
+            now,
+        ),
     )
     conn.commit()
     return BaselineRecord(
-        name=name, suite=suite, model=model, host=host,
-        avg_tps=avg_tps, peak_tps=peak_tps, avg_p95_ms=avg_p95_ms,
-        error_rate=error_rate, verdict=verdict, concurrency=concurrency,
-        notes=notes, timestamp=now,
+        name=name,
+        suite=suite,
+        model=model,
+        host=host,
+        avg_tps=avg_tps,
+        peak_tps=peak_tps,
+        avg_p95_ms=avg_p95_ms,
+        error_rate=error_rate,
+        verdict=verdict,
+        concurrency=concurrency,
+        notes=notes,
+        timestamp=now,
     )
 
 
-def load_baseline(conn: sqlite3.Connection, name: str, suite: str = "soak") -> BaselineRecord | None:
+def load_baseline(
+    conn: sqlite3.Connection, name: str, suite: str = "soak"
+) -> BaselineRecord | None:
     """Load a named baseline from the DB. Returns None if not found."""
     row = conn.execute(
         "SELECT * FROM baselines WHERE name = ? AND suite = ?",
@@ -171,15 +191,21 @@ def load_baseline(conn: sqlite3.Connection, name: str, suite: str = "soak") -> B
 
 def list_baselines(conn: sqlite3.Connection) -> list[BaselineRecord]:
     """Return all stored baselines ordered by suite, name."""
-    rows = conn.execute(
-        "SELECT * FROM baselines ORDER BY suite, name"
-    ).fetchall()
+    rows = conn.execute("SELECT * FROM baselines ORDER BY suite, name").fetchall()
     return [
         BaselineRecord(
-            name=r["name"], suite=r["suite"], model=r["model"], host=r["host"],
-            avg_tps=r["avg_tps"], peak_tps=r["peak_tps"], avg_p95_ms=r["avg_p95_ms"],
-            error_rate=r["error_rate"], verdict=r["verdict"], concurrency=r["concurrency"],
-            notes=r["notes"] or "", timestamp=r["timestamp"],
+            name=r["name"],
+            suite=r["suite"],
+            model=r["model"],
+            host=r["host"],
+            avg_tps=r["avg_tps"],
+            peak_tps=r["peak_tps"],
+            avg_p95_ms=r["avg_p95_ms"],
+            error_rate=r["error_rate"],
+            verdict=r["verdict"],
+            concurrency=r["concurrency"],
+            notes=r["notes"] or "",
+            timestamp=r["timestamp"],
         )
         for r in rows
     ]

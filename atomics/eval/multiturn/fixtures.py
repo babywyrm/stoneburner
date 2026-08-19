@@ -199,7 +199,11 @@ MULTITURN_FIXTURES: list[ConversationFixture] = [
             ConversationTurn(
                 user_message="How do we handle the shared database during the transition?",
                 expected_behavior="Discuss database decomposition strategies referencing the specific services mentioned.",
-                gold_criteria=["shared DB pattern", "eventual migration", "reference earlier services"],
+                gold_criteria=[
+                    "shared DB pattern",
+                    "eventual migration",
+                    "reference earlier services",
+                ],
             ),
             ConversationTurn(
                 user_message="What's our rollback plan if the first extracted service fails in production?",
@@ -715,7 +719,14 @@ MULTITURN_FIXTURES: list[ConversationFixture] = [
             ConversationTurn(
                 user_message="Final check: list every constraint you are respecting in this plan.",
                 expected_behavior="List all constraints: budget, duration, vegetarian, seafood allergy, warm beach, kids.",
-                gold_criteria=["budget", "duration", "vegetarian", "seafood allergy", "beach", "kids"],
+                gold_criteria=[
+                    "budget",
+                    "duration",
+                    "vegetarian",
+                    "seafood allergy",
+                    "beach",
+                    "kids",
+                ],
             ),
         ],
         conversation_criteria=[
@@ -814,12 +825,24 @@ MULTITURN_FIXTURES: list[ConversationFixture] = [
             ConversationTurn(
                 user_message="Write the final incident summary for the post-mortem.",
                 expected_behavior="Summary includes host, service, C2 IP, user, volume, and containment actions.",
-                gold_criteria=["10.0.5.12", "billing", "203.0.113.77", "alice@company.com", "1.2 GB"],
+                gold_criteria=[
+                    "10.0.5.12",
+                    "billing",
+                    "203.0.113.77",
+                    "alice@company.com",
+                    "1.2 GB",
+                ],
             ),
             ConversationTurn(
                 user_message="List all indicators of compromise from this incident.",
                 expected_behavior="List IP, host, account, time, volume, and C2 signature.",
-                gold_criteria=["203.0.113.77", "10.0.5.12", "alice@company.com", "03:00 UTC", "1.2 GB"],
+                gold_criteria=[
+                    "203.0.113.77",
+                    "10.0.5.12",
+                    "alice@company.com",
+                    "03:00 UTC",
+                    "1.2 GB",
+                ],
             ),
         ],
         conversation_criteria=[
@@ -971,7 +994,12 @@ MULTITURN_FIXTURES: list[ConversationFixture] = [
             ConversationTurn(
                 user_message="Summarize the nginx configuration we inspected.",
                 expected_behavior="Reference the files and settings from earlier turns.",
-                gold_criteria=["nginx.conf", "sites-available/default", "worker_processes", "server_name"],
+                gold_criteria=[
+                    "nginx.conf",
+                    "sites-available/default",
+                    "worker_processes",
+                    "server_name",
+                ],
             ),
         ],
         conversation_criteria=[

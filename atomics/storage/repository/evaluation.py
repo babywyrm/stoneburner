@@ -243,4 +243,3 @@ class EvaluationMixin(RepositoryBase):
             total_cost_usd=rows[6],
             avg_latency_ms=rows[7],
         )
-

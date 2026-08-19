@@ -86,9 +86,7 @@ def make_provider(
 
     if name == "claude":
         if not settings.anthropic_api_key:
-            raise ProviderConfigError(
-                "ANTHROPIC_API_KEY not set. Export it or add to .env"
-            )
+            raise ProviderConfigError("ANTHROPIC_API_KEY not set. Export it or add to .env")
         from atomics.providers.claude import ClaudeProvider
 
         return ClaudeProvider(
@@ -105,8 +103,7 @@ def make_provider(
     if name == "openai":
         if not settings.openai_api_key:
             raise ProviderConfigError(
-                "OPENAI_API_KEY not set. Export it or install with: "
-                "uv sync --extra openai"
+                "OPENAI_API_KEY not set. Export it or install with: uv sync --extra openai"
             )
         from atomics.providers.openai import OpenAIProvider
 
@@ -159,8 +156,7 @@ def make_provider(
     if name == "together":
         if not settings.together_api_key:
             raise ProviderConfigError(
-                "TOGETHER_API_KEY not set. "
-                "Get one at https://api.together.xyz/settings/api-keys"
+                "TOGETHER_API_KEY not set. Get one at https://api.together.xyz/settings/api-keys"
             )
         from atomics.providers.together import TogetherProvider
 
@@ -179,6 +175,4 @@ def make_provider(
             api_key=settings.gemini_api_key,
             default_model=model or "gemini-2.5-flash",
         )
-    raise ProviderConfigError(
-        f"Unknown provider: {name!r}. Valid: {', '.join(PROVIDER_NAMES)}"
-    )
+    raise ProviderConfigError(f"Unknown provider: {name!r}. Valid: {', '.join(PROVIDER_NAMES)}")

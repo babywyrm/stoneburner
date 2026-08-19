@@ -35,6 +35,7 @@ _TRUE: frozenset[str] = frozenset({"1", "true", "yes", "on"})
 
 # ── env parsing + legacy normalization ────────────────────────────────────────
 
+
 def parse_env(text: str) -> dict[str, str]:
     """Parse KEY=VALUE lines; ignore comments and blanks. Values kept verbatim."""
     out: dict[str, str] = {}
@@ -82,6 +83,7 @@ def _fill(d: dict[str, str], key: str, value: str | None) -> None:
 
 
 # ── InferenceTarget ───────────────────────────────────────────────────────────
+
 
 @dataclass
 class InferenceTarget:
@@ -218,6 +220,7 @@ def overlay_provider_defaults(
 
 # ── resolver (agnostic intent -> resolved) ────────────────────────────────────
 
+
 def resolve_model(machine: dict, difficulty: str) -> str:
     dm = machine.get("difficulty_models") or {}
     if difficulty not in dm:
@@ -283,8 +286,7 @@ def render_env(intent: dict, resolved: dict, resolved_by: str) -> str:
     return "\n".join(lines)
 
 
-def resolve(machine: dict, profile: dict, difficulty: str, pool: str,
-            resolved_by: str) -> dict:
+def resolve(machine: dict, profile: dict, difficulty: str, pool: str, resolved_by: str) -> dict:
     model = resolve_model(machine, difficulty)
     ep = resolve_endpoint(profile)
     think = str(machine.get("think_default", "false")).lower()
@@ -300,6 +302,7 @@ def resolve(machine: dict, profile: dict, difficulty: str, pool: str,
 
 
 # ── provider auto-load integration point ──────────────────────────────────────
+
 
 def provider_from_target(target: InferenceTarget, *, client: Any | None = None):
     """Build the matching ``atomics`` provider for a resolved target.
@@ -319,13 +322,16 @@ def provider_from_target(target: InferenceTarget, *, client: Any | None = None):
         from atomics.providers.vllm import VllmProvider
 
         url = target.url or "http://localhost:8000/v1"
-        return VllmProvider(base_url=url, default_model=target.model,
-                            api_key=target.api_key or "dummy", client=client)
+        return VllmProvider(
+            base_url=url,
+            default_model=target.model,
+            api_key=target.api_key or "dummy",
+            client=client,
+        )
     if backend == "openai":
         from atomics.providers.openai import OpenAIProvider
 
-        return OpenAIProvider(api_key=target.api_key, default_model=target.model,
-                              client=client)
+        return OpenAIProvider(api_key=target.api_key, default_model=target.model, client=client)
     raise ValueError(
         f"unknown/unsupported backend '{backend}' "
         f"(expected one of: {', '.join(sorted(CANONICAL_BACKENDS))})"

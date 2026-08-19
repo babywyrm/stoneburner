@@ -14,10 +14,7 @@ from atomics.eval.outcomes import (
 from atomics.providers.base import BaseProvider, ProviderResponse
 from atomics.validation import sanitize_error
 
-_SYSTEM = (
-    "You are grading a security code review against ground truth. "
-    "Be strict and objective."
-)
+_SYSTEM = "You are grading a security code review against ground truth. Be strict and objective."
 _VULNERABLE_TEMPLATE = """\
 GROUND TRUTH: the reviewed code contains this vulnerability:
   {cwe} (severity {severity})
@@ -65,9 +62,7 @@ class ReviewVerdictResult:
 def verdict_to_judge_outcome(result: ReviewVerdictResult) -> JudgeOutcome:
     """Convert a code-review verdict into the shared judge contract."""
     score = (
-        _score_for_verdict(result.verdict)
-        if result.status is JudgeOutcomeStatus.SCORED
-        else None
+        _score_for_verdict(result.verdict) if result.status is JudgeOutcomeStatus.SCORED else None
     )
     return JudgeOutcome(
         status=result.status,
@@ -117,9 +112,7 @@ async def judge_review(
         raw = _effective_text(response)
         verdict, rationale = _parse_verdict(raw, pattern)
         status = (
-            JudgeOutcomeStatus.SCORED
-            if verdict != "unknown"
-            else JudgeOutcomeStatus.PARSE_FAILED
+            JudgeOutcomeStatus.SCORED if verdict != "unknown" else JudgeOutcomeStatus.PARSE_FAILED
         )
         score = _score_for_verdict(verdict) if verdict != "unknown" else None
         calls.append(

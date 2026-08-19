@@ -38,7 +38,9 @@ async def test_judge_direct_response_parses():
     """Normal path: thinking=False produces a parseable score on first try."""
     provider = AsyncMock()
     provider.generate = AsyncMock(
-        return_value=_make_provider_response(text="accuracy: 4\ncompleteness: 3\nformat: 3\nrationale: Good response.")
+        return_value=_make_provider_response(
+            text="accuracy: 4\ncompleteness: 3\nformat: 3\nrationale: Good response."
+        )
     )
 
     result = await score_response(
@@ -62,7 +64,9 @@ async def test_judge_empty_response_retries_with_thinking():
     provider.generate = AsyncMock(
         side_effect=[
             _make_provider_response(text=""),
-            _make_provider_response(text="accuracy: 3\ncompleteness: 2\nformat: 2\nrationale: Partial answer."),
+            _make_provider_response(
+                text="accuracy: 3\ncompleteness: 2\nformat: 2\nrationale: Partial answer."
+            ),
         ]
     )
 
@@ -87,7 +91,13 @@ async def test_judge_falls_back_to_thinking_text():
     provider.generate = AsyncMock(
         side_effect=[
             _make_provider_response(text=""),
-            _make_provider_response(text="", thinking_text="accuracy: 2\ncompleteness: 1\nformat: 1\nrationale: Weak answer with errors."),
+            _make_provider_response(
+                text="",
+                thinking_text=(
+                    "accuracy: 2\ncompleteness: 1\nformat: 1\n"
+                    "rationale: Weak answer with errors."
+                ),
+            ),
         ]
     )
 
@@ -110,7 +120,9 @@ async def test_judge_all_fallbacks_fail_gracefully():
     provider.generate = AsyncMock(
         side_effect=[
             _make_provider_response(text=""),
-            _make_provider_response(text="I cannot score this.", thinking_text="hmm let me think..."),
+            _make_provider_response(
+                text="I cannot score this.", thinking_text="hmm let me think..."
+            ),
         ]
     )
 

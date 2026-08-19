@@ -96,6 +96,12 @@ select = ["E", "F", "I", "N", "W", "UP"]
 # scaffolding locals that assert-by-construction (F841), and fixture-shaped
 # local names (N806).
 "tests/*" = ["E402", "F841", "E741", "N806", "N814"]
+# Fixture payloads are scored as written. Wrapping them to 100 chars would
+# change the prompt the model sees, or make the gold text unreadable.
+"atomics/eval/**/fixtures.py" = ["E501"]
+"atomics/eval/adversarial/multiturn.py" = ["E501"]
+"atomics/eval/adversarial/agentic_reasoning.py" = ["E501"]
+"atomics/eval/fixtures.py" = ["E501"]
 
 [tool.mypy]
 python_version = "3.11"

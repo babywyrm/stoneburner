@@ -18,17 +18,44 @@ _CHARS_PER_TOKEN = 4
 
 # Files never worth packing regardless of repo (binary / lockfile noise).
 _DEFAULT_EXCLUDE = (
-    "**/.git/**", "**/node_modules/**", "**/dist/**", "**/build/**",
-    "**/*.min.js", "**/*.map", "**/*.lock", "**/*.png", "**/*.jpg",
-    "**/*.gif", "**/*.ico", "**/*.svg", "**/*.woff*", "**/*.ttf",
+    "**/.git/**",
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/build/**",
+    "**/*.min.js",
+    "**/*.map",
+    "**/*.lock",
+    "**/*.png",
+    "**/*.jpg",
+    "**/*.gif",
+    "**/*.ico",
+    "**/*.svg",
+    "**/*.woff*",
+    "**/*.ttf",
 )
 
 # Security-relevant filename hints used to rank files when no explicit priority
 # is given. Earlier patterns rank higher.
 _RELEVANCE_HINTS = (
-    "auth", "login", "session", "middleware", "route", "controller",
-    "access", "permission", "crypto", "password", "token", "config",
-    "security", "user", "admin", "upload", "query", "db", "sql",
+    "auth",
+    "login",
+    "session",
+    "middleware",
+    "route",
+    "controller",
+    "access",
+    "permission",
+    "crypto",
+    "password",
+    "token",
+    "config",
+    "security",
+    "user",
+    "admin",
+    "upload",
+    "query",
+    "db",
+    "sql",
 )
 _MANIFESTS = ("package.json", "requirements.txt", "pom.xml", "go.mod", "Gemfile")
 
@@ -46,8 +73,7 @@ class EvidencePack:
 
 
 def _matches_any(rel: str, patterns: tuple[str, ...]) -> bool:
-    return any(fnmatch.fnmatch(rel, p) or fnmatch.fnmatch(rel, p.lstrip("*/"))
-               for p in patterns)
+    return any(fnmatch.fnmatch(rel, p) or fnmatch.fnmatch(rel, p.lstrip("*/")) for p in patterns)
 
 
 def _relevance_rank(rel: str, priority: tuple[str, ...]) -> tuple[int, str]:
@@ -114,5 +140,4 @@ def build_pack(repo_path: Path, cfg: TierConfig) -> EvidencePack:
 
     text = "".join(parts)
     digest = hashlib.sha256(text.encode()).hexdigest()
-    return EvidencePack(text=text, content_hash=digest,
-                        file_count=packed, truncated=truncated)
+    return EvidencePack(text=text, content_hash=digest, file_count=packed, truncated=truncated)

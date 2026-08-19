@@ -33,7 +33,9 @@ def test_list_workers_returns_empty_by_default(tmp_path):
 def test_list_jobs_after_creating_run(tmp_path):
     app = create_app(ServerSettings(no_auth=True, db_path=tmp_path / "db.db"))
     with TestClient(app) as tc:
-        tc.post("/api/v1/distributed/runs", json={"mode": "split", "run_request": {"iterations": 1}})
+        tc.post(
+            "/api/v1/distributed/runs", json={"mode": "split", "run_request": {"iterations": 1}}
+        )
         res = tc.get("/api/v1/distributed/runs")
         data = res.json()
         assert len(data["jobs"]) == 1

@@ -150,15 +150,12 @@ class SuiteRun:
                 self._finalize(self.repository, run_id)
             except Exception as exc:
                 failures.append(
-                    f"Failed to finalize {self._suite} run {run_id}: "
-                    f"{sanitize_error(exc)}"
+                    f"Failed to finalize {self._suite} run {run_id}: {sanitize_error(exc)}"
                 )
         try:
             self.repository.close()
         except Exception as exc:
-            failures.append(
-                f"Failed to close {self._suite} repository: {sanitize_error(exc)}"
-            )
+            failures.append(f"Failed to close {self._suite} repository: {sanitize_error(exc)}")
         if failures:
             return click.ClickException("; ".join(failures))
         return None
@@ -208,6 +205,4 @@ def _reraise(failure: BaseException, failure_prefix: str) -> NoReturn:
     if not isinstance(failure, Exception):
         # KeyboardInterrupt and SystemExit are the operator's intent, not a bug.
         raise failure
-    raise click.ClickException(
-        f"{failure_prefix}: {sanitize_error(failure)}"
-    ) from failure
+    raise click.ClickException(f"{failure_prefix}: {sanitize_error(failure)}") from failure

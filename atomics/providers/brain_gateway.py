@@ -84,9 +84,7 @@ class BrainGatewayProvider(BaseProvider):
 
         if "error" in data:
             err = data["error"]
-            raise RuntimeError(
-                f"brain-gateway RPC error {err.get('code')}: {err.get('message')}"
-            )
+            raise RuntimeError(f"brain-gateway RPC error {err.get('code')}: {err.get('message')}")
 
         content = data.get("result", {}).get("content", [])
         if not content:

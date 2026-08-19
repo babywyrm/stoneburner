@@ -27,9 +27,7 @@ def client_recording(requests, *, response=None, api_key="test-key"):
         requests.append(request)
         return response or httpx.Response(200, json={"ok": True})
 
-    return AtomicsApiClient(
-        "http://api.test", api_key, transport=httpx.MockTransport(handler)
-    )
+    return AtomicsApiClient("http://api.test", api_key, transport=httpx.MockTransport(handler))
 
 
 def test_submit_run_posts_expected_payload():
@@ -303,9 +301,7 @@ def test_connection_refused_names_the_missing_server():
     def handler(request: httpx.Request) -> httpx.Response:
         raise httpx.ConnectError("All connection attempts failed")
 
-    client = AtomicsApiClient(
-        "http://127.0.0.1:9999", "k", transport=httpx.MockTransport(handler)
-    )
+    client = AtomicsApiClient("http://127.0.0.1:9999", "k", transport=httpx.MockTransport(handler))
     with pytest.raises(AtomicsApiError) as excinfo:
         client.health()
 

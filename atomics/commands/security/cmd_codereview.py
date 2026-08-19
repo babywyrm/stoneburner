@@ -36,6 +36,7 @@ if TYPE_CHECKING:
     from atomics.eval.codereview.fixtures import SecureCodeFixture
     from atomics.eval.codereview.runner import CodeReviewResult, CodeReviewSummary
 
+
 @click.command("codereview")
 @click.option(
     "--provider",
@@ -128,9 +129,7 @@ def codereview(
             *(p for p, _ in extra_judge_pairs),
         )
         provider, judge = guarded[0], guarded[1]
-        extra_judge_pairs = [
-            (guarded[2 + i], mdl) for i, (_, mdl) in enumerate(extra_judge_pairs)
-        ]
+        extra_judge_pairs = [(guarded[2 + i], mdl) for i, (_, mdl) in enumerate(extra_judge_pairs)]
     except click.ClickException:
         raise
     except Exception as exc:
@@ -226,12 +225,11 @@ def codereview(
 
         if json_out is not None:
             write_summary_json(summary, json_out)
-            console.print(
-                f"\n[dim]Wrote JSON results to {escape(str(json_out))}[/dim]"
-            )
+            console.print(f"\n[dim]Wrote JSON results to {escape(str(json_out))}[/dim]")
 
         if integrity_exit_code(summary.integrity, allow_partial=allow_partial):
             raise click.exceptions.Exit(1)
+
 
 def _render_codereview_summary(
     console: Console,

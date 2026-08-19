@@ -91,7 +91,7 @@ EVAL_PROMPTS: list[str] = [
         "assessment with severity ratings.\n\n"
         "```python\n"
         "def get_user(user_id):\n"
-        "    query = f\"SELECT * FROM users WHERE id = {user_id}\"\n"
+        '    query = f"SELECT * FROM users WHERE id = {user_id}"\n'
         "    return db.execute(query).fetchone()\n"
         "```"
     ),
@@ -100,7 +100,7 @@ EVAL_PROMPTS: list[str] = [
         "assessment with severity ratings.\n\n"
         "```python\n"
         "def get_user(user_id: int):\n"
-        "    query = \"SELECT * FROM users WHERE id = ?\"\n"
+        '    query = "SELECT * FROM users WHERE id = ?"\n'
         "    return db.execute(query, (user_id,)).fetchone()\n"
         "```"
     ),
@@ -147,10 +147,10 @@ EVAL_PROMPTS: list[str] = [
         "Evaluate the following IAM policy for overly permissive access. "
         "Identify specific risks and suggest tighter scoping.\n\n"
         "{\n"
-        "  \"Effect\": \"Allow\",\n"
-        "  \"Action\": \"*\",\n"
-        "  \"Resource\": \"*\",\n"
-        "  \"Principal\": {\"AWS\": \"arn:aws:iam::123456789012:role/deploy-agent\"}\n"
+        '  "Effect": "Allow",\n'
+        '  "Action": "*",\n'
+        '  "Resource": "*",\n'
+        '  "Principal": {"AWS": "arn:aws:iam::123456789012:role/deploy-agent"}\n'
         "}"
     ),
     (

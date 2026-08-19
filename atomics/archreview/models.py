@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 
 @dataclass(frozen=True)
 class Finding:
-    category: str          # normalized Category value, or "unknown"
+    category: str  # normalized Category value, or "unknown"
     location: str
     severity: str
     rationale: str
@@ -43,8 +43,7 @@ class RepoSpec:
 
     def tier(self, name: str) -> TierConfig:
         if name not in self.tiers:
-            raise KeyError(f"repo '{self.name}' has no tier '{name}' "
-                           f"(have: {sorted(self.tiers)})")
+            raise KeyError(f"repo '{self.name}' has no tier '{name}' (have: {sorted(self.tiers)})")
         return self.tiers[name]
 
 

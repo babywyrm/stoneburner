@@ -1,23 +1,30 @@
 """Tests for MCP/agentic and tool-use safety adversarial fixtures."""
+
 from __future__ import annotations
 
 
 def test_mcp_agentic_fixtures_importable():
     from atomics.eval.adversarial.mcp_agentic import MCP_AGENTIC_FIXTURES
+
     assert len(MCP_AGENTIC_FIXTURES) >= 10
 
 
 def test_tool_safety_fixtures_importable():
     from atomics.eval.adversarial.mcp_agentic import TOOL_SAFETY_FIXTURES
+
     assert len(TOOL_SAFETY_FIXTURES) >= 5
 
 
 def test_mcp_agentic_fixtures_all_have_required_fields():
     from atomics.eval.adversarial.mcp_agentic import MCP_AGENTIC_FIXTURES
+
     valid_severities = {"LOW", "MEDIUM", "HIGH", "CRITICAL"}
     valid_categories = {
-        "tool_call_compliance", "authority_fabrication",
-        "breakglass_injection", "context_poisoning", "agent_loop_escape",
+        "tool_call_compliance",
+        "authority_fabrication",
+        "breakglass_injection",
+        "context_poisoning",
+        "agent_loop_escape",
     }
     for f in MCP_AGENTIC_FIXTURES:
         assert f.id, "fixture missing id"
@@ -32,6 +39,7 @@ def test_mcp_agentic_fixtures_all_have_required_fields():
 
 def test_tool_safety_fixtures_all_have_required_fields():
     from atomics.eval.adversarial.mcp_agentic import TOOL_SAFETY_FIXTURES
+
     valid_severities = {"LOW", "MEDIUM", "HIGH", "CRITICAL"}
     for f in TOOL_SAFETY_FIXTURES:
         assert f.id, "fixture missing id"
@@ -46,6 +54,7 @@ def test_tool_safety_fixtures_all_have_required_fields():
 
 def test_mcp_agentic_fixture_ids_unique():
     from atomics.eval.adversarial.mcp_agentic import MCP_AGENTIC_FIXTURES, TOOL_SAFETY_FIXTURES
+
     all_fixtures = MCP_AGENTIC_FIXTURES + TOOL_SAFETY_FIXTURES
     ids = [f.id for f in all_fixtures]
     assert len(ids) == len(set(ids)), "Duplicate fixture IDs"
@@ -54,6 +63,7 @@ def test_mcp_agentic_fixture_ids_unique():
 def test_no_id_collision_with_existing_fixtures():
     from atomics.eval.adversarial.fixtures import ADVERSARIAL_FIXTURES
     from atomics.eval.adversarial.mcp_agentic import MCP_AGENTIC_FIXTURES, TOOL_SAFETY_FIXTURES
+
     existing_ids = {f.id for f in ADVERSARIAL_FIXTURES}
     new_ids = {f.id for f in MCP_AGENTIC_FIXTURES + TOOL_SAFETY_FIXTURES}
     collision = existing_ids & new_ids
@@ -68,8 +78,10 @@ def test_mcp_fixtures_registered_in_runner():
     from atomics.eval.adversarial.zerotrust import ZEROTRUST_FIXTURES
 
     total = (
-        len(ADVERSARIAL_FIXTURES) + len(ZEROTRUST_FIXTURES)
-        + len(AGENTIC_REASONING_FIXTURES) + len(MCP_AGENTIC_FIXTURES)
+        len(ADVERSARIAL_FIXTURES)
+        + len(ZEROTRUST_FIXTURES)
+        + len(AGENTIC_REASONING_FIXTURES)
+        + len(MCP_AGENTIC_FIXTURES)
         + len(TOOL_SAFETY_FIXTURES)
     )
     assert total >= 30, f"Expected at least 30 total fixtures, got {total}"
@@ -78,10 +90,14 @@ def test_mcp_fixtures_registered_in_runner():
 def test_mcp_category_coverage():
     """All 5 MCP/agentic categories are represented."""
     from atomics.eval.adversarial.mcp_agentic import MCP_AGENTIC_FIXTURES
+
     categories = {f.category for f in MCP_AGENTIC_FIXTURES}
     expected = {
-        "tool_call_compliance", "authority_fabrication",
-        "breakglass_injection", "context_poisoning", "agent_loop_escape",
+        "tool_call_compliance",
+        "authority_fabrication",
+        "breakglass_injection",
+        "context_poisoning",
+        "agent_loop_escape",
     }
     missing = expected - categories
     assert not missing, f"Missing categories: {missing}"
@@ -90,6 +106,7 @@ def test_mcp_category_coverage():
 def test_tool_safety_prompts_contain_dangerous_commands():
     """Each tool-safety fixture should contain a recognizable dangerous command."""
     from atomics.eval.adversarial.mcp_agentic import TOOL_SAFETY_FIXTURES
+
     dangerous_indicators = ["chmod", "ssh", "id_rsa", "tar", "curl", "useradd", "kubectl delete"]
     for f in TOOL_SAFETY_FIXTURES:
         has_indicator = any(ind in f.prompt for ind in dangerous_indicators)

@@ -55,21 +55,29 @@ def _split_calls(
     )
 
 
-def test_eval_end_to_end_over_http(
-    inference_stub: StubInferenceServer, tmp_path: Path
-) -> None:
+def test_eval_end_to_end_over_http(inference_stub: StubInferenceServer, tmp_path: Path) -> None:
     """atomics eval: CLI -> provider -> HTTP -> judge -> scored JSON."""
     json_out = tmp_path / "eval.json"
-    _invoke(eval_command, [
-        "--provider", "vllm",
-        "--vllm-host", inference_stub.openai_base_url,
-        "--model", TEST_MODEL,
-        "--judge-provider", "vllm",
-        "--judge-model", JUDGE_MODEL,
-        "--fixtures", "ev-01,ev-02",
-        "--no-save",
-        "--json-out", str(json_out),
-    ])
+    _invoke(
+        eval_command,
+        [
+            "--provider",
+            "vllm",
+            "--vllm-host",
+            inference_stub.openai_base_url,
+            "--model",
+            TEST_MODEL,
+            "--judge-provider",
+            "vllm",
+            "--judge-model",
+            JUDGE_MODEL,
+            "--fixtures",
+            "ev-01,ev-02",
+            "--no-save",
+            "--json-out",
+            str(json_out),
+        ],
+    )
 
     payload = json.loads(json_out.read_text())
     assert payload["provider"] == "vllm"
@@ -107,16 +115,26 @@ def test_adversarial_end_to_end_over_http(
 ) -> None:
     """atomics adversarial: resistance scoring survives a real round trip."""
     json_out = tmp_path / "adversarial.json"
-    _invoke(adversarial_command, [
-        "--provider", "vllm",
-        "--vllm-host", inference_stub.openai_base_url,
-        "--model", TEST_MODEL,
-        "--judge-provider", "vllm",
-        "--judge-model", JUDGE_MODEL,
-        "--category", "role_confusion",
-        "--no-save",
-        "--json-out", str(json_out),
-    ])
+    _invoke(
+        adversarial_command,
+        [
+            "--provider",
+            "vllm",
+            "--vllm-host",
+            inference_stub.openai_base_url,
+            "--model",
+            TEST_MODEL,
+            "--judge-provider",
+            "vllm",
+            "--judge-model",
+            JUDGE_MODEL,
+            "--category",
+            "role_confusion",
+            "--no-save",
+            "--json-out",
+            str(json_out),
+        ],
+    )
 
     payload = json.loads(json_out.read_text())["model_a"]
     fixtures = payload["fixtures"]
@@ -190,10 +208,15 @@ def test_qa_profile_end_to_end_over_http(tmp_path: Path) -> None:
     with StubInferenceServer(responder=gate) as stub:
         profile = _write_gate_profile(tmp_path, stub)
         fixtures = _write_qa_fixtures(tmp_path)
-        result = _invoke(qa_command, [
-            "--file", str(fixtures),
-            "--profile", str(profile),
-        ])
+        result = _invoke(
+            qa_command,
+            [
+                "--file",
+                str(fixtures),
+                "--profile",
+                str(profile),
+            ],
+        )
 
         assert "gate-refuses-credential-request" in result.output
         assert "gate-allows-benign-request" in result.output
@@ -251,17 +274,27 @@ def test_eval_surfaces_upstream_http_failure(
     round trip broke, rather than passing on a default.
     """
     json_out = tmp_path / "eval-broken.json"
-    _invoke(eval_command, [
-        "--provider", "vllm",
-        # A path the stub does not serve, so every generation gets a 404.
-        "--vllm-host", f"{inference_stub.base_url}/nope",
-        "--model", TEST_MODEL,
-        "--judge-provider", "vllm",
-        "--judge-model", JUDGE_MODEL,
-        "--fixtures", "ev-01",
-        "--no-save",
-        "--json-out", str(json_out),
-    ])
+    _invoke(
+        eval_command,
+        [
+            "--provider",
+            "vllm",
+            # A path the stub does not serve, so every generation gets a 404.
+            "--vllm-host",
+            f"{inference_stub.base_url}/nope",
+            "--model",
+            TEST_MODEL,
+            "--judge-provider",
+            "vllm",
+            "--judge-model",
+            JUDGE_MODEL,
+            "--fixtures",
+            "ev-01",
+            "--no-save",
+            "--json-out",
+            str(json_out),
+        ],
+    )
 
     payload = json.loads(json_out.read_text())
     assert payload["overall_accuracy"] is None
@@ -311,16 +344,26 @@ def test_toolcall_end_to_end_over_http(tmp_path: Path) -> None:
 
     json_out = tmp_path / "toolcall.json"
     with StubInferenceServer(_toolcall_responder) as stub:
-        _invoke(toolcall_command, [
-            "--provider", "vllm",
-            "--vllm-host", stub.openai_base_url,
-            "--model", TEST_MODEL,
-            "--judge-provider", "vllm",
-            "--judge-model", JUDGE_MODEL,
-            "--category", "direct",
-            "--no-save",
-            "--json-out", str(json_out),
-        ])
+        _invoke(
+            toolcall_command,
+            [
+                "--provider",
+                "vllm",
+                "--vllm-host",
+                stub.openai_base_url,
+                "--model",
+                TEST_MODEL,
+                "--judge-provider",
+                "vllm",
+                "--judge-model",
+                JUDGE_MODEL,
+                "--category",
+                "direct",
+                "--no-save",
+                "--json-out",
+                str(json_out),
+            ],
+        )
 
         payload = json.loads(json_out.read_text())
         assert payload["suite"] == "toolcall"
@@ -349,9 +392,7 @@ def test_toolcall_end_to_end_over_http(tmp_path: Path) -> None:
         prompts = [c.prompt for c in generation_calls if c.prompt == tc01["prompt"]]
         assert len(prompts) == 2, "expected one prose and one tool request"
         with_tools = [c for c in generation_calls if c.prompt == tc01["prompt"] and c.tools]
-        without_tools = [
-            c for c in generation_calls if c.prompt == tc01["prompt"] and not c.tools
-        ]
+        without_tools = [c for c in generation_calls if c.prompt == tc01["prompt"] and not c.tools]
         assert len(with_tools) == 1
         assert len(without_tools) == 1, "the prose baseline must be offered no tools"
 
@@ -369,13 +410,20 @@ def test_toolcall_skips_a_model_that_cannot_emit_tool_calls(tmp_path: Path) -> N
 
     json_out = tmp_path / "incapable.json"
     with StubInferenceServer(prose_only) as stub:
-        result = CliRunner().invoke(toolcall_command, [
-            "--provider", "vllm",
-            "--vllm-host", stub.openai_base_url,
-            "--model", TEST_MODEL,
-            "--no-save",
-            "--json-out", str(json_out),
-        ])
+        result = CliRunner().invoke(
+            toolcall_command,
+            [
+                "--provider",
+                "vllm",
+                "--vllm-host",
+                stub.openai_base_url,
+                "--model",
+                TEST_MODEL,
+                "--no-save",
+                "--json-out",
+                str(json_out),
+            ],
+        )
 
     assert result.exit_code == 0, result.output
     assert "capability probe" in result.output
@@ -392,13 +440,19 @@ def test_toolcall_no_skip_incapable_exits_nonzero(tmp_path: Path) -> None:
     from atomics.commands.toolcall import toolcall as toolcall_command
 
     with StubInferenceServer(lambda r: "no tools here") as stub:
-        result = CliRunner().invoke(toolcall_command, [
-            "--provider", "vllm",
-            "--vllm-host", stub.openai_base_url,
-            "--model", TEST_MODEL,
-            "--no-save",
-            "--no-skip-incapable",
-        ])
+        result = CliRunner().invoke(
+            toolcall_command,
+            [
+                "--provider",
+                "vllm",
+                "--vllm-host",
+                stub.openai_base_url,
+                "--model",
+                TEST_MODEL,
+                "--no-save",
+                "--no-skip-incapable",
+            ],
+        )
     assert result.exit_code == 1
 
 
@@ -419,14 +473,22 @@ def test_toolcall_malformed_arguments_survive_real_io(tmp_path: Path) -> None:
 
     json_out = tmp_path / "malformed.json"
     with StubInferenceServer(malformed) as stub:
-        _invoke(toolcall_command, [
-            "--provider", "vllm",
-            "--vllm-host", stub.openai_base_url,
-            "--model", TEST_MODEL,
-            "--category", "direct",
-            "--no-save",
-            "--json-out", str(json_out),
-        ])
+        _invoke(
+            toolcall_command,
+            [
+                "--provider",
+                "vllm",
+                "--vllm-host",
+                stub.openai_base_url,
+                "--model",
+                TEST_MODEL,
+                "--category",
+                "direct",
+                "--no-save",
+                "--json-out",
+                str(json_out),
+            ],
+        )
 
     payload = json.loads(json_out.read_text())
     tc01 = next(f for f in payload["fixtures"] if f["id"] == "tc-01")
@@ -450,21 +512,29 @@ def test_toolcall_forwards_injected_tool_output_over_the_wire(tmp_path: Path) ->
 
     json_out = tmp_path / "injection.json"
     with StubInferenceServer(responder) as stub:
-        _invoke(toolcall_command, [
-            "--provider", "vllm",
-            "--vllm-host", stub.openai_base_url,
-            "--model", TEST_MODEL,
-            "--category", "injection",
-            "--no-save",
-            "--json-out", str(json_out),
-        ])
+        _invoke(
+            toolcall_command,
+            [
+                "--provider",
+                "vllm",
+                "--vllm-host",
+                stub.openai_base_url,
+                "--model",
+                TEST_MODEL,
+                "--category",
+                "injection",
+                "--no-save",
+                "--json-out",
+                str(json_out),
+            ],
+        )
 
-        injected = [
-            c for c in stub.chat_completions() if c.tool_result_content
-        ]
+        injected = [c for c in stub.chat_completions() if c.tool_result_content]
         assert injected, "no request carried a tool-result message"
-        assert any("SYSTEM:" in c.tool_result_content or "INSTRUCTION" in c.tool_result_content
-                   for c in injected)
+        assert any(
+            "SYSTEM:" in c.tool_result_content or "INSTRUCTION" in c.tool_result_content
+            for c in injected
+        )
 
     payload = json.loads(json_out.read_text())
     # Tool-only fixtures are excluded from channel divergence: no prose twin.

@@ -86,10 +86,7 @@ class JobManager:
         if max_retained < 1:
             raise ValueError(f"max_retained must be positive, got {max_retained}")
         if max_active_per_caller < 1:
-            raise ValueError(
-                "max_active_per_caller must be positive, got "
-                f"{max_active_per_caller}"
-            )
+            raise ValueError(f"max_active_per_caller must be positive, got {max_active_per_caller}")
         self.jobs: dict[str, Job] = {}
         self.max_active = max_active
         self.max_retained = max_retained
@@ -113,11 +110,7 @@ class JobManager:
 
     def active_count_for(self, owner: str) -> int:
         """Concurrent jobs currently held by one caller."""
-        return sum(
-            1
-            for job in self.jobs.values()
-            if job.owner == owner and self._is_active(job)
-        )
+        return sum(1 for job in self.jobs.values() if job.owner == owner and self._is_active(job))
 
     async def submit(
         self,
@@ -196,8 +189,7 @@ class JobManager:
         finally:
             job.completed_at = time.time()
             logger.info(
-                "job_finished job_id=%s kind=%s caller=%s request_id=%s "
-                "status=%s duration_ms=%.1f",
+                "job_finished job_id=%s kind=%s caller=%s request_id=%s status=%s duration_ms=%.1f",
                 job.job_id,
                 job.kind,
                 job.owner,

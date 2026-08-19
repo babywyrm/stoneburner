@@ -54,9 +54,7 @@ class EvalRequest(BaseModel):
     judge_model: str | None = None
     fixtures: list[str] | None = Field(default=None, max_length=MAX_FIXTURES)
     save: bool = True
-    budget_usd: float = Field(
-        default=DEFAULT_EVAL_BUDGET_USD, gt=0, le=MAX_EVAL_BUDGET_USD
-    )
+    budget_usd: float = Field(default=DEFAULT_EVAL_BUDGET_USD, gt=0, le=MAX_EVAL_BUDGET_USD)
 
 
 class SweepRequest(BaseModel):

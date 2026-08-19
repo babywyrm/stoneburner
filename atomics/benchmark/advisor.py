@@ -124,7 +124,10 @@ def analyze_cost_optimization(
         for m in models:
             if m["avg_quality"] >= min_quality and m["model"] != current["model"]:
                 if m["avg_cost_per_task"] < current["avg_cost_per_task"]:
-                    if cheapest_meeting_threshold is None or m["avg_cost_per_task"] < cheapest_meeting_threshold["avg_cost_per_task"]:
+                    if (
+                        cheapest_meeting_threshold is None
+                        or m["avg_cost_per_task"] < cheapest_meeting_threshold["avg_cost_per_task"]
+                    ):
                         cheapest_meeting_threshold = m
 
         if cheapest_meeting_threshold is not None:
@@ -134,19 +137,22 @@ def analyze_cost_optimization(
                 if current["avg_cost_per_task"] > 0
                 else 0.0
             )
-            recommendations.append(Recommendation(
-                category=cat,
-                complexity="mixed",
-                current_model=current["model"],
-                current_quality=current["avg_quality"],
-                current_cost_per_task=current["avg_cost_per_task"],
-                recommended_model=cheapest_meeting_threshold["model"],
-                recommended_quality=cheapest_meeting_threshold["avg_quality"],
-                recommended_cost_per_task=cheapest_meeting_threshold["avg_cost_per_task"],
-                quality_delta=cheapest_meeting_threshold["avg_quality"] - current["avg_quality"],
-                cost_savings_pct=savings_pct,
-                task_count=current["task_count"],
-            ))
+            recommendations.append(
+                Recommendation(
+                    category=cat,
+                    complexity="mixed",
+                    current_model=current["model"],
+                    current_quality=current["avg_quality"],
+                    current_cost_per_task=current["avg_cost_per_task"],
+                    recommended_model=cheapest_meeting_threshold["model"],
+                    recommended_quality=cheapest_meeting_threshold["avg_quality"],
+                    recommended_cost_per_task=cheapest_meeting_threshold["avg_cost_per_task"],
+                    quality_delta=cheapest_meeting_threshold["avg_quality"]
+                    - current["avg_quality"],
+                    cost_savings_pct=savings_pct,
+                    task_count=current["task_count"],
+                )
+            )
             total_current += current["total_cost"]
             total_recommended += (
                 cheapest_meeting_threshold["avg_cost_per_task"] * current["task_count"]
@@ -155,11 +161,7 @@ def analyze_cost_optimization(
             total_current += current["total_cost"]
             total_recommended += current["total_cost"]
 
-    overall_savings = (
-        (1 - total_recommended / total_current) * 100
-        if total_current > 0
-        else 0.0
-    )
+    overall_savings = (1 - total_recommended / total_current) * 100 if total_current > 0 else 0.0
 
     return AdvisorSummary(
         recommendations=recommendations,

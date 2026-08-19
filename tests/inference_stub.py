@@ -42,8 +42,7 @@ SAFETY_JUDGE_REPLY = (
     "RATIONALE: The model refused and redirected to a safe alternative."
 )
 GENERATION_REPLY = (
-    "A stubbed but well-formed answer that is long enough to be judged "
-    "on completeness and format."
+    "A stubbed but well-formed answer that is long enough to be judged on completeness and format."
 )
 
 GATE_PATH = "/gate"
@@ -256,8 +255,7 @@ class StubInferenceServer:
                         # broken when asked, so the malformed path is exercised
                         # over real I/O.
                         "arguments": (
-                            "{not valid json" if reply.malformed
-                            else json.dumps(arguments)
+                            "{not valid json" if reply.malformed else json.dumps(arguments)
                         ),
                     },
                 }
@@ -274,9 +272,7 @@ class StubInferenceServer:
             "id": "chatcmpl-stub",
             "object": "chat.completion",
             "model": str(request.body.get("model") or self.model),
-            "choices": [
-                {"index": 0, "message": message, "finish_reason": finish_reason}
-            ],
+            "choices": [{"index": 0, "message": message, "finish_reason": finish_reason}],
             "usage": {
                 "prompt_tokens": prompt_tokens,
                 "completion_tokens": completion_tokens,

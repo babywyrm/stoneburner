@@ -34,7 +34,9 @@ def test_the_api_advertises_the_distribution_version():
 
 def test_pypi_listing_has_discoverability_metadata():
     meta = metadata(atomics.DIST_NAME)
-    keywords = {part.strip().lower() for part in meta.get("Keywords", "").split(",") if part.strip()}
+    keywords = {
+        part.strip().lower() for part in meta.get("Keywords", "").split(",") if part.strip()
+    }
     assert {"llm", "eval", "ollama", "prompt-injection", "mcp"} <= keywords
     classifiers = meta.get_all("Classifier") or []
     assert "License :: OSI Approved :: MIT License" in classifiers

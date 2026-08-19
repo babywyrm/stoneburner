@@ -9,10 +9,10 @@ from typing import TYPE_CHECKING
 from atomics.storage.repository._base import RepositoryBase
 
 if TYPE_CHECKING:
+    from atomics.benchmark.sweep import ModelSweepResult
     from atomics.load.scenario_models import ScenarioResult
     from atomics.load.soak import SoakResult
     from atomics.load.stress import StressResult
-    from atomics.benchmark.sweep import ModelSweepResult
 
 
 class LoadMixin(RepositoryBase):
@@ -47,13 +47,21 @@ class LoadMixin(RepositoryBase):
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                result_id, sr.model, sr.host,
-                round(sr.peak_tps, 2), sr.saturation_concurrency,
-                round(sr.duration_seconds, 2), sr.total_tokens,
-                sr.total_requests, sr.total_failed,
-                len(sr.phases), sr.gpu_name or "",
-                sr.vram_total_mb, sr.vram_peak_mb,
-                _json.dumps(phases_data), now,
+                result_id,
+                sr.model,
+                sr.host,
+                round(sr.peak_tps, 2),
+                sr.saturation_concurrency,
+                round(sr.duration_seconds, 2),
+                sr.total_tokens,
+                sr.total_requests,
+                sr.total_failed,
+                len(sr.phases),
+                sr.gpu_name or "",
+                sr.vram_total_mb,
+                sr.vram_peak_mb,
+                _json.dumps(phases_data),
+                now,
             ),
         )
         self._conn.commit()
@@ -74,6 +82,7 @@ class LoadMixin(RepositoryBase):
     def save_sweep_result(self, sr: ModelSweepResult) -> None:
         """Persist a ModelSweepResult to the sweep_results table."""
         import uuid
+
         now = datetime.now(UTC).isoformat()
         result_id = str(uuid.uuid4())
         self._conn.execute(
@@ -145,17 +154,31 @@ class LoadMixin(RepositoryBase):
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                result_id, sr.model, sr.host, sr.provider,
-                sr.concurrency, round(sr.duration_seconds, 2),
-                round(sr.actual_duration_seconds, 2), sr.sample_interval,
-                sr.total_requests, sr.total_failed, sr.total_tokens,
-                round(sr.avg_tps, 2), round(sr.peak_tps, 2), round(sr.min_tps, 2),
-                round(sr.throughput_drift_pct, 2), round(sr.latency_drift_pct, 2),
+                result_id,
+                sr.model,
+                sr.host,
+                sr.provider,
+                sr.concurrency,
+                round(sr.duration_seconds, 2),
+                round(sr.actual_duration_seconds, 2),
+                sr.sample_interval,
+                sr.total_requests,
+                sr.total_failed,
+                sr.total_tokens,
+                round(sr.avg_tps, 2),
+                round(sr.peak_tps, 2),
+                round(sr.min_tps, 2),
+                round(sr.throughput_drift_pct, 2),
+                round(sr.latency_drift_pct, 2),
                 round(sr.avg_p95_ms, 2),
-                sr.vram_start_mb, sr.vram_end_mb, sr.vram_drift_mb,
-                round(sr.error_rate, 6), sr.verdict,
+                sr.vram_start_mb,
+                sr.vram_end_mb,
+                sr.vram_drift_mb,
+                round(sr.error_rate, 6),
+                sr.verdict,
                 round(sr.total_cost_usd, 6),
-                _json.dumps(samples_data), now,
+                _json.dumps(samples_data),
+                now,
             ),
         )
         self._conn.commit()
@@ -251,9 +274,19 @@ class LoadMixin(RepositoryBase):
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                comparison_run_id, datetime.now(UTC).isoformat(), host_name,
-                host_url, model, tokens_per_second, latency_ms, prompt_eval_rate,
-                vram_fit_pct, gpu_name, quality_score, quality_suite, judge_model,
+                comparison_run_id,
+                datetime.now(UTC).isoformat(),
+                host_name,
+                host_url,
+                model,
+                tokens_per_second,
+                latency_ms,
+                prompt_eval_rate,
+                vram_fit_pct,
+                gpu_name,
+                quality_score,
+                quality_suite,
+                judge_model,
                 dimensions,
             ),
         )
@@ -267,4 +300,3 @@ class LoadMixin(RepositoryBase):
             (comparison_run_id,),
         ).fetchall()
         return [dict(r) for r in rows]
-

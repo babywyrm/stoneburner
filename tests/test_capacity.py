@@ -24,6 +24,7 @@ GPU_HOST_PHASES = [
 
 # ── estimate_concurrency (Little's Law) ──────────────────────────────────────
 
+
 def test_estimate_concurrency_basic():
     """200 users, 5 min think time, 15s avg response."""
     conc = estimate_concurrency(users=200, think_time_s=300.0, avg_response_s=15.0)
@@ -48,6 +49,7 @@ def test_estimate_concurrency_zero_users():
 
 
 # ── interpolate_latency ──────────────────────────────────────────────────────
+
 
 def test_interpolate_latency_exact_match():
     """Exact concurrency level should return exact data."""
@@ -80,6 +82,7 @@ def test_interpolate_latency_p95():
 
 
 # ── project_capacity ─────────────────────────────────────────────────────────
+
 
 def test_project_capacity_returns_scenarios():
     profile = LoadProfile(users=200, think_time_s=300.0, response_tokens=400)
@@ -157,7 +160,10 @@ def test_project_capacity_with_cloud_latency():
     ]
     profile = LoadProfile(users=50, think_time_s=300.0, response_tokens=400)
     result = project_capacity(
-        profile=profile, phases=cloud_phases, peak_tps=50.0, model="claude-sonnet-4-6",
+        profile=profile,
+        phases=cloud_phases,
+        peak_tps=50.0,
+        model="claude-sonnet-4-6",
     )
     assert result.model == "claude-sonnet-4-6"
     assert len(result.scenarios) >= 3
@@ -173,6 +179,7 @@ def test_project_capacity_custom_burst():
 
 # ── CLI tests ────────────────────────────────────────────────────────────────
 
+
 def test_cli_capacity_from_manual_params(monkeypatch, tmp_path):
     """atomics capacity with manual --peak-tps and --single-latency should work."""
     from click.testing import CliRunner
@@ -181,10 +188,20 @@ def test_cli_capacity_from_manual_params(monkeypatch, tmp_path):
 
     monkeypatch.setenv("ATOMICS_DB_PATH", str(tmp_path / "test.db"))
     runner = CliRunner()
-    result = runner.invoke(cli, [
-        "capacity", "--users", "100", "--think-time", "300",
-        "--peak-tps", "107", "--single-latency", "15000",
-    ])
+    result = runner.invoke(
+        cli,
+        [
+            "capacity",
+            "--users",
+            "100",
+            "--think-time",
+            "300",
+            "--peak-tps",
+            "107",
+            "--single-latency",
+            "15000",
+        ],
+    )
     assert result.exit_code == 0
     assert "Normal" in result.output
     assert "Burst" in result.output
@@ -201,24 +218,40 @@ def test_cli_capacity_from_db(monkeypatch, tmp_path):
 
     repo = MetricsRepository(tmp_path / "test.db")
     sr = StressResult(
-        model="qwen2.5:7b", host="http://localhost:11434",
-        peak_tps=107.0, saturation_concurrency=16,
-        duration_seconds=60.0, total_tokens=5000, total_requests=20,
+        model="qwen2.5:7b",
+        host="http://localhost:11434",
+        peak_tps=107.0,
+        saturation_concurrency=16,
+        duration_seconds=60.0,
+        total_tokens=5000,
+        total_requests=20,
         phases=[
             ConcurrencyResult(
-                concurrency=1, requests=3, total_output_tokens=1000,
-                aggregate_tps=84.0, avg_request_tps=84.0,
-                avg_latency_ms=15000.0, p95_latency_ms=20000.0,
+                concurrency=1,
+                requests=3,
+                total_output_tokens=1000,
+                aggregate_tps=84.0,
+                avg_request_tps=84.0,
+                avg_latency_ms=15000.0,
+                p95_latency_ms=20000.0,
             ),
             ConcurrencyResult(
-                concurrency=4, requests=6, total_output_tokens=2000,
-                aggregate_tps=85.0, avg_request_tps=21.0,
-                avg_latency_ms=40000.0, p95_latency_ms=60000.0,
+                concurrency=4,
+                requests=6,
+                total_output_tokens=2000,
+                aggregate_tps=85.0,
+                avg_request_tps=21.0,
+                avg_latency_ms=40000.0,
+                p95_latency_ms=60000.0,
             ),
             ConcurrencyResult(
-                concurrency=16, requests=18, total_output_tokens=5000,
-                aggregate_tps=107.0, avg_request_tps=7.0,
-                avg_latency_ms=100000.0, p95_latency_ms=160000.0,
+                concurrency=16,
+                requests=18,
+                total_output_tokens=5000,
+                aggregate_tps=107.0,
+                avg_request_tps=7.0,
+                avg_latency_ms=100000.0,
+                p95_latency_ms=160000.0,
             ),
         ],
     )
@@ -227,9 +260,16 @@ def test_cli_capacity_from_db(monkeypatch, tmp_path):
 
     monkeypatch.setenv("ATOMICS_DB_PATH", str(tmp_path / "test.db"))
     runner = CliRunner()
-    result = runner.invoke(cli, [
-        "capacity", "--users", "50", "--model", "qwen2.5:7b",
-    ])
+    result = runner.invoke(
+        cli,
+        [
+            "capacity",
+            "--users",
+            "50",
+            "--model",
+            "qwen2.5:7b",
+        ],
+    )
     assert result.exit_code == 0
     assert "qwen2.5:7b" in result.output
     assert "Normal" in result.output

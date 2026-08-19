@@ -29,18 +29,38 @@ from atomics.eval.suite_integrity import format_headline_rate
 
 
 @click.command("redblue")
-@click.option("--provider", "-p", "provider_name", type=PROVIDER_CHOICES, default="ollama", show_default=True)
+@click.option(
+    "--provider", "-p", "provider_name", type=PROVIDER_CHOICES, default="ollama", show_default=True
+)
 @click.option("--model", "-m", type=str, default=None)
 @click.option("--ollama-host", type=str, default=None)
-@click.option("--vllm-host", "vllm_host", type=str, default=None, help="vLLM/OpenAI-compatible base URL.")
-@click.option("--judge-provider", "judge_provider_name", type=PROVIDER_CHOICES, default="ollama", show_default=True)
+@click.option(
+    "--vllm-host", "vllm_host", type=str, default=None, help="vLLM/OpenAI-compatible base URL."
+)
+@click.option(
+    "--judge-provider",
+    "judge_provider_name",
+    type=PROVIDER_CHOICES,
+    default="ollama",
+    show_default=True,
+)
 @click.option("--judge-model", type=str, default=None)
 @click.option("--judge-host", type=str, default=None)
 @extra_judges_option
-@click.option("--mode", type=click.Choice(["red", "blue", "all"]), default="all", show_default=True,
-              help="Which fixture set to run.")
-@click.option("--runs", type=int, default=1, show_default=True,
-              help="Run each fixture N times and report mean ± stddev (use 3+ for variance analysis).")
+@click.option(
+    "--mode",
+    type=click.Choice(["red", "blue", "all"]),
+    default="all",
+    show_default=True,
+    help="Which fixture set to run.",
+)
+@click.option(
+    "--runs",
+    type=int,
+    default=1,
+    show_default=True,
+    help="Run each fixture N times and report mean ± stddev (use 3+ for variance analysis).",
+)
 @click.option("--thinking/--no-thinking", "thinking_flag", default=None)
 @click.option("--thinking-budget", type=int, default=8000, show_default=True)
 @click.option(
@@ -53,8 +73,13 @@ from atomics.eval.suite_integrity import format_headline_rate
     ),
 )
 @click.option("--save/--no-save", "save_results", default=True, show_default=True)
-@click.option("--json-out", "json_out", type=click.Path(dir_okay=False, writable=True), default=None,
-              help="Write the full run (per-fixture scores, rationales, latency, cost) as JSON to this file.")
+@click.option(
+    "--json-out",
+    "json_out",
+    type=click.Path(dir_okay=False, writable=True),
+    default=None,
+    help="Write the full run (per-fixture scores, rationales, latency, cost) as JSON to this file.",
+)
 @budget_option
 def redblue(
     provider_name: str,
@@ -82,10 +107,16 @@ def redblue(
     from atomics.eval.redblue.runner import run_redblue
 
     console = Console()
-    fixture_count = {"red": len(RED_FIXTURES), "blue": len(BLUE_FIXTURES), "all": len(ALL_FIXTURES)}[mode]
+    fixture_count = {
+        "red": len(RED_FIXTURES),
+        "blue": len(BLUE_FIXTURES),
+        "all": len(ALL_FIXTURES),
+    }[mode]
     settings = load_settings()
     provider = _make_provider(provider_name, model, ollama_host, settings, vllm_host=vllm_host)
-    judge = _make_provider(judge_provider_name, judge_model, judge_host or ollama_host, settings, vllm_host=vllm_host)
+    judge = _make_provider(
+        judge_provider_name, judge_model, judge_host or ollama_host, settings, vllm_host=vllm_host
+    )
     extra_judge_pairs = parse_extra_judges(
         extra_judges,
         build=lambda name, mdl, host: _make_provider(
@@ -95,16 +126,13 @@ def redblue(
     )
     budget = eval_budget_from(budget_usd)
     if budget is not None:
-        guarded = share_budget(
-            budget, provider, judge, *(p for p, _ in extra_judge_pairs)
-        )
+        guarded = share_budget(budget, provider, judge, *(p for p, _ in extra_judge_pairs))
         provider, judge = guarded[0], guarded[1]
-        extra_judge_pairs = [
-            (guarded[2 + i], mdl) for i, (_, mdl) in enumerate(extra_judge_pairs)
-        ]
+        extra_judge_pairs = [(guarded[2 + i], mdl) for i, (_, mdl) in enumerate(extra_judge_pairs)]
 
     console.print(
-        f"\n[bold]Red/Blue eval[/bold] — model: [cyan]{provider_name}[/cyan] ({model or 'default'})\n"
+        f"\n[bold]Red/Blue eval[/bold] — model: [cyan]{provider_name}[/cyan] "
+        f"({model or 'default'})\n"
         f"Judge: [cyan]{judge_provider_name}[/cyan] | Mode: [bold]{mode}[/bold] | "
         f"Fixtures: [bold]{fixture_count}[/bold] | Runs per fixture: [bold]{runs}[/bold]\n"
     )
@@ -150,9 +178,7 @@ def redblue(
                 label = "[yellow]PARSE[/]"
             else:
                 label = "[red]ERROR[/]"
-            console.print(
-                f"    {fixture.id} run {run_number + 1}/{run_count} — {label}"
-            )
+            console.print(f"    {fixture.id} run {run_number + 1}/{run_count} — {label}")
 
         def on_done(fr):
             j = fr.judge
@@ -166,28 +192,36 @@ def redblue(
                     f"[{color}]{pct}%[/] ({fr.fixture.category}) — {_rich_escape(j.rationale[:80])}"
                 )
                 if verbose:
-                    console.print(f"       [dim]Response ({fr.task_result.output_tokens} tokens, "
-                                  f"{fr.task_result.latency_ms:.0f}ms):[/dim]")
-                    console.print(f"       [dim]{_rich_escape((fr.task_result.response or '')[:200])}...[/dim]")
+                    console.print(
+                        f"       [dim]Response ({fr.task_result.output_tokens} tokens, "
+                        f"{fr.task_result.latency_ms:.0f}ms):[/dim]"
+                    )
+                    console.print(
+                        f"       [dim]"
+                        f"{_rich_escape((fr.task_result.response or '')[:200])}"
+                        f"...[/dim]"
+                    )
             if repo:
                 repo.save_task_result(fr.task_result, suite=f"redblue-{fr.fixture.team}")
 
-        summary = asyncio.run(run_redblue(
-            provider,
-            judge_provider=judge,
-            mode=mode,
-            model=model,
-            judge_model=judge_model,
-            extra_judges=extra_judge_pairs,
-            runs=runs,
-            run_id=run_id,
-            thinking=thinking_flag,
-            thinking_budget=thinking_budget,
-            min_output_tokens=max_output_tokens,
-            on_fixture_start=on_start,
-            on_fixture_done=on_done,
-            on_run_done=on_run,
-        ))
+        summary = asyncio.run(
+            run_redblue(
+                provider,
+                judge_provider=judge,
+                mode=mode,
+                model=model,
+                judge_model=judge_model,
+                extra_judges=extra_judge_pairs,
+                runs=runs,
+                run_id=run_id,
+                thinking=thinking_flag,
+                thinking_budget=thinking_budget,
+                min_output_tokens=max_output_tokens,
+                on_fixture_start=on_start,
+                on_fixture_done=on_done,
+                on_run_done=on_run,
+            )
+        )
 
         table = Table(title=f"Red/Blue Eval Summary ({mode})")
         table.add_column("Metric")
@@ -198,10 +232,7 @@ def redblue(
         table.add_row("Mode", mode)
         table.add_row("Runs per fixture", str(summary.runs))
         quality_str = format_headline_rate(summary.overall_quality, summary.integrity)
-        if (
-            summary.quality_stddev is not None
-            and summary.integrity.status is RunStatus.COMPLETE
-        ):
+        if summary.quality_stddev is not None and summary.integrity.status is RunStatus.COMPLETE:
             quality_str += f"  ±{summary.quality_stddev * 100:.1f}%"
         table.add_row("Overall Quality", quality_str)
         table.add_row("Fixtures Run", str(summary.total_fixtures))
@@ -215,5 +246,5 @@ def redblue(
             write_summary_json(summary, Path(json_out))
             console.print(f"\n[dim]Wrote JSON results to {json_out}[/dim]")
 
-# ── atomics probe ─────────────────────────────────────────────────────────────
 
+# ── atomics probe ─────────────────────────────────────────────────────────────

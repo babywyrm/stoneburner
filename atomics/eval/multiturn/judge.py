@@ -117,8 +117,12 @@ def _parse_turn_rubric(raw: str) -> tuple[int, int, int, str] | None:
     match = _TURN_RE.search(raw)
     if match:
         rationale = " ".join(match.group(4).strip().splitlines()).strip()
-        return (min(int(match.group(1)), 4), min(int(match.group(2)), 3),
-                min(int(match.group(3)), 3), rationale)
+        return (
+            min(int(match.group(1)), 4),
+            min(int(match.group(2)), 3),
+            min(int(match.group(3)), 3),
+            rationale,
+        )
 
     a = _ACC_RE.search(raw)
     c = _CTX_RE.search(raw)
@@ -127,16 +131,19 @@ def _parse_turn_rubric(raw: str) -> tuple[int, int, int, str] | None:
         return None
     r = _RAT_RE.search(raw)
     rat = " ".join(r.group(1).strip().splitlines()).strip() if r else "(no rationale)"
-    return (min(int(a.group(1)), 4), min(int(c.group(1)), 3),
-            min(int(h.group(1)), 3), rat)
+    return (min(int(a.group(1)), 4), min(int(c.group(1)), 3), min(int(h.group(1)), 3), rat)
 
 
 def _parse_conv_rubric(raw: str) -> tuple[int, int, int, str] | None:
     match = _CONV_RE.search(raw)
     if match:
         rationale = " ".join(match.group(4).strip().splitlines()).strip()
-        return (min(int(match.group(1)), 4), min(int(match.group(2)), 3),
-                min(int(match.group(3)), 3), rationale)
+        return (
+            min(int(match.group(1)), 4),
+            min(int(match.group(2)), 3),
+            min(int(match.group(3)), 3),
+            rationale,
+        )
 
     r = _RET_RE.search(raw)
     c = _CON_RE.search(raw)
@@ -145,8 +152,7 @@ def _parse_conv_rubric(raw: str) -> tuple[int, int, int, str] | None:
         return None
     rat_m = _RAT_RE.search(raw)
     rat = " ".join(rat_m.group(1).strip().splitlines()).strip() if rat_m else "(no rationale)"
-    return (min(int(r.group(1)), 4), min(int(c.group(1)), 3),
-            min(int(i.group(1)), 3), rat)
+    return (min(int(r.group(1)), 4), min(int(c.group(1)), 3), min(int(i.group(1)), 3), rat)
 
 
 async def score_turn(
@@ -167,8 +173,11 @@ async def score_turn(
     )
     try:
         resp = await judge.generate(
-            prompt, system=_TURN_JUDGE_SYSTEM,
-            model=judge_model, max_tokens=256, temperature=0.0,
+            prompt,
+            system=_TURN_JUDGE_SYSTEM,
+            model=judge_model,
+            max_tokens=256,
+            temperature=0.0,
         )
     except Exception:
         logger.warning("Turn judge call failed", exc_info=True)
@@ -192,12 +201,16 @@ async def score_conversation(
     """Score the overall conversation quality."""
     criteria_text = "\n".join(f"- {c}" for c in criteria) if criteria else "No specific criteria."
     prompt = _CONV_RUBRIC_TEMPLATE.format(
-        transcript=transcript, criteria=criteria_text,
+        transcript=transcript,
+        criteria=criteria_text,
     )
     try:
         resp = await judge.generate(
-            prompt, system=_CONV_JUDGE_SYSTEM,
-            model=judge_model, max_tokens=256, temperature=0.0,
+            prompt,
+            system=_CONV_JUDGE_SYSTEM,
+            model=judge_model,
+            max_tokens=256,
+            temperature=0.0,
         )
     except Exception:
         logger.warning("Conversation judge call failed", exc_info=True)

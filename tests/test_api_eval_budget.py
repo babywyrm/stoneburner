@@ -40,9 +40,7 @@ class TestEvalRequestBudget:
 
     def test_the_ceiling_itself_is_capped(self):
         with pytest.raises(ValidationError):
-            EvalRequest(
-                suite="accuracy", provider="ollama", budget_usd=MAX_EVAL_BUDGET_USD + 1
-            )
+            EvalRequest(suite="accuracy", provider="ollama", budget_usd=MAX_EVAL_BUDGET_USD + 1)
 
     def test_the_api_rejects_an_uncapped_eval_with_422(self, tmp_path):
         app = create_app(ServerSettings(no_auth=True, db_path=tmp_path / "b.db"))

@@ -196,8 +196,8 @@ async def _dispatch_suite(
     skip_incapable: bool,
 ) -> SuiteJobResult:
     if suite == "eval":
-        from atomics.eval.runner import run_eval
         from atomics.benchmark.sweep import _filter_fixtures
+        from atomics.eval.runner import run_eval
 
         eval_summary = await run_eval(
             provider,

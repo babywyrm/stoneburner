@@ -26,9 +26,11 @@ def _model_supports_thinking(model: str) -> bool:
 def _strip_thinking(text: str) -> tuple[str, str]:
     """Separate <think>...</think> blocks from the visible answer."""
     thinking_parts: list[str] = []
+
     def _collect(m: re.Match) -> str:
         thinking_parts.append(m.group(1).strip())
         return ""
+
     clean = _THINK_TAG_RE.sub(_collect, text).strip()
     return clean, "\n\n".join(thinking_parts)
 
@@ -193,13 +195,15 @@ class OllamaProvider(BaseProvider):
         if injected_tool_output is not None:
             # Indirect injection: the attack arrives as the result of a tool the
             # model appears to have already called.
-            messages.append({
-                "role": "assistant",
-                "content": "",
-                "tool_calls": [{
-                    "function": {"name": "list_files", "arguments": {"directory": "."}}
-                }],
-            })
+            messages.append(
+                {
+                    "role": "assistant",
+                    "content": "",
+                    "tool_calls": [
+                        {"function": {"name": "list_files", "arguments": {"directory": "."}}}
+                    ],
+                }
+            )
             messages.append({"role": "tool", "content": injected_tool_output})
 
         body: dict[str, Any] = {
@@ -242,9 +246,7 @@ class OllamaProvider(BaseProvider):
             model=model,
             latency_ms=round(total_duration / 1e6, 2) if total_duration else 0.0,
             estimated_cost_usd=0.0,
-            tokens_per_second=(
-                compute_tps(out, eval_duration / 1e9) if eval_duration else None
-            ),
+            tokens_per_second=(compute_tps(out, eval_duration / 1e9) if eval_duration else None),
             tps_basis="generation",
             raw=data,
             tool_calls=parse_ollama_tool_calls(message),
@@ -269,14 +271,16 @@ class OllamaProvider(BaseProvider):
             name: str = entry.get("name", "")
             size_bytes: int = entry.get("size", 0)
             details: dict = entry.get("details", {})
-            results.append({
-                "name": name,
-                "size_gb": round(size_bytes / 1e9, 1),
-                "parameter_size": details.get("parameter_size", ""),
-                "family": details.get("family", ""),
-                "model_class": classify_model(name).value,
-                "thinking": supports_thinking(name),
-            })
+            results.append(
+                {
+                    "name": name,
+                    "size_gb": round(size_bytes / 1e9, 1),
+                    "parameter_size": details.get("parameter_size", ""),
+                    "family": details.get("family", ""),
+                    "model_class": classify_model(name).value,
+                    "thinking": supports_thinking(name),
+                }
+            )
         return results
 
     async def health_check(self) -> bool:

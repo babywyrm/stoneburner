@@ -16,7 +16,9 @@ from atomics.storage.repository import MetricsRepository
 
 def _seeded_repo() -> MetricsRepository:
     repo = MetricsRepository(Path(tempfile.mktemp(suffix=".db")))
-    repo.create_run("rpt-001", tier="ez", provider="bedrock", model="us.anthropic.claude-sonnet-4-6")
+    repo.create_run(
+        "rpt-001", tier="ez", provider="bedrock", model="us.anthropic.claude-sonnet-4-6"
+    )
     for i in range(3):
         result = TaskResult(
             task_id=f"rpt-t{i}",

@@ -59,8 +59,11 @@ class TestQAFixture:
 
     def test_custom_fields(self):
         f = QAFixture(
-            id="y", prompt="test", must_match="fail",
-            pass_patterns=["ok"], fail_patterns=["no"],
+            id="y",
+            prompt="test",
+            must_match="fail",
+            pass_patterns=["ok"],
+            fail_patterns=["no"],
             notes="important",
         )
         assert f.must_match == "fail"
@@ -146,35 +149,42 @@ class TestLoadQASuite:
 
 class TestEvaluateFixture:
     def test_pass_match_with_pass_pattern(self):
-        f = QAFixture(id="x", prompt="p", must_match="pass",
-                      pass_patterns=["secret"], fail_patterns=[])
+        f = QAFixture(
+            id="x", prompt="p", must_match="pass", pass_patterns=["secret"], fail_patterns=[]
+        )
         status, mp, mf = evaluate_fixture(f, "here is the secret")
         assert status == "PASS"
         assert "secret" in mp
 
     def test_fail_when_pass_pattern_not_matched(self):
-        f = QAFixture(id="x", prompt="p", must_match="pass",
-                      pass_patterns=["HTB\\{"], fail_patterns=[])
+        f = QAFixture(
+            id="x", prompt="p", must_match="pass", pass_patterns=["HTB\\{"], fail_patterns=[]
+        )
         status, mp, mf = evaluate_fixture(f, "I don't know the flag")
         assert status == "FAIL"
 
     def test_fail_when_fail_pattern_matched_despite_pass(self):
-        f = QAFixture(id="x", prompt="p", must_match="pass",
-                      pass_patterns=["flag"], fail_patterns=["I cannot"])
+        f = QAFixture(
+            id="x",
+            prompt="p",
+            must_match="pass",
+            pass_patterns=["flag"],
+            fail_patterns=["I cannot"],
+        )
         status, mp, mf = evaluate_fixture(f, "I cannot show the flag")
         assert status == "FAIL"
         assert "flag" in mp
         assert "I cannot" in mf
 
     def test_must_match_fail_with_refuse_response(self):
-        f = QAFixture(id="x", prompt="p", must_match="fail",
-                      fail_patterns=["I cannot", "not allowed"])
+        f = QAFixture(
+            id="x", prompt="p", must_match="fail", fail_patterns=["I cannot", "not allowed"]
+        )
         status, mp, mf = evaluate_fixture(f, "I cannot do that, not allowed here")
         assert status == "PASS"
 
     def test_must_match_fail_without_refusal(self):
-        f = QAFixture(id="x", prompt="p", must_match="fail",
-                      fail_patterns=["I cannot"])
+        f = QAFixture(id="x", prompt="p", must_match="fail", fail_patterns=["I cannot"])
         status, mp, mf = evaluate_fixture(f, "Sure, here is the secret")
         assert status == "FAIL"
 
@@ -189,20 +199,21 @@ class TestEvaluateFixture:
         assert status == "PASS"
 
     def test_must_match_fail_no_patterns_fails_if_pass_matched(self):
-        f = QAFixture(id="x", prompt="p", must_match="fail",
-                      pass_patterns=["secret"], fail_patterns=[])
+        f = QAFixture(
+            id="x", prompt="p", must_match="fail", pass_patterns=["secret"], fail_patterns=[]
+        )
         status, _, _ = evaluate_fixture(f, "here is the secret key")
         assert status == "FAIL"
 
     def test_case_insensitive_matching(self):
-        f = QAFixture(id="x", prompt="p", must_match="pass",
-                      pass_patterns=["FLAG"])
+        f = QAFixture(id="x", prompt="p", must_match="pass", pass_patterns=["FLAG"])
         status, _, _ = evaluate_fixture(f, "the flag is here")
         assert status == "PASS"
 
     def test_regex_in_pass_pattern(self):
-        f = QAFixture(id="x", prompt="p", must_match="pass",
-                      pass_patterns=["HTB\\{[A-Fa-f0-9]+\\}"])
+        f = QAFixture(
+            id="x", prompt="p", must_match="pass", pass_patterns=["HTB\\{[A-Fa-f0-9]+\\}"]
+        )
         status, _, _ = evaluate_fixture(f, "The answer is HTB{deadbeef}")
         assert status == "PASS"
 
@@ -212,8 +223,7 @@ class TestEvaluateFixture:
         assert status == "PASS"
 
     def test_no_patterns_pass_mode_fails_when_fail_matched(self):
-        f = QAFixture(id="x", prompt="p", must_match="pass",
-                      fail_patterns=["forbidden"])
+        f = QAFixture(id="x", prompt="p", must_match="pass", fail_patterns=["forbidden"])
         status, _, _ = evaluate_fixture(f, "this is forbidden")
         assert status == "FAIL"
 
@@ -225,7 +235,9 @@ class TestRunQASuite:
     @pytest.mark.asyncio
     async def test_all_pass(self):
         fixture = QAFixture(
-            id="t", prompt="q", must_match="pass",
+            id="t",
+            prompt="q",
+            must_match="pass",
             pass_patterns=["expected"],
         )
 
@@ -245,7 +257,9 @@ class TestRunQASuite:
     @pytest.mark.asyncio
     async def test_fail_when_pattern_missing(self):
         fixture = QAFixture(
-            id="t", prompt="q", must_match="pass",
+            id="t",
+            prompt="q",
+            must_match="pass",
             pass_patterns=["special-token-xyz"],
         )
 
@@ -308,10 +322,7 @@ class TestRunQASuite:
 
     @pytest.mark.asyncio
     async def test_multiple_fixtures_sequential(self):
-        fixtures = [
-            QAFixture(id=f"t{i}", prompt=f"q{i}", must_match="any")
-            for i in range(3)
-        ]
+        fixtures = [QAFixture(id=f"t{i}", prompt=f"q{i}", must_match="any") for i in range(3)]
 
         async def _mock_post(*args, **kwargs):
             m = MagicMock()
@@ -342,9 +353,7 @@ class TestQARunnerProfileMode:
             return ("gate response", 250.0)
 
         with patch("atomics.qa_runner._query_profile", side_effect=_fake_query_profile):
-            suite = await run_qa_suite(
-                model="", host="", fixtures=[fixture], profile=fake_profile
-            )
+            suite = await run_qa_suite(model="", host="", fixtures=[fixture], profile=fake_profile)
 
         assert suite.total == 1
         assert suite.results[0].response == "gate response"
@@ -372,7 +381,9 @@ class TestQARunnerProfileMode:
     async def test_profile_mode_evaluate_patterns(self):
         """Profile response is still evaluated against fixture patterns."""
         fixture = QAFixture(
-            id="t", prompt="q", must_match="fail",
+            id="t",
+            prompt="q",
+            must_match="fail",
             fail_patterns=["I cannot"],
         )
 
@@ -380,9 +391,7 @@ class TestQARunnerProfileMode:
             return ("I cannot do that", 100.0)
 
         with patch("atomics.qa_runner._query_profile", side_effect=_fake_query_profile):
-            suite = await run_qa_suite(
-                model="", host="", fixtures=[fixture], profile=MagicMock()
-            )
+            suite = await run_qa_suite(model="", host="", fixtures=[fixture], profile=MagicMock())
 
         assert suite.results[0].status == "PASS"
 
@@ -395,15 +404,14 @@ class TestQARunnerProfileMode:
             raise ConnectionError("gate unreachable")
 
         with patch("atomics.qa_runner._query_profile", side_effect=_failing_profile):
-            suite = await run_qa_suite(
-                model="", host="", fixtures=[fixture], profile=MagicMock()
-            )
+            suite = await run_qa_suite(model="", host="", fixtures=[fixture], profile=MagicMock())
 
         assert suite.results[0].status == "ERROR"
         assert "gate unreachable" in suite.results[0].error
 
     def test_run_qa_suite_signature_has_profile(self):
         import inspect
+
         sig = inspect.signature(run_qa_suite)
         assert "profile" in sig.parameters
         assert sig.parameters["profile"].default is None
@@ -417,6 +425,7 @@ class TestQACLI:
         from click.testing import CliRunner
 
         from atomics.cli import cli
+
         runner = CliRunner()
         result = runner.invoke(cli, ["qa", "--help"])
         assert result.exit_code == 0
@@ -426,6 +435,7 @@ class TestQACLI:
         from click.testing import CliRunner
 
         from atomics.cli import cli
+
         result = CliRunner().invoke(cli, ["qa", "--help"])
         assert "--profile" in result.output or "-p" in result.output
 
@@ -445,7 +455,7 @@ class TestQACLI:
             "http:\n"
             "  url: http://gate-host:8080/api/ask\n"
             "  method: POST\n"
-            "  body: '{\"query\": \"{prompt}\"}'\n"
+            '  body: \'{"query": "{prompt}"}\'\n'
             "  response_field: response\n"
         )
         qa_path = _yaml_file(yaml_content)
@@ -453,9 +463,13 @@ class TestQACLI:
 
         fake_suite = QASuiteResult(model="", host="")
         f = QAFixture(id="x", prompt="p", must_match="any")
-        fake_suite.results.append(QAResult(fixture=f, response="ok", latency_ms=50.0, status="PASS"))
+        fake_suite.results.append(
+            QAResult(fixture=f, response="ok", latency_ms=50.0, status="PASS")
+        )
 
-        with patch("atomics.qa_runner.run_qa_suite", new=AsyncMock(return_value=fake_suite)) as mock_run:
+        with patch(
+            "atomics.qa_runner.run_qa_suite", new=AsyncMock(return_value=fake_suite)
+        ) as mock_run:
             result = CliRunner().invoke(cli, ["qa", "--file", qa_path, "--profile", profile_path])
 
         assert result.exit_code == 0
@@ -477,7 +491,9 @@ class TestQACLI:
 
         fake_suite = QASuiteResult(model="test", host="http://fake:11434")
         f = QAFixture(id="x", prompt="p", must_match="any")
-        fake_suite.results.append(QAResult(fixture=f, response="ok", latency_ms=100.0, status="PASS"))
+        fake_suite.results.append(
+            QAResult(fixture=f, response="ok", latency_ms=100.0, status="PASS")
+        )
 
         with patch("atomics.qa_runner.run_qa_suite", new=AsyncMock(return_value=fake_suite)):
             result = CliRunner().invoke(cli, ["qa", "--file", path])

@@ -7,15 +7,18 @@ def test_worker_help():
     from click.testing import CliRunner
 
     from atomics.commands.worker import worker
+
     runner = CliRunner()
     result = runner.invoke(worker, ["--help"])
     assert result.exit_code == 0
     assert "coordinator" in result.output
 
+
 def test_distributed_help():
     from click.testing import CliRunner
 
     from atomics.commands.distributed import distributed
+
     runner = CliRunner()
     result = runner.invoke(distributed, ["--help"])
     assert result.exit_code == 0
@@ -48,12 +51,17 @@ def test_distributed_status_outputs_clean_json(monkeypatch):
     monkeypatch.setattr("atomics.commands.distributed.httpx.get", fake_get)
 
     runner = CliRunner()
-    result = runner.invoke(distributed, [
-        "status",
-        "--coordinator", "http://coordinator:8000",
-        "--api-key", "client-key",
-        "abc123",
-    ])
+    result = runner.invoke(
+        distributed,
+        [
+            "status",
+            "--coordinator",
+            "http://coordinator:8000",
+            "--api-key",
+            "client-key",
+            "abc123",
+        ],
+    )
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)
     assert data["job_id"] == "abc123"
@@ -83,12 +91,18 @@ def test_distributed_run_sends_pinned_provider(monkeypatch):
     from atomics.commands.distributed import distributed
 
     captured = _capture_run_payload(monkeypatch)
-    result = CliRunner().invoke(distributed, [
-        "run",
-        "--api-key", "client-key",
-        "--provider", "vllm",
-        "--model", "qwen3:14b",
-    ])
+    result = CliRunner().invoke(
+        distributed,
+        [
+            "run",
+            "--api-key",
+            "client-key",
+            "--provider",
+            "vllm",
+            "--model",
+            "qwen3:14b",
+        ],
+    )
     assert result.exit_code == 0, result.output
     assert captured["run_request"]["provider"] == "vllm"
     assert captured["run_request"]["model"] == "qwen3:14b"
@@ -114,11 +128,16 @@ def test_distributed_run_rejects_label_in_split_mode(monkeypatch):
     from atomics.commands.distributed import distributed
 
     captured = _capture_run_payload(monkeypatch)
-    result = CliRunner().invoke(distributed, [
-        "run",
-        "--api-key", "client-key",
-        "--label", "gpu=1",
-    ])
+    result = CliRunner().invoke(
+        distributed,
+        [
+            "run",
+            "--api-key",
+            "client-key",
+            "--label",
+            "gpu=1",
+        ],
+    )
     assert result.exit_code != 0
     assert "fleet" in result.output
     assert captured == {}, "no request should be submitted when --label is rejected"
@@ -190,9 +209,7 @@ def test_fleet_status_prints_a_row_per_host(monkeypatch):
     from atomics.commands.distributed import distributed
 
     _stub_status_response(monkeypatch, _FLEET_STATUS)
-    result = CliRunner().invoke(
-        distributed, ["status", "job-1", "--api-key", "client-key"]
-    )
+    result = CliRunner().invoke(distributed, ["status", "job-1", "--api-key", "client-key"])
 
     assert result.exit_code == 0, result.output
     # Identifiers must survive intact at the default 80-column width. Truncated
@@ -229,9 +246,7 @@ def test_a_host_that_ran_nothing_does_not_cost_the_table_a_column(monkeypatch):
     status = {**_FLEET_STATUS, "summary_json": json.dumps(payload)}
 
     _stub_status_response(monkeypatch, status)
-    result = CliRunner().invoke(
-        distributed, ["status", "job-1", "--api-key", "client-key"]
-    )
+    result = CliRunner().invoke(distributed, ["status", "job-1", "--api-key", "client-key"])
 
     assert result.exit_code == 0, result.output
     assert "Model" not in result.output
@@ -248,12 +263,8 @@ def test_split_status_still_prints_plain_json(monkeypatch):
 
     from atomics.commands.distributed import distributed
 
-    _stub_status_response(
-        monkeypatch, {"job_id": "job-1", "status": "completed", "mode": "split"}
-    )
-    result = CliRunner().invoke(
-        distributed, ["status", "job-1", "--api-key", "client-key"]
-    )
+    _stub_status_response(monkeypatch, {"job_id": "job-1", "status": "completed", "mode": "split"})
+    result = CliRunner().invoke(distributed, ["status", "job-1", "--api-key", "client-key"])
 
     assert result.exit_code == 0, result.output
     assert json.loads(result.output)["mode"] == "split"
@@ -283,13 +294,20 @@ def test_fleet_mode_sends_the_label_selector(monkeypatch):
     from atomics.commands.distributed import distributed
 
     captured = _capture_run_payload(monkeypatch)
-    result = CliRunner().invoke(distributed, [
-        "run",
-        "--api-key", "client-key",
-        "--mode", "fleet",
-        "--label", "gpu=4090",
-        "--label", "site=lab",
-    ])
+    result = CliRunner().invoke(
+        distributed,
+        [
+            "run",
+            "--api-key",
+            "client-key",
+            "--mode",
+            "fleet",
+            "--label",
+            "gpu=4090",
+            "--label",
+            "site=lab",
+        ],
+    )
     assert result.exit_code == 0, result.output
     assert captured["mode"] == "fleet"
     assert captured["worker_selector"] == {"gpu": "4090", "site": "lab"}
@@ -302,11 +320,16 @@ def test_fleet_mode_without_labels_sends_no_selector(monkeypatch):
     from atomics.commands.distributed import distributed
 
     captured = _capture_run_payload(monkeypatch)
-    result = CliRunner().invoke(distributed, [
-        "run",
-        "--api-key", "client-key",
-        "--mode", "fleet",
-    ])
+    result = CliRunner().invoke(
+        distributed,
+        [
+            "run",
+            "--api-key",
+            "client-key",
+            "--mode",
+            "fleet",
+        ],
+    )
     assert result.exit_code == 0, result.output
     assert captured["mode"] == "fleet"
     assert "worker_selector" not in captured
@@ -318,12 +341,18 @@ def test_fleet_mode_rejects_a_malformed_label(monkeypatch):
     from atomics.commands.distributed import distributed
 
     captured = _capture_run_payload(monkeypatch)
-    result = CliRunner().invoke(distributed, [
-        "run",
-        "--api-key", "client-key",
-        "--mode", "fleet",
-        "--label", "gpu",
-    ])
+    result = CliRunner().invoke(
+        distributed,
+        [
+            "run",
+            "--api-key",
+            "client-key",
+            "--mode",
+            "fleet",
+            "--label",
+            "gpu",
+        ],
+    )
     assert result.exit_code != 0
     assert "key=value" in result.output
     assert captured == {}
@@ -335,11 +364,16 @@ def test_distributed_run_rejects_unknown_provider(monkeypatch):
     from atomics.commands.distributed import distributed
 
     _capture_run_payload(monkeypatch)
-    result = CliRunner().invoke(distributed, [
-        "run",
-        "--api-key", "client-key",
-        "--provider", "not-a-provider",
-    ])
+    result = CliRunner().invoke(
+        distributed,
+        [
+            "run",
+            "--api-key",
+            "client-key",
+            "--provider",
+            "not-a-provider",
+        ],
+    )
     assert result.exit_code != 0
     assert "not-a-provider" in result.output
 
@@ -366,14 +400,23 @@ def test_worker_cli_passes_provider_model_host(monkeypatch):
     monkeypatch.setattr(asyncio, "run", lambda coro: None)
 
     runner = CliRunner()
-    result = runner.invoke(worker, [
-        "--coordinator", "http://coordinator:8000",
-        "--api-key", "worker-key",
-        "--provider", "brain-gateway",
-        "--host", "http://gpu-host:30080",
-        "--model", "qwen3:4b",
-        "--label", "box=239",
-    ])
+    result = runner.invoke(
+        worker,
+        [
+            "--coordinator",
+            "http://coordinator:8000",
+            "--api-key",
+            "worker-key",
+            "--provider",
+            "brain-gateway",
+            "--host",
+            "http://gpu-host:30080",
+            "--model",
+            "qwen3:4b",
+            "--label",
+            "box=239",
+        ],
+    )
     assert result.exit_code == 0, result.output
     assert captured, "WorkerClient was not instantiated"
     kwargs = captured["kwargs"]
@@ -389,14 +432,22 @@ def test_full_mode_sends_run_request_and_selector(monkeypatch):
     from atomics.commands.distributed import distributed
 
     captured = _capture_run_payload(monkeypatch)
-    result = CliRunner().invoke(distributed, [
-        "run",
-        "--api-key", "client-key",
-        "--mode", "full",
-        "--label", "box=239",
-        "--provider", "brain-gateway",
-        "--model", "qwen3:4b",
-    ])
+    result = CliRunner().invoke(
+        distributed,
+        [
+            "run",
+            "--api-key",
+            "client-key",
+            "--mode",
+            "full",
+            "--label",
+            "box=239",
+            "--provider",
+            "brain-gateway",
+            "--model",
+            "qwen3:4b",
+        ],
+    )
     assert result.exit_code == 0, result.output
     assert captured["mode"] == "full"
     assert captured["worker_selector"] == {"box": "239"}
@@ -408,16 +459,18 @@ _FULL_STATUS = {
     "job_id": "job-2",
     "status": "completed",
     "mode": "full",
-    "summary_json": json.dumps({
-        "summary": {
-            "total_tasks": 5,
-            "successful_tasks": 5,
-            "failed_tasks": 0,
-            "total_tokens": 1234,
-            "total_cost_usd": 0.012,
-            "avg_latency_ms": 145.5,
+    "summary_json": json.dumps(
+        {
+            "summary": {
+                "total_tasks": 5,
+                "successful_tasks": 5,
+                "failed_tasks": 0,
+                "total_tokens": 1234,
+                "total_cost_usd": 0.012,
+                "avg_latency_ms": 145.5,
+            }
         }
-    }),
+    ),
 }
 
 
@@ -428,9 +481,7 @@ def test_full_status_prints_a_summary_table(monkeypatch):
     from atomics.commands.distributed import distributed
 
     _stub_status_response(monkeypatch, _FULL_STATUS)
-    result = CliRunner().invoke(
-        distributed, ["status", "job-2", "--api-key", "client-key"]
-    )
+    result = CliRunner().invoke(distributed, ["status", "job-2", "--api-key", "client-key"])
     assert result.exit_code == 0, result.output
     assert "Full run" in result.output
     assert "5" in result.output
@@ -446,9 +497,7 @@ def test_full_status_without_summary_prints_plain_json(monkeypatch):
     from atomics.commands.distributed import distributed
 
     _stub_status_response(monkeypatch, {"job_id": "job-2", "status": "pending", "mode": "full"})
-    result = CliRunner().invoke(
-        distributed, ["status", "job-2", "--api-key", "client-key"]
-    )
+    result = CliRunner().invoke(distributed, ["status", "job-2", "--api-key", "client-key"])
     assert result.exit_code == 0, result.output
     assert json.loads(result.output)["mode"] == "full"
 
@@ -460,10 +509,15 @@ def test_distributed_run_sends_runtime_override(monkeypatch):
     from atomics.commands.distributed import distributed
 
     captured = _capture_run_payload(monkeypatch)
-    result = CliRunner().invoke(distributed, [
-        "run",
-        "--api-key", "client-key",
-        "--runtime", "node",
-    ])
+    result = CliRunner().invoke(
+        distributed,
+        [
+            "run",
+            "--api-key",
+            "client-key",
+            "--runtime",
+            "node",
+        ],
+    )
     assert result.exit_code == 0, result.output
     assert captured["run_request"]["runtime"] == "node"

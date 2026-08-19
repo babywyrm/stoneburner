@@ -44,11 +44,7 @@ def _lines(changelog: Path) -> list[str]:
 
 
 def list_versions(changelog: Path = CHANGELOG) -> list[str]:
-    return [
-        match.group("version")
-        for line in _lines(changelog)
-        if (match := HEADING.match(line))
-    ]
+    return [match.group("version") for line in _lines(changelog) if (match := HEADING.match(line))]
 
 
 def section(version: str, changelog: Path = CHANGELOG) -> tuple[str, str]:

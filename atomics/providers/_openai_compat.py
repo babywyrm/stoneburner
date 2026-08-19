@@ -83,22 +83,28 @@ class OpenAICompatibleTools:
         if injected_tool_output is not None:
             # Indirect injection: the attack arrives as the result of a tool the
             # model appears to have already called.
-            messages.append({
-                "role": "assistant",
-                "tool_calls": [{
-                    "id": _INJECTED_CALL_ID,
-                    "type": "function",
-                    "function": {
-                        "name": "list_files",
-                        "arguments": '{"directory": "."}',
-                    },
-                }],
-            })
-            messages.append({
-                "role": "tool",
-                "tool_call_id": _INJECTED_CALL_ID,
-                "content": injected_tool_output,
-            })
+            messages.append(
+                {
+                    "role": "assistant",
+                    "tool_calls": [
+                        {
+                            "id": _INJECTED_CALL_ID,
+                            "type": "function",
+                            "function": {
+                                "name": "list_files",
+                                "arguments": '{"directory": "."}',
+                            },
+                        }
+                    ],
+                }
+            )
+            messages.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": _INJECTED_CALL_ID,
+                    "content": injected_tool_output,
+                }
+            )
 
         body: dict[str, Any] = {
             "model": model,

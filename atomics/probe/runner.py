@@ -90,9 +90,7 @@ async def run_probe(
 ) -> ProbeSummary:
     """Run LLM probe checks against a list of configured artifact targets."""
     extra_judges = extra_judges or []
-    if detect_self_judge(
-        provider, model, [(judge_provider, judge_model), *extra_judges]
-    ):
+    if detect_self_judge(provider, model, [(judge_provider, judge_model), *extra_judges]):
         logger.warning(
             "Self-judging detected: the model under test is also a judge. "
             "Scores are biased upward by self-preference — use a different "
@@ -186,7 +184,9 @@ async def run_probe(
 
         logger.info(
             "[probe] '%s' → %.3f (%s)%s",
-            target.name, judge.score or 0, check["check_id"],
+            target.name,
+            judge.score or 0,
+            check["check_id"],
             " [REGRESSION]" if regressed else "",
         )
 

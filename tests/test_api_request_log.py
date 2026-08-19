@@ -58,7 +58,7 @@ class TestRequestIdSanitizing:
             "newline\ninjected",
             "carriage\rreturn",
             "semi;colon",
-            "quote\"mark",
+            'quote"mark',
             "null\x00byte",
             "unicode\u2028separator",
         ],
@@ -86,15 +86,11 @@ class TestResponseHeader:
         assert res.headers[REQUEST_ID_HEADER]
 
     def test_a_caller_supplied_id_is_echoed_back(self, client):
-        res = client.get(
-            "/api/v1/health", headers={REQUEST_ID_HEADER: "trace-abc-123"}
-        )
+        res = client.get("/api/v1/health", headers={REQUEST_ID_HEADER: "trace-abc-123"})
         assert res.headers[REQUEST_ID_HEADER] == "trace-abc-123"
 
     def test_a_hostile_id_is_replaced_not_echoed(self, client):
-        res = client.get(
-            "/api/v1/health", headers={REQUEST_ID_HEADER: "bad id with spaces"}
-        )
+        res = client.get("/api/v1/health", headers={REQUEST_ID_HEADER: "bad id with spaces"})
         assert res.headers[REQUEST_ID_HEADER] != "bad id with spaces"
         assert sanitize_request_id(res.headers[REQUEST_ID_HEADER])
 
@@ -124,9 +120,7 @@ class TestAccessLog:
 
     def test_the_log_line_carries_the_correlation_id(self, client, caplog):
         with caplog.at_level(logging.INFO, logger="atomics.api.request_log"):
-            res = client.get(
-                "/api/v1/health", headers={REQUEST_ID_HEADER: "corr-42"}
-            )
+            res = client.get("/api/v1/health", headers={REQUEST_ID_HEADER: "corr-42"})
 
         assert res.headers[REQUEST_ID_HEADER] == "corr-42"
         assert "request_id=corr-42" in access_lines(caplog)[0]

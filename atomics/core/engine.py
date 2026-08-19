@@ -8,6 +8,7 @@ import random
 import signal
 import uuid
 
+from atomics.benchmark.tiers import TierProfile, get_tier_profile
 from atomics.config import AtomicsSettings
 from atomics.core.guard import GuardConfig, RateBudgetGuard
 from atomics.core.runner import execute_task
@@ -15,7 +16,6 @@ from atomics.models import BurnTier, RunSummary, TaskStatus
 from atomics.providers.base import BaseProvider
 from atomics.storage.repository import MetricsRepository
 from atomics.tasks import get_weighted_task
-from atomics.benchmark.tiers import TierProfile, get_tier_profile
 
 logger = logging.getLogger("atomics.engine")
 

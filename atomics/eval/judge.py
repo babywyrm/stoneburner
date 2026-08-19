@@ -110,7 +110,8 @@ def _parse_rubric(raw: str) -> tuple[int, int, int, str] | None:
     rat_m = _RATIONALE_RE.search(raw)
     rationale = (
         " ".join(rat_m.group(1).strip().splitlines()).strip()
-        if rat_m else "(no rationale provided)"
+        if rat_m
+        else "(no rationale provided)"
     )
     return (
         min(int(acc_m.group(1)), 4),
@@ -139,10 +140,33 @@ def char_budget_for_tokens(max_output_tokens: int) -> int:
 
 
 # Words ignored when matching a gold criterion's key terms against a response.
-_COVERAGE_STOPWORDS = frozenset({
-    "the", "a", "an", "of", "and", "or", "to", "in", "is", "for", "with", "on",
-    "how", "does", "what", "why", "be", "are", "as", "by", "it", "that", "this",
-})
+_COVERAGE_STOPWORDS = frozenset(
+    {
+        "the",
+        "a",
+        "an",
+        "of",
+        "and",
+        "or",
+        "to",
+        "in",
+        "is",
+        "for",
+        "with",
+        "on",
+        "how",
+        "does",
+        "what",
+        "why",
+        "be",
+        "are",
+        "as",
+        "by",
+        "it",
+        "that",
+        "this",
+    }
+)
 # Fraction of a criterion's significant terms that must appear for it to count
 # as covered. Lets multi-word concepts tolerate a missing minor word.
 _COVERAGE_TERM_THRESHOLD = 0.6
@@ -150,7 +174,8 @@ _COVERAGE_TERM_THRESHOLD = 0.6
 
 def _criterion_covered(criterion: str, response_lower: str) -> bool:
     terms = [
-        t for t in re.findall(r"[a-z0-9]+", criterion.lower())
+        t
+        for t in re.findall(r"[a-z0-9]+", criterion.lower())
         if t not in _COVERAGE_STOPWORDS and len(t) > 2
     ]
     if not terms:
@@ -177,13 +202,17 @@ def detect_self_judge(
     collisions: list[str] = []
     for judge_provider, judge_model in judges:
         j_model = judge_model or getattr(judge_provider, "default_model", None)
-        if getattr(judge_provider, "name", None) == getattr(under_test, "name", None) and j_model == ut_model:
+        if (
+            getattr(judge_provider, "name", None) == getattr(under_test, "name", None)
+            and j_model == ut_model
+        ):
             collisions.append(f"{judge_provider.name}:{j_model}")
     return collisions
 
 
 def compute_criteria_coverage(
-    response: str, gold_criteria: list[str] | None,
+    response: str,
+    gold_criteria: list[str] | None,
 ) -> float | None:
     """Objective, judge-independent fraction of gold criteria present in a response.
 
@@ -202,10 +231,10 @@ def compute_criteria_coverage(
 
 @dataclass
 class JudgeResult:
-    score: float          # 0.0-1.0 normalised
-    accuracy: int         # raw 0-4
-    completeness: int     # raw 0-3
-    format_score: int     # raw 0-3
+    score: float  # 0.0-1.0 normalised
+    accuracy: int  # raw 0-4
+    completeness: int  # raw 0-3
+    format_score: int  # raw 0-3
     rationale: str
     judge_model: str
     parse_failed: bool = False
@@ -244,9 +273,7 @@ async def score_response(
 
     if gold_criteria:
         criteria_lines = "\n".join(f"  - {c}" for c in gold_criteria)
-        criteria_block = (
-            f"A good answer should cover these concepts:\n{criteria_lines}\n\n"
-        )
+        criteria_block = f"A good answer should cover these concepts:\n{criteria_lines}\n\n"
     else:
         criteria_block = ""
 
@@ -331,7 +358,8 @@ async def score_response(
         logger.info("Judge reply unparseable; attempting one reformat retry.")
         try:
             retry_raw, effective_model = await _ask(
-                _REFORMAT_TEMPLATE.format(bad=raw[:500]), _REFORMAT_SYSTEM,
+                _REFORMAT_TEMPLATE.format(bad=raw[:500]),
+                _REFORMAT_SYSTEM,
             )
             parsed = _parse_rubric(retry_raw)
             if parsed is not None:
@@ -353,12 +381,16 @@ async def score_response(
         )
 
     acc, comp, fmt, rationale = parsed
-    raw_score = acc + comp + fmt          # 0-10
+    raw_score = acc + comp + fmt  # 0-10
     normalised = round(raw_score / 10.0, 3)
 
     logger.debug(
         "Judge scored acc=%d comp=%d fmt=%d → %.3f | %s",
-        acc, comp, fmt, normalised, rationale,
+        acc,
+        comp,
+        fmt,
+        normalised,
+        rationale,
     )
 
     return JudgeResult(
@@ -394,17 +426,23 @@ async def score_consensus(
 
     results: list[JudgeResult] = [
         await score_response(
-            prompt, response,
-            judge_provider=primary_judge, judge_model=primary_model,
-            gold_criteria=gold_criteria, max_response_chars=max_response_chars,
+            prompt,
+            response,
+            judge_provider=primary_judge,
+            judge_model=primary_model,
+            gold_criteria=gold_criteria,
+            max_response_chars=max_response_chars,
         )
     ]
     for jp, jm in extra_judges:
         results.append(
             await score_response(
-                prompt, response,
-                judge_provider=jp, judge_model=jm,
-                gold_criteria=gold_criteria, max_response_chars=max_response_chars,
+                prompt,
+                response,
+                judge_provider=jp,
+                judge_model=jm,
+                gold_criteria=gold_criteria,
+                max_response_chars=max_response_chars,
             )
         )
 

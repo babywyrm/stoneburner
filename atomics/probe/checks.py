@@ -17,6 +17,7 @@ def _register(artifact_type: str):
     def decorator(fn: Callable[[str], dict]):
         _HANDLERS[artifact_type] = fn
         return fn
+
     return decorator
 
 
@@ -90,11 +91,13 @@ def _inference_api(content: str) -> dict:
     return {
         "check_id": "inference_api_health",
         "prompt": (
-            "You are reviewing the response from an inference API endpoint (e.g., Ollama, vLLM).\n\n"
+            "You are reviewing the response from an inference API endpoint "
+            "(e.g., Ollama, vLLM).\n\n"
             "Assess the following API response for:\n"
             "1. Service health — is it responding correctly?\n"
             "2. Exposed models — are any unexpectedly exposed or outdated?\n"
-            "3. Security posture — any unauthenticated access indicators, unusual model names, "
+            "3. Security posture — any unauthenticated access indicators, "
+            "unusual model names, "
             "or configuration issues?\n"
             "4. Recommendations for hardening the inference endpoint.\n\n"
             f"API RESPONSE:\n{content[:4000]}"
@@ -115,7 +118,8 @@ def _k8s_audit_log(content: str) -> dict:
         "prompt": (
             "You are a Kubernetes security engineer reviewing audit log events.\n\n"
             "Analyse the following Kubernetes audit log entries for:\n"
-            "1. Privilege escalation attempts (e.g., ClusterRoleBinding creation, exec into pods).\n"
+            "1. Privilege escalation attempts "
+            "(e.g., ClusterRoleBinding creation, exec into pods).\n"
             "2. Unusual API calls (unexpected verbs, resources, or namespaces).\n"
             "3. Service account abuse or token requests.\n"
             "4. Any events that should trigger a security alert.\n\n"

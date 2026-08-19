@@ -216,7 +216,7 @@ BLUE_FIXTURES: list[RedBlueFixture] = [
             "COPY . .\n"
             "RUN pip install -r requirements.txt\n"
             "EXPOSE 8080\n"
-            "CMD [\"python\", \"app.py\"]\n"
+            'CMD ["python", "app.py"]\n'
             "```\n\n"
             "Identify at least five security issues with this Dockerfile and provide "
             "a corrected version that addresses all of them."

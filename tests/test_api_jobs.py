@@ -131,4 +131,3 @@ async def test_wait_for_no_timeout_awaits_task():
     job = await manager.wait_for(job_id)  # timeout=None
     assert job.status == JobStatus.COMPLETED
     assert job.result == {"ok": True}
-

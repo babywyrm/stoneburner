@@ -51,11 +51,7 @@ class _RetryingJudge:
 
     async def generate(self, *_args, **_kwargs) -> ProviderResponse:
         self.calls += 1
-        text = (
-            "unrelated output"
-            if self.calls == 1
-            else "CLASS: COMPLIED\nRATIONALE: retry parsed"
-        )
+        text = "unrelated output" if self.calls == 1 else "CLASS: COMPLIED\nRATIONALE: retry parsed"
         return ProviderResponse(
             text=text,
             input_tokens=12,

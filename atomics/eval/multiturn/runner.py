@@ -100,7 +100,11 @@ class MultiturnRunSummary:
 
     @property
     def avg_latency_ms(self) -> float:
-        lats = [cr.task_result.latency_ms for cr in self.conversation_results if cr.task_result.latency_ms]
+        lats = [
+            cr.task_result.latency_ms
+            for cr in self.conversation_results
+            if cr.task_result.latency_ms
+        ]
         return round(sum(lats) / len(lats), 1) if lats else 0.0
 
     @property
@@ -169,7 +173,9 @@ class MultiturnRunSummary:
                         "instruction": cr.conversation_judge.instruction,
                         "score": cr.conversation_judge.score,
                         "rationale": cr.conversation_judge.rationale,
-                    } if cr.conversation_judge and not cr.conversation_judge.parse_failed else None,
+                    }
+                    if cr.conversation_judge and not cr.conversation_judge.parse_failed
+                    else None,
                     "turns": [
                         {
                             "turn": t.turn_index,
@@ -275,15 +281,17 @@ async def run_multiturn(
             else:
                 turn_judge = None
 
-            turn_results.append(TurnResult(
-                turn_index=i,
-                user_message=turn.user_message,
-                response=response_text,
-                latency_ms=turn_latency,
-                tokens=turn_tokens,
-                cost=turn_cost,
-                judge=turn_judge,
-            ))
+            turn_results.append(
+                TurnResult(
+                    turn_index=i,
+                    user_message=turn.user_message,
+                    response=response_text,
+                    latency_ms=turn_latency,
+                    tokens=turn_tokens,
+                    cost=turn_cost,
+                    judge=turn_judge,
+                )
+            )
 
             if conversation_failed:
                 break
@@ -330,10 +338,7 @@ async def run_multiturn(
         else:
             conv_judge = None
 
-        turn_scores = [
-            t.judge.score for t in turn_results
-            if t.judge and not t.judge.parse_failed
-        ]
+        turn_scores = [t.judge.score for t in turn_results if t.judge and not t.judge.parse_failed]
         conv_score = conv_judge.score if conv_judge and not conv_judge.parse_failed else None
         if turn_scores and conv_score is not None:
             overall = round((sum(turn_scores) / len(turn_scores) + conv_score) / 2, 3)

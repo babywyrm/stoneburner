@@ -100,7 +100,9 @@ def test_categorical_two_of_three_is_majority() -> None:
     result = combine_categorical(
         [
             CategoricalVote(label="detected", parse_failed=False, judge_model="a", rationale="hit"),
-            CategoricalVote(label="detected", parse_failed=False, judge_model="b", rationale="hit2"),
+            CategoricalVote(
+                label="detected", parse_failed=False, judge_model="b", rationale="hit2"
+            ),
             CategoricalVote(label="unknown", parse_failed=True, judge_model="c", rationale="?"),
         ]
     )

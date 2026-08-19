@@ -178,7 +178,17 @@ CODEGEN_FIXTURES: list[CodegenFixture] = [
         signature="def lru_cache_ops(capacity: int, operations: list[tuple]) -> list[int]:",
         test_cases=[
             CodeTestCase(
-                [2, [("put", 1, 1), ("put", 2, 2), ("get", 1), ("put", 3, 3), ("get", 2), ("get", 3)]],
+                [
+                    2,
+                    [
+                        ("put", 1, 1),
+                        ("put", 2, 2),
+                        ("get", 1),
+                        ("put", 3, 3),
+                        ("get", 2),
+                        ("get", 3),
+                    ],
+                ],
                 [1, -1, 3],
             ),
             CodeTestCase(
@@ -216,11 +226,15 @@ CODEGEN_FIXTURES: list[CodegenFixture] = [
         ),
         signature="def serialize_tree(tree: tuple | None) -> tuple | None:",
         test_cases=[
-            CodeTestCase([(1, (2, None, None), (3, None, None))], (1, (2, None, None), (3, None, None))),
+            CodeTestCase(
+                [(1, (2, None, None), (3, None, None))], (1, (2, None, None), (3, None, None))
+            ),
             CodeTestCase([None], None),
             CodeTestCase([(1, None, None)], (1, None, None)),
-            CodeTestCase([(1, (2, (4, None, None), None), (3, None, (5, None, None)))],
-                     (1, (2, (4, None, None), None), (3, None, (5, None, None)))),
+            CodeTestCase(
+                [(1, (2, (4, None, None), None), (3, None, (5, None, None)))],
+                (1, (2, (4, None, None), None), (3, None, (5, None, None))),
+            ),
         ],
         max_output_tokens=1500,
     ),
@@ -250,7 +264,11 @@ CODEGEN_FIXTURES: list[CodegenFixture] = [
         ),
         signature="def topological_sort(n: int, edges: list[list[int]]) -> list[int]:",
         test_cases=[
-            CodeTestCase([4, [[1, 0], [2, 0], [3, 1], [3, 2]]], [3, 1, 2, 0], description="any valid topo order"),
+            CodeTestCase(
+                [4, [[1, 0], [2, 0], [3, 1], [3, 2]]],
+                [3, 1, 2, 0],
+                description="any valid topo order",
+            ),
             CodeTestCase([2, [[1, 0]]], [1, 0]),
             CodeTestCase([2, [[0, 1], [1, 0]]], []),
         ],

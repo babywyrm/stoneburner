@@ -284,16 +284,11 @@ class RunIntegrity:
     ) -> RunIntegrity:
         """Derive integrity from the typed attempt records a suite produced."""
         return _count_integrity(
-            [
-                [_view_of_attempt(attempt) for attempt in fixture]
-                for fixture in per_fixture_attempts
-            ]
+            [[_view_of_attempt(attempt) for attempt in fixture] for fixture in per_fixture_attempts]
         )
 
     @classmethod
-    def from_fixture_outcomes(
-        cls, outcomes: Sequence[FixtureOutcome]
-    ) -> RunIntegrity:
+    def from_fixture_outcomes(cls, outcomes: Sequence[FixtureOutcome]) -> RunIntegrity:
         """Derive integrity for a suite whose results are not `AttemptResult`.
 
         Several suites — multi-turn, RAG, red/blue, codegen, tool-call — grew
@@ -361,8 +356,7 @@ def _view_of_attempt(attempt: AttemptResult) -> _AttemptView:
         judge_failed=attempt.provider.is_scorable
         and (
             judge is None
-            or judge.status
-            in {JudgeOutcomeStatus.PARSE_FAILED, JudgeOutcomeStatus.PROVIDER_ERROR}
+            or judge.status in {JudgeOutcomeStatus.PARSE_FAILED, JudgeOutcomeStatus.PROVIDER_ERROR}
             or not judge.panel_complete
         ),
     )
@@ -375,8 +369,7 @@ def _view_of_outcome(outcome: FixtureOutcome) -> _AttemptView:
         infrastructure_invalid=provider.is_infrastructure_invalid,
         scored=provider.is_scorable and outcome.judge is JudgeOutcomeStatus.SCORED,
         judge_failed=provider.is_scorable
-        and outcome.judge
-        in {JudgeOutcomeStatus.PARSE_FAILED, JudgeOutcomeStatus.PROVIDER_ERROR},
+        and outcome.judge in {JudgeOutcomeStatus.PARSE_FAILED, JudgeOutcomeStatus.PROVIDER_ERROR},
     )
 
 
@@ -386,9 +379,7 @@ def _count_integrity(
     """The one place run integrity is counted, for every suite."""
     views = [view for fixture in per_fixture for view in fixture]
     fixtures_total = len(per_fixture)
-    fixtures_scored = sum(
-        any(view.scored for view in fixture) for fixture in per_fixture
-    )
+    fixtures_scored = sum(any(view.scored for view in fixture) for fixture in per_fixture)
     attempts_scored = sum(view.scored for view in views)
     judge_failures = sum(view.judge_failed for view in views)
 

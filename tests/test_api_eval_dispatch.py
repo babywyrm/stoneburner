@@ -30,9 +30,7 @@ async def test_post_evals_accuracy(client):
                 "fixture_results": [1, 2, 3],
             },
         )()
-        resp = client.post(
-            "/api/v1/evals", json={"suite": "accuracy", "provider": "ollama"}
-        )
+        resp = client.post("/api/v1/evals", json={"suite": "accuracy", "provider": "ollama"})
     assert resp.status_code == 202
 
 
@@ -96,9 +94,7 @@ async def test_post_evals_security_suite_is_accepted(client, suite, runner_attr,
 
 @pytest.mark.asyncio
 async def test_post_evals_unsupported_suite(client):
-    resp = client.post(
-        "/api/v1/evals", json={"suite": "unknown", "provider": "ollama"}
-    )
+    resp = client.post("/api/v1/evals", json={"suite": "unknown", "provider": "ollama"})
     assert resp.status_code == 400
 
 

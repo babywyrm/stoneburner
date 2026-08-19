@@ -87,8 +87,12 @@ def _mock_provider():
     provider.name = "mock"
     provider.generate = AsyncMock(
         return_value=SimpleNamespace(
-            text="test answer", model="mock-model", input_tokens=5,
-            output_tokens=5, total_tokens=10, latency_ms=1.0,
+            text="test answer",
+            model="mock-model",
+            input_tokens=5,
+            output_tokens=5,
+            total_tokens=10,
+            latency_ms=1.0,
             estimated_cost_usd=0.0,
         )
     )
@@ -106,8 +110,20 @@ def _mock_repo():
 
 def test_rag_cli_runs_with_mocked_provider():
     runner = CliRunner()
-    with patch("atomics.commands.rag._make_provider", return_value=_mock_provider()) as make_provider,          patch("atomics.eval.rag.runner.run_rag", new=AsyncMock(return_value=_mock_summary())) as run_rag,          patch("atomics.storage.repository.MetricsRepository", return_value=_mock_repo()) as repo_cls:
-        result = runner.invoke(cli, ["rag", "--provider", "ollama", "--judge-provider", "ollama", "--no-save"])
+    with (
+        patch(
+            "atomics.commands.rag._make_provider", return_value=_mock_provider()
+        ) as make_provider,
+        patch(
+            "atomics.eval.rag.runner.run_rag", new=AsyncMock(return_value=_mock_summary())
+        ) as run_rag,
+        patch(
+            "atomics.storage.repository.MetricsRepository", return_value=_mock_repo()
+        ) as repo_cls,
+    ):
+        result = runner.invoke(
+            cli, ["rag", "--provider", "ollama", "--judge-provider", "ollama", "--no-save"]
+        )
         assert result.exit_code == 0, result.output
         assert "RAG Evaluation" in result.output
         assert "Overall RAG Score" in result.output
@@ -119,7 +135,10 @@ def test_rag_cli_runs_with_mocked_provider():
 def test_rag_cli_with_fixtures_filter():
     runner = CliRunner()
     summary = _mock_summary()
-    with patch("atomics.commands.rag._make_provider", return_value=_mock_provider()),          patch("atomics.eval.rag.runner.run_rag", new=AsyncMock(return_value=summary)) as run_rag:
+    with (
+        patch("atomics.commands.rag._make_provider", return_value=_mock_provider()),
+        patch("atomics.eval.rag.runner.run_rag", new=AsyncMock(return_value=summary)) as run_rag,
+    ):
         result = runner.invoke(cli, ["rag", "--fixtures", "rag-01,rag-02", "--no-save"])
         assert result.exit_code == 0, result.output
         call_kwargs = run_rag.call_args.kwargs
@@ -131,12 +150,16 @@ def test_rag_cli_passes_extra_judges_into_the_runner():
     runner = CliRunner()
     extra = _mock_provider()
     extra.name = "extra-judge"
-    with patch("atomics.commands.rag._make_provider", return_value=_mock_provider()), \
-         patch(
-             "atomics.commands.rag.parse_extra_judges",
-             return_value=[(extra, "mistral:7b")],
-         ), \
-         patch("atomics.eval.rag.runner.run_rag", new=AsyncMock(return_value=_mock_summary())) as run_rag:
+    with (
+        patch("atomics.commands.rag._make_provider", return_value=_mock_provider()),
+        patch(
+            "atomics.commands.rag.parse_extra_judges",
+            return_value=[(extra, "mistral:7b")],
+        ),
+        patch(
+            "atomics.eval.rag.runner.run_rag", new=AsyncMock(return_value=_mock_summary())
+        ) as run_rag,
+    ):
         result = runner.invoke(
             cli,
             ["rag", "--no-save", "--extra-judges", "ollama:mistral:7b"],
@@ -157,7 +180,11 @@ def test_rag_cli_with_json_out():
     summary = _mock_summary()
     with runner.isolated_filesystem() as fs:
         out_path = Path(fs) / "rag.json"
-        with patch("atomics.commands.rag._make_provider", return_value=_mock_provider()),              patch("atomics.eval.rag.runner.run_rag", new=AsyncMock(return_value=summary)),              patch("atomics.storage.repository.MetricsRepository", return_value=_mock_repo()):
+        with (
+            patch("atomics.commands.rag._make_provider", return_value=_mock_provider()),
+            patch("atomics.eval.rag.runner.run_rag", new=AsyncMock(return_value=summary)),
+            patch("atomics.storage.repository.MetricsRepository", return_value=_mock_repo()),
+        ):
             result = runner.invoke(cli, ["rag", "--no-save", "--json-out", str(out_path)])
             assert result.exit_code == 0, result.output
             assert out_path.exists()
@@ -182,8 +209,20 @@ def test_rag_cli_with_index_mocks_extras():
     with runner.isolated_filesystem() as fs:
         index_path = Path(fs) / "index.vec"
         index_path.write_text("")  # click.Path requires exists=True
-        with patch.dict("sys.modules", fake_modules),              patch("atomics.eval.rag.retrieval.LocalSentenceTransformerEmbedder", fake_embedder_class),              patch("atomics.eval.rag.retrieval.RAGIndex", fake_index_class),              patch("atomics.eval.rag.runner.run_rag", new=AsyncMock(return_value=summary)) as run_rag,              patch("atomics.commands.rag._make_provider", return_value=_mock_provider()):
-            result = runner.invoke(cli, ["rag", "--index", str(index_path), "--top-k", "3", "--no-save"])
+        with (
+            patch.dict("sys.modules", fake_modules),
+            patch(
+                "atomics.eval.rag.retrieval.LocalSentenceTransformerEmbedder", fake_embedder_class
+            ),
+            patch("atomics.eval.rag.retrieval.RAGIndex", fake_index_class),
+            patch(
+                "atomics.eval.rag.runner.run_rag", new=AsyncMock(return_value=summary)
+            ) as run_rag,
+            patch("atomics.commands.rag._make_provider", return_value=_mock_provider()),
+        ):
+            result = runner.invoke(
+                cli, ["rag", "--index", str(index_path), "--top-k", "3", "--no-save"]
+            )
             assert result.exit_code == 0, result.output
             assert run_rag.call_args.kwargs["index"] is fake_index
             assert run_rag.call_args.kwargs["top_k"] == 3
@@ -245,10 +284,14 @@ def test_rag_retrieval_with_queries_and_json_out(tmp_path: Path):
         cli,
         [
             "rag-retrieval",
-            "--index", str(db_path),
-            "--gold", str(gold_path),
-            "--queries", str(queries_path),
-            "--json-out", str(report_path),
+            "--index",
+            str(db_path),
+            "--gold",
+            str(gold_path),
+            "--queries",
+            str(queries_path),
+            "--json-out",
+            str(report_path),
         ],
     )
     assert result.exit_code == 0, result.output
@@ -274,7 +317,12 @@ def test_rag_index_cli_with_mocked_extras(tmp_path: Path):
         "sentence_transformers": MagicMock(),
         "sqlite_vec": MagicMock(),
     }
-    with patch.dict("sys.modules", fake_modules),          patch("atomics.eval.rag.retrieval.LocalSentenceTransformerEmbedder", fake_embedder_class),          patch("atomics.eval.rag.retrieval.RAGIndex", fake_index_class),          patch("atomics.eval.rag.retrieval.load_documents", return_value=[MagicMock()]):
+    with (
+        patch.dict("sys.modules", fake_modules),
+        patch("atomics.eval.rag.retrieval.LocalSentenceTransformerEmbedder", fake_embedder_class),
+        patch("atomics.eval.rag.retrieval.RAGIndex", fake_index_class),
+        patch("atomics.eval.rag.retrieval.load_documents", return_value=[MagicMock()]),
+    ):
         result = runner.invoke(cli, ["rag-index", str(tmp_path), "--db", str(db_path)])
         assert result.exit_code == 0, result.output
         assert fake_index.build.called
@@ -308,8 +356,14 @@ def test_rag_retrieval_cli_with_mocked_extras(tmp_path: Path):
         "sentence_transformers": MagicMock(),
         "sqlite_vec": MagicMock(),
     }
-    with patch.dict("sys.modules", fake_modules),          patch("atomics.eval.rag.retrieval.LocalSentenceTransformerEmbedder", fake_embedder_class),          patch("atomics.eval.rag.retrieval.RAGIndex", fake_index_class):
-        result = runner.invoke(cli, ["rag-retrieval", "--index", str(db_path), "--gold", str(gold_path)])
+    with (
+        patch.dict("sys.modules", fake_modules),
+        patch("atomics.eval.rag.retrieval.LocalSentenceTransformerEmbedder", fake_embedder_class),
+        patch("atomics.eval.rag.retrieval.RAGIndex", fake_index_class),
+    ):
+        result = runner.invoke(
+            cli, ["rag-retrieval", "--index", str(db_path), "--gold", str(gold_path)]
+        )
         assert result.exit_code == 0, result.output
         assert "MRR:" in result.output
 
@@ -321,6 +375,8 @@ def test_rag_retrieval_cli_missing_extras_exits(tmp_path: Path):
     gold_path = tmp_path / "gold.json"
     gold_path.write_text("{}")
     with patch.dict("sys.modules", {"sentence_transformers": None, "sqlite_vec": None}):
-        result = runner.invoke(cli, ["rag-retrieval", "--index", str(db_path), "--gold", str(gold_path)])
+        result = runner.invoke(
+            cli, ["rag-retrieval", "--index", str(db_path), "--gold", str(gold_path)]
+        )
         assert result.exit_code == 1
         assert "RAG retrieval requires" in result.output

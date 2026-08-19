@@ -34,10 +34,7 @@ def test_complexity_spread():
 
 def test_prompts_contain_non_ascii():
     """At least half the fixtures should contain non-ASCII characters."""
-    non_ascii = sum(
-        1 for f in ALL_MULTILINGUAL_FIXTURES
-        if any(ord(c) > 127 for c in f.prompt)
-    )
+    non_ascii = sum(1 for f in ALL_MULTILINGUAL_FIXTURES if any(ord(c) > 127 for c in f.prompt))
     assert non_ascii >= 5, f"Only {non_ascii}/10 fixtures have non-ASCII prompts"
 
 
@@ -48,7 +45,9 @@ def test_language_diversity():
     assert "é" in all_prompts or "ç" in all_prompts, "No French"
     assert "ä" in all_prompts or "ü" in all_prompts, "No German"
     assert "ã" in all_prompts or "ç" in all_prompts, "No Portuguese"
-    assert any("\u3040" <= c <= "\u30ff" or "\u4e00" <= c <= "\u9fff" for c in all_prompts), "No Japanese/CJK"
+    assert any("\u3040" <= c <= "\u30ff" or "\u4e00" <= c <= "\u9fff" for c in all_prompts), (
+        "No Japanese/CJK"
+    )
     assert any("\uac00" <= c <= "\ud7af" for c in all_prompts), "No Korean"
     assert any("\u0600" <= c <= "\u06ff" for c in all_prompts), "No Arabic"
 

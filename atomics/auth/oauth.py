@@ -112,9 +112,7 @@ class OAuthPKCEAuth(AuthStrategy):
     async def _device_code_flow(self) -> CachedTokens:
         """Device authorization grant for headless environments."""
         if not self._profile.device_authorization_endpoint:
-            raise RuntimeError(
-                f"Profile {self._profile.name!r} does not support device code flow"
-            )
+            raise RuntimeError(f"Profile {self._profile.name!r} does not support device code flow")
 
         async with httpx.AsyncClient() as client:
             resp = await client.post(
@@ -159,9 +157,7 @@ class OAuthPKCEAuth(AuthStrategy):
                     continue
                 resp.raise_for_status()
 
-    async def _exchange_code(
-        self, code: str, verifier: str, redirect_uri: str
-    ) -> CachedTokens:
+    async def _exchange_code(self, code: str, verifier: str, redirect_uri: str) -> CachedTokens:
         async with httpx.AsyncClient() as client:
             resp = await client.post(
                 self._profile.token_endpoint,

@@ -185,9 +185,7 @@ def _render_full_table(job: dict, summary: dict) -> None:
     help="Write the job and its per-worker rollup to this file.",
 )
 @click.argument("job_id")
-def status(
-    coordinator: str, api_key: str, job_id: str, json_out: Path | None
-) -> None:
+def status(coordinator: str, api_key: str, job_id: str, json_out: Path | None) -> None:
     """Check status of a distributed run."""
     if not api_key:
         raise click.UsageError("--api-key is required (or set ATOMICS_API_KEY)")

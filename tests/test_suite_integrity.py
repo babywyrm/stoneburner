@@ -226,9 +226,7 @@ class TestDegradedRunsAreVisible:
 
         summary = _empty_summary("multiturn")
         assert isinstance(summary, MultiturnRunSummary)
-        summary.conversation_results = [
-            _conversation(scored=i == 0) for i in range(10)
-        ]
+        summary.conversation_results = [_conversation(scored=i == 0) for i in range(10)]
 
         # Unchanged behavior: the average is still computed over the one
         # conversation that scored, and still looks like a normal result.
@@ -291,9 +289,7 @@ class TestDegradedRunsAreVisible:
         broken.fixture_results = [_codegen_result(generated=False) for _ in range(3)]
 
         bad_model = _empty_summary("codegen")
-        bad_model.fixture_results = [
-            _codegen_result(generated=True, passed=0) for _ in range(3)
-        ]
+        bad_model.fixture_results = [_codegen_result(generated=True, passed=0) for _ in range(3)]
 
         assert broken.overall_pass_rate == bad_model.overall_pass_rate == 0.0
 
@@ -406,9 +402,7 @@ def _empty_summary(suite: str):
     from datetime import UTC, datetime
 
     now = datetime.now(UTC)
-    common = dict(
-        run_id="r1", provider="ollama", model="m", started_at=now, completed_at=now
-    )
+    common = dict(run_id="r1", provider="ollama", model="m", started_at=now, completed_at=now)
 
     if suite == "multiturn":
         from atomics.eval.multiturn.runner import MultiturnRunSummary

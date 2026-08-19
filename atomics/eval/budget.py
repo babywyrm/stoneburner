@@ -52,17 +52,14 @@ class EvalBudget:
 
     def __post_init__(self) -> None:
         if self.budget_limit_usd <= 0:
-            raise ValueError(
-                f"budget_limit_usd must be positive, got {self.budget_limit_usd}"
-            )
+            raise ValueError(f"budget_limit_usd must be positive, got {self.budget_limit_usd}")
         if self.max_tokens_per_hour < 1:
             raise ValueError(
                 f"max_tokens_per_hour must be positive, got {self.max_tokens_per_hour}"
             )
         if self.max_requests_per_minute < 1:
             raise ValueError(
-                "max_requests_per_minute must be positive, got "
-                f"{self.max_requests_per_minute}"
+                f"max_requests_per_minute must be positive, got {self.max_requests_per_minute}"
             )
 
     def to_guard_config(self) -> GuardConfig:
@@ -213,8 +210,7 @@ class GuardedProvider(BaseProvider):
                 return
             if not self._is_transient(reason):
                 raise EvalBudgetExceededError(
-                    f"eval stopped: {reason} "
-                    f"(spent ${self._guard.total_cost:.4f})"
+                    f"eval stopped: {reason} (spent ${self._guard.total_cost:.4f})"
                 )
             wait = max(self._guard.seconds_until_allowed(), 0.0)
             wait += self.WAIT_MARGIN_SECONDS

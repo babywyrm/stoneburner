@@ -92,10 +92,7 @@ async def test_poll_and_execute_posts_completed_result(mock_httpx_client):
     )
     mock_httpx_client.post.assert_awaited_once()
     post = mock_httpx_client.post.await_args
-    assert (
-        post.args[0]
-        == "http://coordinator:8000/api/v1/workers/w-1/jobs/a-1/result"
-    )
+    assert post.args[0] == "http://coordinator:8000/api/v1/workers/w-1/jobs/a-1/result"
     assert post.kwargs["json"]["status"] == "completed"
     assert json.loads(post.kwargs["json"]["result_json"]) == {"ok": True, "score": 1}
     await worker.close()

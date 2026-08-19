@@ -128,47 +128,49 @@ def _fake_run(returncode=0, stdout="", stderr=""):
 
     def _run(cmd, **kwargs):
         return types.SimpleNamespace(returncode=returncode, stdout=stdout, stderr=stderr)
+
     return _run
 
 
 def test_check_schedule_health_launchd_alive():
-    assert check_schedule_health(
-        "launchd", "ez", run_cmd=_fake_run(returncode=0)
-    ) is True
+    assert check_schedule_health("launchd", "ez", run_cmd=_fake_run(returncode=0)) is True
 
 
 def test_check_schedule_health_launchd_missing():
-    assert check_schedule_health(
-        "launchd", "ez", run_cmd=_fake_run(returncode=1)
-    ) is False
+    assert check_schedule_health("launchd", "ez", run_cmd=_fake_run(returncode=1)) is False
 
 
 def test_check_schedule_health_systemd_active():
-    assert check_schedule_health(
-        "systemd", "baseline", run_cmd=_fake_run(returncode=0, stdout="active\n")
-    ) is True
+    assert (
+        check_schedule_health(
+            "systemd", "baseline", run_cmd=_fake_run(returncode=0, stdout="active\n")
+        )
+        is True
+    )
 
 
 def test_check_schedule_health_systemd_inactive():
-    assert check_schedule_health(
-        "systemd", "baseline", run_cmd=_fake_run(returncode=3, stdout="inactive\n")
-    ) is False
+    assert (
+        check_schedule_health(
+            "systemd", "baseline", run_cmd=_fake_run(returncode=3, stdout="inactive\n")
+        )
+        is False
+    )
 
 
 def test_check_schedule_health_crontab_present():
     crontab_content = "*/30 * * * * ... --tier ez ... # atomics-managed"
-    assert check_schedule_health(
-        "crontab", "ez", run_cmd=_fake_run(returncode=0, stdout=crontab_content)
-    ) is True
+    assert (
+        check_schedule_health(
+            "crontab", "ez", run_cmd=_fake_run(returncode=0, stdout=crontab_content)
+        )
+        is True
+    )
 
 
 def test_check_schedule_health_crontab_absent():
-    assert check_schedule_health(
-        "crontab", "ez", run_cmd=_fake_run(returncode=1)
-    ) is False
+    assert check_schedule_health("crontab", "ez", run_cmd=_fake_run(returncode=1)) is False
 
 
 def test_check_schedule_health_unknown_format():
-    assert check_schedule_health(
-        "windows", "ez", run_cmd=_fake_run(returncode=0)
-    ) is False
+    assert check_schedule_health("windows", "ez", run_cmd=_fake_run(returncode=0)) is False

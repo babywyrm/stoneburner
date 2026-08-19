@@ -113,9 +113,9 @@ def _overall_score(summary: Any) -> float | None:
 
 
 async def run_benchmark_from_request(payload: RunRequest) -> dict[str, Any]:
+    from atomics.benchmark.tiers import get_tier_profile
     from atomics.core.engine import LoopEngine
     from atomics.storage.repository import MetricsRepository
-    from atomics.benchmark.tiers import get_tier_profile
 
     settings = load_settings()
     try:

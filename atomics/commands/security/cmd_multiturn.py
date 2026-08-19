@@ -27,19 +27,34 @@ from atomics.eval.budget import share_budget
 
 
 @click.command("multiturn")
-@click.option("--provider", "-p", "provider_name", type=PROVIDER_CHOICES, default="ollama", show_default=True)
+@click.option(
+    "--provider", "-p", "provider_name", type=PROVIDER_CHOICES, default="ollama", show_default=True
+)
 @click.option("--model", "-m", type=str, default=None, help="Model override.")
 @click.option("--ollama-host", type=str, default=None, help="Ollama base URL.")
 @click.option("--vllm-host", "vllm_host", type=str, default=None, help="vLLM base URL.")
 @click.option("--region", type=str, default="us-east-1", help="AWS region for Bedrock.")
-@click.option("--judge-provider", "judge_provider_name", type=PROVIDER_CHOICES, default="ollama", show_default=True)
+@click.option(
+    "--judge-provider",
+    "judge_provider_name",
+    type=PROVIDER_CHOICES,
+    default="ollama",
+    show_default=True,
+)
 @click.option("--judge-model", type=str, default=None, help="Model for the judge.")
 @click.option("--judge-host", type=str, default=None, help="Ollama host for the judge.")
 @extra_judges_option
-@click.option("--fixtures", "fixtures_filter", type=str, default=None,
-              help="Comma-separated fixture IDs (e.g. mt-eval-01,mt-eval-05).")
+@click.option(
+    "--fixtures",
+    "fixtures_filter",
+    type=str,
+    default=None,
+    help="Comma-separated fixture IDs (e.g. mt-eval-01,mt-eval-05).",
+)
 @click.option("--save/--no-save", "save_results", default=True, help="Persist results.")
-@click.option("--json-out", "json_out", type=click.Path(dir_okay=False, writable=True), default=None)
+@click.option(
+    "--json-out", "json_out", type=click.Path(dir_okay=False, writable=True), default=None
+)
 @click.option("--thinking/--no-thinking", "thinking_flag", default=None)
 @click.option("--thinking-budget", type=int, default=None)
 @budget_option
@@ -69,17 +84,30 @@ def multiturn(
     from atomics.eval.multiturn.runner import ConversationResult, run_multiturn
 
     test_provider = _make_provider(
-        provider_name, model, ollama_host, settings,
-        vllm_host=vllm_host, region=region,
+        provider_name,
+        model,
+        ollama_host,
+        settings,
+        vllm_host=vllm_host,
+        region=region,
     )
     judge_provider = _make_provider(
-        judge_provider_name, judge_model, judge_host or ollama_host, settings,
-        vllm_host=vllm_host, region=region,
+        judge_provider_name,
+        judge_model,
+        judge_host or ollama_host,
+        settings,
+        vllm_host=vllm_host,
+        region=region,
     )
     extra_judge_pairs = parse_extra_judges(
         extra_judges,
         build=lambda name, mdl, host: _make_provider(
-            name, mdl, host, settings, vllm_host=vllm_host, region=region,
+            name,
+            mdl,
+            host,
+            settings,
+            vllm_host=vllm_host,
+            region=region,
         ),
         default_host=judge_host or ollama_host,
     )
@@ -89,9 +117,7 @@ def multiturn(
             budget, test_provider, judge_provider, *(p for p, _ in extra_judge_pairs)
         )
         test_provider, judge_provider = guarded[0], guarded[1]
-        extra_judge_pairs = [
-            (guarded[2 + i], mdl) for i, (_, mdl) in enumerate(extra_judge_pairs)
-        ]
+        extra_judge_pairs = [(guarded[2 + i], mdl) for i, (_, mdl) in enumerate(extra_judge_pairs)]
 
     selected_fixtures = ALL_MULTITURN_FIXTURES
     if fixtures_filter:
@@ -147,8 +173,10 @@ def multiturn(
         result_table.add_column("Cost", justify="right", style="yellow")
 
         def on_done(cr: ConversationResult) -> None:
-            turn_scores = [t.judge.score for t in cr.turn_results if t.judge and not t.judge.parse_failed]
-            turn_avg = f"{sum(turn_scores)/len(turn_scores)*100:.0f}%" if turn_scores else "—"
+            turn_scores = [
+                t.judge.score for t in cr.turn_results if t.judge and not t.judge.parse_failed
+            ]
+            turn_avg = f"{sum(turn_scores) / len(turn_scores) * 100:.0f}%" if turn_scores else "—"
             cj = cr.conversation_judge
             if cj and not cj.parse_failed:
                 ret = str(cj.retention)
@@ -156,11 +184,16 @@ def multiturn(
                 ins = str(cj.instruction)
             else:
                 ret = con = ins = "—"
-            overall = f"{cr.overall_score*100:.0f}%" if cr.overall_score is not None else "—"
+            overall = f"{cr.overall_score * 100:.0f}%" if cr.overall_score is not None else "—"
 
             result_table.add_row(
-                cr.fixture.id, str(len(cr.turn_results)),
-                turn_avg, ret, con, ins, overall,
+                cr.fixture.id,
+                str(len(cr.turn_results)),
+                turn_avg,
+                ret,
+                con,
+                ins,
+                overall,
                 f"{cr.task_result.latency_ms:.0f}ms",
                 f"${cr.task_result.estimated_cost_usd:.6f}",
             )
@@ -170,21 +203,24 @@ def multiturn(
         eff_thinking = thinking_flag
         if eff_thinking is None and model:
             from atomics.benchmark.model_classes import supports_thinking
+
             if supports_thinking(model):
                 eff_thinking = True
 
-        summary = asyncio.run(run_multiturn(
-            test_provider,
-            judge_provider=judge_provider,
-            model=model,
-            judge_model=judge_model,
-            extra_judges=extra_judge_pairs,
-            run_id=mt_run_id,
-            on_conversation_done=on_done,
-            thinking=eff_thinking,
-            thinking_budget=thinking_budget,
-            fixtures=selected_fixtures,
-        ))
+        summary = asyncio.run(
+            run_multiturn(
+                test_provider,
+                judge_provider=judge_provider,
+                model=model,
+                judge_model=judge_model,
+                extra_judges=extra_judge_pairs,
+                run_id=mt_run_id,
+                on_conversation_done=on_done,
+                thinking=eff_thinking,
+                thinking_budget=thinking_budget,
+                fixtures=selected_fixtures,
+            )
+        )
 
         console.print(result_table)
 
@@ -194,13 +230,15 @@ def multiturn(
         summary_table.add_row("Provider", provider_name)
         summary_table.add_row("Model", model or "default")
         ts = summary.avg_turn_score
-        summary_table.add_row("Avg Turn Score", f"[green]{ts*100:.1f}%[/green]" if ts else "—")
+        summary_table.add_row("Avg Turn Score", f"[green]{ts * 100:.1f}%[/green]" if ts else "—")
         cs = summary.avg_conversation_score
-        summary_table.add_row("Avg Conversation Score", f"[green]{cs*100:.1f}%[/green]" if cs else "—")
+        summary_table.add_row(
+            "Avg Conversation Score", f"[green]{cs * 100:.1f}%[/green]" if cs else "—"
+        )
         ret = summary.avg_retention
-        summary_table.add_row("Avg Retention", f"{ret*100:.1f}%" if ret else "—")
+        summary_table.add_row("Avg Retention", f"{ret * 100:.1f}%" if ret else "—")
         con = summary.avg_consistency
-        summary_table.add_row("Avg Consistency", f"{con*100:.1f}%" if con else "—")
+        summary_table.add_row("Avg Consistency", f"{con * 100:.1f}%" if con else "—")
         summary_table.add_row("Total Turns", str(summary.total_turns))
         summary_table.add_row("Total Tokens", f"{summary.total_tokens:,}")
         summary_table.add_row("Total Cost", f"${summary.total_cost_usd:.6f}")
@@ -210,5 +248,5 @@ def multiturn(
             write_summary_json(summary, Path(json_out))
             console.print(f"[dim]Wrote JSON results to {json_out}[/dim]")
 
-# ── atomics rag ───────────────────────────────────────────────────────────────
 
+# ── atomics rag ───────────────────────────────────────────────────────────────

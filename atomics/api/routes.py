@@ -80,9 +80,7 @@ def _database_check(request: Request) -> ReadinessCheck:
     if coordinator is None:
         # Reachable before startup completes, so report not-ready rather than
         # raising: an unready server is exactly what this endpoint describes.
-        return ReadinessCheck(
-            name="database", ok=False, detail="coordinator not initialized"
-        )
+        return ReadinessCheck(name="database", ok=False, detail="coordinator not initialized")
     error = coordinator.check_database()
     return ReadinessCheck(name="database", ok=error is None, detail=error)
 
@@ -98,9 +96,7 @@ async def start_run(
             "run", lambda _jid: run_benchmark_from_request(payload), owner=caller
         )
     except TooManyActiveJobsError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)
-        ) from exc
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)) from exc
     job = job_manager.jobs[job_id]
     return _job_to_response(job)
 
@@ -124,9 +120,7 @@ async def start_eval(
             "eval", lambda _jid: run_eval_suite(payload), owner=caller
         )
     except TooManyActiveJobsError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)
-        ) from exc
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)) from exc
     job = job_manager.jobs[job_id]
     return _job_to_response(job)
 
@@ -143,9 +137,7 @@ async def start_sweep(
             "sweep", lambda _jid: run_sweep_from_request(payload), owner=caller
         )
     except TooManyActiveJobsError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)
-        ) from exc
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)) from exc
     job = job_manager.jobs[job_id]
     return _job_to_response(job)
 
@@ -162,9 +154,7 @@ async def start_stress(
             "stress", lambda _jid: run_stress_from_request(payload), owner=caller
         )
     except TooManyActiveJobsError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)
-        ) from exc
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)) from exc
     job = job_manager.jobs[job_id]
     return _job_to_response(job)
 
@@ -181,9 +171,7 @@ async def start_soak(
             "soak", lambda _jid: run_soak_from_request(payload), owner=caller
         )
     except TooManyActiveJobsError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)
-        ) from exc
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)) from exc
     job = job_manager.jobs[job_id]
     return _job_to_response(job)
 
@@ -194,9 +182,7 @@ async def list_jobs(
     _: None = Depends(require_auth),
 ) -> JobsListResponse:
     """In-memory API jobs. The result payload is omitted; poll `/jobs/{id}`."""
-    return JobsListResponse(
-        jobs=[_job_to_summary(job) for job in job_manager.list_jobs()]
-    )
+    return JobsListResponse(jobs=[_job_to_summary(job) for job in job_manager.list_jobs()])
 
 
 @router.get("/jobs/{job_id}", response_model=JobResponse)

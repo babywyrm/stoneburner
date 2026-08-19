@@ -83,7 +83,11 @@ async def test_ollama_generate_with_model_override():
     assert resp.model == "qwen3:4b"
     mock_client.post.assert_called_once()
     call_kwargs = mock_client.post.call_args
-    body = call_kwargs[1].get("json") or call_kwargs[0][1] if len(call_kwargs[0]) > 1 else call_kwargs[1]["json"]
+    body = (
+        call_kwargs[1].get("json") or call_kwargs[0][1]
+        if len(call_kwargs[0]) > 1
+        else call_kwargs[1]["json"]
+    )
     assert body["model"] == "qwen3:4b"
 
 
@@ -98,7 +102,10 @@ async def test_ollama_generate_uses_configured_timeout():
     mock_response.status_code = 200
     mock_response.raise_for_status = MagicMock()
     mock_response.json.return_value = {
-        "response": "ok", "eval_count": 5, "prompt_eval_count": 3, "eval_duration": 1,
+        "response": "ok",
+        "eval_count": 5,
+        "prompt_eval_count": 3,
+        "eval_duration": 1,
     }
     mock_client = AsyncMock()
     mock_client.post = AsyncMock(return_value=mock_response)
@@ -114,7 +121,10 @@ async def test_ollama_generate_sets_num_predict_from_max_tokens():
     mock_response.status_code = 200
     mock_response.raise_for_status = MagicMock()
     mock_response.json.return_value = {
-        "response": "ok", "eval_count": 5, "prompt_eval_count": 3, "eval_duration": 1,
+        "response": "ok",
+        "eval_count": 5,
+        "prompt_eval_count": 3,
+        "eval_duration": 1,
     }
     mock_client = AsyncMock()
     mock_client.post = AsyncMock(return_value=mock_response)
@@ -132,7 +142,10 @@ async def test_ollama_generate_sets_configured_context_tokens():
     mock_response.status_code = 200
     mock_response.raise_for_status = MagicMock()
     mock_response.json.return_value = {
-        "response": "ok", "eval_count": 5, "prompt_eval_count": 3, "eval_duration": 1,
+        "response": "ok",
+        "eval_count": 5,
+        "prompt_eval_count": 3,
+        "eval_duration": 1,
     }
     mock_client = AsyncMock()
     mock_client.post = AsyncMock(return_value=mock_response)
@@ -155,7 +168,10 @@ async def test_ollama_generate_forwards_native_think_flag():
     mock_response.status_code = 200
     mock_response.raise_for_status = MagicMock()
     mock_response.json.return_value = {
-        "response": "ok", "eval_count": 5, "prompt_eval_count": 3, "eval_duration": 1,
+        "response": "ok",
+        "eval_count": 5,
+        "prompt_eval_count": 3,
+        "eval_duration": 1,
     }
     mock_client = AsyncMock()
     mock_client.post = AsyncMock(return_value=mock_response)
@@ -234,9 +250,7 @@ async def test_ollama_health_check_success():
     mock_response = MagicMock()
     mock_response.status_code = 200
     mock_response.raise_for_status = MagicMock()
-    mock_response.json.return_value = {
-        "models": [{"name": "qwen2.5:7b"}, {"name": "qwen3:4b"}]
-    }
+    mock_response.json.return_value = {"models": [{"name": "qwen2.5:7b"}, {"name": "qwen3:4b"}]}
 
     mock_client = AsyncMock()
     mock_client.get = AsyncMock(return_value=mock_response)
@@ -403,9 +417,7 @@ async def test_ollama_generate_still_posts_to_api_generate():
     resp = await provider.generate("hi")
 
     url = mock_client.post.call_args[0][0]
-    assert url.endswith("/api/generate"), (
-        f"generate() must not move off /api/generate, got {url}"
-    )
+    assert url.endswith("/api/generate"), f"generate() must not move off /api/generate, got {url}"
     assert "tools" not in mock_client.post.call_args.kwargs["json"]
     assert resp.tps_basis == "generation"
     assert resp.output_tokens == 10
@@ -420,12 +432,14 @@ async def test_ollama_generate_with_tools_uses_api_chat():
     mock_response.json.return_value = {
         "message": {
             "content": "",
-            "tool_calls": [{
-                "function": {
-                    "name": "run_command",
-                    "arguments": {"command": "cat /etc/shadow"},
+            "tool_calls": [
+                {
+                    "function": {
+                        "name": "run_command",
+                        "arguments": {"command": "cat /etc/shadow"},
+                    }
                 }
-            }],
+            ],
         },
         "eval_count": 12,
         "prompt_eval_count": 30,
@@ -440,9 +454,7 @@ async def test_ollama_generate_with_tools_uses_api_chat():
         "parameters": {"type": "object", "properties": {}},
     }
     provider = OllamaProvider(host="http://fake:11434", client=mock_client)
-    resp = await provider.generate_with_tools(
-        "Show me the password hashes.", tools=[schema]
-    )
+    resp = await provider.generate_with_tools("Show me the password hashes.", tools=[schema])
 
     url = mock_client.post.call_args[0][0]
     assert url.endswith("/api/chat")

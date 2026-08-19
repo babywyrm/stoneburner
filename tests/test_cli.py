@@ -33,7 +33,10 @@ def _mock_adversarial_cli(monkeypatch, summaries):
     async def fake_run_adversarial(*_args, **_kwargs):
         return next(remaining)
 
-    monkeypatch.setattr("atomics.commands.security.cmd_adversarial._make_provider", lambda *_args, **_kwargs: DummyProvider())
+    monkeypatch.setattr(
+        "atomics.commands.security.cmd_adversarial._make_provider",
+        lambda *_args, **_kwargs: DummyProvider(),
+    )
     monkeypatch.setattr("atomics.eval.adversarial.select_fixtures", lambda _categories: [])
     monkeypatch.setattr(
         "atomics.eval.adversarial.runner.run_adversarial",
@@ -44,9 +47,7 @@ def _mock_adversarial_cli(monkeypatch, summaries):
 def test_cli_adversarial_renders_indeterminate_resilience_as_na(monkeypatch):
     _mock_adversarial_cli(monkeypatch, [_adversarial_cli_summary(None)])
 
-    result = CliRunner().invoke(
-        cli, ["adversarial", "--no-save", "--allow-partial"]
-    )
+    result = CliRunner().invoke(cli, ["adversarial", "--no-save", "--allow-partial"])
 
     assert result.exit_code == 0
     assert "Overall Resilience" in result.output
@@ -88,7 +89,9 @@ def test_cli_adversarial_fail_threshold_rejects_indeterminate(monkeypatch):
     assert "indeterminate" in result.output.lower()
 
 
-def _patch_adversarial_live_lines(monkeypatch, *, passes: list[dict], call_kwargs: list | None = None):
+def _patch_adversarial_live_lines(
+    monkeypatch, *, passes: list[dict], call_kwargs: list | None = None
+):
     from atomics.eval.adversarial.fixtures import AdversarialFixture
 
     fixture = AdversarialFixture(
@@ -599,9 +602,7 @@ def test_cli_schedule_systemd_with_provider():
 
 def test_cli_schedule_launchd_with_provider():
     runner = CliRunner()
-    result = runner.invoke(
-        cli, ["schedule", "--format", "launchd", "--provider", "openai"]
-    )
+    result = runner.invoke(cli, ["schedule", "--format", "launchd", "--provider", "openai"])
     assert result.exit_code == 0
     assert "openai" in result.output
 
@@ -873,15 +874,28 @@ def test_cli_models_command(monkeypatch):
     """atomics models should list Ollama models with class/thinking annotations."""
 
     mock_models = [
-        {"name": "qwen2.5:7b", "size_gb": 4.7, "parameter_size": "7.6B",
-         "family": "qwen2.5", "model_class": "mid", "thinking": False},
-        {"name": "deepseek-r1:14b", "size_gb": 9.0, "parameter_size": "14.8B",
-         "family": "deepseek", "model_class": "mid", "thinking": True},
+        {
+            "name": "qwen2.5:7b",
+            "size_gb": 4.7,
+            "parameter_size": "7.6B",
+            "family": "qwen2.5",
+            "model_class": "mid",
+            "thinking": False,
+        },
+        {
+            "name": "deepseek-r1:14b",
+            "size_gb": 9.0,
+            "parameter_size": "14.8B",
+            "family": "deepseek",
+            "model_class": "mid",
+            "thinking": True,
+        },
     ]
 
     class FakeOllama:
         def __init__(self, **_kw):
             pass
+
         async def list_models(self):
             return mock_models
 
@@ -896,9 +910,11 @@ def test_cli_models_command(monkeypatch):
 
 def test_cli_models_connection_error(monkeypatch):
     """atomics models should handle connection errors gracefully."""
+
     class FakeOllama:
         def __init__(self, **_kw):
             pass
+
         async def list_models(self):
             raise ConnectionError("Cannot connect to Ollama at http://fake:11434")
 
@@ -915,14 +931,24 @@ def test_cli_sweep_command(monkeypatch):
 
     mock_results = [
         ModelSweepResult(
-            model="qwen2.5:1.5b", fixtures_run=2, overall_quality=0.85,
-            avg_latency_ms=150.0, total_tokens=500, total_cost_usd=0.0,
-            value_score=850.0, eval_summary=None,
+            model="qwen2.5:1.5b",
+            fixtures_run=2,
+            overall_quality=0.85,
+            avg_latency_ms=150.0,
+            total_tokens=500,
+            total_cost_usd=0.0,
+            value_score=850.0,
+            eval_summary=None,
         ),
         ModelSweepResult(
-            model="mistral:7b", fixtures_run=2, overall_quality=0.72,
-            avg_latency_ms=300.0, total_tokens=800, total_cost_usd=0.0,
-            value_score=720.0, eval_summary=None,
+            model="mistral:7b",
+            fixtures_run=2,
+            overall_quality=0.72,
+            avg_latency_ms=300.0,
+            total_tokens=800,
+            total_cost_usd=0.0,
+            value_score=720.0,
+            eval_summary=None,
         ),
     ]
 
@@ -935,10 +961,16 @@ def test_cli_sweep_command(monkeypatch):
 
     monkeypatch.setattr("atomics.sweep.run_model_sweep", fake_sweep)
     runner = CliRunner()
-    result = runner.invoke(cli, [
-        "sweep", "--models", "qwen2.5:1.5b,mistral:7b",
-        "--host", "http://fake:11434",
-    ])
+    result = runner.invoke(
+        cli,
+        [
+            "sweep",
+            "--models",
+            "qwen2.5:1.5b,mistral:7b",
+            "--host",
+            "http://fake:11434",
+        ],
+    )
     assert result.exit_code == 0
     assert "qwen2.5:1.5b" in result.output
     assert "mistral:7b" in result.output
@@ -951,9 +983,14 @@ def test_cli_sweep_cloud_provider(monkeypatch):
 
     mock_results = [
         ModelSweepResult(
-            model="claude-sonnet-4-6", fixtures_run=2, overall_quality=0.92,
-            avg_latency_ms=800.0, total_tokens=1200, total_cost_usd=0.036,
-            value_score=30.7, eval_summary=None,
+            model="claude-sonnet-4-6",
+            fixtures_run=2,
+            overall_quality=0.92,
+            avg_latency_ms=800.0,
+            total_tokens=1200,
+            total_cost_usd=0.036,
+            value_score=30.7,
+            eval_summary=None,
         ),
     ]
 
@@ -973,10 +1010,16 @@ def test_cli_sweep_cloud_provider(monkeypatch):
     monkeypatch.setattr("atomics.sweep.run_model_sweep", fake_sweep)
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test-fake-key")
     runner = CliRunner()
-    result = runner.invoke(cli, [
-        "sweep", "--provider", "claude",
-        "--models", "claude-sonnet-4-6",
-    ])
+    result = runner.invoke(
+        cli,
+        [
+            "sweep",
+            "--provider",
+            "claude",
+            "--models",
+            "claude-sonnet-4-6",
+        ],
+    )
     assert result.exit_code == 0
     assert "claude-sonnet-4-6" in result.output
     assert "92" in result.output
@@ -989,9 +1032,14 @@ def test_cli_sweep_openai_provider(monkeypatch):
 
     mock_results = [
         ModelSweepResult(
-            model="gpt-4o", fixtures_run=2, overall_quality=0.88,
-            avg_latency_ms=600.0, total_tokens=900, total_cost_usd=0.027,
-            value_score=32.6, eval_summary=None,
+            model="gpt-4o",
+            fixtures_run=2,
+            overall_quality=0.88,
+            avg_latency_ms=600.0,
+            total_tokens=900,
+            total_cost_usd=0.027,
+            value_score=32.6,
+            eval_summary=None,
         ),
     ]
 
@@ -1005,10 +1053,16 @@ def test_cli_sweep_openai_provider(monkeypatch):
     monkeypatch.setattr("atomics.sweep.run_model_sweep", fake_sweep)
     monkeypatch.setenv("OPENAI_API_KEY", "sk-proj-test-fake-key")
     runner = CliRunner()
-    result = runner.invoke(cli, [
-        "sweep", "--provider", "openai",
-        "--models", "gpt-4o",
-    ])
+    result = runner.invoke(
+        cli,
+        [
+            "sweep",
+            "--provider",
+            "openai",
+            "--models",
+            "gpt-4o",
+        ],
+    )
     assert result.exit_code == 0
     assert "gpt-4o" in result.output
 
@@ -1084,30 +1138,56 @@ def test_cli_sweep_verbose_shows_replies(monkeypatch):
     from atomics.sweep import ModelSweepResult
 
     fixture = EvalFixture(
-        id="ev-01", prompt="What is X?", complexity=TaskComplexity.LIGHT,
-        gold_criteria="Explain X", max_output_tokens=512,
+        id="ev-01",
+        prompt="What is X?",
+        complexity=TaskComplexity.LIGHT,
+        gold_criteria="Explain X",
+        max_output_tokens=512,
     )
     task = TaskResult(
-        run_id="test", category=TaskCategory.GENERAL_QA,
-        task_name="ev-01", provider="claude", model="claude-sonnet-4-6",
-        prompt="What is X?", response="X is a fantastic thing that does Y and Z.",
-        status=TaskStatus.SUCCESS, input_tokens=50, output_tokens=100,
-        total_tokens=150, latency_ms=800.0, estimated_cost_usd=0.003,
+        run_id="test",
+        category=TaskCategory.GENERAL_QA,
+        task_name="ev-01",
+        provider="claude",
+        model="claude-sonnet-4-6",
+        prompt="What is X?",
+        response="X is a fantastic thing that does Y and Z.",
+        status=TaskStatus.SUCCESS,
+        input_tokens=50,
+        output_tokens=100,
+        total_tokens=150,
+        latency_ms=800.0,
+        estimated_cost_usd=0.003,
     )
-    judge = JudgeResult(score=0.9, accuracy=4, completeness=3, format_score=3,
-                        rationale="Good answer", judge_model="qwen2.5:7b")
+    judge = JudgeResult(
+        score=0.9,
+        accuracy=4,
+        completeness=3,
+        format_score=3,
+        rationale="Good answer",
+        judge_model="qwen2.5:7b",
+    )
     fr = FixtureResult(fixture=fixture, task_result=task, judge=judge)
     summary = EvalRunSummary(
-        run_id="test", provider="claude", model="claude-sonnet-4-6",
-        judge_provider="ollama", judge_model="qwen2.5:7b",
-        started_at=datetime.now(UTC), completed_at=datetime.now(UTC),
+        run_id="test",
+        provider="claude",
+        model="claude-sonnet-4-6",
+        judge_provider="ollama",
+        judge_model="qwen2.5:7b",
+        started_at=datetime.now(UTC),
+        completed_at=datetime.now(UTC),
         fixture_results=[fr],
     )
     mock_results = [
         ModelSweepResult(
-            model="claude-sonnet-4-6", fixtures_run=1, overall_quality=0.9,
-            avg_latency_ms=800.0, total_tokens=150, total_cost_usd=0.003,
-            value_score=300.0, eval_summary=summary,
+            model="claude-sonnet-4-6",
+            fixtures_run=1,
+            overall_quality=0.9,
+            avg_latency_ms=800.0,
+            total_tokens=150,
+            total_cost_usd=0.003,
+            value_score=300.0,
+            eval_summary=summary,
         ),
     ]
 
@@ -1125,9 +1205,17 @@ def test_cli_sweep_verbose_shows_replies(monkeypatch):
     monkeypatch.setattr("atomics.sweep.run_model_sweep", fake_sweep)
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test-fake-key")
     runner = CliRunner()
-    result = runner.invoke(cli, [
-        "sweep", "--provider", "claude", "--models", "claude-sonnet-4-6", "--verbose",
-    ])
+    result = runner.invoke(
+        cli,
+        [
+            "sweep",
+            "--provider",
+            "claude",
+            "--models",
+            "claude-sonnet-4-6",
+            "--verbose",
+        ],
+    )
     assert result.exit_code == 0
     assert "X is a fantastic thing" in result.output
     assert "ev-01" in result.output
@@ -1144,30 +1232,56 @@ def test_cli_sweep_no_verbose_hides_replies(monkeypatch):
     from atomics.sweep import ModelSweepResult
 
     fixture = EvalFixture(
-        id="ev-01", prompt="What is X?", complexity=TaskComplexity.LIGHT,
-        gold_criteria="Explain X", max_output_tokens=512,
+        id="ev-01",
+        prompt="What is X?",
+        complexity=TaskComplexity.LIGHT,
+        gold_criteria="Explain X",
+        max_output_tokens=512,
     )
     task = TaskResult(
-        run_id="test", category=TaskCategory.GENERAL_QA,
-        task_name="ev-01", provider="claude", model="claude-sonnet-4-6",
-        prompt="What is X?", response="X is a fantastic thing that does Y and Z.",
-        status=TaskStatus.SUCCESS, input_tokens=50, output_tokens=100,
-        total_tokens=150, latency_ms=800.0, estimated_cost_usd=0.003,
+        run_id="test",
+        category=TaskCategory.GENERAL_QA,
+        task_name="ev-01",
+        provider="claude",
+        model="claude-sonnet-4-6",
+        prompt="What is X?",
+        response="X is a fantastic thing that does Y and Z.",
+        status=TaskStatus.SUCCESS,
+        input_tokens=50,
+        output_tokens=100,
+        total_tokens=150,
+        latency_ms=800.0,
+        estimated_cost_usd=0.003,
     )
-    judge = JudgeResult(score=0.9, accuracy=4, completeness=3, format_score=3,
-                        rationale="Good answer", judge_model="qwen2.5:7b")
+    judge = JudgeResult(
+        score=0.9,
+        accuracy=4,
+        completeness=3,
+        format_score=3,
+        rationale="Good answer",
+        judge_model="qwen2.5:7b",
+    )
     fr = FixtureResult(fixture=fixture, task_result=task, judge=judge)
     summary = EvalRunSummary(
-        run_id="test", provider="claude", model="claude-sonnet-4-6",
-        judge_provider="ollama", judge_model="qwen2.5:7b",
-        started_at=datetime.now(UTC), completed_at=datetime.now(UTC),
+        run_id="test",
+        provider="claude",
+        model="claude-sonnet-4-6",
+        judge_provider="ollama",
+        judge_model="qwen2.5:7b",
+        started_at=datetime.now(UTC),
+        completed_at=datetime.now(UTC),
         fixture_results=[fr],
     )
     mock_results = [
         ModelSweepResult(
-            model="claude-sonnet-4-6", fixtures_run=1, overall_quality=0.9,
-            avg_latency_ms=800.0, total_tokens=150, total_cost_usd=0.003,
-            value_score=300.0, eval_summary=summary,
+            model="claude-sonnet-4-6",
+            fixtures_run=1,
+            overall_quality=0.9,
+            avg_latency_ms=800.0,
+            total_tokens=150,
+            total_cost_usd=0.003,
+            value_score=300.0,
+            eval_summary=summary,
         ),
     ]
 
@@ -1185,9 +1299,16 @@ def test_cli_sweep_no_verbose_hides_replies(monkeypatch):
     monkeypatch.setattr("atomics.sweep.run_model_sweep", fake_sweep)
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test-fake-key")
     runner = CliRunner()
-    result = runner.invoke(cli, [
-        "sweep", "--provider", "claude", "--models", "claude-sonnet-4-6",
-    ])
+    result = runner.invoke(
+        cli,
+        [
+            "sweep",
+            "--provider",
+            "claude",
+            "--models",
+            "claude-sonnet-4-6",
+        ],
+    )
     assert result.exit_code == 0
     assert "X is a fantastic thing" not in result.output
 
@@ -1195,6 +1316,7 @@ def test_cli_sweep_no_verbose_hides_replies(monkeypatch):
 # ---------------------------------------------------------------------------
 # vllm provider — CLI path tests
 # ---------------------------------------------------------------------------
+
 
 def test_cli_run_with_mocked_vllm(monkeypatch, tmp_path):
     """atomics run --provider vllm should construct VllmProvider and run."""
@@ -1204,10 +1326,19 @@ def test_cli_run_with_mocked_vllm(monkeypatch, tmp_path):
     from atomics.models import BurnTier
 
     fake_resp = SimpleNamespace(
-        text="ok", input_tokens=10, output_tokens=20, total_tokens=30,
-        model="qwen2.5:3b", latency_ms=120.0, estimated_cost_usd=0.0,
-        tokens_per_second=100.0, thinking_tokens=0, thinking_text="",
-        tps_basis="wall_clock", cache_read_tokens=0, cache_write_tokens=0,
+        text="ok",
+        input_tokens=10,
+        output_tokens=20,
+        total_tokens=30,
+        model="qwen2.5:3b",
+        latency_ms=120.0,
+        estimated_cost_usd=0.0,
+        tokens_per_second=100.0,
+        thinking_tokens=0,
+        thinking_text="",
+        tps_basis="wall_clock",
+        cache_read_tokens=0,
+        cache_write_tokens=0,
     )
     fake_provider = MagicMock()
     fake_provider.name = "vllm"
@@ -1217,10 +1348,13 @@ def test_cli_run_with_mocked_vllm(monkeypatch, tmp_path):
     class FakeVllm:
         def __init__(self, **_kw):
             self._default_model = "qwen2.5:3b"
+
         async def generate(self, *a, **kw):
             return fake_resp
+
         async def health_check(self):
             return True
+
         @property
         def name(self):
             return "vllm"
@@ -1231,12 +1365,17 @@ def test_cli_run_with_mocked_vllm(monkeypatch, tmp_path):
 
     from atomics.core.engine import LoopEngine
     from atomics.models import RunSummary
+
     fake_summary = RunSummary(
         run_id="test-vllm-001",
         started_at=datetime.now(UTC),
-        total_tasks=1, total_tokens=30, total_cost_usd=0.0,
-        avg_tokens_per_task=30.0, avg_latency_ms=120.0,
-        tier=BurnTier.EZ, provider="vllm",
+        total_tasks=1,
+        total_tokens=30,
+        total_cost_usd=0.0,
+        avg_tokens_per_task=30.0,
+        avg_latency_ms=120.0,
+        tier=BurnTier.EZ,
+        provider="vllm",
     )
 
     async def fake_run(*a, **kw):
@@ -1246,11 +1385,20 @@ def test_cli_run_with_mocked_vllm(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
 
     runner = CliRunner()
-    result = runner.invoke(cli, [
-        "run", "--provider", "vllm",
-        "--vllm-host", "http://fake:8000/v1",
-        "-m", "qwen2.5:3b", "-n", "1",
-    ])
+    result = runner.invoke(
+        cli,
+        [
+            "run",
+            "--provider",
+            "vllm",
+            "--vllm-host",
+            "http://fake:8000/v1",
+            "-m",
+            "qwen2.5:3b",
+            "-n",
+            "1",
+        ],
+    )
     assert result.exit_code == 0
 
 
@@ -1259,19 +1407,31 @@ def test_cli_provider_test_vllm_success(monkeypatch, tmp_path):
     from types import SimpleNamespace
 
     fake_resp = SimpleNamespace(
-        text="ok", input_tokens=5, output_tokens=10, total_tokens=15,
-        model="qwen2.5:3b", latency_ms=80.0, estimated_cost_usd=0.0,
-        tokens_per_second=125.0, thinking_tokens=0, thinking_text="",
-        tps_basis="wall_clock", cache_read_tokens=0, cache_write_tokens=0,
+        text="ok",
+        input_tokens=5,
+        output_tokens=10,
+        total_tokens=15,
+        model="qwen2.5:3b",
+        latency_ms=80.0,
+        estimated_cost_usd=0.0,
+        tokens_per_second=125.0,
+        thinking_tokens=0,
+        thinking_text="",
+        tps_basis="wall_clock",
+        cache_read_tokens=0,
+        cache_write_tokens=0,
     )
 
     class FakeVllm:
         def __init__(self, **_kw):
             self._default_model = "qwen2.5:3b"
+
         async def generate(self, *a, **kw):
             return fake_resp
+
         async def health_check(self):
             return True
+
         @property
         def name(self):
             return "vllm"
@@ -1280,11 +1440,18 @@ def test_cli_provider_test_vllm_success(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
 
     runner = CliRunner()
-    result = runner.invoke(cli, [
-        "provider-test", "--provider", "vllm",
-        "--vllm-host", "http://fake:8000/v1",
-        "-m", "qwen2.5:3b",
-    ])
+    result = runner.invoke(
+        cli,
+        [
+            "provider-test",
+            "--provider",
+            "vllm",
+            "--vllm-host",
+            "http://fake:8000/v1",
+            "-m",
+            "qwen2.5:3b",
+        ],
+    )
     assert result.exit_code == 0
     assert "vllm" in result.output.lower()
 
@@ -1310,15 +1477,20 @@ def test_cli_provider_test_brain_gateway_default_label(monkeypatch):
 
         async def generate(self, *_args, **_kwargs):
             return SimpleNamespace(
-                text="4", input_tokens=1, output_tokens=1, total_tokens=2,
-                latency_ms=1.0, estimated_cost_usd=0.0, tokens_per_second=None,
-                tps_basis="wall_clock", thinking_tokens=0,
-                cache_read_tokens=0, cache_write_tokens=0,
+                text="4",
+                input_tokens=1,
+                output_tokens=1,
+                total_tokens=2,
+                latency_ms=1.0,
+                estimated_cost_usd=0.0,
+                tokens_per_second=None,
+                tps_basis="wall_clock",
+                thinking_tokens=0,
+                cache_read_tokens=0,
+                cache_write_tokens=0,
             )
 
-    monkeypatch.setattr(
-        "atomics.providers.brain_gateway.BrainGatewayProvider", FakeGateway
-    )
+    monkeypatch.setattr("atomics.providers.brain_gateway.BrainGatewayProvider", FakeGateway)
     result = CliRunner().invoke(
         cli,
         ["provider-test", "--provider", "brain-gateway", "--gateway-url", "http://gw:8080"],
@@ -1339,15 +1511,21 @@ def test_cli_sweep_vllm_provider(monkeypatch, tmp_path):
         def __init__(self, base_url="http://localhost:8000/v1", default_model="qwen2.5:3b", **_kw):
             self._default_model = default_model
             constructed.append(default_model)
+
         @property
         def name(self):
             return "vllm"
 
     mock_results = [
         ModelSweepResult(
-            model="qwen2.5:3b", fixtures_run=1, overall_quality=0.90,
-            avg_latency_ms=300.0, total_tokens=200, total_cost_usd=0.0,
-            value_score=900.0, eval_summary=None,
+            model="qwen2.5:3b",
+            fixtures_run=1,
+            overall_quality=0.90,
+            avg_latency_ms=300.0,
+            total_tokens=200,
+            total_cost_usd=0.0,
+            value_score=900.0,
+            eval_summary=None,
         ),
     ]
 
@@ -1365,11 +1543,18 @@ def test_cli_sweep_vllm_provider(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
 
     runner = CliRunner()
-    result = runner.invoke(cli, [
-        "sweep", "--provider", "vllm",
-        "--vllm-host", "http://fake:8000/v1",
-        "--models", "qwen2.5:3b",
-    ])
+    result = runner.invoke(
+        cli,
+        [
+            "sweep",
+            "--provider",
+            "vllm",
+            "--vllm-host",
+            "http://fake:8000/v1",
+            "--models",
+            "qwen2.5:3b",
+        ],
+    )
     assert result.exit_code == 0
     assert "qwen2.5:3b" in result.output
     assert "qwen2.5:3b" in constructed
@@ -1395,8 +1580,12 @@ def test_cli_eval_vllm_provider(monkeypatch, tmp_path):
             return "vllm"
 
     fake_summary = SimpleNamespace(
-        overall_accuracy=0.9, value_score=900.0, avg_latency_ms=120.0,
-        total_tokens=100, total_cost_usd=0.0, fixture_results=[],
+        overall_accuracy=0.9,
+        value_score=900.0,
+        avg_latency_ms=120.0,
+        total_tokens=100,
+        total_cost_usd=0.0,
+        fixture_results=[],
         parse_failure_rate=0.0,
     )
 
@@ -1408,14 +1597,23 @@ def test_cli_eval_vllm_provider(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
 
     runner = CliRunner()
-    result = runner.invoke(cli, [
-        "eval", "--provider", "vllm",
-        "--vllm-host", "http://fake:8000/v1",
-        "-m", "qwen3:0.6b",
-        "--judge-provider", "vllm",
-        "--judge-model", "qwen2.5:3b",
-        "--no-save",
-    ])
+    result = runner.invoke(
+        cli,
+        [
+            "eval",
+            "--provider",
+            "vllm",
+            "--vllm-host",
+            "http://fake:8000/v1",
+            "-m",
+            "qwen3:0.6b",
+            "--judge-provider",
+            "vllm",
+            "--judge-model",
+            "qwen2.5:3b",
+            "--no-save",
+        ],
+    )
     assert result.exit_code == 0, result.output
     assert "Unknown provider" not in result.output
     # Model under test and judge both built through VllmProvider with the supplied host
@@ -1438,8 +1636,12 @@ def test_cli_eval_vllm_missing_host_uses_config(monkeypatch, tmp_path):
             return "vllm"
 
     fake_summary = SimpleNamespace(
-        overall_accuracy=None, value_score=None, avg_latency_ms=0.0,
-        total_tokens=0, total_cost_usd=0.0, fixture_results=[],
+        overall_accuracy=None,
+        value_score=None,
+        avg_latency_ms=0.0,
+        total_tokens=0,
+        total_cost_usd=0.0,
+        fixture_results=[],
         parse_failure_rate=0.0,
     )
 
@@ -1452,11 +1654,21 @@ def test_cli_eval_vllm_missing_host_uses_config(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
 
     runner = CliRunner()
-    result = runner.invoke(cli, [
-        "eval", "--provider", "vllm", "-m", "qwen3:0.6b",
-        "--judge-provider", "vllm", "--judge-model", "qwen2.5:3b",
-        "--no-save",
-    ])
+    result = runner.invoke(
+        cli,
+        [
+            "eval",
+            "--provider",
+            "vllm",
+            "-m",
+            "qwen3:0.6b",
+            "--judge-provider",
+            "vllm",
+            "--judge-model",
+            "qwen2.5:3b",
+            "--no-save",
+        ],
+    )
     assert result.exit_code == 0, result.output
     assert "http://config-host:8000/v1" in constructed
 
@@ -1464,15 +1676,28 @@ def test_cli_eval_vllm_missing_host_uses_config(monkeypatch, tmp_path):
 def test_cli_models_vllm_provider(monkeypatch, tmp_path):
     """atomics models --provider vllm should list models from VllmProvider."""
     mock_models = [
-        {"name": "qwen2.5:1.5b", "size_gb": 0.0, "parameter_size": "",
-         "family": "qwen2.5", "model_class": "light", "thinking": False},
-        {"name": "qwen3.5:0.8b", "size_gb": 0.0, "parameter_size": "",
-         "family": "qwen3.5", "model_class": "light", "thinking": True},
+        {
+            "name": "qwen2.5:1.5b",
+            "size_gb": 0.0,
+            "parameter_size": "",
+            "family": "qwen2.5",
+            "model_class": "light",
+            "thinking": False,
+        },
+        {
+            "name": "qwen3.5:0.8b",
+            "size_gb": 0.0,
+            "parameter_size": "",
+            "family": "qwen3.5",
+            "model_class": "light",
+            "thinking": True,
+        },
     ]
 
     class FakeVllm:
         def __init__(self, **_kw):
             pass
+
         async def list_models(self):
             return mock_models
 
@@ -1480,10 +1705,16 @@ def test_cli_models_vllm_provider(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
 
     runner = CliRunner()
-    result = runner.invoke(cli, [
-        "models", "--provider", "vllm",
-        "--vllm-host", "http://fake:8000/v1",
-    ])
+    result = runner.invoke(
+        cli,
+        [
+            "models",
+            "--provider",
+            "vllm",
+            "--vllm-host",
+            "http://fake:8000/v1",
+        ],
+    )
     assert result.exit_code == 0
     assert "qwen2.5:1.5b" in result.output
     assert "qwen3.5:0.8b" in result.output
@@ -1492,9 +1723,11 @@ def test_cli_models_vllm_provider(monkeypatch, tmp_path):
 
 def test_cli_models_vllm_connection_error(monkeypatch, tmp_path):
     """atomics models --provider vllm should surface connection errors."""
+
     class FakeVllm:
         def __init__(self, **_kw):
             pass
+
         async def list_models(self):
             raise ConnectionError("Cannot connect to vLLM endpoint at http://fake:8000/v1")
 
@@ -1502,10 +1735,16 @@ def test_cli_models_vllm_connection_error(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
 
     runner = CliRunner()
-    result = runner.invoke(cli, [
-        "models", "--provider", "vllm",
-        "--vllm-host", "http://fake:8000/v1",
-    ])
+    result = runner.invoke(
+        cli,
+        [
+            "models",
+            "--provider",
+            "vllm",
+            "--vllm-host",
+            "http://fake:8000/v1",
+        ],
+    )
     assert result.exit_code == 1
     assert "Cannot connect" in result.output
 
@@ -1513,6 +1752,7 @@ def test_cli_models_vllm_connection_error(monkeypatch, tmp_path):
 # ---------------------------------------------------------------------------
 # baselines command
 # ---------------------------------------------------------------------------
+
 
 def test_cli_baselines_empty(tmp_path, monkeypatch):
     """atomics baselines should handle empty database gracefully."""
@@ -1529,8 +1769,12 @@ def test_cli_baselines_with_records(tmp_path, monkeypatch):
 
     fake_records = [
         SimpleNamespace(
-            name="qwen3-stable", suite="soak", model="qwen3:4b",
-            avg_tps=85.3, avg_p95_ms=1200.0, verdict="STABLE",
+            name="qwen3-stable",
+            suite="soak",
+            model="qwen3:4b",
+            avg_tps=85.3,
+            avg_p95_ms=1200.0,
+            verdict="STABLE",
             timestamp="2026-06-04T18:00:00",
         ),
     ]
@@ -1548,24 +1792,32 @@ def test_cli_baselines_with_records(tmp_path, monkeypatch):
 def test_parse_model_spec_bare_ollama_model_with_colon():
     """Ollama model names contain colons and must not be mis-split as provider:model."""
     from atomics.cli import _parse_model_spec
+
     assert _parse_model_spec("qwen3.5:0.8b", "ollama") == ("ollama", "qwen3.5:0.8b", None)
     assert _parse_model_spec("qwen2.5:7b", "ollama") == ("ollama", "qwen2.5:7b", None)
 
 
 def test_parse_model_spec_provider_prefixed():
     from atomics.cli import _parse_model_spec
+
     assert _parse_model_spec("claude:claude-sonnet-4-6", "ollama") == (
-        "claude", "claude-sonnet-4-6", None,
+        "claude",
+        "claude-sonnet-4-6",
+        None,
     )
 
 
 def test_parse_model_spec_with_host():
     from atomics.cli import _parse_model_spec
+
     assert _parse_model_spec("ollama:qwen2.5:7b@http://h:11434", "ollama") == (
-        "ollama", "qwen2.5:7b", "http://h:11434",
+        "ollama",
+        "qwen2.5:7b",
+        "http://h:11434",
     )
 
 
 def test_parse_model_spec_bare_model_no_colon():
     from atomics.cli import _parse_model_spec
+
     assert _parse_model_spec("gpt-4o", "openai") == ("openai", "gpt-4o", None)

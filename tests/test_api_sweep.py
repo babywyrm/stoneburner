@@ -59,9 +59,7 @@ def test_sweep_rejects_unknown_suite():
 
 
 def test_sweep_strips_blank_models():
-    req = SweepRequest(
-        provider="ollama", models=[" a ", "", "b"], suites=["eval"], budget_usd=2.0
-    )
+    req = SweepRequest(provider="ollama", models=[" a ", "", "b"], suites=["eval"], budget_usd=2.0)
     assert req.models == ["a", "b"]
 
 

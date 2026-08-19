@@ -83,9 +83,7 @@ async def test_run_benchmark_none_summary_raises_http_400():
 
 @pytest.mark.asyncio
 async def test_run_eval_from_request_accuracy_normalized():
-    payload = EvalRequest(
-        suite="accuracy", provider="ollama", model="m1", judge_model="j1"
-    )
+    payload = EvalRequest(suite="accuracy", provider="ollama", model="m1", judge_model="j1")
     summary = SimpleNamespace(
         overall_accuracy=0.9,
         fixture_results=[1, 2, 3],
@@ -95,9 +93,7 @@ async def test_run_eval_from_request_accuracy_normalized():
 
     with (
         patch.object(runners, "_provider_for", side_effect=[MagicMock(), MagicMock()]),
-        patch.object(
-            runners, "run_eval", new_callable=AsyncMock, return_value=summary
-        ) as mock_run,
+        patch.object(runners, "run_eval", new_callable=AsyncMock, return_value=summary) as mock_run,
     ):
         result = await runners.run_eval_from_request(payload)
 
@@ -125,9 +121,7 @@ async def test_run_eval_suite_accuracy_dispatches_to_run_eval():
 
     with (
         patch.object(runners, "_provider_for", side_effect=[MagicMock(), MagicMock()]),
-        patch.object(
-            runners, "run_eval", new_callable=AsyncMock, return_value=summary
-        ) as mock_run,
+        patch.object(runners, "run_eval", new_callable=AsyncMock, return_value=summary) as mock_run,
     ):
         result = await runners.run_eval_suite(payload)
 
@@ -230,9 +224,7 @@ async def test_run_eval_suite_accuracy_dispatches_to_run_eval():
 async def test_run_eval_suite_dispatches(
     suite, runner_attr, summary, fixtures_attr, expected_score
 ):
-    payload = EvalRequest(
-        suite=suite, provider="ollama", model="m1", judge_model="j1"
-    )
+    payload = EvalRequest(suite=suite, provider="ollama", model="m1", judge_model="j1")
     provider = MagicMock(name="provider")
     judge = MagicMock(name="judge")
 
@@ -273,9 +265,7 @@ async def test_run_eval_suite_dispatches(
 @pytest.mark.asyncio
 async def test_run_eval_suite_dispatches_toolcall():
     """toolcall's runner is keyword-only and takes a fixture catalog."""
-    payload = EvalRequest(
-        suite="toolcall", provider="ollama", model="m1", judge_model="j1"
-    )
+    payload = EvalRequest(suite="toolcall", provider="ollama", model="m1", judge_model="j1")
     provider = MagicMock(name="provider")
     judge = MagicMock(name="judge")
     summary = SimpleNamespace(
@@ -359,9 +349,7 @@ def test_summary_totals_from_fixture_attempts():
         total_tokens=None,
         attempts=attempts,
     )
-    summary = SimpleNamespace(
-        total_tokens=None, total_cost_usd=None, fixture_results=[fr]
-    )
+    summary = SimpleNamespace(total_tokens=None, total_cost_usd=None, fixture_results=[fr])
     tokens, cost = runners._summary_totals(summary)
     assert tokens == 12
     assert cost == pytest.approx(0.1)
@@ -394,9 +382,7 @@ def test_summary_totals_uses_fixture_total_tokens():
         total_tokens=15,
         attempts=[],
     )
-    summary = SimpleNamespace(
-        total_tokens=None, total_cost_usd=None, fixture_results=[fr]
-    )
+    summary = SimpleNamespace(total_tokens=None, total_cost_usd=None, fixture_results=[fr])
     tokens, cost = runners._summary_totals(summary)
     assert tokens == 15
     assert cost == pytest.approx(0.2)
@@ -419,9 +405,7 @@ async def test_run_benchmark_invalid_tier_raises_http_400():
 async def test_run_benchmark_rethrows_http_exception():
     payload = RunRequest(provider="ollama", iterations=1)
     engine = MagicMock()
-    engine.run = AsyncMock(
-        side_effect=HTTPException(status_code=400, detail="engine boom")
-    )
+    engine.run = AsyncMock(side_effect=HTTPException(status_code=400, detail="engine boom"))
     repo = MagicMock()
 
     with (
@@ -503,4 +487,3 @@ async def test_run_eval_suite_rethrows_http_exception_from_runner():
             await runners.run_eval_suite(payload)
 
     assert exc_info.value.detail == "inner"
-

@@ -95,9 +95,7 @@ def eval_budget_from(budget_usd: float | None) -> EvalBudget | None:
         raise click.BadParameter(str(exc), param_hint="--budget") from exc
 
 
-def setup_logging(
-    level: str, *, rich_tracebacks: bool = False, plain: bool = False
-) -> None:
+def setup_logging(level: str, *, rich_tracebacks: bool = False, plain: bool = False) -> None:
     """Configure logging for the atomics logger.
 
     `plain` swaps Rich for one unwrapped line per record, and is what long-lived
@@ -155,14 +153,9 @@ class FixtureProgress:
     def on_start(self, index: int, fixture_id: str, category: str) -> None:
         self._current_start = time.monotonic()
         eta = self._estimate_remaining(index)
-        eta_str = (
-            f" | ETA remaining: {self._fmt_duration(eta)}"
-            if eta is not None
-            else ""
-        )
+        eta_str = f" | ETA remaining: {self._fmt_duration(eta)}" if eta is not None else ""
         status_msg = (
-            f"[{index + 1}/{self.total}] {fixture_id} ({category}) "
-            f"— generating...{eta_str}"
+            f"[{index + 1}/{self.total}] {fixture_id} ({category}) — generating...{eta_str}"
         )
         self._status = self.console.status(status_msg, spinner="dots")
         self._status.start()
@@ -210,9 +203,7 @@ def write_summary_json(summary: SerializableSummary, path: Path) -> None:
         with path.open("w", encoding="utf-8") as handle:
             json.dump(summary.to_dict(), handle, indent=2)
     except (OSError, TypeError, ValueError) as exc:
-        raise click.ClickException(
-            f"Unable to write JSON output: {sanitize_error(exc)}"
-        ) from exc
+        raise click.ClickException(f"Unable to write JSON output: {sanitize_error(exc)}") from exc
 
 
 def integrity_exit_code(
@@ -239,15 +230,11 @@ def evaluation_record_from_fixture(
     attempts = cast(list[dict[str, object]], attempts_value)
     input_tokens = sum(_as_int(attempt["input_tokens"]) for attempt in attempts)
     output_tokens = sum(_as_int(attempt["output_tokens"]) for attempt in attempts)
-    thinking_tokens = sum(
-        _as_int(attempt["thinking_tokens"]) for attempt in attempts
-    )
+    thinking_tokens = sum(_as_int(attempt["thinking_tokens"]) for attempt in attempts)
     score_value = payload.get("score")
     score = None if score_value is None else _as_float(score_value)
     agreement_value = payload.get("judge_agreement")
-    judge_agreement = (
-        None if agreement_value is None else _as_float(agreement_value)
-    )
+    judge_agreement = None if agreement_value is None else _as_float(agreement_value)
     return EvaluationResultRecord(
         run_id=run_id,
         suite=suite,

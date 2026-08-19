@@ -180,7 +180,5 @@ def build_rollup(records: Sequence[AssignmentRecord]) -> FleetRollup:
         failed=sum(worker.failed for worker in workers),
         total_input_tokens=sum(worker.input_tokens for worker in workers),
         total_output_tokens=sum(worker.output_tokens for worker in workers),
-        estimated_cost_usd=round(
-            sum(worker.estimated_cost_usd for worker in workers), 6
-        ),
+        estimated_cost_usd=round(sum(worker.estimated_cost_usd for worker in workers), 6),
     )

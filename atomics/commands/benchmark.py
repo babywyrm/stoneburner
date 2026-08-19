@@ -11,6 +11,12 @@ from rich.console import Console
 from rich.markup import escape as _rich_escape
 from rich.table import Table
 
+from atomics.benchmark.labcompare import (
+    parity_verdict,
+    parse_host_specs,
+    run_labcompare,
+    speedup_ratio,
+)
 from atomics.commands.common import (
     PROVIDER_CHOICES,
     _make_provider,
@@ -21,12 +27,6 @@ from atomics.commands.common import (
 from atomics.commands.common import effective_model as resolve_effective_model
 from atomics.config import load_settings
 from atomics.eval.budget import BudgetMeter
-from atomics.benchmark.labcompare import (
-    parity_verdict,
-    parse_host_specs,
-    run_labcompare,
-    speedup_ratio,
-)
 from atomics.models import BurnTier
 from atomics.providers.base import BaseProvider
 
@@ -34,6 +34,7 @@ if TYPE_CHECKING:
     from atomics.benchmark.labcompare import CellResult
 
 TIER_CHOICES = click.Choice([t.value for t in BurnTier], case_sensitive=False)
+
 
 @click.command()
 @click.option(
@@ -62,9 +63,24 @@ TIER_CHOICES = click.Choice([t.value for t in BurnTier], case_sensitive=False)
 @click.option("--budget", "-b", type=float, default=None, help="Override budget limit (USD)")
 @click.option("--interval", "-i", type=int, default=None, help="Override loop interval (seconds)")
 @click.option("--region", type=str, default="us-east-1", help="AWS region for Bedrock")
-@click.option("--ollama-host", type=str, default=None, help="Ollama endpoint (default: ATOMICS_OLLAMA_HOST or http://localhost:11434)")
-@click.option("--vllm-host", type=str, default=None, help="vLLM/OpenAI-compatible base URL (default: ATOMICS_VLLM_HOST or http://localhost:8000/v1)")
-@click.option("--gateway-url", type=str, default=None, help="Brain-gateway endpoint (default: ATOMICS_BRAIN_GATEWAY_URL or http://localhost:8080)")
+@click.option(
+    "--ollama-host",
+    type=str,
+    default=None,
+    help="Ollama endpoint (default: ATOMICS_OLLAMA_HOST or http://localhost:11434)",
+)
+@click.option(
+    "--vllm-host",
+    type=str,
+    default=None,
+    help="vLLM/OpenAI-compatible base URL (default: ATOMICS_VLLM_HOST or http://localhost:8000/v1)",
+)
+@click.option(
+    "--gateway-url",
+    type=str,
+    default=None,
+    help="Brain-gateway endpoint (default: ATOMICS_BRAIN_GATEWAY_URL or http://localhost:8080)",
+)
 @click.option(
     "--hook",
     "hook_cmd",
@@ -120,9 +136,9 @@ def run(
 
     burn_tier = BurnTier(tier)
 
+    from atomics.benchmark.tiers import get_tier_profile
     from atomics.core.engine import LoopEngine
     from atomics.storage.repository import MetricsRepository
-    from atomics.benchmark.tiers import get_tier_profile
 
     profile = get_tier_profile(burn_tier)
 
@@ -159,6 +175,7 @@ def run(
     # Auto-detect thinking capability when not explicitly set
     if thinking_flag is None and effective_model:
         from atomics.benchmark.model_classes import supports_thinking
+
         if supports_thinking(effective_model):
             thinking_flag = True
 
@@ -196,11 +213,15 @@ def run(
                     console.print(f"[yellow]Post-run hook exited with code {rc}[/yellow]")
             if settings.webhook_url:
                 from atomics.reporting.webhooks import send_webhook
+
                 send_webhook(
-                    settings.webhook_url, summary,
-                    tier=burn_tier.value, provider=provider_name,
+                    settings.webhook_url,
+                    summary,
+                    tier=burn_tier.value,
+                    provider=provider_name,
                 )
         repo.close()
+
 
 @click.command()
 @click.option("--hours", "-h", type=int, default=24, help="Hours of history to show")
@@ -225,6 +246,7 @@ def report(hours: int, runs: int) -> None:
     finally:
         repo.close()
 
+
 @click.command()
 @click.option(
     "--by",
@@ -235,9 +257,17 @@ def report(hours: int, runs: int) -> None:
 @click.option("--since-hours", type=float, default=None, help="Only include recent data")
 @click.option("--tier", "-t", type=TIER_CHOICES, default=None, help="Filter by tier")
 @click.option("--category", type=str, default=None, help="Filter by task category")
-@click.option("--narrative", is_flag=True, default=False, help="Print a plain-English business-case summary")
-@click.option("--output", "-o", "out_file", type=click.Path(), default=None,
-              help="Write JSON summary to FILE instead of (or alongside) table output")
+@click.option(
+    "--narrative", is_flag=True, default=False, help="Print a plain-English business-case summary"
+)
+@click.option(
+    "--output",
+    "-o",
+    "out_file",
+    type=click.Path(),
+    default=None,
+    help="Write JSON summary to FILE instead of (or alongside) table output",
+)
 def compare(
     by: str,
     since_hours: float | None,
@@ -261,7 +291,9 @@ def compare(
             group_by=by,
         )
         if not rows:
-            console.print("[dim]No data to compare. Run benchmarks with multiple providers first.[/dim]")
+            console.print(
+                "[dim]No data to compare. Run benchmarks with multiple providers first.[/dim]"
+            )
             return
 
         # Only surface the optional fidelity columns when there's signal, to keep
@@ -357,17 +389,20 @@ def compare(
         if out_file:
             import json as _json
             from pathlib import Path
+
             Path(out_file).write_text(_json.dumps(rows, indent=2, default=str))
             console.print(f"\n[dim]Comparison written to {out_file}[/dim]")
     finally:
         repo.close()
+
 
 def _print_narrative(console: Console, rows: list[dict], by: str) -> None:
     """Print a plain-English business-case summary of the comparison data."""
     scored = [r for r in rows if r.get("avg_accuracy_score") is not None]
     if not scored:
         console.print(
-            "\n[dim]No accuracy scores yet. Run [bold]atomics eval[/bold] to generate quality scores.[/dim]"
+            "\n[dim]No accuracy scores yet. "
+            "Run [bold]atomics eval[/bold] to generate quality scores.[/dim]"
         )
         return
 
@@ -376,7 +411,9 @@ def _print_narrative(console: Console, rows: list[dict], by: str) -> None:
     free_options = [r for r in scored if r.get("cost_per_1k_tokens", 1) < 0.0001]
     paid_options = [r for r in scored if r.get("cost_per_1k_tokens", 0) >= 0.0001]
 
-    console.print("\n[bold cyan]── Business Case Summary ──────────────────────────────[/bold cyan]")
+    console.print(
+        "\n[bold cyan]── Business Case Summary ──────────────────────────────[/bold cyan]"
+    )
 
     best_acc = best["avg_accuracy_score"] * 100
     console.print(
@@ -395,10 +432,12 @@ def _print_narrative(console: Console, rows: list[dict], by: str) -> None:
 
         console.print(
             f"\n[bold]Self-hosted vs API:[/bold] "
-            f"[cyan]{best_free['group_key']}[/cyan] achieves [green]{free_acc:.1f}%[/green] quality "
+            f"[cyan]{best_free['group_key']}[/cyan] achieves "
+            f"[green]{free_acc:.1f}%[/green] quality "
             f"at [green]$0 marginal cost[/green], "
             f"versus [magenta]{best_paid['group_key']}[/magenta] at "
-            f"[green]{paid_acc:.1f}%[/green] for [yellow]${paid_cost:.4f}[/yellow] total spend."
+            f"[green]{paid_acc:.1f}%[/green] for "
+            f"[yellow]${paid_cost:.4f}[/yellow] total spend."
         )
         if gap_pp <= 0:
             console.print(
@@ -435,6 +474,7 @@ def _print_narrative(console: Console, rows: list[dict], by: str) -> None:
         "Higher is better. Local inference uses $0.001 as a floor (not literally free).[/dim]"
     )
 
+
 @click.command("tiers")
 def tiers() -> None:
     """Show available burn tiers and their profiles."""
@@ -462,38 +502,78 @@ def tiers() -> None:
         )
     console.print(table)
 
+
 @click.command("sweep")
 @click.option(
-    "--provider", "-p", "provider_name",
+    "--provider",
+    "-p",
+    "provider_name",
     type=PROVIDER_CHOICES,
     default="ollama",
     help="Provider to evaluate (default: ollama for local models)",
 )
 @click.option(
-    "--models", type=str, default=None,
+    "--models",
+    type=str,
+    default=None,
     help="Comma-separated list of models to sweep (e.g. qwen2.5:1.5b,mistral:7b)",
 )
 @click.option(
-    "--all-local", "all_local", is_flag=True, default=False,
+    "--all-local",
+    "all_local",
+    is_flag=True,
+    default=False,
     help="Discover and sweep all models on the Ollama host (ollama provider only)",
 )
-@click.option("--ollama-host", "ollama_host", type=str, default=None,
-              help="Ollama host URL (default: ATOMICS_OLLAMA_HOST)")
-@click.option("--host", "ollama_host", type=str, default=None, hidden=True,
-              help="Deprecated alias for --ollama-host")
-@click.option("--vllm-host", "vllm_host", type=str, default=None,
-              help="vLLM/OpenAI-compatible base URL (default: ATOMICS_VLLM_HOST)")
-@click.option("--judge-provider", "judge_provider_name", type=PROVIDER_CHOICES, default="ollama",
-              help="Provider for quality judge (default: ollama — $0)")
+@click.option(
+    "--ollama-host",
+    "ollama_host",
+    type=str,
+    default=None,
+    help="Ollama host URL (default: ATOMICS_OLLAMA_HOST)",
+)
+@click.option(
+    "--host",
+    "ollama_host",
+    type=str,
+    default=None,
+    hidden=True,
+    help="Deprecated alias for --ollama-host",
+)
+@click.option(
+    "--vllm-host",
+    "vllm_host",
+    type=str,
+    default=None,
+    help="vLLM/OpenAI-compatible base URL (default: ATOMICS_VLLM_HOST)",
+)
+@click.option(
+    "--judge-provider",
+    "judge_provider_name",
+    type=PROVIDER_CHOICES,
+    default="ollama",
+    help="Provider for quality judge (default: ollama — $0)",
+)
 @click.option("--judge-model", type=str, default=None, help="Judge model override")
 @click.option("--judge-host", type=str, default=None, help="Ollama host for judge")
-@click.option("--fixtures", type=str, default=None, help="Comma-separated fixture IDs (default: all)")
+@click.option(
+    "--fixtures", type=str, default=None, help="Comma-separated fixture IDs (default: all)"
+)
 @click.option("--thinking/--no-thinking", "thinking_flag", default=None)
 @click.option("--thinking-budget", type=int, default=None)
-@click.option("--verbose", "-v", is_flag=True, default=False,
-              help="Print each model's full reply alongside scores")
-@click.option("--save/--no-save", "save_results", default=False,
-              help="Persist sweep results to database (default: off)")
+@click.option(
+    "--verbose",
+    "-v",
+    is_flag=True,
+    default=False,
+    help="Print each model's full reply alongside scores",
+)
+@click.option(
+    "--save/--no-save",
+    "save_results",
+    default=False,
+    help="Persist sweep results to database (default: off)",
+)
 @click.option(
     "--suites",
     type=str,
@@ -568,13 +648,13 @@ def sweep(
     """
     from pathlib import Path
 
+    from atomics.benchmark.sweep import ModelSweepResult, run_model_sweep
     from atomics.eval.gauntlet import (
         ignore_broken_pipe,
         make_suite_runner,
         parse_suites,
         run_gauntlet,
     )
-    from atomics.benchmark.sweep import ModelSweepResult, run_model_sweep
 
     settings = load_settings()
     setup_logging(settings.log_level)
@@ -592,6 +672,7 @@ def sweep(
             console.print("[red]--all-local only works with --provider ollama[/red]")
             raise SystemExit(1)
         from atomics.providers.ollama import OllamaProvider
+
         disc = OllamaProvider(host=effective_host)
         try:
             available = asyncio.run(disc.list_models())
@@ -660,9 +741,7 @@ def sweep(
             mark = "[green]OK[/green]" if row.ok else "[red]FAIL[/red]"
             if row.tool_capable is False:
                 mark = "[yellow]SKIP[/yellow]" if row.ok else "[red]INCAPABLE[/red]"
-            headline = (
-                f"{row.headline * 100:.1f}%" if row.headline is not None else "—"
-            )
+            headline = f"{row.headline * 100:.1f}%" if row.headline is not None else "—"
             table.add_row(row.model, row.suite, mark, headline)
             try:
                 console.print(f"  [dim]{row.suite}[/dim] {row.model}")
@@ -699,7 +778,11 @@ def sweep(
             console.print(f"  [dim]judge:[/dim]  {_rich_escape(fr.judge.rationale[:200])}")
 
     def on_model_done(r: ModelSweepResult) -> None:
-        q = f"[green]{r.overall_quality * 100:.0f}%[/green]" if r.overall_quality is not None else "[red]FAIL[/red]"
+        q = (
+            f"[green]{r.overall_quality * 100:.0f}%[/green]"
+            if r.overall_quality is not None
+            else "[red]FAIL[/red]"
+        )
         result_table.add_row(
             r.model,
             q,
@@ -710,20 +793,24 @@ def sweep(
         )
         console.print(f"\n  [dim]Done:[/dim] {r.model}")
 
-    console.print(f"[bold]Sweeping {len(model_list)} models × "
-                  f"{'all' if fixture_ids is None else len(fixture_ids)} fixtures[/bold]\n")
+    console.print(
+        f"[bold]Sweeping {len(model_list)} models × "
+        f"{'all' if fixture_ids is None else len(fixture_ids)} fixtures[/bold]\n"
+    )
 
-    results = asyncio.run(run_model_sweep(
-        provider_factory=provider_factory,
-        judge_provider=judge_provider,
-        models=model_list,
-        fixture_ids=fixture_ids,
-        judge_model=judge_model,
-        thinking=thinking_flag,
-        thinking_budget=thinking_budget,
-        on_model_done=on_model_done,
-        on_fixture_done=on_fixture_done_verbose,
-    ))
+    results = asyncio.run(
+        run_model_sweep(
+            provider_factory=provider_factory,
+            judge_provider=judge_provider,
+            models=model_list,
+            fixture_ids=fixture_ids,
+            judge_model=judge_model,
+            thinking=thinking_flag,
+            thinking_budget=thinking_budget,
+            on_model_done=on_model_done,
+            on_fixture_done=on_fixture_done_verbose,
+        )
+    )
 
     console.print(result_table)
 
@@ -750,15 +837,18 @@ def sweep(
 
     if save_results:
         from atomics.storage.repository import MetricsRepository
+
         repo = MetricsRepository(settings.db_path)
         for r in results:
             repo.save_sweep_result(r)
         repo.close()
         console.print("\n[dim]Sweep results saved to database.[/dim]")
 
+
 def _run_labcompare_sync(**kwargs) -> list[CellResult]:
     """Sync wrapper around the async orchestrator (patch target in tests)."""
     return asyncio.run(run_labcompare(**kwargs))
+
 
 def _render_labcompare(console, cells, hosts, dims) -> None:
     """Print a per-model side-by-side block with speedup and parity verdicts."""
@@ -811,22 +901,43 @@ def _render_labcompare(console, cells, hosts, dims) -> None:
             console.print(line)
         console.print()
 
+
 @click.command("labcompare")
-@click.option("--host", "hosts_raw", multiple=True, required=True,
-              help="Labeled endpoint NAME=URL (repeat for each host).")
-@click.option("--models", "models_csv", required=True,
-              help="Comma-separated models to test on every host.")
-@click.option("--quality-suite", type=click.Choice(["eval", "redblue"]),
-              default="eval", show_default=True)
-@click.option("--dimensions", default="throughput,quality", show_default=True,
-              help="Comma-separated: throughput,quality")
+@click.option(
+    "--host",
+    "hosts_raw",
+    multiple=True,
+    required=True,
+    help="Labeled endpoint NAME=URL (repeat for each host).",
+)
+@click.option(
+    "--models", "models_csv", required=True, help="Comma-separated models to test on every host."
+)
+@click.option(
+    "--quality-suite", type=click.Choice(["eval", "redblue"]), default="eval", show_default=True
+)
+@click.option(
+    "--dimensions",
+    default="throughput,quality",
+    show_default=True,
+    help="Comma-separated: throughput,quality",
+)
 @click.option("--judge-host", default=None)
 @click.option("--judge-model", default=None)
 @click.option("--prompts", type=int, default=3, show_default=True)
 @click.option("--save/--no-save", "save_results", default=True, show_default=True)
 @click.option("-o", "--json-out", "json_out", type=click.Path(), default=None)
-def labcompare(hosts_raw, models_csv, quality_suite, dimensions, judge_host,
-               judge_model, prompts, save_results, json_out):
+def labcompare(
+    hosts_raw,
+    models_csv,
+    quality_suite,
+    dimensions,
+    judge_host,
+    judge_model,
+    prompts,
+    save_results,
+    json_out,
+):
     """Compare two+ inference hosts on throughput and quality parity."""
     console = Console()
     settings = load_settings()
@@ -850,21 +961,29 @@ def labcompare(hosts_raw, models_csv, quality_suite, dimensions, judge_host,
     def ps_fetcher_factory(url):
         async def _ps():
             import httpx
+
             async with httpx.AsyncClient(timeout=10.0) as client:
                 r = await client.get(f"{url}/api/ps")
                 r.raise_for_status()
                 return r.json()
+
         return _ps
 
     async def quality_fn(provider, jhost, jmodel, model):
         judge = _make_provider("ollama", jmodel, jhost or provider._host, settings)
         if quality_suite == "redblue":
             summary = await run_redblue(
-                provider, judge_provider=judge, model=model, judge_model=jmodel,
+                provider,
+                judge_provider=judge,
+                model=model,
+                judge_model=jmodel,
             )
             return summary.overall_quality
         summary = await run_eval(
-            provider, judge_provider=judge, model=model, judge_model=jmodel,
+            provider,
+            judge_provider=judge,
+            model=model,
+            judge_model=jmodel,
         )
         return summary.overall_accuracy
 
@@ -874,9 +993,15 @@ def labcompare(hosts_raw, models_csv, quality_suite, dimensions, judge_host,
     )
 
     cells = _run_labcompare_sync(
-        hosts=hosts, models=models, dimensions=dims, quality_suite=quality_suite,
-        judge_host=judge_host, judge_model=judge_model, prompts=prompts,
-        provider_factory=provider_factory, quality_fn=quality_fn,
+        hosts=hosts,
+        models=models,
+        dimensions=dims,
+        quality_suite=quality_suite,
+        judge_host=judge_host,
+        judge_model=judge_model,
+        prompts=prompts,
+        provider_factory=provider_factory,
+        quality_fn=quality_fn,
         ps_fetcher_factory=ps_fetcher_factory,
     )
 
@@ -885,14 +1010,20 @@ def labcompare(hosts_raw, models_csv, quality_suite, dimensions, judge_host,
     if save_results:
         cmp_id = __import__("uuid").uuid4().hex[:12]
         from atomics.storage.repository import MetricsRepository
+
         repo = MetricsRepository(settings.db_path)
         for c in cells:
             repo.save_labcompare_result(
-                comparison_run_id=cmp_id, host_name=c.host_name,
-                host_url=c.host_url, model=c.model,
-                tokens_per_second=c.tokens_per_second, latency_ms=c.latency_ms,
-                prompt_eval_rate=c.prompt_eval_rate, vram_fit_pct=c.vram_fit_pct,
-                gpu_name=c.gpu_name, quality_score=c.quality_score,
+                comparison_run_id=cmp_id,
+                host_name=c.host_name,
+                host_url=c.host_url,
+                model=c.model,
+                tokens_per_second=c.tokens_per_second,
+                latency_ms=c.latency_ms,
+                prompt_eval_rate=c.prompt_eval_rate,
+                vram_fit_pct=c.vram_fit_pct,
+                gpu_name=c.gpu_name,
+                quality_score=c.quality_score,
                 quality_suite=quality_suite if "quality" in dims else None,
                 judge_model=judge_model if "quality" in dims else None,
                 dimensions=",".join(dims),
@@ -903,5 +1034,6 @@ def labcompare(hosts_raw, models_csv, quality_suite, dimensions, judge_host,
     if json_out:
         import json
         from pathlib import Path as _Path
+
         _Path(json_out).write_text(json.dumps([c.__dict__ for c in cells], indent=2))
         console.print(f"[dim]Wrote {json_out}[/dim]")

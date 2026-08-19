@@ -97,9 +97,7 @@ def print_category_breakdown(repo: MetricsRepository) -> None:
     console.print(table)
 
 
-def print_provider_summary(
-    repo: MetricsRepository, *, since_hours: float | None = None
-) -> None:
+def print_provider_summary(repo: MetricsRepository, *, since_hours: float | None = None) -> None:
     console = Console()
     rows = repo.get_runs_by_provider(since_hours=since_hours)
     if not rows:

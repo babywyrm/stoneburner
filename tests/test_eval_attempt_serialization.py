@@ -146,7 +146,5 @@ def test_representative_error_prefers_provider_and_sanitizes_secret() -> None:
 
 
 def test_has_parse_failure_checks_judge_status() -> None:
-    assert has_parse_failure(
-        [_attempt(judge_status=JudgeOutcomeStatus.PARSE_FAILED)]
-    )
+    assert has_parse_failure([_attempt(judge_status=JudgeOutcomeStatus.PARSE_FAILED)])
     assert not has_parse_failure([_attempt()])

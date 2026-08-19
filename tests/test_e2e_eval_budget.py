@@ -45,17 +45,28 @@ def test_a_budgeted_eval_runs_end_to_end_over_http(
     the real path, this fails.
     """
     json_out = tmp_path / "eval.json"
-    result = CliRunner().invoke(eval_command, [
-        "--provider", "vllm",
-        "--vllm-host", inference_stub.openai_base_url,
-        "--model", TEST_MODEL,
-        "--judge-provider", "vllm",
-        "--judge-model", JUDGE_MODEL,
-        "--fixtures", "ev-01,ev-02",
-        "--no-save",
-        "--budget", "50.00",
-        "--json-out", str(json_out),
-    ])
+    result = CliRunner().invoke(
+        eval_command,
+        [
+            "--provider",
+            "vllm",
+            "--vllm-host",
+            inference_stub.openai_base_url,
+            "--model",
+            TEST_MODEL,
+            "--judge-provider",
+            "vllm",
+            "--judge-model",
+            JUDGE_MODEL,
+            "--fixtures",
+            "ev-01,ev-02",
+            "--no-save",
+            "--budget",
+            "50.00",
+            "--json-out",
+            str(json_out),
+        ],
+    )
 
     assert result.exit_code == 0, f"{result.output}\n{result.exception}"
     payload = json.loads(json_out.read_text())
@@ -80,22 +91,31 @@ def test_an_unbudgeted_eval_is_byte_identical(
     outputs = []
     for args in (["--budget", "50.00"], []):
         json_out = tmp_path / f"eval{len(outputs)}.json"
-        result = CliRunner().invoke(eval_command, [
-            "--provider", "vllm",
-            "--vllm-host", inference_stub.openai_base_url,
-            "--model", TEST_MODEL,
-            "--judge-provider", "vllm",
-            "--judge-model", JUDGE_MODEL,
-            "--fixtures", "ev-01",
-            "--no-save",
-            "--json-out", str(json_out),
-            *args,
-        ])
+        result = CliRunner().invoke(
+            eval_command,
+            [
+                "--provider",
+                "vllm",
+                "--vllm-host",
+                inference_stub.openai_base_url,
+                "--model",
+                TEST_MODEL,
+                "--judge-provider",
+                "vllm",
+                "--judge-model",
+                JUDGE_MODEL,
+                "--fixtures",
+                "ev-01",
+                "--no-save",
+                "--json-out",
+                str(json_out),
+                *args,
+            ],
+        )
         assert result.exit_code == 0, result.output
         payload = json.loads(json_out.read_text())
         outputs.append(
-            (payload["overall_accuracy"], payload["total_fixtures"],
-             payload["parse_failure_rate"])
+            (payload["overall_accuracy"], payload["total_fixtures"], payload["parse_failure_rate"])
         )
 
     assert outputs[0] == outputs[1]

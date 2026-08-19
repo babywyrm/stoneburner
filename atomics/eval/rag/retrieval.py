@@ -79,8 +79,7 @@ class LocalSentenceTransformerEmbedder:
             from sentence_transformers import SentenceTransformer
         except ImportError as exc:
             raise ImportError(
-                "RAG indexing requires the [rag] extra: "
-                'uv pip install "stoneburner-atomics[rag]"'
+                'RAG indexing requires the [rag] extra: uv pip install "stoneburner-atomics[rag]"'
             ) from exc
         self.model_name = model
         self._model = SentenceTransformer(model)
@@ -143,8 +142,7 @@ def _require_sqlite_vec() -> Any:
         import sqlite_vec
     except ImportError as exc:
         raise ImportError(
-            "RAG indexing requires the [rag] extra: "
-            'uv pip install "stoneburner-atomics[rag]"'
+            'RAG indexing requires the [rag] extra: uv pip install "stoneburner-atomics[rag]"'
         ) from exc
     return sqlite_vec
 
@@ -168,9 +166,7 @@ class RAGIndex:
                 f"embedding FLOAT[{self.embedder.dim}], "
                 f"+source TEXT, +chunk_index INTEGER, +offset INTEGER, +content TEXT)"
             )
-            conn.execute(
-                "CREATE TABLE IF NOT EXISTS index_meta (key TEXT PRIMARY KEY, value TEXT)"
-            )
+            conn.execute("CREATE TABLE IF NOT EXISTS index_meta (key TEXT PRIMARY KEY, value TEXT)")
 
     def build(
         self,
@@ -194,8 +190,7 @@ class RAGIndex:
                     )
                 )
         source_paths = {
-            doc.source: (doc.metadata or {}).get("full_path", doc.source)
-            for doc in documents
+            doc.source: (doc.metadata or {}).get("full_path", doc.source) for doc in documents
         }
         with sqlite3.connect(self.db_path) as conn:
             conn.enable_load_extension(True)
@@ -238,10 +233,7 @@ class RAGIndex:
                 "FROM chunks WHERE embedding MATCH ? ORDER BY distance LIMIT ?",
                 (vec.serialize_float32(query_embedding), top_k),
             ).fetchall()
-        return [
-            RAGChunk(content=row[3], label="retrieved", source=row[0])
-            for row in rows
-        ]
+        return [RAGChunk(content=row[3], label="retrieved", source=row[0]) for row in rows]
 
     def info(self) -> dict[str, Any]:
         with sqlite3.connect(self.db_path) as conn:

@@ -48,9 +48,7 @@ class RAGRunSummary:
     @property
     def grounding_score(self) -> float | None:
         scored = [
-            r.judge.grounding
-            for r in self.fixture_results
-            if r.judge and not r.judge.parse_failed
+            r.judge.grounding for r in self.fixture_results if r.judge and not r.judge.parse_failed
         ]
         return round(sum(scored) / len(scored) / 4.0, 3) if scored else None
 
@@ -93,9 +91,7 @@ class RAGRunSummary:
     @property
     def overall_rag_score(self) -> float | None:
         scored = [
-            r.judge.score
-            for r in self.fixture_results
-            if r.judge and not r.judge.parse_failed
+            r.judge.score for r in self.fixture_results if r.judge and not r.judge.parse_failed
         ]
         return round(sum(scored) / len(scored), 3) if scored else None
 
@@ -217,9 +213,7 @@ async def run_rag(
     """Run the RAG evaluation suite."""
     effective_judge = judge_provider or provider
     extra_judges = extra_judges or []
-    if detect_self_judge(
-        provider, model, [(effective_judge, judge_model), *extra_judges]
-    ):
+    if detect_self_judge(provider, model, [(effective_judge, judge_model), *extra_judges]):
         logger.warning(
             "Self-judging detected: the model under test is also a judge. "
             "Scores are biased upward by self-preference — use a different "

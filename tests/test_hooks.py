@@ -53,6 +53,7 @@ def test_notify_skips_when_no_binary(monkeypatch, system):
 
 def test_notify_macos_runs_osascript(monkeypatch):
     monkeypatch.setattr("atomics.hooks.platform.system", lambda: "Darwin")
+
     def _which(name: str) -> str | None:
         return "/usr/bin/osascript" if name == "osascript" else None
 
@@ -65,6 +66,7 @@ def test_notify_macos_runs_osascript(monkeypatch):
 
 # ── notify-send Linux path ────────────────────────────────────────────────────
 
+
 def test_notify_linux_notify_send():
     """Line 56: Linux + notify-send path uses notify_run_complete."""
     from datetime import UTC, datetime
@@ -72,14 +74,22 @@ def test_notify_linux_notify_send():
 
     from atomics.hooks import notify_run_complete
     from atomics.models import RunSummary
+
     summary = RunSummary(
-        run_id="test123", total_tasks=2, successful_tasks=2,
-        failed_tasks=0, total_tokens=500, total_cost_usd=0.005,
-        started_at=datetime.now(UTC), completed_at=datetime.now(UTC),
+        run_id="test123",
+        total_tasks=2,
+        successful_tasks=2,
+        failed_tasks=0,
+        total_tokens=500,
+        total_cost_usd=0.005,
+        started_at=datetime.now(UTC),
+        completed_at=datetime.now(UTC),
     )
-    with patch("platform.system", return_value="Linux"), \
-         patch("shutil.which", return_value="/usr/bin/notify-send"), \
-         patch("subprocess.run") as mock_run:
+    with (
+        patch("platform.system", return_value="Linux"),
+        patch("shutil.which", return_value="/usr/bin/notify-send"),
+        patch("subprocess.run") as mock_run,
+    ):
         notify_run_complete(summary, title="Atomics")
 
     assert mock_run.called

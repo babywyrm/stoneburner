@@ -215,9 +215,12 @@ async def _fake_single_request(client, host, model, prompt, num_predict):
 class TestRunSoak:
     @pytest.mark.asyncio
     async def test_basic_run(self):
-        with patch("atomics.stress._get_vram_used_mb", return_value=8000.0), \
-             patch("atomics.stress._single_request", side_effect=_fake_single_request):
+        with (
+            patch("atomics.stress._get_vram_used_mb", return_value=8000.0),
+            patch("atomics.stress._single_request", side_effect=_fake_single_request),
+        ):
             from atomics.soak import run_soak
+
             result = await run_soak(
                 host="http://localhost:11434",
                 model="test-model",
@@ -234,9 +237,12 @@ class TestRunSoak:
 
     @pytest.mark.asyncio
     async def test_samples_have_data(self):
-        with patch("atomics.stress._get_vram_used_mb", return_value=None), \
-             patch("atomics.stress._single_request", side_effect=_fake_single_request):
+        with (
+            patch("atomics.stress._get_vram_used_mb", return_value=None),
+            patch("atomics.stress._single_request", side_effect=_fake_single_request),
+        ):
             from atomics.soak import run_soak
+
             result = await run_soak(
                 host="http://localhost:11434",
                 model="test-model",
@@ -255,9 +261,12 @@ class TestRunSoak:
         def on_sample(s: SoakSample) -> None:
             samples_received.append(s)
 
-        with patch("atomics.stress._get_vram_used_mb", return_value=None), \
-             patch("atomics.stress._single_request", side_effect=_fake_single_request):
+        with (
+            patch("atomics.stress._get_vram_used_mb", return_value=None),
+            patch("atomics.stress._single_request", side_effect=_fake_single_request),
+        ):
             from atomics.soak import run_soak
+
             await run_soak(
                 host="http://localhost:11434",
                 model="test-model",
@@ -280,9 +289,12 @@ class TestRunSoak:
             await asyncio.sleep(0.001)
             return (50, 25, 300.0, 166.0)
 
-        with patch("atomics.stress._get_vram_used_mb", return_value=None), \
-             patch("atomics.stress._single_request", side_effect=_failing_request):
+        with (
+            patch("atomics.stress._get_vram_used_mb", return_value=None),
+            patch("atomics.stress._single_request", side_effect=_failing_request),
+        ):
             from atomics.soak import run_soak
+
             result = await run_soak(
                 host="http://localhost:11434",
                 model="test-model",
@@ -432,6 +444,7 @@ class TestSchemaVersion:
 
     def test_schema_version_bumped(self):
         from atomics.storage.schema import SCHEMA_VERSION
+
         assert SCHEMA_VERSION == 21
 
 
@@ -444,6 +457,7 @@ class TestThinkTime:
         import inspect
 
         from atomics.soak import run_soak
+
         sig = inspect.signature(run_soak)
         assert "think_time_seconds" in sig.parameters
         assert sig.parameters["think_time_seconds"].default == 0.0
@@ -453,6 +467,7 @@ class TestThinkTime:
         import inspect
 
         from atomics.soak import run_soak_provider
+
         sig = inspect.signature(run_soak_provider)
         assert "think_time_seconds" in sig.parameters
         assert sig.parameters["think_time_seconds"].default == 0.0
@@ -462,6 +477,7 @@ class TestThinkTime:
         import inspect
 
         from atomics.soak import run_soak_profile
+
         sig = inspect.signature(run_soak_profile)
         assert "think_time_seconds" in sig.parameters
         assert sig.parameters["think_time_seconds"].default == 0.0
@@ -471,6 +487,7 @@ class TestThinkTime:
         import inspect
 
         from atomics import soak as soak_module
+
         source = inspect.getsource(soak_module)
         assert "think_time_seconds > 0" in source
         assert "asyncio.sleep(think_time_seconds)" in source
@@ -501,13 +518,21 @@ class TestThinkTimeCLI:
 
         runner = CliRunner()
         with patch("atomics.soak.run_soak", side_effect=_fake_run):
-            result = runner.invoke(cli, [
-                "soak", "--model", "test",
-                "--ollama-host", "http://fake:11434",
-                "--duration", "1m",
-                "--think-time", "5.0",
-                "--no-save",
-            ])
+            result = runner.invoke(
+                cli,
+                [
+                    "soak",
+                    "--model",
+                    "test",
+                    "--ollama-host",
+                    "http://fake:11434",
+                    "--duration",
+                    "1m",
+                    "--think-time",
+                    "5.0",
+                    "--no-save",
+                ],
+            )
 
         assert result.exit_code == 0
         assert captured.get("think_time_seconds") == 5.0
@@ -543,9 +568,11 @@ class TestSoakPercentile:
 
 def _async_req_provider(out=80, inp=20, lat=20.0, tps=200.0, cost=0.001):
     """Return an AsyncMock that resolves instantly to (out, inp, lat, tps, cost)."""
+
     async def _fn(provider, prompt, num_predict):
         await asyncio.sleep(0)
         return (out, inp, lat, tps, cost)
+
     return _fn
 
 
@@ -563,8 +590,8 @@ class TestRunSoakProvider:
     @pytest.mark.asyncio
     async def test_basic_provider_run(self):
         from atomics.soak import run_soak_provider
-        with patch("atomics.stress._single_request_provider",
-                   side_effect=_async_req_provider()):
+
+        with patch("atomics.stress._single_request_provider", side_effect=_async_req_provider()):
             result = await run_soak_provider(
                 provider=_make_mock_provider(),
                 model="test-model",
@@ -582,11 +609,14 @@ class TestRunSoakProvider:
     @pytest.mark.asyncio
     async def test_provider_samples_collected(self):
         from atomics.soak import run_soak_provider
+
         # duration/interval give ~15 expected samples so coverage/scheduler
         # overhead on slow CI hosts can't starve this below the >=2 assertion
         # (1.0s/0.2s still flaked under coverage on a slower Linux box).
-        with patch("atomics.stress._single_request_provider",
-                   side_effect=_async_req_provider(out=60, lat=50.0)):
+        with patch(
+            "atomics.stress._single_request_provider",
+            side_effect=_async_req_provider(out=60, lat=50.0),
+        ):
             result = await run_soak_provider(
                 provider=_make_mock_provider("prov2"),
                 model="m",
@@ -601,6 +631,7 @@ class TestRunSoakProvider:
     @pytest.mark.asyncio
     async def test_provider_callback_fires(self):
         from atomics.soak import run_soak_provider
+
         received: list[SoakSample] = []
 
         def on_sample(s: SoakSample) -> None:
@@ -609,8 +640,7 @@ class TestRunSoakProvider:
         # duration/interval give ~15 expected samples — enough margin that
         # coverage/scheduler overhead on slow CI hosts can't starve this below
         # the >=2 assertion (1.0s/0.2s still flaked under coverage on Linux).
-        with patch("atomics.stress._single_request_provider",
-                   side_effect=_async_req_provider()):
+        with patch("atomics.stress._single_request_provider", side_effect=_async_req_provider()):
             await run_soak_provider(
                 provider=_make_mock_provider("cb-prov"),
                 model="m",
@@ -624,6 +654,7 @@ class TestRunSoakProvider:
     @pytest.mark.asyncio
     async def test_provider_failure_handling(self):
         from atomics.soak import run_soak_provider
+
         call_n = [0]
 
         async def _sometimes_fail(provider, prompt, num_predict):
@@ -646,8 +677,10 @@ class TestRunSoakProvider:
     @pytest.mark.asyncio
     async def test_provider_think_time_param(self):
         from atomics.soak import run_soak_provider
-        with patch("atomics.stress._single_request_provider",
-                   side_effect=_async_req_provider(lat=10.0)):
+
+        with patch(
+            "atomics.stress._single_request_provider", side_effect=_async_req_provider(lat=10.0)
+        ):
             result = await run_soak_provider(
                 provider=_make_mock_provider("think"),
                 model="m",
@@ -661,8 +694,11 @@ class TestRunSoakProvider:
     @pytest.mark.asyncio
     async def test_provider_metrics_computed(self):
         from atomics.soak import run_soak_provider
-        with patch("atomics.stress._single_request_provider",
-                   side_effect=_async_req_provider(out=100, cost=0.002)):
+
+        with patch(
+            "atomics.stress._single_request_provider",
+            side_effect=_async_req_provider(out=100, cost=0.002),
+        ):
             result = await run_soak_provider(
                 provider=_make_mock_provider("metrics-prov", "https://x"),
                 model="metrics-model",
@@ -680,19 +716,29 @@ class TestRunSoakProvider:
 
 def _make_ollama_profile():
     from types import SimpleNamespace
+
     return SimpleNamespace(
-        type="ollama", name="test-gate", model="qwen2.5:3b",
-        ollama_host="http://localhost:11434", http_url="",
-        http_timeout=30, prompts=["Is this a test?", "What is your role?"],
+        type="ollama",
+        name="test-gate",
+        model="qwen2.5:3b",
+        ollama_host="http://localhost:11434",
+        http_url="",
+        http_timeout=30,
+        prompts=["Is this a test?", "What is your role?"],
     )
 
 
 def _make_http_profile():
     from types import SimpleNamespace
+
     return SimpleNamespace(
-        type="http", name="http-gate", model="",
-        ollama_host="", http_url="http://localhost:8080/ask",
-        http_timeout=30, prompts=["Probe question"],
+        type="http",
+        name="http-gate",
+        model="",
+        ollama_host="",
+        http_url="http://localhost:8080/ask",
+        http_timeout=30,
+        prompts=["Probe question"],
     )
 
 
@@ -707,8 +753,8 @@ class TestRunSoakProfile:
     @pytest.mark.asyncio
     async def test_ollama_profile_basic_run(self):
         from atomics.soak import run_soak_profile
-        with patch("atomics.profiles._single_request_profile",
-                   side_effect=_fast_profile_req):
+
+        with patch("atomics.profiles._single_request_profile", side_effect=_fast_profile_req):
             result = await run_soak_profile(
                 profile=_make_ollama_profile(),
                 concurrency=2,
@@ -723,8 +769,8 @@ class TestRunSoakProfile:
     @pytest.mark.asyncio
     async def test_http_profile_basic_run(self):
         from atomics.soak import run_soak_profile
-        with patch("atomics.profiles._single_request_profile",
-                   side_effect=_fast_profile_req):
+
+        with patch("atomics.profiles._single_request_profile", side_effect=_fast_profile_req):
             result = await run_soak_profile(
                 profile=_make_http_profile(),
                 concurrency=1,
@@ -737,6 +783,7 @@ class TestRunSoakProfile:
     @pytest.mark.asyncio
     async def test_profile_callback_fires(self):
         from atomics.soak import run_soak_profile
+
         received: list[SoakSample] = []
 
         def on_sample(s: SoakSample) -> None:
@@ -744,8 +791,7 @@ class TestRunSoakProfile:
 
         # ~5 expected samples so coverage/scheduler overhead can't starve the
         # >=2 assertion (0.5s/0.2s left exactly 2 expected with zero slack).
-        with patch("atomics.profiles._single_request_profile",
-                   side_effect=_fast_profile_req):
+        with patch("atomics.profiles._single_request_profile", side_effect=_fast_profile_req):
             await run_soak_profile(
                 profile=_make_ollama_profile(),
                 concurrency=1,
@@ -758,6 +804,7 @@ class TestRunSoakProfile:
     @pytest.mark.asyncio
     async def test_profile_failure_handling(self):
         from atomics.soak import run_soak_profile
+
         call_n = [0]
 
         async def _sometimes_fail(client, profile, prompt):
@@ -779,8 +826,8 @@ class TestRunSoakProfile:
     @pytest.mark.asyncio
     async def test_profile_think_time_param(self):
         from atomics.soak import run_soak_profile
-        with patch("atomics.profiles._single_request_profile",
-                   side_effect=_fast_profile_req):
+
+        with patch("atomics.profiles._single_request_profile", side_effect=_fast_profile_req):
             result = await run_soak_profile(
                 profile=_make_ollama_profile(),
                 concurrency=1,
@@ -793,8 +840,8 @@ class TestRunSoakProfile:
     @pytest.mark.asyncio
     async def test_profile_metrics_computed(self):
         from atomics.soak import run_soak_profile
-        with patch("atomics.profiles._single_request_profile",
-                   side_effect=_fast_profile_req):
+
+        with patch("atomics.profiles._single_request_profile", side_effect=_fast_profile_req):
             result = await run_soak_profile(
                 profile=_make_ollama_profile(),
                 concurrency=2,
@@ -809,13 +856,17 @@ class TestRunSoakProfile:
         from types import SimpleNamespace
 
         from atomics.soak import run_soak_profile
+
         profile_no_prompts = SimpleNamespace(
-            type="ollama", name="no-prompts", model="m",
-            ollama_host="http://localhost:11434", http_url="",
-            http_timeout=30, prompts=[],
+            type="ollama",
+            name="no-prompts",
+            model="m",
+            ollama_host="http://localhost:11434",
+            http_url="",
+            http_timeout=30,
+            prompts=[],
         )
-        with patch("atomics.profiles._single_request_profile",
-                   side_effect=_fast_profile_req):
+        with patch("atomics.profiles._single_request_profile", side_effect=_fast_profile_req):
             result = await run_soak_profile(
                 profile=profile_no_prompts,
                 concurrency=1,

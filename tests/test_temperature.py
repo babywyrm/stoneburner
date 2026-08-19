@@ -20,7 +20,9 @@ def _ollama_response():
     r.status_code = 200
     r.raise_for_status = MagicMock()
     r.json.return_value = {
-        "response": "ok", "eval_count": 5, "prompt_eval_count": 3,
+        "response": "ok",
+        "eval_count": 5,
+        "prompt_eval_count": 3,
         "eval_duration": 100_000_000,
     }
     return r
@@ -29,6 +31,7 @@ def _ollama_response():
 @pytest.mark.asyncio
 async def test_ollama_forwards_temperature():
     from atomics.providers.ollama import OllamaProvider
+
     client = AsyncMock()
     client.post = AsyncMock(return_value=_ollama_response())
     provider = OllamaProvider(host="http://fake:11434", client=client)
@@ -40,6 +43,7 @@ async def test_ollama_forwards_temperature():
 @pytest.mark.asyncio
 async def test_ollama_omits_temperature_when_none():
     from atomics.providers.ollama import OllamaProvider
+
     client = AsyncMock()
     client.post = AsyncMock(return_value=_ollama_response())
     provider = OllamaProvider(host="http://fake:11434", client=client)
@@ -63,6 +67,7 @@ def _vllm_response():
 @pytest.mark.asyncio
 async def test_vllm_forwards_temperature():
     from atomics.providers.vllm import VllmProvider
+
     client = AsyncMock()
     client.post = AsyncMock(return_value=_vllm_response())
     provider = VllmProvider(base_url="http://fake:8000/v1", client=client)
@@ -74,6 +79,7 @@ async def test_vllm_forwards_temperature():
 @pytest.mark.asyncio
 async def test_vllm_omits_temperature_when_none():
     from atomics.providers.vllm import VllmProvider
+
     client = AsyncMock()
     client.post = AsyncMock(return_value=_vllm_response())
     provider = VllmProvider(base_url="http://fake:8000/v1", client=client)
@@ -92,6 +98,7 @@ class _OAIUsage:
 class _OAIChoice:
     class _M:
         content = "ok"
+
     message = _M()
 
 
@@ -114,6 +121,7 @@ class _CapturingCompletions:
 
 def _openai_provider():
     from atomics.providers.openai import OpenAIProvider
+
     comps = _CapturingCompletions()
     client = type("C", (), {"chat": type("Chat", (), {"completions": comps})()})()
     return OpenAIProvider(api_key="fake", client=client), comps
@@ -228,6 +236,7 @@ class _CapturingMessages:
 
 def _claude_provider():
     from atomics.providers.claude import ClaudeProvider
+
     msgs = _CapturingMessages()
     client = type("C", (), {"messages": msgs})()
     return ClaudeProvider(api_key="fake", client=client), msgs
@@ -244,7 +253,10 @@ async def test_claude_forwards_temperature_without_thinking():
 async def test_claude_omits_temperature_with_thinking():
     provider, msgs = _claude_provider()
     await provider.generate(
-        "hi", model="claude-sonnet-4-6", thinking=True, temperature=0.0,
+        "hi",
+        model="claude-sonnet-4-6",
+        thinking=True,
+        temperature=0.0,
     )
     # Anthropic requires temperature=1 with extended thinking, so we must not
     # send our explicit value.
@@ -268,6 +280,7 @@ class _CapturingBedrock:
 @pytest.mark.asyncio
 async def test_bedrock_forwards_temperature():
     from atomics.providers.bedrock import BedrockProvider
+
     client = _CapturingBedrock()
     provider = BedrockProvider(client=client)
     await provider.generate("hi", temperature=0.0)
@@ -277,6 +290,7 @@ async def test_bedrock_forwards_temperature():
 @pytest.mark.asyncio
 async def test_bedrock_omits_temperature_when_none():
     from atomics.providers.bedrock import BedrockProvider
+
     client = _CapturingBedrock()
     provider = BedrockProvider(client=client)
     await provider.generate("hi")
@@ -286,18 +300,32 @@ async def test_bedrock_omits_temperature_when_none():
 # ── Judge passes temperature=0.0 ────────────────────────────────────────────
 class _CapturingJudgeProvider:
     """Records the temperature the judge requests; returns a parseable rubric."""
+
     name = "fake-judge"
 
     def __init__(self):
         self.temperature = "unset"
 
-    async def generate(self, prompt, *, system="", model=None, max_tokens=1024,
-                        thinking=None, thinking_budget=None, temperature=None):
+    async def generate(
+        self,
+        prompt,
+        *,
+        system="",
+        model=None,
+        max_tokens=1024,
+        thinking=None,
+        thinking_budget=None,
+        temperature=None,
+    ):
         self.temperature = temperature
         return ProviderResponse(
             text="ACCURACY: 4\nCOMPLETENESS: 3\nFORMAT: 3\nRATIONALE: solid.",
-            input_tokens=1, output_tokens=1, total_tokens=2,
-            model="fake-judge", latency_ms=1.0, estimated_cost_usd=0.0,
+            input_tokens=1,
+            output_tokens=1,
+            total_tokens=2,
+            model="fake-judge",
+            latency_ms=1.0,
+            estimated_cost_usd=0.0,
         )
 
     async def health_check(self):
@@ -307,6 +335,7 @@ class _CapturingJudgeProvider:
 @pytest.mark.asyncio
 async def test_quality_judge_requests_greedy_decoding():
     from atomics.eval.judge import score_response
+
     judge = _CapturingJudgeProvider()
     result = await score_response("q", "a", judge_provider=judge)
     assert judge.temperature == 0.0
@@ -316,20 +345,38 @@ async def test_quality_judge_requests_greedy_decoding():
 @pytest.mark.asyncio
 async def test_resistance_judge_requests_greedy_decoding():
     from atomics.eval.adversarial.scorer import score_resistance
+
     judge = _CapturingJudgeProvider()
     judge_text = "RESISTANCE: 10\nLABEL: resisted\nRATIONALE: refused."
 
-    async def _gen(prompt, *, system="", model=None, max_tokens=1024,
-                   thinking=None, thinking_budget=None, temperature=None):
+    async def _gen(
+        prompt,
+        *,
+        system="",
+        model=None,
+        max_tokens=1024,
+        thinking=None,
+        thinking_budget=None,
+        temperature=None,
+    ):
         judge.temperature = temperature
         return ProviderResponse(
-            text=judge_text, input_tokens=1, output_tokens=1, total_tokens=2,
-            model="fake-judge", latency_ms=1.0, estimated_cost_usd=0.0,
+            text=judge_text,
+            input_tokens=1,
+            output_tokens=1,
+            total_tokens=2,
+            model="fake-judge",
+            latency_ms=1.0,
+            estimated_cost_usd=0.0,
         )
 
     judge.generate = _gen
     result = await score_resistance(
-        "p", "r", attack_goal="g", resistance_criteria=["c"], judge_provider=judge,
+        "p",
+        "r",
+        attack_goal="g",
+        resistance_criteria=["c"],
+        judge_provider=judge,
     )
     assert judge.temperature == 0.0
     assert result.label == "resisted"

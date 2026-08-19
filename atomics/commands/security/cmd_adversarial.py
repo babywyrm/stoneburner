@@ -27,6 +27,7 @@ from atomics.eval.budget import share_budget
 
 _KNOWN_PROVIDERS = {"claude", "bedrock", "openai", "ollama", "vllm", "brain-gateway"}
 
+
 def _parse_model_spec(spec: str, default_provider: str) -> tuple[str, str, str | None]:
     """Parse a `model`, `provider:model`, or `provider:model@host` spec.
 
@@ -44,37 +45,95 @@ def _parse_model_spec(spec: str, default_provider: str) -> tuple[str, str, str |
         return provider_name, model, host
     return default_provider, spec, host
 
+
 @click.command("adversarial")
-@click.option("--provider", "-p", "provider_name", type=PROVIDER_CHOICES, default="ollama", show_default=True)
-@click.option("--model", "-m", type=str, default=None, help="Model override for the provider under test.")
-@click.option("--ollama-host", type=str, default=None, help="Ollama base URL for the model under test.")
-@click.option("--vllm-host", "vllm_host", type=str, default=None, help="vLLM/OpenAI-compatible base URL for the model under test.")
-@click.option("--judge-provider", "judge_provider_name", type=PROVIDER_CHOICES, default="ollama", show_default=True)
+@click.option(
+    "--provider", "-p", "provider_name", type=PROVIDER_CHOICES, default="ollama", show_default=True
+)
+@click.option(
+    "--model", "-m", type=str, default=None, help="Model override for the provider under test."
+)
+@click.option(
+    "--ollama-host", type=str, default=None, help="Ollama base URL for the model under test."
+)
+@click.option(
+    "--vllm-host",
+    "vllm_host",
+    type=str,
+    default=None,
+    help="vLLM/OpenAI-compatible base URL for the model under test.",
+)
+@click.option(
+    "--judge-provider",
+    "judge_provider_name",
+    type=PROVIDER_CHOICES,
+    default="ollama",
+    show_default=True,
+)
 @click.option("--judge-model", type=str, default=None, help="Primary judge model override.")
 @click.option("--judge-host", type=str, default=None, help="Ollama base URL for the primary judge.")
 @extra_judges_option
-@click.option("--runs", type=click.IntRange(min=1), default=1, show_default=True,
-              help="Run each fixture N times and report mean ± stddev (use 3+ for variance analysis).")
-@click.option("--category", type=str, default=None,
-              help="Comma-separated categories or group aliases to run (default: all). "
-                   "Group aliases: zerotrust, agentic, mcp, tool_safety, multiturn, "
-                   "rag_poisoning, tool_desc_injection. "
-                   "Base categories: prompt_injection, role_confusion, context_escape, "
-                   "instruction_override, social_engineering, data_exfil_attempt.")
-@click.option("--thinking/--no-thinking", "thinking_flag", default=None,
-              help="Force thinking mode on or off (default: auto-detect).")
+@click.option(
+    "--runs",
+    type=click.IntRange(min=1),
+    default=1,
+    show_default=True,
+    help="Run each fixture N times and report mean ± stddev (use 3+ for variance analysis).",
+)
+@click.option(
+    "--category",
+    type=str,
+    default=None,
+    help="Comma-separated categories or group aliases to run (default: all). "
+    "Group aliases: zerotrust, agentic, mcp, tool_safety, multiturn, "
+    "rag_poisoning, tool_desc_injection. "
+    "Base categories: prompt_injection, role_confusion, context_escape, "
+    "instruction_override, social_engineering, data_exfil_attempt.",
+)
+@click.option(
+    "--thinking/--no-thinking",
+    "thinking_flag",
+    default=None,
+    help="Force thinking mode on or off (default: auto-detect).",
+)
 @click.option("--thinking-budget", type=int, default=8000, show_default=True)
 @click.option("--save/--no-save", "save_results", default=True, show_default=True)
-@click.option("--json-out", "json_out", type=click.Path(dir_okay=False, writable=True), default=None,
-              help="Write the full run (per-fixture scores, rationales, latency, cost) as JSON to this file.")
-@click.option("--compare", "compare_model", type=str, default=None,
-              help="Run a second model on the same fixtures and print a per-fixture diff. "
-                   "Format: model, provider:model, or provider:model@host.")
-@click.option("--fail-on-resilience", "fail_on_resilience", type=float, default=None,
-              help="Exit non-zero if overall severity-weighted resilience %% is below this threshold (CI gate).")
-@click.option("--allow-partial", is_flag=True,
-              help="Allow partial/invalid execution to exit zero after diagnostics.")
-@click.option("--verbose", "-v", is_flag=True, help="Show full prompt, model response, and judge reasoning for each fixture.")
+@click.option(
+    "--json-out",
+    "json_out",
+    type=click.Path(dir_okay=False, writable=True),
+    default=None,
+    help="Write the full run (per-fixture scores, rationales, latency, cost) as JSON to this file.",
+)
+@click.option(
+    "--compare",
+    "compare_model",
+    type=str,
+    default=None,
+    help="Run a second model on the same fixtures and print a per-fixture diff. "
+    "Format: model, provider:model, or provider:model@host.",
+)
+@click.option(
+    "--fail-on-resilience",
+    "fail_on_resilience",
+    type=float,
+    default=None,
+    help=(
+        "Exit non-zero if overall severity-weighted resilience %% "
+        "is below this threshold (CI gate)."
+    ),
+)
+@click.option(
+    "--allow-partial",
+    is_flag=True,
+    help="Allow partial/invalid execution to exit zero after diagnostics.",
+)
+@click.option(
+    "--verbose",
+    "-v",
+    is_flag=True,
+    help="Show full prompt, model response, and judge reasoning for each fixture.",
+)
 @budget_option
 def adversarial(
     provider_name: str,
@@ -113,7 +172,9 @@ def adversarial(
     console = Console()
     settings = load_settings()
     provider = _make_provider(provider_name, model, ollama_host, settings, vllm_host=vllm_host)
-    judge = _make_provider(judge_provider_name, judge_model, judge_host or ollama_host, settings, vllm_host=vllm_host)
+    judge = _make_provider(
+        judge_provider_name, judge_model, judge_host or ollama_host, settings, vllm_host=vllm_host
+    )
     actual_provider_name = provider.name
     effective_model = _attribution_model(provider, model)
     actual_judge_name = judge.name
@@ -133,13 +194,9 @@ def adversarial(
     # judge. One shared ceiling covers all of it.
     budget = eval_budget_from(budget_usd)
     if budget is not None:
-        guarded = share_budget(
-            budget, provider, judge, *(p for p, _ in extra_judge_pairs)
-        )
+        guarded = share_budget(budget, provider, judge, *(p for p, _ in extra_judge_pairs))
         provider, judge = guarded[0], guarded[1]
-        extra_judge_pairs = [
-            (guarded[2 + i], mdl) for i, (_, mdl) in enumerate(extra_judge_pairs)
-        ]
+        extra_judge_pairs = [(guarded[2 + i], mdl) for i, (_, mdl) in enumerate(extra_judge_pairs)]
 
     judge_label = effective_judge_model
     if extra_judge_pairs:
@@ -169,6 +226,7 @@ def adversarial(
     run.open()
     repo = run.repository
     if repo:
+
         def log_unfinished_cleanup() -> None:
             failure = run.cleanup()
             if failure is not None:
@@ -189,10 +247,13 @@ def adversarial(
     # Actual fixture count (may be filtered by --category) via the single source
     # of truth so header/progress/run all agree.
     from atomics.eval.adversarial import select_fixtures
+
     adv_fixture_count = len(select_fixtures(categories))
 
     show_progress = ctx.obj.get("progress", True) if ctx.obj else True
-    progress = FixtureProgress(adv_fixture_count, console, label="adversarial") if show_progress else None
+    progress = (
+        FixtureProgress(adv_fixture_count, console, label="adversarial") if show_progress else None
+    )
 
     def on_start(idx, fixture):
         if progress:
@@ -205,10 +266,7 @@ def adversarial(
         label = record.get("label")
         score = record.get("score")
         if status == "scored" and isinstance(score, (int, float)):
-            color = (
-                "green" if label == "resisted"
-                else ("yellow" if label == "partial" else "red")
-            )
+            color = "green" if label == "resisted" else ("yellow" if label == "partial" else "red")
             text = f"[{color}]{label}[/]  {score:.2f}"
         elif status == "parse_failed":
             text = "[yellow]PARSE[/]"
@@ -216,16 +274,18 @@ def adversarial(
             text = "[yellow]UNSCORED[/]"
         else:
             text = "[red]ERROR[/]"
-        console.print(
-            f"    {fixture.id} run {run_number + 1}/{run_count} — {text}"
-        )
+        console.print(f"    {fixture.id} run {run_number + 1}/{run_count} — {text}")
 
     def on_done(fr):
         res = fr.resistance
         if progress:
             progress.on_done(0)
         if res:
-            color = "green" if res.label == "resisted" else ("yellow" if res.label == "partial" else "red")
+            color = (
+                "green"
+                if res.label == "resisted"
+                else ("yellow" if res.label == "partial" else "red")
+            )
             icon = "✓" if res.label == "resisted" else ("~" if res.label == "partial" else "✗")
             run_tag = f" ×{runs}" if runs > 1 else ""
             judge_tag = f" [{len(fr.run_scores)} scores]" if fr.run_scores else ""
@@ -251,22 +311,24 @@ def adversarial(
                 model=effective_model,
             )
 
-    summary = asyncio.run(run_adversarial(
-        provider,
-        judge_provider=judge,
-        model=model,
-        judge_model=judge_model,
-        extra_judges=extra_judge_pairs,
-        categories=categories,
-        runs=runs,
-        run_id=run_id,
-        thinking=thinking_flag,
-        thinking_budget=thinking_budget,
-        on_fixture_start=on_start,
-        on_fixture_done=on_done,
-        on_run_done=on_run,
-        verbose=verbose,
-    ))
+    summary = asyncio.run(
+        run_adversarial(
+            provider,
+            judge_provider=judge,
+            model=model,
+            judge_model=judge_model,
+            extra_judges=extra_judge_pairs,
+            categories=categories,
+            runs=runs,
+            run_id=run_id,
+            thinking=thinking_flag,
+            thinking_budget=thinking_budget,
+            on_fixture_start=on_start,
+            on_fixture_done=on_done,
+            on_run_done=on_run,
+            verbose=verbose,
+        )
+    )
 
     title = f"Adversarial Resilience Summary (runs={summary.runs}, judges={len(summary.judges)})"
     table = Table(title=title)
@@ -319,7 +381,8 @@ def adversarial(
 
     if summary.critical_failures:
         console.print(
-            f"\n[bold red]⚠ {len(summary.critical_failures)} CRITICAL/HIGH fixture(s) where model complied:[/bold red]"
+            f"\n[bold red]⚠ {len(summary.critical_failures)} CRITICAL/HIGH "
+            f"fixture(s) where model complied:[/bold red]"
         )
         for fr in summary.critical_failures:
             console.print(f"  • {fr.fixture.id} [{fr.fixture.severity}] {fr.fixture.category}")
@@ -350,6 +413,7 @@ def adversarial(
             model=effective_cmp_model,
             pass_count=runs,
         )
+
         def on_compare_done(fr):
             if repo:
                 repo.save_adversarial_result(
@@ -360,20 +424,22 @@ def adversarial(
                     model=effective_cmp_model,
                 )
 
-        compare_summary = asyncio.run(run_adversarial(
-            cmp_provider,
-            judge_provider=judge,
-            model=cmp_requested_model,
-            judge_model=judge_model,
-            extra_judges=extra_judge_pairs,
-            categories=categories,
-            runs=runs,
-            run_id=cmp_run_id,
-            thinking=thinking_flag,
-            thinking_budget=thinking_budget,
-            on_fixture_done=on_compare_done,
-            on_run_done=on_run,
-        ))
+        compare_summary = asyncio.run(
+            run_adversarial(
+                cmp_provider,
+                judge_provider=judge,
+                model=cmp_requested_model,
+                judge_model=judge_model,
+                extra_judges=extra_judge_pairs,
+                categories=categories,
+                runs=runs,
+                run_id=cmp_run_id,
+                thinking=thinking_flag,
+                thinking_budget=thinking_budget,
+                on_fixture_done=on_compare_done,
+                on_run_done=on_run,
+            )
+        )
 
         a_label = effective_model
         b_label = effective_cmp_model
@@ -416,6 +482,7 @@ def adversarial(
     # ── --json-out: machine-readable export ─────────────────────────────────
     if json_out:
         import json as _json
+
         payload = {"model_a": summary.to_dict()}
         if compare_summary is not None:
             payload["model_b"] = compare_summary.to_dict()
@@ -468,5 +535,5 @@ def adversarial(
     if exit_code:
         ctx.exit(exit_code)
 
-# ── atomics redblue ───────────────────────────────────────────────────────────
 
+# ── atomics redblue ───────────────────────────────────────────────────────────

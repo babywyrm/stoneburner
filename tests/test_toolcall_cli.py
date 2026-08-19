@@ -59,9 +59,7 @@ def test_channel_choice_is_validated():
 
 
 def test_runs_must_be_positive():
-    result = CliRunner().invoke(
-        cli, ["toolcall", "-p", "ollama", "-m", "x", "--runs", "0"]
-    )
+    result = CliRunner().invoke(cli, ["toolcall", "-p", "ollama", "-m", "x", "--runs", "0"])
     assert result.exit_code != 0
 
 
@@ -131,17 +129,19 @@ def _one_fixture_summary():
         started_at="2026-01-01T00:00:00+00:00",
         completed_at="2026-01-01T00:00:01+00:00",
         tool_capable=True,
-        fixtures=[{
-            "id": "tc-01",
-            "category": "direct_dangerous",
-            "severity": "CRITICAL",
-            "tool_outcome": "dangerous_call",
-            "prose_label": "resisted",
-            "error": None,
-            "latency_ms": 10.0,
-            "cost_usd": 0.0,
-            "runs": [{}],
-        }],
+        fixtures=[
+            {
+                "id": "tc-01",
+                "category": "direct_dangerous",
+                "severity": "CRITICAL",
+                "tool_outcome": "dangerous_call",
+                "prose_label": "resisted",
+                "error": None,
+                "latency_ms": 10.0,
+                "cost_usd": 0.0,
+                "runs": [{}],
+            }
+        ],
     )
 
 
@@ -177,9 +177,7 @@ def test_saving_finalizes_the_parent_run_row(tmp_path):
 
     repo = MetricsRepository(db)
     try:
-        parent = next(
-            run for run in repo.get_recent_runs() if run["run_id"] == "r-save"
-        )
+        parent = next(run for run in repo.get_recent_runs() if run["run_id"] == "r-save")
     finally:
         repo.close()
     assert parent["completed_at"] is not None
@@ -237,9 +235,7 @@ def test_toolcall_prints_live_fixture_progress(monkeypatch) -> None:
     )
     monkeypatch.setattr("atomics.commands.toolcall.run_toolcall_suite", fake_run)
 
-    result = CliRunner().invoke(
-        cli, ["toolcall", "-p", "ollama", "-m", "x", "--no-save"]
-    )
+    result = CliRunner().invoke(cli, ["toolcall", "-p", "ollama", "-m", "x", "--no-save"])
     assert result.exit_code == 0, result.output
     assert "capability probe" in result.output.lower()
     assert "generating..." in result.output
@@ -290,9 +286,7 @@ def test_toolcall_prints_each_run_outcome(monkeypatch) -> None:
                     {
                         "tool_outcome": outcome,
                         "calls": (
-                            [{"name": "read_file"}]
-                            if outcome is ToolOutcome.DANGEROUS_CALL
-                            else []
+                            [{"name": "read_file"}] if outcome is ToolOutcome.DANGEROUS_CALL else []
                         ),
                     },
                 )

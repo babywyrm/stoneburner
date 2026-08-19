@@ -305,9 +305,7 @@ async def test_multiturn_study_numeric_flip(monkeypatch):
         score = 0.9 if judge.name == "high" else 0.3
         return ConversationJudgeResult(4, 3, 3, score, "ok")
 
-    monkeypatch.setattr(
-        "atomics.eval.multiturn.judge.score_conversation", fake_conversation
-    )
+    monkeypatch.setattr("atomics.eval.multiturn.judge.score_conversation", fake_conversation)
     summary = await run_agreement_study(
         suite="multiturn",
         provider=_Named("model"),

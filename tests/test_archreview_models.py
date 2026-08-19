@@ -20,7 +20,9 @@ def test_answer_key_present_categories():
 
 def test_repo_spec_tier_lookup():
     spec = RepoSpec(
-        name="demo", git_ref="abc", path_env="DEMO_PATH",
+        name="demo",
+        git_ref="abc",
+        path_env="DEMO_PATH",
         tiers={"floor": TierConfig(budget_tokens=16000)},
         answer_key=AnswerKey(version=1, weights={"injection": 1.0}),
     )
@@ -29,8 +31,13 @@ def test_repo_spec_tier_lookup():
 
 def test_archreview_result_defaults():
     r = ArchReviewResult(
-        run_id="run1", repo="demo", tier="floor", model="m", provider="ollama",
-        round=1, findings=[],
+        run_id="run1",
+        repo="demo",
+        tier="floor",
+        model="m",
+        provider="ollama",
+        round=1,
+        findings=[],
     )
     assert r.objective_recall == 0.0
     assert r.parse_failed is False
@@ -46,11 +53,19 @@ def test_archreview_summary_to_dict_serializable():
     )
 
     result = ArchReviewResult(
-        run_id="r", repo="juice-shop", tier="floor", model="m",
-        provider="ollama", round=0,
-        findings=[Finding(category="injection", location="routes/x.ts",
-                          severity="high", rationale="raw sql")],
-        objective_recall=0.5, judge_score=0.8,
+        run_id="r",
+        repo="juice-shop",
+        tier="floor",
+        model="m",
+        provider="ollama",
+        round=0,
+        findings=[
+            Finding(
+                category="injection", location="routes/x.ts", severity="high", rationale="raw sql"
+            )
+        ],
+        objective_recall=0.5,
+        judge_score=0.8,
     )
     summary = ArchReviewSummary(repo="juice-shop", tier="floor", results=[result])
     d = summary.to_dict()

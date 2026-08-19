@@ -32,7 +32,9 @@ Implement the following Python function:
 
 Description: {description}
 
-Write ONLY the function definition. Do not include any other code, imports should be inside the function if needed, no examples, no tests, no explanations.
+Write ONLY the function definition. Do not include any other code, \
+imports should be inside the function if needed, no examples, no tests, \
+no explanations.
 """
 
 
@@ -225,9 +227,7 @@ class CodegenRunSummary:
                     "pass_rate": r.pass_rate,
                     "latency_ms": r.task_result.latency_ms,
                     "tokens": r.task_result.total_tokens,
-                    "test_details": [
-                        {"passed": p, "detail": d} for p, d in r.test_details
-                    ],
+                    "test_details": [{"passed": p, "detail": d} for p, d in r.test_details],
                 }
                 for r in self.fixture_results
             ],
@@ -305,9 +305,13 @@ async def run_codegen(
                 completed_at=datetime.now(UTC),
             )
             fr = CodegenFixtureResult(
-                fixture=fixture, task_result=tr,
-                tests_passed=0, tests_total=len(fixture.test_cases),
-                pass_rate=0.0, extracted_code=None, test_details=[],
+                fixture=fixture,
+                task_result=tr,
+                tests_passed=0,
+                tests_total=len(fixture.test_cases),
+                pass_rate=0.0,
+                extracted_code=None,
+                test_details=[],
             )
             results.append(fr)
             if on_fixture_done:
@@ -331,9 +335,13 @@ async def run_codegen(
         tr.accuracy_score = pass_rate
 
         fr = CodegenFixtureResult(
-            fixture=fixture, task_result=tr,
-            tests_passed=tests_passed, tests_total=tests_total,
-            pass_rate=pass_rate, extracted_code=code, test_details=test_details,
+            fixture=fixture,
+            task_result=tr,
+            tests_passed=tests_passed,
+            tests_total=tests_total,
+            pass_rate=pass_rate,
+            extracted_code=code,
+            test_details=test_details,
         )
         results.append(fr)
         if on_fixture_done:

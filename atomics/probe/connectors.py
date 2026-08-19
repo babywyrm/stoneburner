@@ -29,9 +29,7 @@ async def fetch_artifact(target: ProbeTarget, *, max_bytes: int = 64_000) -> str
 async def _fetch_file(target: ProbeTarget, *, max_bytes: int) -> str:
     path = Path(target.path or "")
     if not path.exists():
-        raise ProbeConnectorError(
-            f"Artifact file not found for target '{target.name}': {path}"
-        )
+        raise ProbeConnectorError(f"Artifact file not found for target '{target.name}': {path}")
     raw = path.read_bytes()
     if len(raw) > max_bytes:
         raw = raw[:max_bytes]

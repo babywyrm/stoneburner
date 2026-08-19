@@ -168,9 +168,7 @@ class TestQuotaOverHttp:
 
     def test_an_authenticated_submitter_is_attributed_to_their_key(self, tmp_path):
         """Jobs must carry the submitting caller, or the quota counts nothing."""
-        app = create_app(
-            ServerSettings(api_keys={ALICE}, db_path=tmp_path / "q.db")
-        )
+        app = create_app(ServerSettings(api_keys={ALICE}, db_path=tmp_path / "q.db"))
         with TestClient(app) as client:
             res = client.post(
                 "/api/v1/evals",

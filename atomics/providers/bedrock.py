@@ -18,6 +18,7 @@ class _BedrockRuntimeClient(Protocol):
 
     def converse(self, **kwargs: Any) -> dict: ...
 
+
 # Pricing per 1M tokens (input / output). Sourced from the central pricing
 # module; re-exported here for backward compatibility.
 BEDROCK_PRICING = pricing.BEDROCK_PRICING
@@ -82,8 +83,11 @@ class BedrockProvider(BaseProvider):
         response = await loop.run_in_executor(
             None,
             lambda: self._converse(
-                prompt, system=system, model_id=model_id,
-                max_tokens=max_tokens, temperature=temperature,
+                prompt,
+                system=system,
+                model_id=model_id,
+                max_tokens=max_tokens,
+                temperature=temperature,
             ),
         )
         latency = (time.monotonic() - t0) * 1000
@@ -110,7 +114,12 @@ class BedrockProvider(BaseProvider):
         )
 
     def _converse(
-        self, prompt: str, *, system: str, model_id: str, max_tokens: int,
+        self,
+        prompt: str,
+        *,
+        system: str,
+        model_id: str,
+        max_tokens: int,
         temperature: float | None = None,
     ) -> dict:
         inference_config: dict = {"maxTokens": max_tokens}

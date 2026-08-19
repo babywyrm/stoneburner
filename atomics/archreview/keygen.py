@@ -44,6 +44,9 @@ def load_repo_spec(spec_path: Path) -> RepoSpec:
     weights = {c["id"]: float(c["weight"]) for c in ak_raw["categories"]}
     answer_key = AnswerKey(version=int(ak_raw["version"]), weights=weights)
     return RepoSpec(
-        name=repo["name"], git_ref=repo["git_ref"], path_env=repo["path_env"],
-        tiers=tiers, answer_key=answer_key,
+        name=repo["name"],
+        git_ref=repo["git_ref"],
+        path_env=repo["path_env"],
+        tiers=tiers,
+        answer_key=answer_key,
     )

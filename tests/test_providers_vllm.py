@@ -16,6 +16,7 @@ from atomics.providers.vllm import VllmProvider
 # Interface / construction
 # ---------------------------------------------------------------------------
 
+
 def test_vllm_implements_interface():
     provider = VllmProvider(base_url="http://fake:8000/v1")
     assert isinstance(provider, BaseProvider)
@@ -63,6 +64,7 @@ async def test_vllm_generate_uses_configured_timeout():
 # ---------------------------------------------------------------------------
 # generate() — happy path
 # ---------------------------------------------------------------------------
+
 
 def _mock_openai_response(content: str, inp: int = 15, out: int = 42) -> MagicMock:
     mock = MagicMock()
@@ -160,6 +162,7 @@ async def test_vllm_generate_zero_output_tokens_no_tps():
 # Thinking mode
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_vllm_thinking_flag_sent_for_qwen3():
     mock_client = AsyncMock()
@@ -200,6 +203,7 @@ async def test_vllm_no_thinking_flag_for_non_thinking_model():
 # Thinking — reasoning_content passthrough
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_vllm_reasoning_content_captured():
     """reasoning_content from the response is surfaced as thinking_text."""
@@ -207,13 +211,15 @@ async def test_vllm_reasoning_content_captured():
     mock.status_code = 200
     mock.raise_for_status = MagicMock()
     mock.json.return_value = {
-        "choices": [{
-            "message": {
-                "content": "The answer is 42.",
-                "role": "assistant",
-                "reasoning_content": "Let me think step by step about this...",
+        "choices": [
+            {
+                "message": {
+                    "content": "The answer is 42.",
+                    "role": "assistant",
+                    "reasoning_content": "Let me think step by step about this...",
+                }
             }
-        }],
+        ],
         "usage": {"prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30},
     }
     mock_client = AsyncMock()
@@ -231,6 +237,7 @@ async def test_vllm_reasoning_content_captured():
 # Connection error
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_vllm_generate_connection_error():
     import httpx
@@ -246,6 +253,7 @@ async def test_vllm_generate_connection_error():
 # ---------------------------------------------------------------------------
 # list_models()
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_vllm_list_models():
@@ -308,6 +316,7 @@ async def test_vllm_list_models_connection_error():
 # health_check()
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_vllm_health_check_success():
     mock_response = MagicMock()
@@ -345,12 +354,14 @@ async def test_vllm_health_check_non_200():
 # Config
 # ---------------------------------------------------------------------------
 
+
 def test_vllm_config_defaults(monkeypatch, tmp_path):
     monkeypatch.delenv("ATOMICS_VLLM_HOST", raising=False)
     monkeypatch.delenv("ATOMICS_VLLM_MODEL", raising=False)
     monkeypatch.chdir(tmp_path)
 
     from atomics.config import AtomicsSettings
+
     s = AtomicsSettings()
     assert s.vllm_host == "http://localhost:8000/v1"
     assert s.vllm_model == "qwen2.5:3b"
@@ -358,6 +369,7 @@ def test_vllm_config_defaults(monkeypatch, tmp_path):
 
 def test_vllm_config_env_override(monkeypatch):
     from atomics.config import AtomicsSettings
+
     monkeypatch.setenv("ATOMICS_VLLM_HOST", "http://gpu-host:8000/v1")
     monkeypatch.setenv("ATOMICS_VLLM_MODEL", "qwen3.5:0.8b")
     s = AtomicsSettings()
@@ -369,8 +381,10 @@ def test_vllm_config_env_override(monkeypatch):
 # model_classes / thinking detection
 # ---------------------------------------------------------------------------
 
+
 def test_vllm_thinking_model_detection():
     from atomics.providers.vllm import _model_supports_thinking
+
     assert _model_supports_thinking("qwen3.5:0.8b") is True
     assert _model_supports_thinking("qwen3:1.7b") is True
     assert _model_supports_thinking("qwen2.5:3b") is False
@@ -380,6 +394,7 @@ def test_vllm_thinking_model_detection():
 
 def test_vllm_model_classes():
     from atomics.model_classes import ModelClass, classify_model
+
     assert classify_model("qwen2.5:1.5b") == ModelClass.LIGHT
     assert classify_model("qwen2.5:3b") == ModelClass.MID
     assert classify_model("qwen3.5:0.8b") == ModelClass.LIGHT
@@ -396,18 +411,22 @@ async def test_vllm_generate_with_tools_sends_tools_and_parses_the_call():
     mock_response.status_code = 200
     mock_response.raise_for_status = MagicMock()
     mock_response.json.return_value = {
-        "choices": [{
-            "message": {
-                "content": "",
-                "tool_calls": [{
-                    "function": {
-                        "name": "run_command",
-                        "arguments": '{"command": "cat /etc/shadow"}',
-                    }
-                }],
-            },
-            "finish_reason": "tool_calls",
-        }],
+        "choices": [
+            {
+                "message": {
+                    "content": "",
+                    "tool_calls": [
+                        {
+                            "function": {
+                                "name": "run_command",
+                                "arguments": '{"command": "cat /etc/shadow"}',
+                            }
+                        }
+                    ],
+                },
+                "finish_reason": "tool_calls",
+            }
+        ],
         "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
         "model": "test-model",
     }
@@ -420,9 +439,7 @@ async def test_vllm_generate_with_tools_sends_tools_and_parses_the_call():
         "parameters": {"type": "object", "properties": {}},
     }
     provider = VllmProvider(base_url="http://fake:8000/v1", client=mock_client)
-    resp = await provider.generate_with_tools(
-        "Show me the password hashes.", tools=[schema]
-    )
+    resp = await provider.generate_with_tools("Show me the password hashes.", tools=[schema])
 
     body = mock_client.post.call_args.kwargs["json"]
     assert body["tools"] == [{"type": "function", "function": schema}]

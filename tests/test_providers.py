@@ -44,12 +44,7 @@ def test_claude_cost_estimation_cache_aware():
         cache_read_tokens=2000,
         cache_write_tokens=400,
     )
-    expected = (
-        1000 * 3.0
-        + 400 * 3.0 * 1.25
-        + 2000 * 3.0 * 0.10
-        + 500 * 15.0
-    ) / 1_000_000
+    expected = (1000 * 3.0 + 400 * 3.0 * 1.25 + 2000 * 3.0 * 0.10 + 500 * 15.0) / 1_000_000
     assert abs(cost - expected) < 0.000001
 
 
@@ -129,26 +124,31 @@ def test_openai_cost_estimation():
 
 # ── providers/__init__ lazy __getattr__ ──────────────────────────────────────
 
+
 def test_providers_init_ollama_lazy():
     import atomics.providers as p
+
     OllamaProvider = p.OllamaProvider
     assert OllamaProvider.__name__ == "OllamaProvider"
 
 
 def test_providers_init_openai_lazy():
     import atomics.providers as p
+
     OpenAIProvider = p.OpenAIProvider
     assert OpenAIProvider.__name__ == "OpenAIProvider"
 
 
 def test_providers_init_brain_gateway_lazy():
     import atomics.providers as p
+
     BrainGatewayProvider = p.BrainGatewayProvider
     assert BrainGatewayProvider.__name__ == "BrainGatewayProvider"
 
 
 def test_providers_init_bedrock_lazy():
     import atomics.providers as p
+
     BedrockProvider = p.BedrockProvider
     assert BedrockProvider.__name__ == "BedrockProvider"
 
@@ -157,6 +157,7 @@ def test_providers_init_unknown_attr():
     import pytest
 
     import atomics.providers as p
+
     with pytest.raises(AttributeError, match="no attribute"):
         _ = p.NonExistentProvider
 
@@ -176,8 +177,13 @@ def test_tool_calls_defaults_to_empty_so_existing_construction_sites_hold():
     from atomics.providers.base import ProviderResponse
 
     resp = ProviderResponse(
-        text="hi", input_tokens=1, output_tokens=1, total_tokens=2,
-        model="m", latency_ms=1.0, estimated_cost_usd=0.0,
+        text="hi",
+        input_tokens=1,
+        output_tokens=1,
+        total_tokens=2,
+        model="m",
+        latency_ms=1.0,
+        estimated_cost_usd=0.0,
     )
     assert resp.tool_calls == ()
 

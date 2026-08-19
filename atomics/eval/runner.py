@@ -44,7 +44,9 @@ class EvalRunSummary:
 
     @property
     def overall_accuracy(self) -> float | None:
-        scored = [r.judge.score for r in self.fixture_results if r.judge and not r.judge.parse_failed]
+        scored = [
+            r.judge.score for r in self.fixture_results if r.judge and not r.judge.parse_failed
+        ]
         return round(sum(scored) / len(scored), 3) if scored else None
 
     @property
@@ -146,7 +148,9 @@ async def run_eval(
     extra_judges = extra_judges or []
 
     _collisions = detect_self_judge(
-        provider, model, [(judge_provider, judge_model), *extra_judges],
+        provider,
+        model,
+        [(judge_provider, judge_model), *extra_judges],
     )
     if _collisions:
         logger.warning(
@@ -162,7 +166,9 @@ async def run_eval(
     effective_fixtures = fixtures if fixtures is not None else EVAL_FIXTURES
 
     for fixture in effective_fixtures:
-        logger.info("[eval] %s (%s) — %s", fixture.id, fixture.complexity.value, fixture.prompt[:60])
+        logger.info(
+            "[eval] %s (%s) — %s", fixture.id, fixture.complexity.value, fixture.prompt[:60]
+        )
         task_result = TaskResult(
             run_id=run_id,
             category=TaskCategory.GENERAL_QA,
@@ -249,7 +255,9 @@ async def run_eval(
 
         logger.info(
             "[eval] %s scored %.3f — %s",
-            fixture.id, judge.score, judge.rationale[:80],
+            fixture.id,
+            judge.score,
+            judge.rationale[:80],
         )
 
         if on_fixture_done is not None:

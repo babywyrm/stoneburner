@@ -70,12 +70,16 @@ def main() -> int:
 
         status, body = http("GET", "/api/v1/distributed/runs")
         assert status == 200, f"list jobs returned {status}: {body[:200]}"
-        assert b'"jobs":[]' in body or b'"jobs": []' in body, f"expected empty jobs list: {body[:200]}"
+        assert b'"jobs":[]' in body or b'"jobs": []' in body, (
+            f"expected empty jobs list: {body[:200]}"
+        )
         print("GET /api/v1/distributed/runs -> 200 OK, empty list")
 
         status, body = http("GET", "/api/v1/workers")
         assert status == 200, f"list workers returned {status}: {body[:200]}"
-        assert b'"workers":[]' in body or b'"workers": []' in body, f"expected empty workers list: {body[:200]}"
+        assert b'"workers":[]' in body or b'"workers": []' in body, (
+            f"expected empty workers list: {body[:200]}"
+        )
         print("GET /api/v1/workers -> 200 OK, empty list")
 
         status, body = http(

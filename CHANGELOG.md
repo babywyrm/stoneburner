@@ -36,6 +36,9 @@
 - **Top-level modules grouped into `load/`, `benchmark/`, and `reporting/`.**
   `from atomics.stress import …` and the other existing import paths still
   resolve; the implementations moved.
+- **Ruff enforces the 100-character line length.** CI no longer
+  `--ignore E501`. Fixture payload files stay exempt so scored prompts
+  are not rewritten.
 
 ## 0.18.2 (2026-08-17) — Landing page, doctor next step, and extra judges
 

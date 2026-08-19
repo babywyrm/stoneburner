@@ -62,7 +62,9 @@ def test_an_infinite_loop_inside_the_function_is_killed():
 def test_module_level_code_is_covered_by_the_timeout():
     """The in-process version armed its alarm after exec, leaving this unguarded."""
     started = time.monotonic()
-    outcome = sandbox.execute("while True:\n    pass\ndef f():\n    return 1", "f", (), timeout_seconds=2)
+    outcome = sandbox.execute(
+        "while True:\n    pass\ndef f():\n    return 1", "f", (), timeout_seconds=2
+    )
     assert outcome.status == "timeout"
     assert time.monotonic() - started < 10
 
@@ -103,8 +105,6 @@ def test_stdout_from_generated_code_does_not_corrupt_the_result():
     [((), None), ((1,), 1), (([1, 2],), [1, 2])],
 )
 def test_arguments_are_passed_through_faithfully(args, expected):
-    outcome = sandbox.execute(
-        "def f(x=None):\n    return x", "f", args
-    )
+    outcome = sandbox.execute("def f(x=None):\n    return x", "f", args)
     assert outcome.status == "ok"
     assert outcome.result == expected

@@ -100,17 +100,16 @@ class StressResult:
     total_cost_usd: float = 0.0
 
 
-
-
 def _get_gpu_info() -> tuple[str, float | None]:
     """Try to get GPU name and total VRAM via nvidia-smi."""
     if not shutil.which("nvidia-smi"):
         return "", None
     try:
         out = subprocess.run(
-            ["nvidia-smi", "--query-gpu=name,memory.total",
-             "--format=csv,noheader,nounits"],
-            capture_output=True, text=True, timeout=5,
+            ["nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader,nounits"],
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         if out.returncode == 0:
             parts = out.stdout.strip().split(",")
@@ -127,9 +126,10 @@ def _get_vram_used_mb() -> float | None:
         return None
     try:
         out = subprocess.run(
-            ["nvidia-smi", "--query-gpu=memory.used",
-             "--format=csv,noheader,nounits"],
-            capture_output=True, text=True, timeout=5,
+            ["nvidia-smi", "--query-gpu=memory.used", "--format=csv,noheader,nounits"],
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         if out.returncode == 0:
             return float(out.stdout.strip())
@@ -186,9 +186,7 @@ async def _run_phase(
             prompt = STRESS_PROMPTS[prompt_idx % len(STRESS_PROMPTS)]
             prompt_idx += 1
             try:
-                out, inp, lat, tps = await _single_request(
-                    client, host, model, prompt, num_predict
-                )
+                out, inp, lat, tps = await _single_request(client, host, model, prompt, num_predict)
                 result.requests += 1
                 result.total_output_tokens += out
                 result.total_input_tokens += inp
@@ -245,9 +243,7 @@ async def run_stress(
             if vram is not None:
                 peak_vram = max(peak_vram or 0, vram)
 
-            phase = await _run_phase(
-                client, host, model, conc, phase_seconds, num_predict
-            )
+            phase = await _run_phase(client, host, model, conc, phase_seconds, num_predict)
             result.phases.append(phase)
             result.total_tokens += phase.total_output_tokens + phase.total_input_tokens
             result.total_requests += phase.requests
@@ -282,7 +278,13 @@ async def _single_request_provider(
     tps = resp.tokens_per_second
     if tps is None and resp.output_tokens > 0 and resp.latency_ms > 0:
         tps = resp.output_tokens / (resp.latency_ms / 1000)
-    return resp.output_tokens, resp.input_tokens, resp.latency_ms, tps or 0.0, resp.estimated_cost_usd
+    return (
+        resp.output_tokens,
+        resp.input_tokens,
+        resp.latency_ms,
+        tps or 0.0,
+        resp.estimated_cost_usd,
+    )
 
 
 async def _run_phase_provider(
@@ -354,9 +356,7 @@ async def run_stress_provider(
     t0 = time.monotonic()
 
     for conc in concurrency_levels:
-        phase = await _run_phase_provider(
-            provider, conc, phase_seconds, num_predict
-        )
+        phase = await _run_phase_provider(provider, conc, phase_seconds, num_predict)
         result.phases.append(phase)
         result.total_tokens += phase.total_output_tokens + phase.total_input_tokens
         result.total_requests += phase.requests
@@ -396,9 +396,7 @@ async def _run_phase_profile(
             prompt = prompts[prompt_idx % len(prompts)]
             prompt_idx += 1
             try:
-                _text, lat_ms, _cls = await _single_request_profile(
-                    client, tp, prompt
-                )
+                _text, lat_ms, _cls = await _single_request_profile(client, tp, prompt)
                 result.requests += 1
                 result.latencies.append(lat_ms)
             except Exception:
@@ -412,7 +410,9 @@ async def _run_phase_profile(
         sorted_lats = sorted(result.latencies)
         result.avg_latency_ms = sum(sorted_lats) / len(sorted_lats)
         result.p95_latency_ms = _percentile(sorted_lats, 95)
-        result.aggregate_tps = result.requests / result.elapsed_seconds if result.elapsed_seconds > 0 else 0.0
+        result.aggregate_tps = (
+            result.requests / result.elapsed_seconds if result.elapsed_seconds > 0 else 0.0
+        )
     return result
 
 
@@ -452,7 +452,11 @@ async def run_stress_profile(
             if on_phase:
                 on_phase(phase)
 
-            conc = min(conc * 2, max_concurrency) if conc * 2 <= max_concurrency else max_concurrency + 1
+            conc = (
+                min(conc * 2, max_concurrency)
+                if conc * 2 <= max_concurrency
+                else max_concurrency + 1
+            )
 
     result.duration_seconds = time.monotonic() - t0
     return result

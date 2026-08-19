@@ -1,4 +1,5 @@
 """Tests for labcompare orchestration helpers."""
+
 from __future__ import annotations
 
 import pytest
@@ -12,10 +13,12 @@ def test_parse_single_host():
 
 
 def test_parse_multiple_hosts():
-    specs = parse_host_specs([
-        "laptop=http://203.0.113.11:11434",
-        "gpu-host=http://203.0.113.10:11434",
-    ])
+    specs = parse_host_specs(
+        [
+            "laptop=http://203.0.113.11:11434",
+            "gpu-host=http://203.0.113.10:11434",
+        ]
+    )
     assert len(specs) == 2
     assert specs[1].name == "gpu-host"
 
@@ -36,8 +39,11 @@ from atomics.labcompare import vram_fit_from_ps
 
 
 def test_vram_fit_full_gpu():
-    ps = {"models": [{"name": "qwen3.6:27b", "size": 100, "size_vram": 100,
-                      "details": {"family": "qwen"}}]}
+    ps = {
+        "models": [
+            {"name": "qwen3.6:27b", "size": 100, "size_vram": 100, "details": {"family": "qwen"}}
+        ]
+    }
     fit, gpu = vram_fit_from_ps(ps, "qwen3.6:27b")
     assert fit == 1.0
 
@@ -106,14 +112,28 @@ class _FakeProvider:
     def __init__(self):
         self.calls = 0
 
-    async def generate(self, prompt, *, system=None, model=None, max_tokens=256,
-                        thinking=None, thinking_budget=None, temperature=None):
+    async def generate(
+        self,
+        prompt,
+        *,
+        system=None,
+        model=None,
+        max_tokens=256,
+        thinking=None,
+        thinking_budget=None,
+        temperature=None,
+    ):
         self.calls += 1
         return ProviderResponse(
             text="hello world",
-            input_tokens=10, output_tokens=20, total_tokens=30,
-            model=model or "m", latency_ms=250.0, estimated_cost_usd=0.0,
-            tokens_per_second=80.0, tps_basis="generation",
+            input_tokens=10,
+            output_tokens=20,
+            total_tokens=30,
+            model=model or "m",
+            latency_ms=250.0,
+            estimated_cost_usd=0.0,
+            tokens_per_second=80.0,
+            tps_basis="generation",
             raw={"prompt_eval_count": 10, "prompt_eval_duration": 10_000_000},
         )
 
@@ -160,15 +180,22 @@ async def test_run_labcompare_two_hosts_throughput_and_quality():
     def ps_fetcher_factory(url):
         async def _ps():
             return {"models": [{"name": "m", "size": 100, "size_vram": 100}]}
+
         return _ps
 
     async def quality_fn(provider, judge_provider, judge_model, model):
         return 0.9
 
     cells = await run_labcompare(
-        hosts=hosts, models=["m"], dimensions=["throughput", "quality"],
-        quality_suite="eval", judge_host=None, judge_model="judge",
-        prompts=2, provider_factory=provider_factory, quality_fn=quality_fn,
+        hosts=hosts,
+        models=["m"],
+        dimensions=["throughput", "quality"],
+        quality_suite="eval",
+        judge_host=None,
+        judge_model="judge",
+        prompts=2,
+        provider_factory=provider_factory,
+        quality_fn=quality_fn,
         ps_fetcher_factory=ps_fetcher_factory,
     )
     assert len(cells) == 2
@@ -191,15 +218,22 @@ async def test_run_labcompare_unreachable_host_skipped():
     def ps_fetcher_factory(url):
         async def _ps():
             return {"models": []}
+
         return _ps
 
     async def quality_fn(provider, judge_provider, judge_model, model):
         return 0.9
 
     cells = await run_labcompare(
-        hosts=hosts, models=["m"], dimensions=["throughput"],
-        quality_suite="eval", judge_host=None, judge_model=None,
-        prompts=1, provider_factory=provider_factory, quality_fn=quality_fn,
+        hosts=hosts,
+        models=["m"],
+        dimensions=["throughput"],
+        quality_suite="eval",
+        judge_host=None,
+        judge_model=None,
+        prompts=1,
+        provider_factory=provider_factory,
+        quality_fn=quality_fn,
         ps_fetcher_factory=ps_fetcher_factory,
     )
     up = [c for c in cells if c.host_name == "up"][0]

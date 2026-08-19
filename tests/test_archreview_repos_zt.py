@@ -1,4 +1,5 @@
 """Tests for zero-trust archreview answer keys (nullfield, blueprint, camazotz)."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -38,7 +39,9 @@ def test_tiers_valid():
         for tier_name, tier in d["tiers"].items():
             assert "budget_tokens" in tier, f"{name}/{tier_name}: missing budget_tokens"
             assert "priority" in tier, f"{name}/{tier_name}: missing priority"
-            assert isinstance(tier["priority"], list), f"{name}/{tier_name}: priority should be list"
+            assert isinstance(tier["priority"], list), (
+                f"{name}/{tier_name}: priority should be list"
+            )
             assert tier["budget_tokens"] > 0, f"{name}/{tier_name}: budget must be positive"
 
 

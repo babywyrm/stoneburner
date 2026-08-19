@@ -599,16 +599,26 @@ async def test_run_rag_judge_parse_failure_handled():
     provider.name = "mock"
     provider.generate = AsyncMock(
         return_value=ProviderResponse(
-            text="some answer", model="mock", input_tokens=5, output_tokens=5,
-            total_tokens=10, latency_ms=1.0, estimated_cost_usd=0.0,
+            text="some answer",
+            model="mock",
+            input_tokens=5,
+            output_tokens=5,
+            total_tokens=10,
+            latency_ms=1.0,
+            estimated_cost_usd=0.0,
         )
     )
     judge = AsyncMock()
     judge.name = "mock-judge"
     judge.generate = AsyncMock(
         return_value=SimpleNamespace(
-            text="unparseable judge output", model="judge", input_tokens=5,
-            output_tokens=5, total_tokens=10, latency_ms=1.0, estimated_cost_usd=0.0,
+            text="unparseable judge output",
+            model="judge",
+            input_tokens=5,
+            output_tokens=5,
+            total_tokens=10,
+            latency_ms=1.0,
+            estimated_cost_usd=0.0,
         )
     )
 
@@ -642,8 +652,13 @@ async def test_run_rag_with_index_returns_empty_results():
     provider.name = "mock"
     provider.generate = AsyncMock(
         return_value=ProviderResponse(
-            text="I cannot answer from the context.", model="mock", input_tokens=5,
-            output_tokens=5, total_tokens=10, latency_ms=1.0, estimated_cost_usd=0.0,
+            text="I cannot answer from the context.",
+            model="mock",
+            input_tokens=5,
+            output_tokens=5,
+            total_tokens=10,
+            latency_ms=1.0,
+            estimated_cost_usd=0.0,
         )
     )
     judge = AsyncMock()
@@ -651,14 +666,19 @@ async def test_run_rag_with_index_returns_empty_results():
     judge.generate = AsyncMock(
         return_value=SimpleNamespace(
             text="GROUNDING: 0\nFAITHFULNESS: 3\nABSTENTION: 3\nRATIONALE: No context.",
-            model="judge", input_tokens=5, output_tokens=5, total_tokens=10,
-            latency_ms=1.0, estimated_cost_usd=0.0,
+            model="judge",
+            input_tokens=5,
+            output_tokens=5,
+            total_tokens=10,
+            latency_ms=1.0,
+            estimated_cost_usd=0.0,
         )
     )
 
     class EmptyIndex:
         def search(self, query: str, top_k: int = 5) -> list:
             return []
+
         def info(self) -> dict:
             return {"chunk_count": "0", "embedding_model": "mock"}
 
@@ -669,7 +689,9 @@ async def test_run_rag_with_index_returns_empty_results():
         context_chunks=[RAGChunk(content="placeholder", label="relevant", source="x.md")],
         context_contains_answer=False,
     )
-    summary = await run_rag(provider, judge_provider=judge, fixtures=[fixture], index=EmptyIndex(), top_k=5)
+    summary = await run_rag(
+        provider, judge_provider=judge, fixtures=[fixture], index=EmptyIndex(), top_k=5
+    )
     assert summary.avg_retrieved_chunks == 0.0
     assert summary.unique_sources_retrieved == 0
     assert summary.index_info is not None
@@ -681,8 +703,13 @@ async def test_run_rag_uses_provider_as_judge_when_none_provided():
     provider.name = "mock-provider"
     provider.generate = AsyncMock(
         return_value=ProviderResponse(
-            text="answer", model="mock", input_tokens=5, output_tokens=5,
-            total_tokens=10, latency_ms=1.0, estimated_cost_usd=0.0,
+            text="answer",
+            model="mock",
+            input_tokens=5,
+            output_tokens=5,
+            total_tokens=10,
+            latency_ms=1.0,
+            estimated_cost_usd=0.0,
         )
     )
     fixture = RAGFixture(

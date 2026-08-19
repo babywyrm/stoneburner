@@ -129,9 +129,7 @@ def test_score_response_perfect():
 def test_score_response_low():
     reply = "ACCURACY: 1\nCOMPLETENESS: 0\nFORMAT: 1\nRATIONALE: Off-topic response."
     provider = _make_judge_provider(reply)
-    result = asyncio.run(
-        score_response("What is JWT?", "I don't know.", judge_provider=provider)
-    )
+    result = asyncio.run(score_response("What is JWT?", "I don't know.", judge_provider=provider))
     assert result.score == pytest.approx(0.2)
     assert not result.parse_failed
 
@@ -139,9 +137,7 @@ def test_score_response_low():
 def test_score_response_parse_failure_returns_05():
     reply = "Sorry, I cannot score this."
     provider = _make_judge_provider(reply)
-    result = asyncio.run(
-        score_response("prompt", "response", judge_provider=provider)
-    )
+    result = asyncio.run(score_response("prompt", "response", judge_provider=provider))
     assert result.score == 0.5
     assert result.parse_failed
 
@@ -149,9 +145,7 @@ def test_score_response_parse_failure_returns_05():
 def test_score_response_provider_exception_returns_05():
     provider = MagicMock()
     provider.generate = AsyncMock(side_effect=ConnectionError("Ollama down"))
-    result = asyncio.run(
-        score_response("prompt", "response", judge_provider=provider)
-    )
+    result = asyncio.run(score_response("prompt", "response", judge_provider=provider))
     assert result.score == 0.5
     assert result.parse_failed
 
@@ -176,7 +170,12 @@ def test_score_response_injects_gold_criteria():
     )
     gold = ["public/private key pair", "TLS handshake"]
     asyncio.run(
-        score_response("Explain asymmetric encryption.", "Response.", judge_provider=provider, gold_criteria=gold)
+        score_response(
+            "Explain asymmetric encryption.",
+            "Response.",
+            judge_provider=provider,
+            gold_criteria=gold,
+        )
     )
     call_prompt = provider.generate.call_args[0][0]
     assert "public/private key pair" in call_prompt
@@ -299,9 +298,7 @@ def test_run_eval_empty_exception_message_falls_back_to_repr():
     provider.name = "timeouty"
     provider.generate = AsyncMock(side_effect=httpx.ReadTimeout(""))
     judge = _make_good_judge()
-    summary = asyncio.run(
-        run_eval(provider, judge_provider=judge, fixtures=[EVAL_FIXTURES[0]])
-    )
+    summary = asyncio.run(run_eval(provider, judge_provider=judge, fixtures=[EVAL_FIXTURES[0]]))
     tr = summary.fixture_results[0].task_result
     assert tr.status.value == "failed"
     assert tr.error_class == "ReadTimeout"

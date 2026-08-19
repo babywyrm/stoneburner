@@ -181,9 +181,7 @@ async def test_worker_host_reaches_the_provider_it_selected(provider_name, attri
             return_value=fake_result,
         ) as exec_task,
     ):
-        await execute_assignment(
-            assignment, provider_name=provider_name, host=host
-        )
+        await execute_assignment(assignment, provider_name=provider_name, host=host)
 
     provider = exec_task.await_args.kwargs["provider"]
     assert getattr(provider, attribute) == host.rstrip("/")
@@ -244,7 +242,30 @@ async def test_execute_full_run_delegates_to_loop_engine():
     )
     fake_summary = MagicMock(run_id="run-5", model_dump=MagicMock(return_value={"run_id": "run-5"}))
     fake_rows = [
-        ("t1", "run-5", "general_qa", "q1", "ollama", "m", "success", None, "p", "r", 1, 2, 3, 0, 0, 0, 10, 0.0, None, None, None, None),
+        (
+            "t1",
+            "run-5",
+            "general_qa",
+            "q1",
+            "ollama",
+            "m",
+            "success",
+            None,
+            "p",
+            "r",
+            1,
+            2,
+            3,
+            0,
+            0,
+            0,
+            10,
+            0.0,
+            None,
+            None,
+            None,
+            None,
+        ),
     ]
 
     fake_cursor = MagicMock()
@@ -258,10 +279,18 @@ async def test_execute_full_run_delegates_to_loop_engine():
     fake_engine.run = AsyncMock(return_value=fake_summary)
 
     with (
-        patch("atomics.distributed.worker_runner.LoopEngine", return_value=fake_engine) as engine_cls,
+        patch(
+            "atomics.distributed.worker_runner.LoopEngine", return_value=fake_engine
+        ) as engine_cls,
         patch("atomics.distributed.worker_runner.MetricsRepository", return_value=fake_repo),
-        patch("atomics.distributed.worker_runner.make_provider", return_value=MagicMock(name="provider")),
-        patch("atomics.distributed.worker_runner.load_settings", return_value=MagicMock(name="settings")),
+        patch(
+            "atomics.distributed.worker_runner.make_provider",
+            return_value=MagicMock(name="provider"),
+        ),
+        patch(
+            "atomics.distributed.worker_runner.load_settings",
+            return_value=MagicMock(name="settings"),
+        ),
     ):
         result = await execute_full_run(assignment, provider_name="ollama", model="m")
 
@@ -293,8 +322,12 @@ async def test_execute_full_run_uses_run_request_provider_and_model():
         ) as make_provider,
         patch("atomics.distributed.worker_runner.load_settings", return_value=MagicMock()),
     ):
-        engine_cls.return_value.run = AsyncMock(return_value=MagicMock(run_id="r6", model_dump=MagicMock(return_value={"run_id": "r6"})))
-        await execute_full_run(assignment, provider_name="ollama", model="ollama-model", host="http://host")
+        engine_cls.return_value.run = AsyncMock(
+            return_value=MagicMock(run_id="r6", model_dump=MagicMock(return_value={"run_id": "r6"}))
+        )
+        await execute_full_run(
+            assignment, provider_name="ollama", model="ollama-model", host="http://host"
+        )
 
     assert make_provider.call_args.args[0] == "vllm"
     assert make_provider.call_args.args[1] == "vllm-model"

@@ -117,9 +117,7 @@ def test_anthropic_parses_sdk_objects_not_only_dicts():
 
     blocks = [
         SimpleNamespace(type="text", text="I can't do that."),
-        SimpleNamespace(
-            type="tool_use", name="read_file", input={"path": "/etc/shadow"}
-        ),
+        SimpleNamespace(type="tool_use", name="read_file", input={"path": "/etc/shadow"}),
     ]
     calls = parse_anthropic_tool_calls(blocks)
     assert len(calls) == 1

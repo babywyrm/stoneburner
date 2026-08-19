@@ -174,14 +174,16 @@ class VllmProvider(OpenAICompatibleTools, BaseProvider):
         results: list[dict[str, str | float | bool]] = []
         for entry in data.get("data", []):
             name: str = entry.get("id", "")
-            results.append({
-                "name": name,
-                "size_gb": 0.0,
-                "parameter_size": "",
-                "family": name.split(":")[0] if ":" in name else name.split("/")[-1],
-                "model_class": classify_model(name).value,
-                "thinking": supports_thinking(name),
-            })
+            results.append(
+                {
+                    "name": name,
+                    "size_gb": 0.0,
+                    "parameter_size": "",
+                    "family": name.split(":")[0] if ":" in name else name.split("/")[-1],
+                    "model_class": classify_model(name).value,
+                    "thinking": supports_thinking(name),
+                }
+            )
         return results
 
     async def health_check(self) -> bool:

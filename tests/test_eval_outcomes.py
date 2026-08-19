@@ -148,9 +148,7 @@ def test_provider_exception_classification(
 
 
 def test_provider_exception_message_is_sanitized() -> None:
-    outcome = provider_outcome_from_exception(
-        ValueError("request used Bearer super-secret-token")
-    )
+    outcome = provider_outcome_from_exception(ValueError("request used Bearer super-secret-token"))
     assert outcome.error_message == "request used [REDACTED]"
     assert "super-secret-token" not in outcome.error_message
 
@@ -361,9 +359,7 @@ def test_timeout_error_precedes_policy_prose() -> None:
 
 
 def test_unstructured_exception_policy_prose_is_not_a_safety_block() -> None:
-    outcome = provider_outcome_from_exception(
-        ValueError("request was blocked by content policy")
-    )
+    outcome = provider_outcome_from_exception(ValueError("request was blocked by content policy"))
 
     assert outcome.kind is ProviderOutcomeKind.PROVIDER_ERROR
     assert outcome.safety_reason is None
@@ -558,9 +554,7 @@ def test_judge_outcome_rejects_invalid_panel_counts(
         ("thinking_tokens", -1),
     ],
 )
-def test_attempt_result_rejects_negative_indices_and_metrics(
-    field: str, value: float
-) -> None:
+def test_attempt_result_rejects_negative_indices_and_metrics(field: str, value: float) -> None:
     values: dict[str, object] = {
         "attempt_index": 0,
         "provider": ProviderOutcome(ProviderOutcomeKind.COMPLETED),
@@ -903,9 +897,7 @@ def test_run_integrity_rejects_negative_counts(field: str) -> None:
         ("judge_failures", 5),
     ],
 )
-def test_run_integrity_rejects_impossible_count_relationships(
-    field: str, value: int
-) -> None:
+def test_run_integrity_rejects_impossible_count_relationships(field: str, value: int) -> None:
     values = _integrity_values()
     values[field] = value
     with pytest.raises(ValueError, match=field):
@@ -947,8 +939,16 @@ def test_run_integrity_rejects_cross_counter_contradictions(
 @pytest.mark.parametrize(
     ("overrides",),
     [
-        ({"status": RunStatus.COMPLETE, "fixtures_total": 0, "fixtures_scored": 0,
-          "attempts_total": 0, "attempts_scorable": 0, "attempts_scored": 0},),
+        (
+            {
+                "status": RunStatus.COMPLETE,
+                "fixtures_total": 0,
+                "fixtures_scored": 0,
+                "attempts_total": 0,
+                "attempts_scorable": 0,
+                "attempts_scored": 0,
+            },
+        ),
         ({"status": RunStatus.COMPLETE, "fixtures_scored": 1},),
         ({"status": RunStatus.COMPLETE, "attempts_scored": 3},),
         ({"status": RunStatus.PARTIAL, "fixtures_scored": 0, "attempts_scored": 0},),

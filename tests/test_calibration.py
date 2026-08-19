@@ -22,12 +22,25 @@ from atomics.eval.judge import JudgeResult
 
 def _score_fn_from_map(score_map: dict[str, float]):
     """Build a score_fn that returns a fixed score keyed by the answer text."""
-    async def _fn(prompt, response, *, judge_provider=None, judge_model=None,
-                  gold_criteria=None, max_response_chars=3000):
+
+    async def _fn(
+        prompt,
+        response,
+        *,
+        judge_provider=None,
+        judge_model=None,
+        gold_criteria=None,
+        max_response_chars=3000,
+    ):
         return JudgeResult(
-            score=score_map[response], accuracy=0, completeness=0, format_score=0,
-            rationale="", judge_model="fake",
+            score=score_map[response],
+            accuracy=0,
+            completeness=0,
+            format_score=0,
+            rationale="",
+            judge_model="fake",
         )
+
     return _fn
 
 
@@ -70,11 +83,13 @@ async def test_calibration_detects_insufficient_separation():
 async def test_calibration_pass_rate_partial():
     good, bad = CALIBRATION_CASES[0], CALIBRATION_CASES[1]
     score_map = {
-        **_ordered_map(good, [0.2, 0.6, 0.9]),   # calibrated
-        **_ordered_map(bad, [0.8, 0.5, 0.3]),    # inverted
+        **_ordered_map(good, [0.2, 0.6, 0.9]),  # calibrated
+        **_ordered_map(bad, [0.8, 0.5, 0.3]),  # inverted
     }
     report = await calibrate_judge(
-        None, cases=[good, bad], score_fn=_score_fn_from_map(score_map),
+        None,
+        cases=[good, bad],
+        score_fn=_score_fn_from_map(score_map),
     )
     assert report.pass_rate == 0.5
     assert report.passed is False

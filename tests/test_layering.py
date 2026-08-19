@@ -44,9 +44,7 @@ def _rel(path: Path) -> str:
     return path.relative_to(ATOMICS.parent).as_posix()
 
 
-def _violations(
-    files: list[Path], forbidden_prefix: str
-) -> list[tuple[str, str]]:
+def _violations(files: list[Path], forbidden_prefix: str) -> list[tuple[str, str]]:
     found = []
     for path in files:
         for module in sorted(_imported_modules(path)):
@@ -64,29 +62,24 @@ def test_only_the_cli_layer_imports_the_command_layer() -> None:
     candidates = [
         path
         for path in _source_files()
-        if "commands" not in path.relative_to(ATOMICS).parts
-        and path.name != "cli.py"
+        if "commands" not in path.relative_to(ATOMICS).parts and path.name != "cli.py"
     ]
     assert candidates, "no files to check — the layout must have moved"
 
     violations = _violations(candidates, "atomics.commands")
-    assert not violations, (
-        "non-CLI code imported the command layer: "
-        + ", ".join(f"{path} -> {module}" for path, module in violations)
+    assert not violations, "non-CLI code imported the command layer: " + ", ".join(
+        f"{path} -> {module}" for path, module in violations
     )
 
 
 def test_providers_do_not_depend_on_the_eval_layer() -> None:
     """Providers sit below eval, so the outcome contract lives with providers."""
-    provider_files = [
-        path for path in _source_files() if path.parent.name == "providers"
-    ]
+    provider_files = [path for path in _source_files() if path.parent.name == "providers"]
     assert provider_files, "no provider modules found — the layout must have moved"
 
     violations = _violations(provider_files, "atomics.eval")
-    assert not violations, (
-        "provider code imported the eval layer: "
-        + ", ".join(f"{path} -> {module}" for path, module in violations)
+    assert not violations, "provider code imported the eval layer: " + ", ".join(
+        f"{path} -> {module}" for path, module in violations
     )
 
 
@@ -106,7 +99,5 @@ def test_eval_outcomes_still_re_exports_the_provider_contract(
     from atomics.eval import outcomes as eval_outcomes
     from atomics.providers import outcomes as provider_outcomes
 
-    assert getattr(eval_outcomes, module_name) is getattr(
-        provider_outcomes, module_name
-    )
+    assert getattr(eval_outcomes, module_name) is getattr(provider_outcomes, module_name)
     assert module_name in eval_outcomes.__all__

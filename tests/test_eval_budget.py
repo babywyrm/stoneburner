@@ -189,9 +189,7 @@ class TestTokenAndFailureCeilings:
     async def test_a_failure_still_counts_toward_the_circuit(self):
         """Without recording failures the breaker would never trip."""
         inner = StubProvider(fail=True)
-        guarded = GuardedProvider(
-            inner, EvalBudget(circuit_breaker_threshold=1).new_guard()
-        )
+        guarded = GuardedProvider(inner, EvalBudget(circuit_breaker_threshold=1).new_guard())
         with pytest.raises(RuntimeError):
             await _call(guarded)
         assert guarded.guard.circuit_open

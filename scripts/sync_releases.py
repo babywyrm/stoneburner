@@ -79,7 +79,8 @@ def is_placeholder(body: str) -> bool:
     better than the changelog section and are deliberately left alone.
     """
     meaningful = [
-        line for line in body.strip().splitlines()
+        line
+        for line in body.strip().splitlines()
         if line.strip() and not line.strip().startswith("**Full Changelog**:")
     ]
     return not meaningful
@@ -124,8 +125,14 @@ def main(argv: list[str] | None = None) -> int:
             # most recently. Backfilling an old version would otherwise put
             # "Latest" on it and present a superseded release as current.
             argv = [
-                "gh", "release", "create", tag,
-                "--title", title, "--notes", body,
+                "gh",
+                "release",
+                "create",
+                tag,
+                "--title",
+                title,
+                "--notes",
+                body,
                 "--latest=false",
             ]
             if on_remote:
@@ -156,7 +163,9 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"       retitle -> {title!r}")
                 if args.apply:
                     result = _run(["gh", "release", "edit", tag, "--title", title])
-                    print(f"       {'updated' if result.returncode == 0 else result.stderr.strip()}")
+                    print(
+                        f"       {'updated' if result.returncode == 0 else result.stderr.strip()}"
+                    )
             continue
 
         if current_title == title and current_body.strip() == body.strip():
@@ -170,9 +179,18 @@ def main(argv: list[str] | None = None) -> int:
         print(f"       body:  {_summarize(current_body or '(empty)')}")
         print(f"          ->  {_summarize(body)}")
         if args.apply:
-            result = _run([
-                "gh", "release", "edit", tag, "--title", title, "--notes", body,
-            ])
+            result = _run(
+                [
+                    "gh",
+                    "release",
+                    "edit",
+                    tag,
+                    "--title",
+                    title,
+                    "--notes",
+                    body,
+                ]
+            )
             print(f"       {'updated' if result.returncode == 0 else result.stderr.strip()}")
 
     if not changed:

@@ -67,9 +67,7 @@ def server(
     try:
         import uvicorn
     except ImportError as exc:
-        console.print(
-            "[red]API server requires the [api] extra:[/red] uv sync --extra api"
-        )
+        console.print("[red]API server requires the [api] extra:[/red] uv sync --extra api")
         raise SystemExit(1) from exc
 
     from atomics.api.config import ServerSettings
@@ -104,6 +102,4 @@ def server(
     # included, which defeats the middleware's deliberate omission of it: a key
     # passed as ?api_key= would land in the log anyway. Ours replaces it and
     # carries the correlation ID and caller besides.
-    uvicorn.run(
-        app, host=host, port=port, log_level=log_level, access_log=False
-    )
+    uvicorn.run(app, host=host, port=port, log_level=log_level, access_log=False)

@@ -64,9 +64,7 @@ def test_empty_visible_with_thinking_tokens_is_budget_spent_on_reasoning() -> No
 
 
 def test_empty_visible_with_thinking_text_is_budget_spent_on_reasoning() -> None:
-    outcome = provider_outcome_from_response(
-        _response("", thinking_text="the model reasoned here")
-    )
+    outcome = provider_outcome_from_response(_response("", thinking_text="the model reasoned here"))
 
     assert outcome.kind is ProviderOutcomeKind.THINKING_BUDGET
 

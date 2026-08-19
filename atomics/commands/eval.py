@@ -28,31 +28,61 @@ from atomics.eval.budget import share_budget
 
 @click.command()
 @click.option(
-    "--provider", "-p", "provider_name",
+    "--provider",
+    "-p",
+    "provider_name",
     type=PROVIDER_CHOICES,
     default="ollama",
     help="Provider to evaluate (model under test)",
 )
-@click.option("--model", "-m", type=str, default=None, help="Model override for the provider under test")
+@click.option(
+    "--model", "-m", type=str, default=None, help="Model override for the provider under test"
+)
 @click.option("--ollama-host", type=str, default=None, help="Ollama endpoint for model under test")
-@click.option("--vllm-host", "vllm_host", type=str, default=None, help="vLLM/OpenAI-compatible base URL (default: ATOMICS_VLLM_HOST)")
+@click.option(
+    "--vllm-host",
+    "vllm_host",
+    type=str,
+    default=None,
+    help="vLLM/OpenAI-compatible base URL (default: ATOMICS_VLLM_HOST)",
+)
 @click.option("--region", type=str, default="us-east-1", help="AWS region for Bedrock")
 @click.option(
-    "--judge-provider", "judge_provider_name",
+    "--judge-provider",
+    "judge_provider_name",
     type=PROVIDER_CHOICES,
     default="ollama",
     help="Provider to use as judge (default: ollama — $0 cost)",
 )
 @click.option("--judge-model", type=str, default=None, help="Model override for the judge")
-@click.option("--judge-host", type=str, default=None, help="Ollama host for the judge (if different)")
+@click.option(
+    "--judge-host", type=str, default=None, help="Ollama host for the judge (if different)"
+)
 @extra_judges_option
-@click.option("--fixtures", "fixtures_filter", type=str, default=None,
-              help="Comma-separated fixture IDs to run a subset (e.g. ev-19 or "
-                   "ev-01,ev-02). Default: all 25 fixtures.")
-@click.option("--save/--no-save", "save_results", default=True, help="Persist results to the database")
-@click.option("--json-out", "json_out", type=click.Path(dir_okay=False, writable=True), default=None,
-              help="Write the full run (per-fixture scores, rationales, latency, cost) as JSON to this file.")
-@click.option("--thinking/--no-thinking", "thinking_flag", default=None, help="Enable/disable thinking for capable models")
+@click.option(
+    "--fixtures",
+    "fixtures_filter",
+    type=str,
+    default=None,
+    help="Comma-separated fixture IDs to run a subset (e.g. ev-19 or "
+    "ev-01,ev-02). Default: all 25 fixtures.",
+)
+@click.option(
+    "--save/--no-save", "save_results", default=True, help="Persist results to the database"
+)
+@click.option(
+    "--json-out",
+    "json_out",
+    type=click.Path(dir_okay=False, writable=True),
+    default=None,
+    help="Write the full run (per-fixture scores, rationales, latency, cost) as JSON to this file.",
+)
+@click.option(
+    "--thinking/--no-thinking",
+    "thinking_flag",
+    default=None,
+    help="Enable/disable thinking for capable models",
+)
 @click.option("--thinking-budget", type=int, default=None, help="Max thinking tokens")
 @budget_option
 def eval(
@@ -95,13 +125,20 @@ def eval(
         context_tokens: int | None = None,
     ):
         return _make_provider(
-            name, mdl, host, settings,
-            vllm_host=vllm_host, region=region, context_tokens=context_tokens,
+            name,
+            mdl,
+            host,
+            settings,
+            vllm_host=vllm_host,
+            region=region,
+            context_tokens=context_tokens,
         )
 
     test_provider = _build_provider(provider_name, model, ollama_host)
     # Judge host falls back to: --judge-host → --ollama-host → ATOMICS_OLLAMA_HOST env/.env
-    judge_provider = _build_provider(judge_provider_name, judge_model, judge_host or ollama_host or settings.ollama_host)
+    judge_provider = _build_provider(
+        judge_provider_name, judge_model, judge_host or ollama_host or settings.ollama_host
+    )
 
     # Parse --extra-judges "claude:claude-sonnet-4-6,ollama:deepseek-r1:14b@http://host:11434"
     extra_judge_pairs = parse_extra_judges(
@@ -122,9 +159,7 @@ def eval(
             *(p for p, _ in extra_judge_pairs),
         )
         test_provider, judge_provider = guarded[0], guarded[1]
-        extra_judge_pairs = [
-            (guarded[2 + i], mdl) for i, (_, mdl) in enumerate(extra_judge_pairs)
-        ]
+        extra_judge_pairs = [(guarded[2 + i], mdl) for i, (_, mdl) in enumerate(extra_judge_pairs)]
 
     from atomics.eval.fixtures import EVAL_FIXTURES
     from atomics.eval.multilingual import ALL_MULTILINGUAL_FIXTURES
@@ -147,7 +182,8 @@ def eval(
         f"\n[bold]Eval run[/bold] — model under test: [cyan]{provider_name}[/cyan] "
         f"({model or 'default'})\n"
         f"Judge: [cyan]{judge_provider_name}[/cyan] ({judge_label})\n"
-        f"Fixtures: [bold]{fixture_count}[/bold] | Results saved: [bold]{'yes' if save_results else 'no'}[/bold]\n"
+        f"Fixtures: [bold]{fixture_count}[/bold] | "
+        f"Results saved: [bold]{'yes' if save_results else 'no'}[/bold]\n"
     )
 
     from atomics.eval.runner import run_eval
@@ -216,21 +252,24 @@ def eval(
         eff_thinking = thinking_flag
         if eff_thinking is None and model:
             from atomics.benchmark.model_classes import supports_thinking
+
             if supports_thinking(model):
                 eff_thinking = True
 
-        summary = asyncio.run(run_eval(
-            test_provider,
-            judge_provider=judge_provider,
-            model=model,
-            judge_model=judge_model,
-            run_id=eval_run_id,
-            on_fixture_done=on_done,
-            thinking=eff_thinking,
-            thinking_budget=thinking_budget,
-            extra_judges=extra_judge_pairs,
-            fixtures=selected_fixtures,
-        ))
+        summary = asyncio.run(
+            run_eval(
+                test_provider,
+                judge_provider=judge_provider,
+                model=model,
+                judge_model=judge_model,
+                run_id=eval_run_id,
+                on_fixture_done=on_done,
+                thinking=eff_thinking,
+                thinking_budget=thinking_budget,
+                extra_judges=extra_judge_pairs,
+                fixtures=selected_fixtures,
+            )
+        )
 
         console.print(result_table)
 
@@ -251,25 +290,47 @@ def eval(
         summary_table.add_row("Fixtures Run", str(len(summary.fixture_results)))
         pf_rate = summary.parse_failure_rate
         pf_style = "green" if pf_rate == 0 else "yellow" if pf_rate < 0.1 else "red"
-        summary_table.add_row("Judge Parse Failures", f"[{pf_style}]{pf_rate * 100:.1f}%[/{pf_style}]")
+        summary_table.add_row(
+            "Judge Parse Failures", f"[{pf_style}]{pf_rate * 100:.1f}%[/{pf_style}]"
+        )
         console.print(summary_table)
 
         if repo:
-            console.print("\n[dim]Results saved to database. Run [bold]atomics compare --narrative[/bold] after evaluating multiple providers.[/dim]")
+            console.print(
+                "\n[dim]Results saved to database. "
+                "Run [bold]atomics compare --narrative[/bold] "
+                "after evaluating multiple providers.[/dim]"
+            )
 
         if json_out:
             write_summary_json(summary, Path(json_out))
             console.print(f"[dim]Wrote JSON results to {json_out}[/dim]")
 
+
 @click.command("advisor")
-@click.option("--min-quality", type=float, default=0.8, show_default=True,
-              help="Minimum acceptable quality score (0.0-1.0).")
-@click.option("--since-hours", type=float, default=None,
-              help="Only analyze data from the last N hours.")
-@click.option("--current-model", type=str, default=None,
-              help="Treat this model as the baseline to optimize from.")
-@click.option("--json-out", "json_out", type=click.Path(dir_okay=False, writable=True),
-              default=None, help="Write recommendations as JSON.")
+@click.option(
+    "--min-quality",
+    type=float,
+    default=0.8,
+    show_default=True,
+    help="Minimum acceptable quality score (0.0-1.0).",
+)
+@click.option(
+    "--since-hours", type=float, default=None, help="Only analyze data from the last N hours."
+)
+@click.option(
+    "--current-model",
+    type=str,
+    default=None,
+    help="Treat this model as the baseline to optimize from.",
+)
+@click.option(
+    "--json-out",
+    "json_out",
+    type=click.Path(dir_okay=False, writable=True),
+    default=None,
+    help="Write recommendations as JSON.",
+)
 def advisor(
     min_quality: float,
     since_hours: float | None,
@@ -333,12 +394,14 @@ def advisor(
     summary_table.add_row("Current Total Cost", f"${summary.total_current_cost:.4f}")
     summary_table.add_row("Recommended Total Cost", f"${summary.total_recommended_cost:.4f}")
     savings_style = "green" if summary.overall_savings_pct > 0 else "yellow"
-    summary_table.add_row("Overall Savings",
-                          f"[{savings_style}]{summary.overall_savings_pct:.1f}%[/{savings_style}]")
+    summary_table.add_row(
+        "Overall Savings", f"[{savings_style}]{summary.overall_savings_pct:.1f}%[/{savings_style}]"
+    )
     console.print(summary_table)
 
     if json_out:
         import json as _json
+
         with open(json_out, "w", encoding="utf-8") as fh:
             _json.dump(summary.to_dict(), fh, indent=2)
         console.print(f"[dim]Wrote recommendations to {json_out}[/dim]")

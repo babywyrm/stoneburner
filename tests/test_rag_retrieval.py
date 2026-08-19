@@ -186,9 +186,7 @@ def test_rag_index_round_trips_basename_sources(tmp_path: Path):
     info = index.info()
     assert info["embedding_model"] == "mock"
     source_paths = json.loads(info["source_paths"])
-    assert source_paths["CVE-2026-3891.md"] == str(
-        (tmp_path / "CVE-2026-3891.md").resolve()
-    )
+    assert source_paths["CVE-2026-3891.md"] == str((tmp_path / "CVE-2026-3891.md").resolve())
 
 
 @pytest.mark.skipif(sqlite_vec is None, reason="sqlite-vec not installed")

@@ -78,9 +78,7 @@ EVAL_FIXTURES: list[EvalFixture] = [
     EvalFixture(
         id="ev-04",
         complexity=TaskComplexity.LIGHT,
-        prompt=(
-            "What is a JSON Web Token (JWT)? Name and describe its three parts."
-        ),
+        prompt=("What is a JSON Web Token (JWT)? Name and describe its three parts."),
         gold_criteria=[
             "header",
             "payload",
@@ -526,14 +524,14 @@ EVAL_FIXTURES: list[EvalFixture] = [
         prompt=(
             "An incident responder finds this in Apache access logs:\n\n"
             "```\n"
-            "10.0.2.99 - - [15/May/2026:03:14:22] \"GET /api/users/1 HTTP/1.1\" 200 342\n"
-            "10.0.2.99 - - [15/May/2026:03:14:23] \"GET /api/users/2 HTTP/1.1\" 200 342\n"
-            "10.0.2.99 - - [15/May/2026:03:14:23] \"GET /api/users/3 HTTP/1.1\" 200 342\n"
+            '10.0.2.99 - - [15/May/2026:03:14:22] "GET /api/users/1 HTTP/1.1" 200 342\n'
+            '10.0.2.99 - - [15/May/2026:03:14:23] "GET /api/users/2 HTTP/1.1" 200 342\n'
+            '10.0.2.99 - - [15/May/2026:03:14:23] "GET /api/users/3 HTTP/1.1" 200 342\n'
             "...\n"
-            "10.0.2.99 - - [15/May/2026:03:17:45] \"GET /api/users/8547 HTTP/1.1\" 200 342\n"
-            "10.0.2.99 - - [15/May/2026:03:17:46] \"GET /api/users/8548 HTTP/1.1\" 403 28\n"
-            "10.0.2.99 - - [15/May/2026:03:18:01] \"POST /api/export HTTP/1.1\" 200 4521887\n"
-            "10.0.2.99 - - [15/May/2026:03:18:15] \"DELETE /api/audit-log HTTP/1.1\" 204 0\n"
+            '10.0.2.99 - - [15/May/2026:03:17:45] "GET /api/users/8547 HTTP/1.1" 200 342\n'
+            '10.0.2.99 - - [15/May/2026:03:17:46] "GET /api/users/8548 HTTP/1.1" 403 28\n'
+            '10.0.2.99 - - [15/May/2026:03:18:01] "POST /api/export HTTP/1.1" 200 4521887\n'
+            '10.0.2.99 - - [15/May/2026:03:18:15] "DELETE /api/audit-log HTTP/1.1" 204 0\n'
             "```\n\n"
             "Analyse this incident: What attack is this? What's the timeline? "
             "What data was likely exfiltrated? What's the significance of the final two requests? "
