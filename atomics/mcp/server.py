@@ -6,12 +6,13 @@ and async job scheduling, so an agent driving this server gets exactly the
 guardrails a remote HTTP caller gets — no more, and no separate copy of them.
 
 The tool surface is deliberately bounded by what the API already exposes.
-`sweep` is an endpoint: named models, a required budget, capped runs.
-`stress`, `soak`, and `probe` stay CLI-only.
+`sweep`, `stress`, and `soak` are endpoints with required budgets and hard
+caps. `probe` stays CLI-only.
 
-Runs, evals, and sweeps are asynchronous: submitting returns a job id
-immediately and the agent polls `get_job`. `list_models` and `provider_test`
-are the two short synchronous probes. Nothing else blocks on model work.
+Runs, evals, sweeps, and load jobs are asynchronous: submitting returns a
+job id immediately and the agent polls `get_job`. `list_models` and
+`provider_test` are the two short synchronous probes. Nothing else blocks
+on model work.
 """
 
 from __future__ import annotations
@@ -25,15 +26,18 @@ from atomics.mcp.client import AtomicsApiClient
 
 INSTRUCTIONS = """Evaluate and benchmark language models through a running atomics API server.
 
-Runs, evals, and sweeps are asynchronous. `submit_run`, `submit_eval`, and
-`submit_sweep` return a job id; poll `get_job` until its status is `completed`.
+Runs, evals, sweeps, and load jobs are asynchronous. `submit_run`,
+`submit_eval`, `submit_sweep`, `submit_stress`, and `submit_soak` return a
+job id; poll `get_job` until its status is `completed`.
 
 Read-only tools (`health`, `list_models`, `list_jobs`, `get_job`, `get_run`,
 `compare`, `recent_runs`, `trends`) are safe to call freely. `provider_test`
 spends a few tokens on a fixed probe.
-`submit_run`, `submit_eval`, and `submit_sweep` spend real provider tokens
-and money, so treat them as costly. `submit_sweep` requires an explicit
-`budget_usd`. The server still caps models, suites, and runs.
+`submit_run`, `submit_eval`, `submit_sweep`, `submit_stress`, and
+`submit_soak` spend real provider tokens and money, so treat them as costly.
+`submit_sweep`, `submit_stress`, and `submit_soak` require an explicit
+`budget_usd`. Stress caps concurrency at 8 and each phase at 15s. Soak
+duration is seconds, 30–300. The CLI still owns hours-long soaks.
 """
 
 READ_ONLY = ToolAnnotations(read_only_hint=True, destructive_hint=False)
@@ -163,6 +167,52 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
             judge_model=judge_model,
             runs=runs,
             thinking=thinking,
+        )
+
+    @server.tool(annotations=SPENDS)
+    def submit_stress(
+        provider: str,
+        model: str,
+        budget_usd: float,
+        max_concurrency: int = 4,
+        phase_seconds: float = 10.0,
+    ) -> Any:
+        """Ramp concurrency to find saturation and return a job id.
+
+        Spends tokens. `budget_usd` is required. One named model. Concurrency
+        is 1–8; each phase is at most 15 seconds. Not a hours-long CLI soak.
+        Poll `get_job` until `status` is `completed`.
+        """
+        return api.submit_stress(
+            provider=provider,
+            model=model,
+            budget_usd=budget_usd,
+            max_concurrency=max_concurrency,
+            phase_seconds=phase_seconds,
+        )
+
+    @server.tool(annotations=SPENDS)
+    def submit_soak(
+        provider: str,
+        model: str,
+        budget_usd: float,
+        duration_seconds: int = 60,
+        concurrency: int = 2,
+        sample_interval: int = 15,
+    ) -> Any:
+        """Hold concurrency, classify drift, and return a job id.
+
+        Spends tokens. `budget_usd` is required. `duration_seconds` is 30–300
+        (not hours). Concurrency is 1–4. Verdict is STABLE / DEGRADED /
+        UNSTABLE. Poll `get_job` until `status` is `completed`.
+        """
+        return api.submit_soak(
+            provider=provider,
+            model=model,
+            budget_usd=budget_usd,
+            duration_seconds=duration_seconds,
+            concurrency=concurrency,
+            sample_interval=sample_interval,
         )
 
     @server.tool(annotations=READ_ONLY)

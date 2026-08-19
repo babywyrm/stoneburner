@@ -180,11 +180,14 @@ iteration/fixture bounds already documented above. See
 - Serves on **stdio only**. The HTTP MCP transports would open a port that no
   MCP-layer credential guards while this process holds an API key with spend
   authority.
-- The tool surface is bounded by the API. `stress`, `soak`, and `probe`
-  stay CLI-only. `sweep` is an endpoint: named models, required
-  `budget_usd`, at most 8 models and 3 runs. No discover-everything flag.
-- `submit_run`, `submit_eval`, `submit_sweep`, and `provider_test` are
-  annotated as not read-only. The rest are annotated read-only.
+- The tool surface is bounded by the API. `sweep`, `stress`, and `soak`
+  are endpoints with required `budget_usd` and hard caps (8 models / 3
+  runs for sweep; c≤8 and 15s phases for stress; 300s and c≤4 for soak).
+  No discover-everything flag. Hours-long soaks, contention, and `probe`
+  stay CLI-only.
+- `submit_run`, `submit_eval`, `submit_sweep`, `submit_stress`,
+  `submit_soak`, and `provider_test` are annotated as not read-only. The
+  rest are annotated read-only.
 - On stdio, stdout is the JSON-RPC channel. Status and logs go to stderr.
 
 ## Logging

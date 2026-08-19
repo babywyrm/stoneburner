@@ -2,6 +2,12 @@
 
 Tools for measuring inference throughput, stability, and capacity under load.
 
+The CLI is the long path: hours-long soaks, high concurrency, contention,
+profiles, and baselines. A remote caller uses `POST /api/v1/stress` or
+`POST /api/v1/soak` (MCP: `submit_stress` / `submit_soak`) with a required
+budget, one named model, and hard caps (stress c≤8 and phase ≤15s; soak
+30–300 seconds and c≤4). See [API_SERVER.md](API_SERVER.md).
+
 ## `atomics stress` — GPU Saturation Testing
 
 Ramp concurrent requests from 1 to N against an Ollama host to find the throughput saturation point. Reports per-phase TPS, latency percentiles, VRAM usage, and throttling detection.

@@ -14,7 +14,7 @@ The same suite names work over HTTP and MCP: `POST /api/v1/evals` with
 Budget and job polling are documented in [API_SERVER.md](API_SERVER.md) and
 [MCP_SERVER.md](MCP_SERVER.md). `POST /api/v1/sweeps` / `submit_sweep`
 runs several of these as a campaign (required budget, named models).
-`stress` and `soak` remain CLI-only.
+`POST /stress` / `POST /soak` are load jobs, not security suites.
 
 ## Fixture Coverage (72 adversarial + 20 toolcall + 10 redblue + 12 refusal + 8 codereview)
 

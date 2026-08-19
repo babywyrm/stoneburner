@@ -96,6 +96,8 @@ ATOMICS_API_URL="https://atomics.internal:8000" uv run atomics mcp
 | `submit_run` | **no** | Start a benchmark run — spends tokens |
 | `submit_eval` | **no** | Start an eval suite — spends tokens |
 | `submit_sweep` | **no** | Multi-model, multi-suite campaign — spends tokens. Budget required |
+| `submit_stress` | **no** | Ramp concurrency to find saturation — spends tokens. Budget required, c≤8 |
+| `submit_soak` | **no** | Hold concurrency and classify drift — spends tokens. Budget required, 30–300s |
 
 The spending tools are annotated as not read-only so a client can treat them
 as costly. The read tools are annotated read-only so an agent is not
@@ -113,8 +115,10 @@ open `result.run_id` with `get_run` if you need fixtures.
 4. `submit_eval` — start one suite; you get a job id immediately
 5. `submit_sweep` — same, but models × suites. `budget_usd` is required;
    name the models (`list_models` first). No discover-everything flag.
-6. `get_job` / `list_jobs` — poll until `status` is `completed`
-7. `get_run` / `compare` / `trends` — read what was stored
+6. `submit_stress` / `submit_soak` — load tests. `budget_usd` is required.
+   Stress: one model, c≤8, phase ≤15s. Soak: duration is seconds, 30–300.
+7. `get_job` / `list_jobs` — poll until `status` is `completed`
+8. `get_run` / `compare` / `trends` — read what was stored
 
 ### `submit_eval` suites
 
@@ -133,11 +137,13 @@ open `result.run_id` with `get_run` if you need fixtures.
 Sweep suite names are `eval` (not `accuracy`), `redblue`, `refusal`,
 `toolcall`, `codereview`. Caps: 8 models, 3 runs, required `budget_usd`.
 
-`stress`, `soak`, and `probe` have no endpoint.
+`probe` has no endpoint. Hours-long soaks, contention, and baselines stay
+on the CLI.
 
 ### Asynchronous by design
 
-`submit_run` and `submit_eval` return a job id immediately:
+`submit_run`, `submit_eval`, `submit_sweep`, `submit_stress`, and
+`submit_soak` return a job id immediately:
 
 ```json
 {"job_id": "3f2a...", "status": "pending", "kind": "eval"}
@@ -157,9 +163,9 @@ connection error.
 
 ## Scope
 
-The tool surface is bounded by what the API exposes. `sweep` is an endpoint
-with a required budget and caps on models and runs. `stress`, `soak`, and
-`probe` stay CLI-only.
+The tool surface is bounded by what the API exposes. `sweep`, `stress`, and
+`soak` are endpoints with a required budget and hard caps. Hours-long
+soaks, contention, and `probe` stay CLI-only.
 
 Note the symmetry worth keeping in mind: atomics ships an adversarial suite that
 tests models against MCP and agentic manipulation (`--category mcp`). A server

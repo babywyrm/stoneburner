@@ -99,6 +99,33 @@ def test_submit_sweep_is_accepted_by_the_real_api(app_client):
     assert response.json()["kind"] == "sweep"
 
 
+def test_submit_stress_is_accepted_by_the_real_api(app_client):
+    request = captured_request(
+        lambda c: c.submit_stress(
+            provider="ollama",
+            model="qwen3:14b",
+            budget_usd=1.0,
+        )
+    )
+    response = replay(app_client, request)
+    assert response.status_code == 202
+    assert response.json()["kind"] == "stress"
+
+
+def test_submit_soak_is_accepted_by_the_real_api(app_client):
+    request = captured_request(
+        lambda c: c.submit_soak(
+            provider="ollama",
+            model="qwen3:14b",
+            budget_usd=1.0,
+            duration_seconds=60,
+        )
+    )
+    response = replay(app_client, request)
+    assert response.status_code == 202
+    assert response.json()["kind"] == "soak"
+
+
 def test_submit_eval_without_budget_is_accepted(app_client):
     """Omitting the budget must satisfy the server's default, not fail validation."""
     request = captured_request(lambda c: c.submit_eval(suite="accuracy", provider="ollama"))
