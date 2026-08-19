@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+## 0.19.0 (2026-08-18) — Agent surface, durable schema, and housekeeping
+
+### Upgrade notes
+- Install is still `stoneburner-atomics`. The import and CLI stay `atomics`.
+- Opening an existing metrics database upgrades it to schema v21 **in
+  place**. A timestamped `.bak` is written beside the file. Tables are
+  not dropped. `from atomics.stress import …` and the other existing
+  import paths still resolve after the package split.
+- MCP and HTTP callers gain `submit_sweep`, `submit_stress`, and
+  `submit_soak`. Those require `budget_usd`. Hours-long soaks, contention,
+  and `probe` stay CLI-only.
+- No breaking CLI changes.
+
 ### Added
 - **MCP catches up to the API's read surface.** `list_jobs`, `get_run`, and
   `trends` were already HTTP endpoints (dashboard drill-in and live jobs) and
