@@ -12,19 +12,22 @@
 - **`POST /evals` accepts the four security suites the CLI already ran.**
   `refusal`, `redblue`, `toolcall`, and `codereview` were CLI-only, so an MCP
   agent could launch `adversarial` but not the rest of the security set.
-  Same budget ceiling, same job id. `sweep` / `stress` / `soak` stay off
-  the API: those are overnight or load campaigns, not a single eval, and
-  an agent launching them would need bounds we have not designed yet.
-  Docs (`MCP_SERVER.md`, `API_SERVER.md`, `SECURITY_SUITES.md`) list every
-  suite and the agent loop; `get_job` now says `completed`, which is the
-  status the API actually writes.
+  Same budget ceiling, same job id. Docs (`MCP_SERVER.md`,
+  `API_SERVER.md`, `SECURITY_SUITES.md`) list every suite and the agent
+  loop; `get_job` now says `completed`, which is the status the API
+  actually writes.
 - **`POST /sweeps` and MCP `submit_sweep`.** A multi-model, multi-suite
   campaign as a job, using the existing gauntlet driver. `budget_usd` is
   required (no $10 default — that is not a ceiling on eight models). Name
   the models; there is no discover-everything flag. Caps: 8 models, 3
   runs, suites `eval` / `redblue` / `refusal` / `toolcall` /
   `codereview`. One shared budget across every model and the judge.
-  `stress` and `soak` stay CLI-only.
+- **`POST /stress`, `POST /soak`, and MCP `submit_stress` / `submit_soak`.**
+  Load tests as jobs, using the existing provider runners. `budget_usd`
+  is required. One named model. Stress: concurrency 1–8, phase ≤15s.
+  Soak: duration 30–300 seconds, concurrency 1–4. Predict tokens are
+  capped at 256. No contention mode, no profile YAML, no baselines, no
+  hours-long soak — those stay on the CLI.
 
 ## 0.18.2 (2026-08-17) — Landing page, doctor next step, and extra judges
 

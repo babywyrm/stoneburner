@@ -65,6 +65,8 @@ would expose eval submission to the network unauthenticated.
 | POST | `/api/v1/runs` | Start a benchmark run |
 | POST | `/api/v1/evals` | Start an eval suite |
 | POST | `/api/v1/sweeps` | Start a bounded multi-model, multi-suite campaign (budget required) |
+| POST | `/api/v1/stress` | Ramp concurrency to find saturation (budget required, c≤8, phase ≤15s) |
+| POST | `/api/v1/soak` | Hold concurrency and classify drift (budget required, 30–300s, c≤4) |
 | GET | `/api/v1/jobs` | List in-memory API jobs (no result payload) |
 | GET | `/api/v1/jobs/{job_id}` | Poll job status/result |
 | GET | `/api/v1/models` | List Ollama or vLLM tags (`?provider=&host=`) |
@@ -208,7 +210,7 @@ worse).
 | `toolcall` | dangerous-call rate | Tool-channel leaks (higher is worse) |
 | `codereview` | review score | Planted-vuln detection vs false positives |
 
-`stress`, `soak`, and `probe` are CLI-only.
+`probe` is CLI-only. Load tests have their own endpoints, not `suite` values.
 
 ### Sweeps
 
@@ -223,6 +225,25 @@ not `accuracy`).
 curl -H "X-API-Key: $ATOMICS_API_KEY" -H "Content-Type: application/json" \
   -d '{"provider":"ollama","models":["qwen3:14b","granite4.1:8b"],"suites":["redblue","refusal"],"runs":3,"budget_usd":25}' \
   http://127.0.0.1:8000/api/v1/sweeps
+```
+
+### Stress and soak
+
+`POST /api/v1/stress` ramps concurrency against one named model.
+`POST /api/v1/soak` holds concurrency and returns STABLE / DEGRADED /
+UNSTABLE. Both require `budget_usd`. These are not the CLI's hours-long
+path: concurrency is 1–8 (stress) or 1–4 (soak), each stress phase is at
+most 15 seconds, soak duration is 30–300 seconds, and `num_predict` is
+fixed at 256. No contention mode, no profile YAML, no baselines.
+
+```bash
+curl -H "X-API-Key: $ATOMICS_API_KEY" -H "Content-Type: application/json" \
+  -d '{"provider":"ollama","model":"qwen3:14b","budget_usd":2,"max_concurrency":4}' \
+  http://127.0.0.1:8000/api/v1/stress
+
+curl -H "X-API-Key: $ATOMICS_API_KEY" -H "Content-Type: application/json" \
+  -d '{"provider":"ollama","model":"qwen3:14b","budget_usd":2,"duration_seconds":120,"concurrency":2}' \
+  http://127.0.0.1:8000/api/v1/soak
 ```
 
 The `codegen` suite executes model-generated Python. It runs in a child

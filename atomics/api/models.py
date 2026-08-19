@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 # Upper bounds exist so one authenticated request cannot pin the server or run
 # up an unbounded provider bill. They are deliberately generous: the CLI is the
@@ -25,6 +25,13 @@ MAX_EVAL_BUDGET_USD = 1000.0
 # is the most one API request may start.
 MAX_SWEEP_MODELS = 8
 MAX_SWEEP_RUNS = 3
+
+# Load tests. The CLI can soak for hours at c=8; a remote caller cannot.
+MAX_STRESS_CONCURRENCY = 8
+MAX_STRESS_PHASE_SECONDS = 15.0
+MAX_SOAK_DURATION_SECONDS = 300
+MAX_SOAK_CONCURRENCY = 4
+MAX_LOAD_PREDICT = 256
 
 
 class RunRequest(BaseModel):
@@ -85,6 +92,53 @@ class SweepRequest(BaseModel):
         from atomics.eval.gauntlet import parse_suites
 
         return parse_suites(",".join(value))
+
+
+class StressRequest(BaseModel):
+    """Ramp concurrency to find saturation. One named model, required budget."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    provider: str
+    model: str
+    budget_usd: float = Field(gt=0, le=MAX_EVAL_BUDGET_USD)
+    max_concurrency: int = Field(default=4, ge=1, le=MAX_STRESS_CONCURRENCY)
+    phase_seconds: float = Field(default=10.0, gt=0, le=MAX_STRESS_PHASE_SECONDS)
+
+    @field_validator("model")
+    @classmethod
+    def _clean_model(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("model must not be empty")
+        return cleaned
+
+
+class SoakRequest(BaseModel):
+    """Hold fixed concurrency and classify drift. Duration is seconds, max 300."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    provider: str
+    model: str
+    budget_usd: float = Field(gt=0, le=MAX_EVAL_BUDGET_USD)
+    duration_seconds: int = Field(default=60, ge=30, le=MAX_SOAK_DURATION_SECONDS)
+    concurrency: int = Field(default=2, ge=1, le=MAX_SOAK_CONCURRENCY)
+    sample_interval: int = Field(default=15, ge=10, le=60)
+
+    @field_validator("model")
+    @classmethod
+    def _clean_model(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("model must not be empty")
+        return cleaned
+
+    @model_validator(mode="after")
+    def _interval_fits_duration(self) -> SoakRequest:
+        if self.sample_interval >= self.duration_seconds:
+            raise ValueError("sample_interval must be less than duration_seconds")
+        return self
 
 
 class JobResponse(BaseModel):

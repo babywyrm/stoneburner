@@ -217,6 +217,50 @@ class AtomicsApiClient:
             payload["thinking"] = thinking
         return self._request("POST", "/sweeps", json=payload)
 
+    def submit_stress(
+        self,
+        *,
+        provider: str,
+        model: str,
+        budget_usd: float,
+        max_concurrency: int = 4,
+        phase_seconds: float = 10.0,
+    ) -> Any:
+        return self._request(
+            "POST",
+            "/stress",
+            json={
+                "provider": provider,
+                "model": model,
+                "budget_usd": budget_usd,
+                "max_concurrency": max_concurrency,
+                "phase_seconds": phase_seconds,
+            },
+        )
+
+    def submit_soak(
+        self,
+        *,
+        provider: str,
+        model: str,
+        budget_usd: float,
+        duration_seconds: int = 60,
+        concurrency: int = 2,
+        sample_interval: int = 15,
+    ) -> Any:
+        return self._request(
+            "POST",
+            "/soak",
+            json={
+                "provider": provider,
+                "model": model,
+                "budget_usd": budget_usd,
+                "duration_seconds": duration_seconds,
+                "concurrency": concurrency,
+                "sample_interval": sample_interval,
+            },
+        )
+
     def get_job(self, job_id: str) -> Any:
         return self._request("GET", f"/jobs/{job_id}")
 

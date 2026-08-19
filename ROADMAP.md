@@ -166,8 +166,11 @@ whether it answered. Endpoints first, then the proxy.
       An agent that could only run `adversarial` was not using the security
       product. Same metered job path.
 - [x] `POST /sweeps` / MCP `submit_sweep`. Named models, required budget,
-      max 8 models and 3 runs. No `--all-local`. `stress` / `soak` stay
-      CLI-only.
+      max 8 models and 3 runs. No `--all-local`.
+- [x] `POST /stress` / `POST /soak` and MCP `submit_stress` /
+      `submit_soak`. Required budget, one named model. Stress: c≤8,
+      phase ≤15s. Soak: 30–300 seconds, c≤4. Hours-long soaks, contention,
+      profiles, and baselines stay on the CLI.
 
 ## v0.22.0 — Dashboard drill-in
 

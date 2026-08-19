@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 
 from atomics.api._discovery import list_models, run_provider_test
+from atomics.api._load import run_soak_from_request, run_stress_from_request
 from atomics.api._runners import (
     run_benchmark_from_request,
     run_eval_suite,
@@ -28,6 +29,8 @@ from atomics.api.models import (
     ReadinessResponse,
     ReportResponse,
     RunRequest,
+    SoakRequest,
+    StressRequest,
     SweepRequest,
     TrendsResponse,
 )
@@ -138,6 +141,44 @@ async def start_sweep(
     try:
         job_id = await job_manager.submit(
             "sweep", lambda _jid: run_sweep_from_request(payload), owner=caller
+        )
+    except TooManyActiveJobsError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)
+        ) from exc
+    job = job_manager.jobs[job_id]
+    return _job_to_response(job)
+
+
+@router.post("/stress", response_model=JobResponse, status_code=status.HTTP_202_ACCEPTED)
+async def start_stress(
+    payload: StressRequest,
+    job_manager: JobManager = Depends(get_job_manager),
+    caller: str = Depends(require_auth),
+) -> JobResponse:
+    """Ramp concurrency to find saturation. One model, required budget, capped."""
+    try:
+        job_id = await job_manager.submit(
+            "stress", lambda _jid: run_stress_from_request(payload), owner=caller
+        )
+    except TooManyActiveJobsError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)
+        ) from exc
+    job = job_manager.jobs[job_id]
+    return _job_to_response(job)
+
+
+@router.post("/soak", response_model=JobResponse, status_code=status.HTTP_202_ACCEPTED)
+async def start_soak(
+    payload: SoakRequest,
+    job_manager: JobManager = Depends(get_job_manager),
+    caller: str = Depends(require_auth),
+) -> JobResponse:
+    """Hold concurrency and classify drift. Duration is seconds, max 300."""
+    try:
+        job_id = await job_manager.submit(
+            "soak", lambda _jid: run_soak_from_request(payload), owner=caller
         )
     except TooManyActiveJobsError as exc:
         raise HTTPException(

@@ -28,7 +28,14 @@ READ_ONLY_TOOLS = {
     "recent_runs",
     "trends",
 }
-SPENDING_TOOLS = {"submit_run", "submit_eval", "submit_sweep", "provider_test"}
+SPENDING_TOOLS = {
+    "submit_run",
+    "submit_eval",
+    "submit_sweep",
+    "submit_stress",
+    "submit_soak",
+    "provider_test",
+}
 
 
 class FakeApi:
@@ -80,6 +87,12 @@ class FakeApi:
 
     def submit_sweep(self, **kwargs):
         return self._record("submit_sweep", **kwargs)
+
+    def submit_stress(self, **kwargs):
+        return self._record("submit_stress", **kwargs)
+
+    def submit_soak(self, **kwargs):
+        return self._record("submit_soak", **kwargs)
 
 
 def payload_of(result):
@@ -161,6 +174,41 @@ async def test_submit_sweep_forwards_required_budget():
     assert kwargs["models"] == ["qwen3:14b"]
     assert kwargs["suites"] == ["redblue", "refusal"]
     assert kwargs["runs"] == 3
+
+
+async def test_submit_stress_forwards_required_budget():
+    api = FakeApi()
+    await build_server(api).call_tool(
+        "submit_stress",
+        {
+            "provider": "ollama",
+            "model": "qwen3:14b",
+            "budget_usd": 3.0,
+            "max_concurrency": 8,
+        },
+    )
+    _, kwargs = api.calls[0]
+    assert kwargs["budget_usd"] == 3.0
+    assert kwargs["model"] == "qwen3:14b"
+    assert kwargs["max_concurrency"] == 8
+
+
+async def test_submit_soak_forwards_duration_seconds():
+    api = FakeApi()
+    await build_server(api).call_tool(
+        "submit_soak",
+        {
+            "provider": "ollama",
+            "model": "qwen3:14b",
+            "budget_usd": 2.0,
+            "duration_seconds": 120,
+            "concurrency": 2,
+        },
+    )
+    _, kwargs = api.calls[0]
+    assert kwargs["budget_usd"] == 2.0
+    assert kwargs["duration_seconds"] == 120
+    assert kwargs["concurrency"] == 2
 
 
 async def test_submit_eval_forwards_budget():

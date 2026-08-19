@@ -131,6 +131,46 @@ def test_submit_sweep_posts_required_budget():
     assert payload["runs"] == 2
 
 
+def test_submit_stress_posts_required_budget():
+    requests: list[httpx.Request] = []
+    with client_recording(requests) as client:
+        client.submit_stress(
+            provider="ollama",
+            model="qwen3:14b",
+            budget_usd=2.0,
+            max_concurrency=4,
+        )
+
+    import json
+
+    assert requests[0].method == "POST"
+    assert requests[0].url.path == "/api/v1/stress"
+    payload = json.loads(requests[0].content)
+    assert payload["budget_usd"] == 2.0
+    assert payload["model"] == "qwen3:14b"
+    assert payload["max_concurrency"] == 4
+
+
+def test_submit_soak_posts_duration_in_seconds():
+    requests: list[httpx.Request] = []
+    with client_recording(requests) as client:
+        client.submit_soak(
+            provider="ollama",
+            model="qwen3:14b",
+            budget_usd=1.0,
+            duration_seconds=90,
+            concurrency=2,
+        )
+
+    import json
+
+    assert requests[0].url.path == "/api/v1/soak"
+    payload = json.loads(requests[0].content)
+    assert payload["duration_seconds"] == 90
+    assert payload["budget_usd"] == 1.0
+    assert payload["concurrency"] == 2
+
+
 def test_get_job_uses_job_id_in_path():
     requests: list[httpx.Request] = []
     with client_recording(requests) as client:
