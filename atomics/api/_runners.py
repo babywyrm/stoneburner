@@ -11,15 +11,30 @@ from atomics.config import load_settings
 from atomics.eval.adversarial.runner import run_adversarial
 from atomics.eval.budget import EvalBudget, EvalBudgetExceededError, share_budget
 from atomics.eval.codegen.runner import run_codegen
+from atomics.eval.codereview.runner import run_codereview
 from atomics.eval.multiturn.runner import run_multiturn
 from atomics.eval.rag.runner import run_rag
+from atomics.eval.redblue.runner import run_redblue
+from atomics.eval.refusal.runner import run_refusal
 from atomics.eval.runner import run_eval
+from atomics.eval.toolcall.fixtures import ALL_FIXTURES as TOOLCALL_FIXTURES
+from atomics.eval.toolcall.runner import run_toolcall_suite
 from atomics.models import BurnTier
 from atomics.providers.base import BaseProvider
 from atomics.providers.factory import ProviderConfigError, make_provider
 
 SUPPORTED_EVAL_SUITES = frozenset(
-    {"accuracy", "rag", "multiturn", "adversarial", "codegen"}
+    {
+        "accuracy",
+        "rag",
+        "multiturn",
+        "adversarial",
+        "codegen",
+        "refusal",
+        "redblue",
+        "toolcall",
+        "codereview",
+    }
 )
 
 
@@ -86,6 +101,10 @@ def _overall_score(summary: Any) -> float | None:
         "overall_pass_rate",
         "overall_resilience",
         "avg_conversation_score",
+        "calibration_score",
+        "overall_quality",
+        "review_score",
+        "dangerous_call_rate",
     ):
         value = getattr(summary, attr, None)
         if value is not None:
@@ -213,6 +232,41 @@ async def run_eval_suite(payload: EvalRequest) -> dict[str, Any]:
                 model=payload.model,
             )
             fixtures_run = len(summary.fixture_results)
+        elif suite == "refusal":
+            summary = await run_refusal(
+                provider,
+                judge_provider=judge_provider,
+                model=payload.model,
+                judge_model=payload.judge_model,
+            )
+            fixtures_run = len(summary.fixture_results)
+        elif suite == "redblue":
+            summary = await run_redblue(
+                provider,
+                judge_provider=judge_provider,
+                model=payload.model,
+                judge_model=payload.judge_model,
+            )
+            fixtures_run = len(summary.fixture_results)
+        elif suite == "codereview":
+            summary = await run_codereview(
+                provider,
+                judge_provider=judge_provider,
+                model=payload.model,
+                judge_model=payload.judge_model,
+            )
+            fixtures_run = len(summary.fixture_results)
+        elif suite == "toolcall":
+            # Keyword-only runner; fixtures default to the full catalog so an
+            # API caller gets the same suite the CLI does without a prompt list.
+            summary = await run_toolcall_suite(
+                provider=provider,
+                model=payload.model,
+                judge_provider=judge_provider,
+                fixtures=TOOLCALL_FIXTURES,
+                judge_model=payload.judge_model,
+            )
+            fixtures_run = len(summary.fixtures)
         else:  # pragma: no cover - guarded by validate_eval_suite
             raise ValueError(f"Unsupported eval suite: {suite}")
     except HTTPException:

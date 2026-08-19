@@ -190,7 +190,8 @@ who can register a worker run script in an operator's browser.
 
 ## Eval suites
 
-POST `/api/v1/evals` accepts `"suite": "accuracy" | "rag" | "multiturn" | "adversarial" | "codegen"`.
+POST `/api/v1/evals` accepts `"suite": "accuracy" | "rag" | "multiturn" |
+"adversarial" | "codegen" | "refusal" | "redblue" | "toolcall" | "codereview"`.
 
 The `codegen` suite executes model-generated Python. It runs in a child
 interpreter with a scrubbed environment (no provider credentials), a scratch
