@@ -1,10 +1,10 @@
 """Tests for schema initialization and non-destructive column reconciliation.
 
-`init_db` responds to a SCHEMA_VERSION bump by backing the database up and
-dropping every table, which is the documented pre-1.0 fresh-start policy. That is
-far too blunt for adding one nullable column: it would reset local run history,
-schedules, and the evaluation ledger. These tests cover the in-place path that
-adds missing nullable columns instead.
+`init_db` used to respond to a SCHEMA_VERSION bump by backing the database up
+and dropping every table. That is far too blunt: a type change or a new
+constraint would discard run history. These tests cover the in-place path —
+nullable columns via ALTER, everything else via a per-table rebuild that
+copies rows.
 """
 
 from __future__ import annotations
@@ -222,5 +222,116 @@ def test_reconciliation_backfills_the_column_as_null(tmp_path: Path) -> None:
             f"SELECT {MISSING_COLUMN} FROM runs WHERE run_id = ?", ("keep-me",)
         ).fetchone()[0]
         assert value == 0.0
+    finally:
+        conn.close()
+
+
+def test_type_change_rebuilds_the_table_and_keeps_rows(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """INTEGER → TEXT on a populated column must not wipe the database."""
+    from atomics.storage import schema
+
+    db_path = tmp_path / "typed.db"
+    first = init_db(db_path)
+    first.execute(
+        "INSERT INTO runs (run_id, started_at, total_tasks) VALUES (?, ?, ?)",
+        ("keep-me", "2026-01-01T00:00:00+00:00", 7),
+    )
+    first.commit()
+    first.close()
+
+    patched = schema.SCHEMA_SQL.replace(
+        "total_tasks     INTEGER DEFAULT 0",
+        "total_tasks     TEXT DEFAULT '0'",
+        1,
+    )
+    monkeypatch.setattr(schema, "SCHEMA_SQL", patched)
+    monkeypatch.setattr(schema, "SCHEMA_VERSION", schema.SCHEMA_VERSION + 1)
+
+    conn = init_db(db_path)
+    try:
+        row = conn.execute(
+            "SELECT run_id, total_tasks FROM runs WHERE run_id = ?",
+            ("keep-me",),
+        ).fetchone()
+        assert row[0] == "keep-me"
+        assert str(row[1]) == "7"
+        col_type = {
+            info[1]: info[2]
+            for info in conn.execute("PRAGMA table_info(runs)")
+        }
+        assert col_type["total_tasks"].upper() == "TEXT"
+    finally:
+        conn.close()
+
+
+def test_dropped_column_rebuilds_and_keeps_other_values(
+    tmp_path: Path, monkeypatch
+) -> None:
+    from atomics.storage import schema
+
+    db_path = tmp_path / "drop-col.db"
+    first = init_db(db_path)
+    first.execute(
+        "INSERT INTO runs (run_id, started_at, model) VALUES (?, ?, ?)",
+        ("keep-me", "2026-01-01T00:00:00+00:00", "qwen3:14b"),
+    )
+    first.commit()
+    first.close()
+
+    patched = schema.SCHEMA_SQL.replace(
+            "    avg_latency_ms  REAL DEFAULT 0.0,\n",
+            "",
+            1,
+        )
+    monkeypatch.setattr(schema, "SCHEMA_SQL", patched)
+    monkeypatch.setattr(schema, "SCHEMA_VERSION", schema.SCHEMA_VERSION + 1)
+
+    conn = init_db(db_path)
+    try:
+        names = _column_names(conn, "runs")
+        assert "avg_latency_ms" not in names
+        row = conn.execute(
+            "SELECT run_id, model FROM runs WHERE run_id = ?", ("keep-me",)
+        ).fetchone()
+        assert tuple(row) == ("keep-me", "qwen3:14b")
+    finally:
+        conn.close()
+
+
+def test_not_null_column_with_default_is_added_without_wipe(
+    tmp_path: Path, monkeypatch
+) -> None:
+    from atomics.storage import schema
+
+    db_path = tmp_path / "notnull.db"
+    first = init_db(db_path)
+    first.execute(
+        "INSERT INTO runs (run_id, started_at) VALUES (?, ?)",
+        ("keep-me", "2026-01-01T00:00:00+00:00"),
+    )
+    first.commit()
+    first.close()
+
+    patched = schema.SCHEMA_SQL.replace(
+        "    pass_count      INTEGER DEFAULT 1\n",
+        "    pass_count      INTEGER DEFAULT 1,\n"
+        "    origin          TEXT NOT NULL DEFAULT 'local'\n",
+        1,
+    )
+    monkeypatch.setattr(schema, "SCHEMA_SQL", patched)
+
+    conn = init_db(db_path)
+    try:
+        names = _column_names(conn, "runs")
+        assert "origin" in names
+        value = conn.execute(
+            "SELECT origin FROM runs WHERE run_id = ?", ("keep-me",)
+        ).fetchone()[0]
+        assert value == "local"
+        assert [row[0] for row in conn.execute("SELECT run_id FROM runs")] == [
+            "keep-me"
+        ]
     finally:
         conn.close()

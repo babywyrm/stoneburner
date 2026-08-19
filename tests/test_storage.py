@@ -18,7 +18,7 @@ def _tmp_repo() -> MetricsRepository:
 
 
 def test_schema_version_is_current():
-    assert SCHEMA_VERSION == 20
+    assert SCHEMA_VERSION == 21
 
 
 def test_archreview_results_table_exists(tmp_path):
@@ -106,8 +106,8 @@ def test_task_results_has_suite_column(tmp_path):
     assert row[0] == "redblue-red"
 
 
-def test_schema_fresh_start_on_version_mismatch(tmp_path):
-    """A v1 database gets wiped and recreated as v2."""
+def test_schema_version_bump_keeps_existing_rows(tmp_path):
+    """A version bump rebuilds the table shape and keeps the rows."""
     import sqlite3
 
     db_path = tmp_path / "migrate.db"
@@ -123,8 +123,8 @@ def test_schema_fresh_start_on_version_mismatch(tmp_path):
     conn.close()
 
     conn2 = init_db(db_path)
-    rows = conn2.execute("SELECT * FROM runs").fetchall()
-    assert len(rows) == 0
+    rows = conn2.execute("SELECT run_id, started_at FROM runs").fetchall()
+    assert [tuple(row) for row in rows] == [("old", "2026-01-01")]
     ver = conn2.execute("SELECT MAX(version) FROM schema_version").fetchone()[0]
     assert ver == SCHEMA_VERSION
     cols = [desc[0] for desc in conn2.execute("SELECT * FROM runs").description]
@@ -134,8 +134,8 @@ def test_schema_fresh_start_on_version_mismatch(tmp_path):
     conn2.close()
 
 
-def test_schema_migration_backs_up_before_wipe(tmp_path):
-    """The v19 pre-wipe backup exists and still holds the old data."""
+def test_schema_migration_backs_up_and_keeps_live_rows(tmp_path):
+    """A version bump snapshots the old file and leaves the row in the live DB."""
     import sqlite3
 
     db_path = tmp_path / "migrate.db"
@@ -150,12 +150,13 @@ def test_schema_migration_backs_up_before_wipe(tmp_path):
     conn.close()
 
     conn2 = init_db(db_path)
+    live = [row[0] for row in conn2.execute("SELECT run_id FROM runs")]
     conn2.close()
+    assert live == ["keepme"]
 
     backups = list(tmp_path.glob("migrate.db.v19.*.bak"))
     assert len(backups) == 1, f"expected one backup, found {backups}"
 
-    # The backup still contains the pre-migration row.
     bconn = sqlite3.connect(str(backups[0]))
     old = bconn.execute("SELECT run_id FROM runs").fetchall()
     bconn.close()
@@ -322,10 +323,14 @@ def test_schema_migration_lock_prevents_post_backup_write_loss(
         in_live = live.execute(
             "SELECT COUNT(*) FROM runs WHERE run_id='racing-writer'"
         ).fetchone()[0]
+        sentinel = live.execute(
+            "SELECT run_id FROM runs WHERE run_id='sentinel'"
+        ).fetchone()
     finally:
         backup.close()
         live.close()
 
+    assert sentinel is not None and sentinel[0] == "sentinel"
     assert not writer_result.get("committed") or in_backup or in_live
     assert writer_result.get("committed") is not True
     assert isinstance(writer_result.get("error"), sqlite3.Error)

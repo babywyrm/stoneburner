@@ -9,7 +9,7 @@ from pathlib import Path
 
 logger = logging.getLogger("atomics.schema")
 
-SCHEMA_VERSION = 20
+SCHEMA_VERSION = 21
 
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -415,7 +415,7 @@ def _get_schema_version(conn: sqlite3.Connection) -> int:
 
 
 def _backup_before_wipe(conn: sqlite3.Connection, db_path: Path, current: int) -> Path:
-    """WAL-safe snapshot of the DB before a destructive schema reset.
+    """WAL-safe snapshot of the DB before an in-place schema migration.
 
     The caller holds a write lock on ``conn``. A separate read connection avoids
     the online backup API deadlocking on that connection while the lock prevents
@@ -438,8 +438,8 @@ def _backup_before_wipe(conn: sqlite3.Connection, db_path: Path, current: int) -
     return backup_path
 
 
-def _expected_table_columns() -> dict[str, list[tuple]]:
-    """Columns SCHEMA_SQL would create, read back from a scratch database.
+def _scratch_schema() -> tuple[dict[str, list[tuple]], dict[str, str]]:
+    """Columns and CREATE TABLE SQL SCHEMA_SQL would produce.
 
     Parsing the DDL by hand would mean maintaining a second description of the
     schema alongside the first, free to drift from it. Letting SQLite build the
@@ -454,51 +454,171 @@ def _expected_table_columns() -> dict[str, list[tuple]]:
                 "SELECT name FROM sqlite_master WHERE type = 'table'"
             )
         ]
-        return {
+        columns = {
             table: list(scratch.execute(f"PRAGMA table_info({table})"))
             for table in tables
         }
+        ddl: dict[str, str] = {}
+        for table in tables:
+            row = scratch.execute(
+                "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?",
+                (table,),
+            ).fetchone()
+            if row and row[0]:
+                ddl[table] = row[0]
+        return columns, ddl
     finally:
         scratch.close()
 
 
-def _reconcile_added_columns(conn: sqlite3.Connection) -> list[str]:
-    """Add nullable columns SCHEMA_SQL defines that this database is missing.
+def _expected_table_columns() -> dict[str, list[tuple]]:
+    columns, _ddl = _scratch_schema()
+    return columns
 
-    Lets a new nullable column reach existing databases without the backup-then-
-    drop reset that a SCHEMA_VERSION bump triggers — losing a user's run history
-    to add one column is a bad trade.
 
-    Additions only. A type change, a new NOT NULL, or a dropped column still
-    requires a version bump, because SQLite cannot apply those to a populated
-    table.
+def _ident(name: str) -> str:
+    return '"' + name.replace('"', '""') + '"'
+
+
+def _rename_create_table(sql: str, old: str, new: str) -> str:
+    for prefix in (f"CREATE TABLE {old}", f'CREATE TABLE "{old}"'):
+        if sql.startswith(prefix):
+            return f"CREATE TABLE {new}" + sql[len(prefix) :]
+    raise sqlite3.OperationalError(f"unrecognized CREATE TABLE for {old}")
+
+
+def _same_column(existing: tuple, expected: tuple) -> bool:
+    """Type, NOT NULL, and primary-key flag. Defaults may differ without a rebuild."""
+    return (
+        (existing[2] or "").upper() == (expected[2] or "").upper()
+        and existing[3] == expected[3]
+        and existing[5] == expected[5]
+    )
+
+
+def _can_alter_add(expected: tuple) -> bool:
+    """SQLite can ADD a column that is not a PRIMARY KEY.
+
+    NOT NULL is allowed when a DEFAULT is present, which is how SCHEMA_SQL
+    writes almost every new column.
     """
-    added: list[str] = []
-    for table, expected in _expected_table_columns().items():
-        existing = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
-        if not existing:
-            # Table absent entirely; CREATE TABLE IF NOT EXISTS just made it.
+    _cid, _name, _col_type, notnull, default, pk = expected
+    if pk:
+        return False
+    if notnull and default is None:
+        return False
+    return True
+
+
+def _rebuild_needed(existing: list[tuple], expected: list[tuple]) -> bool:
+    exist_by = {row[1]: row for row in existing}
+    exp_by = {row[1]: row for row in expected}
+    if set(exist_by) - set(exp_by):
+        return True
+    for name, exp in exp_by.items():
+        if name not in exist_by:
+            if not _can_alter_add(exp):
+                return True
             continue
-        for _cid, name, col_type, notnull, default, pk in expected:
-            if name in existing:
-                continue
-            if notnull or pk:
-                logger.warning(
-                    "Cannot add %s.%s in place (NOT NULL or PRIMARY KEY); it "
-                    "needs a SCHEMA_VERSION bump to reach existing databases.",
-                    table,
-                    name,
-                )
-                continue
-            clause = f"{name} {col_type}".strip()
-            if default is not None:
-                # table_info reports the default as SQL literal text already.
-                clause += f" DEFAULT {default}"
-            conn.execute(f"ALTER TABLE {table} ADD COLUMN {clause}")
-            added.append(f"{table}.{name}")
-    if added:
-        logger.info("Added missing columns in place: %s", ", ".join(added))
+        if not _same_column(exist_by[name], exp):
+            return True
+    return False
+
+
+def _rebuild_table(
+    conn: sqlite3.Connection,
+    table: str,
+    create_sql: str,
+    expected: list[tuple],
+    existing: list[tuple],
+) -> None:
+    """Copy shared columns into a new table that matches SCHEMA_SQL."""
+    common = [row[1] for row in expected if row[1] in {item[1] for item in existing}]
+    if not common:
+        raise sqlite3.OperationalError(f"cannot rebuild {table}: no shared columns")
+    tmp = f"{table}__new"
+    conn.execute("PRAGMA foreign_keys=OFF")
+    conn.execute(_rename_create_table(create_sql, table, tmp))
+    cols = ", ".join(_ident(name) for name in common)
+    conn.execute(
+        f"INSERT INTO {_ident(tmp)} ({cols}) SELECT {cols} FROM {_ident(table)}"
+    )
+    conn.execute(f"DROP TABLE {_ident(table)}")
+    conn.execute(f"ALTER TABLE {_ident(tmp)} RENAME TO {_ident(table)}")
+    conn.execute("PRAGMA foreign_keys=ON")
+
+
+def _add_missing_columns(
+    conn: sqlite3.Connection, table: str, expected: list[tuple], existing_names: set[str]
+) -> list[str]:
+    added: list[str] = []
+    for expected_col in expected:
+        _cid, name, col_type, notnull, default, pk = expected_col
+        if name in existing_names:
+            continue
+        if not _can_alter_add(expected_col):
+            logger.warning(
+                "Cannot add %s.%s in place (PRIMARY KEY or NOT NULL without "
+                "DEFAULT); rebuilding the table instead.",
+                table,
+                name,
+            )
+            continue
+        clause = f"{name} {col_type}".strip()
+        if notnull:
+            clause += " NOT NULL"
+        if default is not None:
+            clause += f" DEFAULT {default}"
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {clause}")
+        added.append(f"{table}.{name}")
     return added
+
+
+def _reconcile_schema(conn: sqlite3.Connection) -> list[str]:
+    """Bring an existing database in line with SCHEMA_SQL without a wipe.
+
+    Missing columns that SQLite can ADD are added in place. A type change, a
+    dropped column, a PRIMARY KEY, or a NOT NULL without DEFAULT rebuilds that
+    one table and copies the shared columns. Other tables are left alone.
+    """
+    expected_columns, ddl = _scratch_schema()
+    actions: list[str] = []
+    rebuilt: list[str] = []
+    for table, expected in expected_columns.items():
+        existing = list(conn.execute(f"PRAGMA table_info({table})"))
+        if not existing:
+            continue
+        existing_names = {row[1] for row in existing}
+        if _rebuild_needed(existing, expected):
+            create_sql = ddl.get(table)
+            if not create_sql:
+                raise sqlite3.OperationalError(f"no CREATE TABLE for {table}")
+            _rebuild_table(conn, table, create_sql, expected, existing)
+            rebuilt.append(table)
+            actions.append(f"rebuild:{table}")
+            continue
+        added = _add_missing_columns(conn, table, expected, existing_names)
+        actions.extend(f"add:{name}" for name in added)
+    if rebuilt:
+        logger.info("Rebuilt tables in place: %s", ", ".join(rebuilt))
+    added_names = [item.removeprefix("add:") for item in actions if item.startswith("add:")]
+    if added_names:
+        logger.info("Added missing columns in place: %s", ", ".join(added_names))
+    return actions
+
+
+def _reconcile_added_columns(conn: sqlite3.Connection) -> list[str]:
+    """Backward-compatible name for the add-or-rebuild path."""
+    return _reconcile_schema(conn)
+
+
+def _any_rebuild_needed(conn: sqlite3.Connection) -> bool:
+    expected_columns, _ddl = _scratch_schema()
+    for table, expected in expected_columns.items():
+        existing = list(conn.execute(f"PRAGMA table_info({table})"))
+        if existing and _rebuild_needed(existing, expected):
+            return True
+    return False
 
 
 def _execute_sql_statements(conn: sqlite3.Connection, script: str) -> None:
@@ -517,10 +637,11 @@ def _execute_sql_statements(conn: sqlite3.Connection, script: str) -> None:
 def init_db(db_path: Path) -> sqlite3.Connection:
     """Initialize the database, creating tables if needed.
 
-    On a schema version bump the tables are reset (fresh-start policy while the
-    project is pre-1.0), but the existing DB is first snapshotted to a
-    timestamped ``.bak`` beside it, so historical metrics are recoverable rather
-    than silently lost.
+    A schema version bump no longer drops tables. The existing DB is
+    snapshotted to a timestamped ``.bak``, then each table is reconciled in
+    place: missing columns are added, and a type or constraint change rebuilds
+    only that table while copying rows. ``RESET_SQL`` is kept for a manual wipe
+    and is not used here.
     """
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(db_path), check_same_thread=False)
@@ -534,21 +655,21 @@ def init_db(db_path: Path) -> sqlite3.Connection:
         conn.execute("BEGIN IMMEDIATE")
         if migration_candidate:
             current = _get_schema_version(conn)
-        if current != 0 and current < SCHEMA_VERSION:
+        version_bump = current != 0 and current < SCHEMA_VERSION
+        if version_bump or (current != 0 and _any_rebuild_needed(conn)):
             backup_path = _backup_before_wipe(conn, db_path, current)
             logger.warning(
                 "Schema version %d → %d: backed up existing DB to %s, then "
-                "resetting tables.",
-                current, SCHEMA_VERSION, backup_path,
+                "migrating tables in place.",
+                current,
+                SCHEMA_VERSION,
+                backup_path,
             )
 
-        if current != 0 and current < SCHEMA_VERSION:
-            _execute_sql_statements(conn, RESET_SQL)
+        # Reconcile existing tables before CREATE INDEX runs: an old `runs`
+        # table may not yet have `provider`, and SCHEMA_SQL creates that index.
+        _reconcile_schema(conn)
         _execute_sql_statements(conn, SCHEMA_SQL)
-        # CREATE TABLE IF NOT EXISTS is a no-op on a table that already exists,
-        # so a column added to SCHEMA_SQL since this database was written would
-        # otherwise never appear without a destructive version bump.
-        _reconcile_added_columns(conn)
         conn.execute(
             "INSERT OR REPLACE INTO schema_version (version) VALUES (?)",
             (SCHEMA_VERSION,),

@@ -473,7 +473,7 @@ def test_compare_save_creates_and_completes_both_parent_rows(
 def test_schema_v19_has_adversarial_attempt_ledger_and_foreign_key(tmp_path):
     conn = init_db(tmp_path / "schema.db")
     try:
-        assert SCHEMA_VERSION == 20
+        assert SCHEMA_VERSION == 21
         column_info = {
             row["name"]: row
             for row in conn.execute("PRAGMA table_info(adversarial_results)")
@@ -529,7 +529,7 @@ def test_schema_v19_has_adversarial_attempt_ledger_and_foreign_key(tmp_path):
         conn.close()
 
 
-def test_v18_database_resets_before_adversarial_upsert(tmp_path):
+def test_v18_database_migrates_in_place_before_adversarial_upsert(tmp_path):
     db_path = tmp_path / "v18.db"
     legacy = sqlite3.connect(db_path)
     try:
@@ -599,7 +599,7 @@ def test_v18_database_resets_before_adversarial_upsert(tmp_path):
     try:
         assert migrated.execute(
             "SELECT MAX(version) FROM schema_version"
-        ).fetchone()[0] == 20
+        ).fetchone()[0] == SCHEMA_VERSION
     finally:
         migrated.close()
     backups = list(tmp_path.glob("v18.db.v18.*.bak"))

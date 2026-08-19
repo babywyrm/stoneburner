@@ -28,6 +28,11 @@
   Soak: duration 30–300 seconds, concurrency 1–4. Predict tokens are
   capped at 256. No contention mode, no profile YAML, no baselines, no
   hours-long soak — those stay on the CLI.
+- **Schema v21 migrates in place.** A version bump still writes a
+  timestamped `.bak`, but it no longer drops every table. Missing columns
+  are added; a type change, dropped column, or new constraint rebuilds
+  only that table and copies the rows. Existing run history, schedules,
+  and the evaluation ledger survive.
 
 ## 0.18.2 (2026-08-17) — Landing page, doctor next step, and extra judges
 
