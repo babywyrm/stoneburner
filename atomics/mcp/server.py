@@ -5,17 +5,13 @@ Every tool here is one authenticated HTTP call to `atomics server` (see
 and async job scheduling, so an agent driving this server gets exactly the
 guardrails a remote HTTP caller gets — no more, and no separate copy of them.
 
-The tool surface is deliberately bounded by what the API already exposes. The
-CLI can do considerably more (`sweep`, `stress`, `soak`, `probe`), but those
-have no endpoint, and inventing one for each would widen the remotely reachable
-surface well beyond what a proxy should decide on its own. If one of them is
-worth exposing, it should become an API endpoint first, with the auth and bounds
-that implies, and reach MCP from there.
+The tool surface is deliberately bounded by what the API already exposes.
+`sweep` is an endpoint: named models, a required budget, capped runs.
+`stress`, `soak`, and `probe` stay CLI-only.
 
-Runs and evals are asynchronous: submitting returns a job id immediately and the
-agent polls `get_job`. `list_models` and `provider_test` are the two short
-synchronous probes — listing tags, then a fixed 2+2 generate. Nothing else
-blocks on model work.
+Runs, evals, and sweeps are asynchronous: submitting returns a job id
+immediately and the agent polls `get_job`. `list_models` and `provider_test`
+are the two short synchronous probes. Nothing else blocks on model work.
 """
 
 from __future__ import annotations
@@ -29,15 +25,15 @@ from atomics.mcp.client import AtomicsApiClient
 
 INSTRUCTIONS = """Evaluate and benchmark language models through a running atomics API server.
 
-Runs and evals are asynchronous. `submit_run` and `submit_eval` return a job id;
-poll `get_job` with that id until its status is `completed`, then read the result.
+Runs, evals, and sweeps are asynchronous. `submit_run`, `submit_eval`, and
+`submit_sweep` return a job id; poll `get_job` until its status is `completed`.
 
 Read-only tools (`health`, `list_models`, `list_jobs`, `get_job`, `get_run`,
 `compare`, `recent_runs`, `trends`) are safe to call freely. `provider_test`
 spends a few tokens on a fixed probe.
-`submit_run` and `submit_eval` spend real provider tokens and money, so treat
-them as costly: the server enforces a per-eval dollar ceiling, but staying well
-inside it is the caller's job.
+`submit_run`, `submit_eval`, and `submit_sweep` spend real provider tokens
+and money, so treat them as costly. `submit_sweep` requires an explicit
+`budget_usd`. The server still caps models, suites, and runs.
 """
 
 READ_ONLY = ToolAnnotations(read_only_hint=True, destructive_hint=False)
@@ -140,6 +136,33 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
             fixtures=fixtures,
             save=save,
             budget_usd=budget_usd,
+        )
+
+    @server.tool(annotations=SPENDS)
+    def submit_sweep(
+        provider: str,
+        models: list[str],
+        suites: list[str],
+        budget_usd: float,
+        judge_model: str | None = None,
+        runs: int = 1,
+        thinking: bool | None = None,
+    ) -> Any:
+        """Start a multi-model, multi-suite campaign and return a job id.
+
+        Spends tokens. `budget_usd` is required. Name the models — there is no
+        discover-everything flag; call `list_models` first. `suites` is a list
+        from `eval`, `redblue`, `refusal`, `toolcall`, `codereview`. `runs` is
+        1–3. Poll `get_job` until `status` is `completed`.
+        """
+        return api.submit_sweep(
+            provider=provider,
+            models=models,
+            suites=suites,
+            budget_usd=budget_usd,
+            judge_model=judge_model,
+            runs=runs,
+            thinking=thinking,
         )
 
     @server.tool(annotations=READ_ONLY)

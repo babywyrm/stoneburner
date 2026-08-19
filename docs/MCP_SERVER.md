@@ -95,6 +95,7 @@ ATOMICS_API_URL="https://atomics.internal:8000" uv run atomics mcp
 | `provider_test` | **no** | Health + a fixed 2+2 generate — spends a few tokens |
 | `submit_run` | **no** | Start a benchmark run — spends tokens |
 | `submit_eval` | **no** | Start an eval suite — spends tokens |
+| `submit_sweep` | **no** | Multi-model, multi-suite campaign — spends tokens. Budget required |
 
 The spending tools are annotated as not read-only so a client can treat them
 as costly. The read tools are annotated read-only so an agent is not
@@ -109,9 +110,11 @@ open `result.run_id` with `get_run` if you need fixtures.
 1. `health` — is the API up?
 2. `list_models` — what tags are loaded?
 3. `provider_test` — does this tag answer? (spends a few tokens)
-4. `submit_eval` — start a suite; you get a job id immediately
-5. `get_job` / `list_jobs` — poll until `status` is `completed`
-6. `get_run` / `compare` / `trends` — read what was stored
+4. `submit_eval` — start one suite; you get a job id immediately
+5. `submit_sweep` — same, but models × suites. `budget_usd` is required;
+   name the models (`list_models` first). No discover-everything flag.
+6. `get_job` / `list_jobs` — poll until `status` is `completed`
+7. `get_run` / `compare` / `trends` — read what was stored
 
 ### `submit_eval` suites
 
@@ -127,7 +130,10 @@ open `result.run_id` with `get_run` if you need fixtures.
 | `toolcall` | **dangerous-call rate** | Tool-channel leaks. Higher is worse |
 | `codereview` | review score | Planted-vuln detection vs false positives |
 
-`sweep`, `stress`, `soak`, and `probe` have no endpoint.
+Sweep suite names are `eval` (not `accuracy`), `redblue`, `refusal`,
+`toolcall`, `codereview`. Caps: 8 models, 3 runs, required `budget_usd`.
+
+`stress`, `soak`, and `probe` have no endpoint.
 
 ### Asynchronous by design
 
@@ -151,10 +157,9 @@ connection error.
 
 ## Scope
 
-The tool surface is bounded by what the API exposes. The CLI can do more —
-`sweep`, `stress`, `soak`, `probe` — but those have no endpoint, and a proxy
-should not invent one. Exposing any of them means adding an API endpoint first,
-with the authentication and bounds that implies, and reaching MCP from there.
+The tool surface is bounded by what the API exposes. `sweep` is an endpoint
+with a required budget and caps on models and runs. `stress`, `soak`, and
+`probe` stay CLI-only.
 
 Note the symmetry worth keeping in mind: atomics ships an adversarial suite that
 tests models against MCP and agentic manipulation (`--category mcp`). A server

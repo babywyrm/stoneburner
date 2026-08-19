@@ -110,6 +110,27 @@ def test_submit_eval_includes_budget_when_given():
     assert payload["fixtures"] == ["a"]
 
 
+def test_submit_sweep_posts_required_budget():
+    requests: list[httpx.Request] = []
+    with client_recording(requests) as client:
+        client.submit_sweep(
+            provider="ollama",
+            models=["a"],
+            suites=["eval"],
+            budget_usd=4.0,
+            runs=2,
+        )
+
+    import json
+
+    assert requests[0].method == "POST"
+    assert requests[0].url.path == "/api/v1/sweeps"
+    payload = json.loads(requests[0].content)
+    assert payload["budget_usd"] == 4.0
+    assert payload["models"] == ["a"]
+    assert payload["runs"] == 2
+
+
 def test_get_job_uses_job_id_in_path():
     requests: list[httpx.Request] = []
     with client_recording(requests) as client:

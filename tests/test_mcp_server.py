@@ -28,7 +28,7 @@ READ_ONLY_TOOLS = {
     "recent_runs",
     "trends",
 }
-SPENDING_TOOLS = {"submit_run", "submit_eval", "provider_test"}
+SPENDING_TOOLS = {"submit_run", "submit_eval", "submit_sweep", "provider_test"}
 
 
 class FakeApi:
@@ -77,6 +77,9 @@ class FakeApi:
 
     def provider_test(self, **kwargs):
         return self._record("provider_test", **kwargs)
+
+    def submit_sweep(self, **kwargs):
+        return self._record("submit_sweep", **kwargs)
 
 
 def payload_of(result):
@@ -139,6 +142,25 @@ async def test_provider_test_forwards_arguments_to_the_api():
     assert name == "provider_test"
     assert kwargs["provider"] == "ollama"
     assert kwargs["model"] == "qwen3:14b"
+
+
+async def test_submit_sweep_forwards_required_budget():
+    api = FakeApi()
+    await build_server(api).call_tool(
+        "submit_sweep",
+        {
+            "provider": "ollama",
+            "models": ["qwen3:14b"],
+            "suites": ["redblue", "refusal"],
+            "budget_usd": 7.0,
+            "runs": 3,
+        },
+    )
+    _, kwargs = api.calls[0]
+    assert kwargs["budget_usd"] == 7.0
+    assert kwargs["models"] == ["qwen3:14b"]
+    assert kwargs["suites"] == ["redblue", "refusal"]
+    assert kwargs["runs"] == 3
 
 
 async def test_submit_eval_forwards_budget():

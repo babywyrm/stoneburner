@@ -18,6 +18,13 @@
   Docs (`MCP_SERVER.md`, `API_SERVER.md`, `SECURITY_SUITES.md`) list every
   suite and the agent loop; `get_job` now says `completed`, which is the
   status the API actually writes.
+- **`POST /sweeps` and MCP `submit_sweep`.** A multi-model, multi-suite
+  campaign as a job, using the existing gauntlet driver. `budget_usd` is
+  required (no $10 default — that is not a ceiling on eight models). Name
+  the models; there is no discover-everything flag. Caps: 8 models, 3
+  runs, suites `eval` / `redblue` / `refusal` / `toolcall` /
+  `codereview`. One shared budget across every model and the judge.
+  `stress` and `soak` stay CLI-only.
 
 ## 0.18.2 (2026-08-17) — Landing page, doctor next step, and extra judges
 
