@@ -196,6 +196,17 @@ class AtomicsApiClient:
     def get_job(self, job_id: str) -> Any:
         return self._request("GET", f"/jobs/{job_id}")
 
+    def list_jobs(self) -> Any:
+        """In-memory API jobs. The list omits `result`; poll `get_job` for that."""
+        return self._request("GET", "/jobs")
+
+    def get_run(self, run_id: str) -> Any:
+        """One persisted run and its fixtures. Prompts and raw JSON are omitted."""
+        return self._request("GET", f"/runs/{run_id}")
+
+    def trends(self, *, hours: int = 24) -> Any:
+        return self._request("GET", "/reports/trends", params={"hours": hours})
+
     def compare(
         self,
         *,

@@ -220,9 +220,9 @@ Serves on stdio only: the process holds a spend-authorized API key and no
 MCP-layer credential would guard a listening port. To reach a remote atomics,
 point `--api-url` at its authenticated API server and run this locally.
 
-Tools: `health`, `list_models`, `get_job`, `compare`, `recent_runs` (read-only),
-`provider_test` (fixed 2+2 probe), plus `submit_run` and `submit_eval`, which
-spend tokens and return a job id to poll.
+Tools: `health`, `list_models`, `list_jobs`, `get_job`, `get_run`, `compare`,
+`recent_runs`, `trends` (read-only), `provider_test` (fixed 2+2 probe), plus
+`submit_run` and `submit_eval`, which spend tokens and return a job id to poll.
 
 ## atomics worker
 

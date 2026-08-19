@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Added
+- **MCP catches up to the API's read surface.** `list_jobs`, `get_run`, and
+  `trends` were already HTTP endpoints (dashboard drill-in and live jobs) and
+  not tools, so an agent that submitted work could not list in-flight jobs,
+  open a persisted run, or read the hourly series. All three are annotated
+  read-only. Still no new attack surface: the proxy only forwards what the
+  API already serves.
+
 ## 0.18.2 (2026-08-17) — Landing page, doctor next step, and extra judges
 
 ### Upgrade notes

@@ -18,7 +18,16 @@ pytest.importorskip("mcp")
 from atomics.mcp.client import AtomicsApiError
 from atomics.mcp.server import build_server
 
-READ_ONLY_TOOLS = {"health", "get_job", "compare", "recent_runs", "list_models"}
+READ_ONLY_TOOLS = {
+    "health",
+    "list_models",
+    "list_jobs",
+    "get_job",
+    "get_run",
+    "compare",
+    "recent_runs",
+    "trends",
+}
 SPENDING_TOOLS = {"submit_run", "submit_eval", "provider_test"}
 
 
@@ -47,6 +56,15 @@ class FakeApi:
 
     def get_job(self, job_id):
         return self._record("get_job", job_id=job_id)
+
+    def list_jobs(self):
+        return self._record("list_jobs")
+
+    def get_run(self, run_id):
+        return self._record("get_run", run_id=run_id)
+
+    def trends(self, **kwargs):
+        return self._record("trends", **kwargs)
 
     def compare(self, **kwargs):
         return self._record("compare", **kwargs)
@@ -140,6 +158,18 @@ async def test_get_job_returns_the_api_payload():
 
     assert api.calls == [("get_job", {"job_id": "abc"})]
     assert payload_of(result)["status"] == "finished"
+
+
+async def test_list_jobs_and_get_run_and_trends_forward():
+    api = FakeApi(result={"jobs": []})
+    server = build_server(api)
+    await server.call_tool("list_jobs", {})
+    await server.call_tool("get_run", {"run_id": "r1"})
+    await server.call_tool("trends", {"hours": 12})
+
+    assert api.calls[0] == ("list_jobs", {})
+    assert api.calls[1] == ("get_run", {"run_id": "r1"})
+    assert api.calls[2] == ("trends", {"hours": 12})
 
 
 async def test_api_error_detail_reaches_the_agent():
