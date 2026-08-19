@@ -64,6 +64,7 @@ would expose eval submission to the network unauthenticated.
 | GET | `/api/v1/ready` | Readiness — can it serve real work (public) |
 | POST | `/api/v1/runs` | Start a benchmark run |
 | POST | `/api/v1/evals` | Start an eval suite |
+| POST | `/api/v1/sweeps` | Start a bounded multi-model, multi-suite campaign (budget required) |
 | GET | `/api/v1/jobs` | List in-memory API jobs (no result payload) |
 | GET | `/api/v1/jobs/{job_id}` | Poll job status/result |
 | GET | `/api/v1/models` | List Ollama or vLLM tags (`?provider=&host=`) |
@@ -207,7 +208,22 @@ worse).
 | `toolcall` | dangerous-call rate | Tool-channel leaks (higher is worse) |
 | `codereview` | review score | Planted-vuln detection vs false positives |
 
-`sweep`, `stress`, `soak`, and `probe` are CLI-only.
+`stress`, `soak`, and `probe` are CLI-only.
+
+### Sweeps
+
+`POST /api/v1/sweeps` runs the overnight driver (`eval.gauntlet`) as a job.
+Unlike a single eval, **`budget_usd` has no default** — omit it and the
+request is `422`. Name the models; there is no `--all-local` / discover-
+everything flag (call `GET /models` first). Caps: 8 models, 3 runs, suites
+from `eval`, `redblue`, `refusal`, `toolcall`, `codereview` (note `eval`,
+not `accuracy`).
+
+```bash
+curl -H "X-API-Key: $ATOMICS_API_KEY" -H "Content-Type: application/json" \
+  -d '{"provider":"ollama","models":["qwen3:14b","granite4.1:8b"],"suites":["redblue","refusal"],"runs":3,"budget_usd":25}' \
+  http://127.0.0.1:8000/api/v1/sweeps
+```
 
 The `codegen` suite executes model-generated Python. It runs in a child
 interpreter with a scrubbed environment (no provider credentials), a scratch

@@ -10,6 +10,7 @@ from atomics.api._runners import (
     run_eval_suite,
     validate_eval_suite,
 )
+from atomics.api._sweep import run_sweep_from_request
 from atomics.api.dependencies import require_auth
 from atomics.api.jobs import Job, JobManager, TooManyActiveJobsError
 from atomics.api.models import (
@@ -27,6 +28,7 @@ from atomics.api.models import (
     ReadinessResponse,
     ReportResponse,
     RunRequest,
+    SweepRequest,
     TrendsResponse,
 )
 from atomics.config import load_settings
@@ -117,6 +119,25 @@ async def start_eval(
     try:
         job_id = await job_manager.submit(
             "eval", lambda _jid: run_eval_suite(payload), owner=caller
+        )
+    except TooManyActiveJobsError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)
+        ) from exc
+    job = job_manager.jobs[job_id]
+    return _job_to_response(job)
+
+
+@router.post("/sweeps", response_model=JobResponse, status_code=status.HTTP_202_ACCEPTED)
+async def start_sweep(
+    payload: SweepRequest,
+    job_manager: JobManager = Depends(get_job_manager),
+    caller: str = Depends(require_auth),
+) -> JobResponse:
+    """Start a bounded multi-model, multi-suite campaign. Budget is required."""
+    try:
+        job_id = await job_manager.submit(
+            "sweep", lambda _jid: run_sweep_from_request(payload), owner=caller
         )
     except TooManyActiveJobsError as exc:
         raise HTTPException(

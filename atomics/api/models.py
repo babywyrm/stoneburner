@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 # Upper bounds exist so one authenticated request cannot pin the server or run
 # up an unbounded provider bill. They are deliberately generous: the CLI is the
@@ -19,6 +19,12 @@ MAX_TREND_HOURS = 168
 # profile behind it, so unlike the CLI this is always applied.
 DEFAULT_EVAL_BUDGET_USD = 10.0
 MAX_EVAL_BUDGET_USD = 1000.0
+
+# A sweep is models × suites × runs. The CLI can do a 32-model overnight;
+# a remote caller cannot. Eight models, the five known suites, three passes
+# is the most one API request may start.
+MAX_SWEEP_MODELS = 8
+MAX_SWEEP_RUNS = 3
 
 
 class RunRequest(BaseModel):
@@ -44,6 +50,41 @@ class EvalRequest(BaseModel):
     budget_usd: float = Field(
         default=DEFAULT_EVAL_BUDGET_USD, gt=0, le=MAX_EVAL_BUDGET_USD
     )
+
+
+class SweepRequest(BaseModel):
+    """Start a multi-model, multi-suite campaign.
+
+    Budget is required: unlike a single eval there is no default ceiling,
+    because a forgotten default of $10 against eight models is not a ceiling,
+    it is a surprise stop halfway through. Name the models; there is no
+    discover-everything flag.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    provider: str
+    models: list[str] = Field(min_length=1, max_length=MAX_SWEEP_MODELS)
+    suites: list[str] = Field(min_length=1)
+    judge_model: str | None = None
+    runs: int = Field(default=1, ge=1, le=MAX_SWEEP_RUNS)
+    thinking: bool | None = None
+    budget_usd: float = Field(gt=0, le=MAX_EVAL_BUDGET_USD)
+
+    @field_validator("models")
+    @classmethod
+    def _clean_models(cls, value: list[str]) -> list[str]:
+        cleaned = [item.strip() for item in value if item.strip()]
+        if not cleaned:
+            raise ValueError("models must not be empty")
+        return cleaned
+
+    @field_validator("suites")
+    @classmethod
+    def _known_suites(cls, value: list[str]) -> list[str]:
+        from atomics.eval.gauntlet import parse_suites
+
+        return parse_suites(",".join(value))
 
 
 class JobResponse(BaseModel):

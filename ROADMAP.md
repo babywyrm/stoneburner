@@ -164,8 +164,10 @@ whether it answered. Endpoints first, then the proxy.
       jobs and open a recorded run without inventing new HTTP surface
 - [x] `POST /evals` for `refusal`, `redblue`, `toolcall`, and `codereview`.
       An agent that could only run `adversarial` was not using the security
-      product. Same metered job path. `sweep` / `stress` / `soak` stay off
-      until they have their own bounds.
+      product. Same metered job path.
+- [x] `POST /sweeps` / MCP `submit_sweep`. Named models, required budget,
+      max 8 models and 3 runs. No `--all-local`. `stress` / `soak` stay
+      CLI-only.
 
 ## v0.22.0 — Dashboard drill-in
 

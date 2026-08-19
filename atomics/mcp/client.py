@@ -193,6 +193,30 @@ class AtomicsApiClient:
             payload["budget_usd"] = budget_usd
         return self._request("POST", "/evals", json=payload)
 
+    def submit_sweep(
+        self,
+        *,
+        provider: str,
+        models: list[str],
+        suites: list[str],
+        budget_usd: float,
+        judge_model: str | None = None,
+        runs: int = 1,
+        thinking: bool | None = None,
+    ) -> Any:
+        payload: dict[str, Any] = {
+            "provider": provider,
+            "models": models,
+            "suites": suites,
+            "budget_usd": budget_usd,
+            "runs": runs,
+        }
+        if judge_model is not None:
+            payload["judge_model"] = judge_model
+        if thinking is not None:
+            payload["thinking"] = thinking
+        return self._request("POST", "/sweeps", json=payload)
+
     def get_job(self, job_id: str) -> Any:
         return self._request("GET", f"/jobs/{job_id}")
 

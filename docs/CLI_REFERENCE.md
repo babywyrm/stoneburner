@@ -222,10 +222,12 @@ point `--api-url` at its authenticated API server and run this locally.
 
 Tools: `health`, `list_models`, `list_jobs`, `get_job`, `get_run`, `compare`,
 `recent_runs`, `trends` (read-only), `provider_test` (fixed 2+2 probe), plus
-`submit_run` and `submit_eval`, which spend tokens and return a job id to poll
-until `status` is `completed`. `submit_eval` suites: `accuracy`, `rag`,
-`multiturn`, `adversarial`, `codegen`, `refusal`, `redblue`, `toolcall`,
-`codereview`.
+`submit_run`, `submit_eval`, and `submit_sweep`, which spend tokens and
+return a job id to poll until `status` is `completed`. `submit_eval` suites:
+`accuracy`, `rag`, `multiturn`, `adversarial`, `codegen`, `refusal`,
+`redblue`, `toolcall`, `codereview`. `submit_sweep` uses `eval` (not
+`accuracy`) plus `redblue`, `refusal`, `toolcall`, `codereview`; budget is
+required; at most 8 models and 3 runs.
 
 ## atomics worker
 

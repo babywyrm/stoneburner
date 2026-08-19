@@ -12,7 +12,9 @@ The same suite names work over HTTP and MCP: `POST /api/v1/evals` with
 `"suite": "adversarial" | "redblue" | "refusal" | "toolcall" | "codereview"`
 (plus the quality suites). `atomics mcp` `submit_eval` is that request.
 Budget and job polling are documented in [API_SERVER.md](API_SERVER.md) and
-[MCP_SERVER.md](MCP_SERVER.md). `sweep` remains CLI-only.
+[MCP_SERVER.md](MCP_SERVER.md). `POST /api/v1/sweeps` / `submit_sweep`
+runs several of these as a campaign (required budget, named models).
+`stress` and `soak` remain CLI-only.
 
 ## Fixture Coverage (72 adversarial + 20 toolcall + 10 redblue + 12 refusal + 8 codereview)
 
