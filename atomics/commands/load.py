@@ -62,7 +62,7 @@ def stress(
     console = Console()
 
     if models_csv:
-        from atomics.contention import run_contention
+        from atomics.load.contention import run_contention
         host = ollama_host or settings.ollama_host
         model_list = [m.strip() for m in models_csv.split(",") if m.strip()]
         console.print(
@@ -102,7 +102,7 @@ def stress(
         return
 
     if profile_path:
-        from atomics.profiles import load_profile
+        from atomics.load.profiles import load_profile
         tp = load_profile(profile_path)
         effective_model = tp.model
         target_label = f"profile:{tp.name} ({tp.type})"
@@ -148,7 +148,7 @@ def stress(
     console.print("[bold]Throughput by concurrency:[/bold]")
 
     if profile_path:
-        from atomics.stress import run_stress_profile
+        from atomics.load.stress import run_stress_profile
         result = asyncio.run(run_stress_profile(
             profile=tp,
             max_concurrency=max_concurrency,
@@ -157,7 +157,7 @@ def stress(
         ))
     elif use_provider_mode:
         provider = _make_provider(provider_name, effective_model, ollama_host, settings)
-        from atomics.stress import run_stress_provider
+        from atomics.load.stress import run_stress_provider
         result = asyncio.run(run_stress_provider(
             provider=provider,
             model=effective_model,
@@ -167,7 +167,7 @@ def stress(
             on_phase=_on_phase,
         ))
     else:
-        from atomics.stress import run_stress
+        from atomics.load.stress import run_stress
         result = asyncio.run(run_stress(
             host=host,
             model=effective_model,
@@ -259,7 +259,7 @@ def capacity(
       atomics capacity --users 100 --peak-tps 107 --single-latency 15000
       atomics capacity --users 50 --think-time 600 --model qwen2.5:7b
     """
-    from atomics.capacity import LoadProfile, project_capacity
+    from atomics.load.capacity import LoadProfile, project_capacity
 
     settings = load_settings()
     console = Console()
@@ -398,7 +398,7 @@ def soak(
       atomics soak --provider openai --model gpt-4o-mini -d 15m -c 2
       atomics soak --model qwen2.5:3b -d 5m --verbose
     """
-    from atomics.soak import parse_duration, run_soak, run_soak_profile, run_soak_provider
+    from atomics.load.soak import parse_duration, run_soak, run_soak_profile, run_soak_provider
 
     settings = load_settings()
     setup_logging(settings.log_level)
@@ -429,7 +429,7 @@ def soak(
     dur_label = _dur_label(duration_seconds)
 
     if profile_path:
-        from atomics.profiles import load_profile
+        from atomics.load.profiles import load_profile
         tp = load_profile(profile_path)
         target_label = f"profile:{tp.name} ({tp.type})"
         console.print(
@@ -570,12 +570,12 @@ def soak(
         console.print("\n[dim]Results saved to database.[/dim]")
 
     if save_baseline_name or compare_baseline_name:
-        from atomics.regression import compute_regression, load_baseline, save_baseline
+        from atomics.load.regression import compute_regression, load_baseline, save_baseline
         from atomics.storage.schema import init_db
         conn = init_db(settings.db_path)
 
     if save_baseline_name:
-        from atomics.regression import save_baseline
+        from atomics.load.regression import save_baseline
         from atomics.storage.schema import init_db
         conn = init_db(settings.db_path)
         save_baseline(
@@ -589,7 +589,7 @@ def soak(
         console.print(f"\n[green]Baseline '[bold]{save_baseline_name}[/bold]' saved.[/green]")
 
     if compare_baseline_name:
-        from atomics.regression import compute_regression, load_baseline
+        from atomics.load.regression import compute_regression, load_baseline
         from atomics.storage.schema import init_db
         conn = init_db(settings.db_path)
         bl = load_baseline(conn, compare_baseline_name, "soak")
@@ -651,7 +651,7 @@ def soak(
 @click.command("baselines")
 def baselines() -> None:
     """List all saved baselines."""
-    from atomics.regression import list_baselines
+    from atomics.load.regression import list_baselines
     from atomics.storage.schema import init_db
     settings = load_settings()
     console = Console()
@@ -717,8 +717,8 @@ def scenario(
       atomics scenario --file scenario.yaml --ollama-host http://gpu-host:11434
       atomics scenario -w "gate:qwen2.5:3b:3" -d 30
     """
-    from atomics.scenario import run_scenario
-    from atomics.scenario_models import load_scenario_yaml, parse_workload_flag
+    from atomics.load.scenario import run_scenario
+    from atomics.load.scenario_models import load_scenario_yaml, parse_workload_flag
 
     settings = load_settings()
     setup_logging(settings.log_level)

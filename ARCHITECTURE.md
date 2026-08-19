@@ -21,13 +21,13 @@ never imports eval; providers never import storage.
 CLI / entry          cli.py, commands/, __main__.py
 API / server         api/                # FastAPI, async jobs, optional auth
 MCP / agent          mcp/                # stdio proxy over a running API server
-Orchestration        sweep, scenario, qa_runner, labcompare
-Burn loop            core/, tasks/, tiers, hooks
+Orchestration        benchmark/ (sweep, qa_runner, labcompare, advisor)
+Burn loop            core/, tasks/, benchmark/tiers, reporting/hooks
 Eval / security      eval/, probe/, archreview/
-Load testing         stress, soak, contention, capacity, profiles, regression
-Providers            providers/, auth/, model_classes
+Load testing         load/ (stress, soak, contention, capacity, profiles)
+Providers            providers/, auth/, benchmark/model_classes
 Storage              storage/
-Support / infra      config, paths, secrets, doctor, reporting, exporters,
+Support / infra      config, paths, secrets, doctor, reporting/,
                      scheduler, inference
 ```
 
@@ -36,10 +36,10 @@ flowchart TB
     CLI["CLI / entry\ncli.py, commands/"] --> Commands["commands/\nauth, admin, benchmark, eval, security, load, api, mcp, rag"]
     API["API / server\natomics/api/"] --> Commands
     MCP["MCP / agent\natomics/mcp/"] --> API
-    Commands --> Orchestration["Orchestration\nsweep, scenario, labcompare, qa_runner"]
+    Commands --> Orchestration["Orchestration\nbenchmark/sweep, load/scenario"]
     Commands --> Burn["Burn loop\ncore/ engine, runner, guard"]
     Commands --> Eval["Eval / security\neval/, probe/, archreview/"]
-    Commands --> Load["Load testing\nstress, soak, capacity, profiles"]
+    Commands --> Load["Load testing\nload/stress, soak, capacity"]
     Orchestration --> Providers
     Burn --> Providers
     Eval --> Providers
@@ -55,10 +55,10 @@ flowchart TB
 | CLI | Thin Click registration in `cli.py`; command modules in `commands/` handle argument parsing, wiring, and Rich output. No business logic that can't be reached another way. | `cli.py`, `commands/` |
 | API / server | FastAPI HTTP surface for runs, evals, reports, and async jobs; optional auth. | `api/` |
 | MCP / agent | Stdio MCP server that proxies a running API. Holds no provider, storage, or budget logic of its own — an agent inherits the API's authentication and spend ceilings. Tool surface is bounded by the API, not the CLI. | `mcp/`, `commands/mcp.py` |
-| Orchestration | Multi-run/multi-model coordination over the lower layers. | `sweep.py`, `scenario.py`, `qa_runner.py`, `labcompare.py` |
+| Orchestration | Multi-run/multi-model coordination over the lower layers. | `benchmark/sweep.py`, `load/scenario.py`, `benchmark/qa_runner.py` |
 | Burn loop | The continuous token-burn benchmark. | `core/engine.py`, `core/runner.py`, `core/guard.py`, `tasks/` |
 | Eval / security | LLM quality and security evaluation suites. | `eval/`, `probe/`, `archreview/` |
-| Load testing | Throughput/latency/stability under concurrency. | `stress.py`, `soak.py`, `contention.py`, `capacity.py` |
+| Load testing | Throughput/latency/stability under concurrency. | `load/stress.py`, `load/soak.py`, `load/contention.py`, `load/capacity.py` |
 | Providers | One uniform async interface to every LLM backend. | `providers/base.py` + adapters, `auth/` |
 | Storage | SQLite persistence and queries. | `storage/repository.py`, `storage/schema.py` |
 | Support | Config, secrets, paths, diagnostics, reporting. | `config.py`, `secrets.py`, `paths.py`, ... |

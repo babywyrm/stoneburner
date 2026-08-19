@@ -169,7 +169,7 @@ def multiturn(
 
         eff_thinking = thinking_flag
         if eff_thinking is None and model:
-            from atomics.model_classes import supports_thinking
+            from atomics.benchmark.model_classes import supports_thinking
             if supports_thinking(model):
                 eff_thinking = True
 

@@ -267,6 +267,9 @@ stoneburner/
 │   │   ├── routes.py
 │   │   ├── rollup.py     # Per-worker aggregation of fleet results
 │   │   └── auth.py
+│   ├── load/             # Stress, soak, scenario, capacity
+│   ├── benchmark/        # Sweep, qa_runner, labcompare
+│   ├── reporting/        # Reports, exporters, webhooks
 │   ├── core/             # Loop engine, task runner, rate/budget guard
 │   ├── eval/             # Evaluation framework (eval, adversarial, redblue)
 │   ├── probe/            # Live ecosystem probe suite

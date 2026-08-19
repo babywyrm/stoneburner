@@ -24,7 +24,7 @@ from atomics.eval.judge import (
 from atomics.eval.outcomes import RunIntegrity
 from atomics.eval.redblue.fixtures import ALL_FIXTURES, BLUE_FIXTURES, RED_FIXTURES, RedBlueFixture
 from atomics.eval.suite_integrity import fixture_outcome, headline_rate, integrity_of
-from atomics.model_classes import supports_thinking
+from atomics.benchmark.model_classes import supports_thinking
 from atomics.models import TaskCategory, TaskResult, TaskStatus
 from atomics.providers.base import BaseProvider
 from atomics.validation import sanitize_error

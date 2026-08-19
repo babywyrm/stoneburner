@@ -4,7 +4,7 @@ Split along domain seams. Callers still import `MetricsRepository` from
 this package; the public method set is unchanged.
 """
 
-from atomics.stats import percentile as _percentile
+from atomics.reporting.stats import percentile as _percentile
 from atomics.storage.repository.analytics import AnalyticsMixin
 from atomics.storage.repository.evaluation import EvaluationMixin
 from atomics.storage.repository.load import LoadMixin

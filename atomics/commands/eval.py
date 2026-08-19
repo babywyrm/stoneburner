@@ -215,7 +215,7 @@ def eval(
         # Auto-detect thinking if not explicitly set
         eff_thinking = thinking_flag
         if eff_thinking is None and model:
-            from atomics.model_classes import supports_thinking
+            from atomics.benchmark.model_classes import supports_thinking
             if supports_thinking(model):
                 eff_thinking = True
 
@@ -280,7 +280,7 @@ def advisor(
     settings = load_settings()
     console = Console()
 
-    from atomics.advisor import analyze_cost_optimization
+    from atomics.benchmark.advisor import analyze_cost_optimization
     from atomics.storage.schema import init_db
 
     conn = init_db(settings.db_path)

@@ -9,15 +9,15 @@ from typing import TYPE_CHECKING
 from atomics.storage.repository._base import RepositoryBase
 
 if TYPE_CHECKING:
-    from atomics.scenario_models import ScenarioResult
-    from atomics.soak import SoakResult
-    from atomics.stress import StressResult
-    from atomics.sweep import ModelSweepResult
+    from atomics.load.scenario_models import ScenarioResult
+    from atomics.load.soak import SoakResult
+    from atomics.load.stress import StressResult
+    from atomics.benchmark.sweep import ModelSweepResult
 
 
 class LoadMixin(RepositoryBase):
     def save_stress_result(self, sr: StressResult) -> None:
-        """Persist a StressResult from atomics.stress."""
+        """Persist a StressResult from atomics.load.stress."""
         import json as _json
 
         result_id = uuid.uuid4().hex[:12]
@@ -113,7 +113,7 @@ class LoadMixin(RepositoryBase):
     # ── Soak results ──────────────────────────────────────
 
     def save_soak_result(self, sr: SoakResult) -> None:
-        """Persist a SoakResult from atomics.soak."""
+        """Persist a SoakResult from atomics.load.soak."""
         import json as _json
 
         result_id = uuid.uuid4().hex[:12]

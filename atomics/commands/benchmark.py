@@ -21,7 +21,7 @@ from atomics.commands.common import (
 from atomics.commands.common import effective_model as resolve_effective_model
 from atomics.config import load_settings
 from atomics.eval.budget import BudgetMeter
-from atomics.labcompare import (
+from atomics.benchmark.labcompare import (
     parity_verdict,
     parse_host_specs,
     run_labcompare,
@@ -31,7 +31,7 @@ from atomics.models import BurnTier
 from atomics.providers.base import BaseProvider
 
 if TYPE_CHECKING:
-    from atomics.labcompare import CellResult
+    from atomics.benchmark.labcompare import CellResult
 
 TIER_CHOICES = click.Choice([t.value for t in BurnTier], case_sensitive=False)
 
@@ -122,7 +122,7 @@ def run(
 
     from atomics.core.engine import LoopEngine
     from atomics.storage.repository import MetricsRepository
-    from atomics.tiers import get_tier_profile
+    from atomics.benchmark.tiers import get_tier_profile
 
     profile = get_tier_profile(burn_tier)
 
@@ -158,7 +158,7 @@ def run(
 
     # Auto-detect thinking capability when not explicitly set
     if thinking_flag is None and effective_model:
-        from atomics.model_classes import supports_thinking
+        from atomics.benchmark.model_classes import supports_thinking
         if supports_thinking(effective_model):
             thinking_flag = True
 
@@ -176,7 +176,7 @@ def run(
         thinking_budget=thinking_budget,
     )
 
-    from atomics.hooks import hook_env, notify_run_complete, run_post_hook
+    from atomics.reporting.hooks import hook_env, notify_run_complete, run_post_hook
 
     summary = None
     try:
@@ -195,7 +195,7 @@ def run(
                 if rc != 0:
                     console.print(f"[yellow]Post-run hook exited with code {rc}[/yellow]")
             if settings.webhook_url:
-                from atomics.webhooks import send_webhook
+                from atomics.reporting.webhooks import send_webhook
                 send_webhook(
                     settings.webhook_url, summary,
                     tier=burn_tier.value, provider=provider_name,
@@ -248,7 +248,7 @@ def compare(
 ) -> None:
     """Compare providers or models side-by-side (add --narrative for a business-case summary)."""
     settings = load_settings()
-    from atomics.model_classes import classify_model
+    from atomics.benchmark.model_classes import classify_model
     from atomics.storage.repository import MetricsRepository
 
     console = Console()
@@ -438,7 +438,7 @@ def _print_narrative(console: Console, rows: list[dict], by: str) -> None:
 @click.command("tiers")
 def tiers() -> None:
     """Show available burn tiers and their profiles."""
-    from atomics.tiers import TIER_PROFILES
+    from atomics.benchmark.tiers import TIER_PROFILES
 
     console = Console()
     table = Table(title="Burn Tiers", show_lines=True)
@@ -574,7 +574,7 @@ def sweep(
         parse_suites,
         run_gauntlet,
     )
-    from atomics.sweep import ModelSweepResult, run_model_sweep
+    from atomics.benchmark.sweep import ModelSweepResult, run_model_sweep
 
     settings = load_settings()
     setup_logging(settings.log_level)

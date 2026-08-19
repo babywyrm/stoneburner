@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from atomics.stats import percentile as _percentile
+from atomics.reporting.stats import percentile as _percentile
 from atomics.storage.repository._base import RepositoryBase
 
 

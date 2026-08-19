@@ -190,7 +190,7 @@ def rag(
 
         eff_thinking = thinking_flag
         if eff_thinking is None and model:
-            from atomics.model_classes import supports_thinking
+            from atomics.benchmark.model_classes import supports_thinking
             if supports_thinking(model):
                 eff_thinking = True
 
@@ -550,7 +550,7 @@ def codegen(
 
         eff_thinking = thinking_flag
         if eff_thinking is None and model:
-            from atomics.model_classes import supports_thinking
+            from atomics.benchmark.model_classes import supports_thinking
             if supports_thinking(model):
                 eff_thinking = True
 
@@ -1008,7 +1008,7 @@ def qa(
     import asyncio as _asyncio
     import logging as _logging
 
-    from atomics.qa_runner import QAResult, load_qa_suite, run_qa_suite
+    from atomics.benchmark.qa_runner import QAResult, load_qa_suite, run_qa_suite
 
     _logging.getLogger("httpx").setLevel(_logging.WARNING)
     _logging.getLogger("httpcore").setLevel(_logging.WARNING)
@@ -1021,7 +1021,7 @@ def qa(
     loaded_profile = None
     target_label: str
     if profile_path:
-        from atomics.profiles import load_profile
+        from atomics.load.profiles import load_profile
         loaded_profile = load_profile(profile_path)
         target_label = f"profile:[bold cyan]{loaded_profile.name}[/bold cyan] ({loaded_profile.type})"
     else:
@@ -1058,7 +1058,7 @@ def qa(
         ))
     except KeyboardInterrupt:
         stopped_early = True
-        from atomics.qa_runner import QASuiteResult
+        from atomics.benchmark.qa_runner import QASuiteResult
         suite = QASuiteResult(model=effective_model, host=effective_host, results=results)
 
     console.print()
