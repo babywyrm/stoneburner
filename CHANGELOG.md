@@ -33,6 +33,9 @@
   are added; a type change, dropped column, or new constraint rebuilds
   only that table and copies the rows. Existing run history, schedules,
   and the evaluation ledger survive.
+- **Top-level modules grouped into `load/`, `benchmark/`, and `reporting/`.**
+  `from atomics.stress import …` and the other existing import paths still
+  resolve; the implementations moved.
 
 ## 0.18.2 (2026-08-17) — Landing page, doctor next step, and extra judges
 

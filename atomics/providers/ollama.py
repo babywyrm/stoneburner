@@ -8,7 +8,7 @@ from typing import Any
 
 import httpx
 
-from atomics.model_classes import classify_model, supports_thinking
+from atomics.benchmark.model_classes import classify_model, supports_thinking
 from atomics.providers._tool_dialects import (
     openai_tool_payload,
     parse_ollama_tool_calls,

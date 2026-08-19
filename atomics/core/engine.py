@@ -15,7 +15,7 @@ from atomics.models import BurnTier, RunSummary, TaskStatus
 from atomics.providers.base import BaseProvider
 from atomics.storage.repository import MetricsRepository
 from atomics.tasks import get_weighted_task
-from atomics.tiers import TierProfile, get_tier_profile
+from atomics.benchmark.tiers import TierProfile, get_tier_profile
 
 logger = logging.getLogger("atomics.engine")
 

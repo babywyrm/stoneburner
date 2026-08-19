@@ -15,7 +15,7 @@ import time
 
 import httpx
 
-from atomics.model_classes import classify_model, supports_thinking
+from atomics.benchmark.model_classes import classify_model, supports_thinking
 from atomics.providers._openai_compat import OpenAICompatibleTools
 from atomics.providers.base import BaseProvider, ProviderResponse, compute_tps
 

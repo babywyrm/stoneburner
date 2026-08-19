@@ -72,8 +72,8 @@ every item here is a refactor with the test suite as the contract.
       a connection and leaving a row without `completed_at`. `toolcall` never
       finalized its parent at all, on every run. All eleven recording commands now
       share one lifetime
-- [ ] Group the 30 flat top-level modules into `load/`, `benchmark/`, and
-      `reporting/` packages
+- [x] Group the 30 flat top-level modules into `load/`, `benchmark/`, and
+      `reporting/` packages. Old `atomics.<name>` imports stay as shims.
 - [ ] Enforce the configured line length instead of `--ignore E501`, which
       currently suppresses ~396 violations and makes the setting inert
 - [x] Decide the fate of `inference.py` and `workers/bridge.py`.

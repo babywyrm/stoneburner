@@ -261,7 +261,7 @@ def export(
     """
 
     settings = load_settings()
-    from atomics.exporters import write_tasks_export
+    from atomics.reporting.exporters import write_tasks_export
     from atomics.storage.repository import MetricsRepository
 
     repo = MetricsRepository(settings.db_path)
@@ -461,7 +461,7 @@ def provider_test(provider_name: str, model: str | None, region: str, ollama_hos
     # Auto-detect thinking if not explicitly set
     eff_thinking = thinking_flag
     if eff_thinking is None and model:
-        from atomics.model_classes import supports_thinking
+        from atomics.benchmark.model_classes import supports_thinking
         if supports_thinking(model):
             eff_thinking = True
 
