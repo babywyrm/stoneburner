@@ -87,7 +87,7 @@ ATOMICS_API_URL="https://atomics.internal:8000" uv run atomics mcp
 | `health` | yes | Check the API server is reachable |
 | `list_models` | yes | List tags on Ollama or vLLM |
 | `list_jobs` | yes | In-memory API jobs (no `result`; poll `get_job`) |
-| `get_job` | yes | Status, and result once finished, for a submitted job |
+| `get_job` | yes | Status, and result once `completed`, for a submitted job |
 | `get_run` | yes | One persisted run and its fixtures (prompts omitted) |
 | `compare` | yes | Compare recorded results by provider or model |
 | `recent_runs` | yes | List recent recorded runs |
@@ -100,6 +100,35 @@ The spending tools are annotated as not read-only so a client can treat them
 as costly. The read tools are annotated read-only so an agent is not
 discouraged from the cheap calls.
 
+`list_jobs` / `get_job` are the in-memory API queue. `recent_runs` / `get_run`
+are the SQLite ledger. A job id is not a run id: submit, poll the job, then
+open `result.run_id` with `get_run` if you need fixtures.
+
+### Typical agent loop
+
+1. `health` — is the API up?
+2. `list_models` — what tags are loaded?
+3. `provider_test` — does this tag answer? (spends a few tokens)
+4. `submit_eval` — start a suite; you get a job id immediately
+5. `get_job` / `list_jobs` — poll until `status` is `completed`
+6. `get_run` / `compare` / `trends` — read what was stored
+
+### `submit_eval` suites
+
+| `suite` | Headline in `result.overall_score` | Measures |
+|---------|-------------------------------------|----------|
+| `accuracy` | accuracy | Quality vs gold answers |
+| `rag` | RAG score | Grounding / faithfulness |
+| `multiturn` | conversation score | Context retention |
+| `adversarial` | resilience | Resistance to manipulation |
+| `codegen` | pass rate | Generated tests that pass |
+| `refusal` | calibration | Over- vs under-refusal |
+| `redblue` | quality | Offensive / defensive capability |
+| `toolcall` | **dangerous-call rate** | Tool-channel leaks. Higher is worse |
+| `codereview` | review score | Planted-vuln detection vs false positives |
+
+`sweep`, `stress`, `soak`, and `probe` have no endpoint.
+
 ### Asynchronous by design
 
 `submit_run` and `submit_eval` return a job id immediately:
@@ -108,9 +137,10 @@ discouraged from the cheap calls.
 {"job_id": "3f2a...", "status": "pending", "kind": "eval"}
 ```
 
-Poll `get_job` with that id until `status` is finished, then read `result`. No
-tool blocks on model work, which is what keeps a long eval from timing out an
-agent's tool call. The server's `instructions` tell the agent to do this.
+Poll `get_job` with that id until `status` is `completed`, then read `result`.
+The API uses `completed`, not `finished`. No tool blocks on model work, which
+is what keeps a long eval from timing out an agent's tool call. The server's
+`instructions` tell the agent to do this.
 
 ### Errors
 

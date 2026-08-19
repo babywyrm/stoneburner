@@ -186,6 +186,15 @@ async def test_api_error_detail_reaches_the_agent():
 
 async def test_instructions_tell_the_agent_to_poll_for_results():
     """Submissions are async; an agent that does not know to poll sees a job id
-    and concludes the eval produced nothing."""
+    and concludes the eval produced nothing. The API status is `completed`."""
     server = build_server(FakeApi())
-    assert "get_job" in (server.instructions or "")
+    text = server.instructions or ""
+    assert "get_job" in text
+    assert "completed" in text
+
+
+async def test_submit_eval_tool_names_the_security_suites():
+    tools = {t.name: t for t in await build_server(FakeApi()).list_tools()}
+    description = tools["submit_eval"].description or ""
+    for suite in ("refusal", "redblue", "toolcall", "codereview"):
+        assert suite in description

@@ -8,6 +8,12 @@ Stoneburner includes purpose-built security testing suites that complement infra
 > *says*; `toolcall` scores what it *does* when handed function schemas. A refusal
 > in one is not a refusal in the other, and agentic deployments run on the second.
 
+The same suite names work over HTTP and MCP: `POST /api/v1/evals` with
+`"suite": "adversarial" | "redblue" | "refusal" | "toolcall" | "codereview"`
+(plus the quality suites). `atomics mcp` `submit_eval` is that request.
+Budget and job polling are documented in [API_SERVER.md](API_SERVER.md) and
+[MCP_SERVER.md](MCP_SERVER.md). `sweep` remains CLI-only.
+
 ## Fixture Coverage (72 adversarial + 20 toolcall + 10 redblue + 12 refusal + 8 codereview)
 
 **Categories:** prompt injection, role confusion, context escape, instruction override, social engineering, data exfil, tool manipulation, breakglass extraction, credential exfil, behavior persistence, blocklist evasion, MCP/agentic resistance, tool-use safety, encoding obfuscation, many-shot context stuffing, multi-turn manipulation, RAG poisoning, tool-description injection.

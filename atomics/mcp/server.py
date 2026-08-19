@@ -30,7 +30,7 @@ from atomics.mcp.client import AtomicsApiClient
 INSTRUCTIONS = """Evaluate and benchmark language models through a running atomics API server.
 
 Runs and evals are asynchronous. `submit_run` and `submit_eval` return a job id;
-poll `get_job` with that id until its status is finished, then read the result.
+poll `get_job` with that id until its status is `completed`, then read the result.
 
 Read-only tools (`health`, `list_models`, `list_jobs`, `get_job`, `get_run`,
 `compare`, `recent_runs`, `trends`) are safe to call freely. `provider_test`
@@ -144,7 +144,7 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
 
     @server.tool(annotations=READ_ONLY)
     def get_job(job_id: str) -> Any:
-        """Fetch a submitted job's status and, once finished, its result."""
+        """Fetch a submitted job's status and, once `completed`, its result."""
         return api.get_job(job_id)
 
     @server.tool(annotations=READ_ONLY)

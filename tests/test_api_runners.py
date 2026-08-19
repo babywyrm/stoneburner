@@ -346,6 +346,8 @@ async def test_run_eval_suite_propagates_provider_http_400():
 
 def test_validate_eval_suite_normalizes():
     assert runners.validate_eval_suite("RAG") == "rag"
+    for suite in runners.SUPPORTED_EVAL_SUITES:
+        assert runners.validate_eval_suite(suite.upper()) == suite
     with pytest.raises(ValueError, match="Unsupported eval suite"):
         runners.validate_eval_suite("nope")
 
