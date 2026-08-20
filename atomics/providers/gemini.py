@@ -15,6 +15,7 @@ import httpx
 
 from atomics.providers._openai_compat import OpenAICompatibleTools
 from atomics.providers.base import BaseProvider, ProviderResponse, compute_tps
+from atomics.providers.effort import apply_chat_effort, normalize_effort
 
 MODEL_PRICING: dict[str, tuple[float, float]] = {
     "gemini-2.5-pro": (1.25, 10.0),
@@ -78,8 +79,11 @@ class GeminiProvider(OpenAICompatibleTools, BaseProvider):
         thinking: bool | None = None,
         thinking_budget: int | None = None,
         temperature: float | None = None,
+        effort: str | None = None,
+        reasoning_mode: str | None = None,
     ) -> ProviderResponse:
         model = model or self._default_model
+        _ = reasoning_mode
 
         messages = [
             {"role": "system", "content": system or "You are a helpful assistant."},
@@ -94,6 +98,7 @@ class GeminiProvider(OpenAICompatibleTools, BaseProvider):
         }
         if temperature is not None:
             body["temperature"] = temperature
+        reasoning_request = apply_chat_effort(body, effort)
 
         t0 = time.monotonic()
         response = await self._client.post(
@@ -132,6 +137,8 @@ class GeminiProvider(OpenAICompatibleTools, BaseProvider):
             tps_basis="wall_clock",
             thinking_tokens=thinking_tokens,
             raw=data,
+            effort=normalize_effort(effort),
+            reasoning_request=reasoning_request,
         )
 
     async def health_check(self) -> bool:

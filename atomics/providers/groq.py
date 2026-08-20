@@ -12,6 +12,7 @@ import httpx
 
 from atomics.providers._openai_compat import OpenAICompatibleTools
 from atomics.providers.base import BaseProvider, ProviderResponse, compute_tps
+from atomics.providers.effort import apply_chat_effort, normalize_effort
 
 MODEL_PRICING: dict[str, tuple[float, float]] = {
     "llama-3.3-70b-versatile": (0.59, 0.79),
@@ -80,8 +81,11 @@ class GroqProvider(OpenAICompatibleTools, BaseProvider):
         thinking: bool | None = None,
         thinking_budget: int | None = None,
         temperature: float | None = None,
+        effort: str | None = None,
+        reasoning_mode: str | None = None,
     ) -> ProviderResponse:
         model = model or self._default_model
+        _ = reasoning_mode
 
         messages = [
             {"role": "system", "content": system or "You are a helpful assistant."},
@@ -96,6 +100,7 @@ class GroqProvider(OpenAICompatibleTools, BaseProvider):
         }
         if temperature is not None:
             body["temperature"] = temperature
+        reasoning_request = apply_chat_effort(body, effort)
 
         t0 = time.monotonic()
         response = await self._client.post(
@@ -128,6 +133,8 @@ class GroqProvider(OpenAICompatibleTools, BaseProvider):
             tokens_per_second=tps,
             tps_basis="wall_clock",
             raw=data,
+            effort=normalize_effort(effort),
+            reasoning_request=reasoning_request,
         )
 
     async def health_check(self) -> bool:

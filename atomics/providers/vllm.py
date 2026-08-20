@@ -18,6 +18,7 @@ import httpx
 from atomics.benchmark.model_classes import classify_model, supports_thinking
 from atomics.providers._openai_compat import OpenAICompatibleTools
 from atomics.providers.base import BaseProvider, ProviderResponse, compute_tps
+from atomics.providers.effort import apply_chat_effort, normalize_effort
 
 _THINKING_MODEL_PREFIXES: tuple[str, ...] = ("qwen3", "deepseek-r1")
 
@@ -78,8 +79,11 @@ class VllmProvider(OpenAICompatibleTools, BaseProvider):
         thinking: bool | None = None,
         thinking_budget: int | None = None,
         temperature: float | None = None,
+        effort: str | None = None,
+        reasoning_mode: str | None = None,
     ) -> ProviderResponse:
         model = model or self._default_model
+        _ = reasoning_mode
 
         use_thinking = thinking if thinking is not None else _model_supports_thinking(model)
 
@@ -96,6 +100,7 @@ class VllmProvider(OpenAICompatibleTools, BaseProvider):
         }
         if temperature is not None:
             body["temperature"] = temperature
+        reasoning_request = apply_chat_effort(body, effort)
 
         if _model_supports_thinking(model):
             body["chat_template_kwargs"] = {"enable_thinking": use_thinking}
@@ -154,6 +159,8 @@ class VllmProvider(OpenAICompatibleTools, BaseProvider):
             thinking_tokens=thinking_tokens,
             thinking_text=thinking_text,
             raw=data,
+            effort=normalize_effort(effort),
+            reasoning_request=reasoning_request,
         )
 
     async def list_models(self) -> list[dict[str, str | float | bool]]:

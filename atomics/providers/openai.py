@@ -16,6 +16,11 @@ from atomics.providers._tool_dialects import (
     parse_openai_tool_calls,
 )
 from atomics.providers.base import BaseProvider, ProviderResponse, compute_tps
+from atomics.providers.effort import (
+    normalize_effort,
+    normalize_reasoning_mode,
+    openai_reasoning,
+)
 from atomics.providers.outcomes import (
     ProviderOutcome,
     ProviderOutcomeKind,
@@ -145,8 +150,11 @@ class OpenAIProvider(BaseProvider):
         thinking: bool | None = None,
         thinking_budget: int | None = None,
         temperature: float | None = None,
+        effort: str | None = None,
+        reasoning_mode: str | None = None,
     ) -> ProviderResponse:
         model = model or self._default_model
+        resolved_mode = normalize_reasoning_mode(reasoning_mode)
 
         if self._auth is not None:
             headers = await self._auth.get_headers()
@@ -154,7 +162,8 @@ class OpenAIProvider(BaseProvider):
             if token:
                 self._client.api_key = token
 
-        if self._use_responses_api:
+        # Pro mode is Responses-only. API-key clients still have that surface.
+        if self._use_responses_api or resolved_mode == "pro":
             return await self._generate_responses(
                 prompt,
                 system=system,
@@ -163,6 +172,8 @@ class OpenAIProvider(BaseProvider):
                 thinking=thinking,
                 thinking_budget=thinking_budget,
                 temperature=temperature,
+                effort=effort,
+                reasoning_mode=reasoning_mode,
             )
         return await self._generate_completions(
             prompt,
@@ -172,6 +183,8 @@ class OpenAIProvider(BaseProvider):
             thinking=thinking,
             thinking_budget=thinking_budget,
             temperature=temperature,
+            effort=effort,
+            reasoning_mode=reasoning_mode,
         )
 
     async def _generate_completions(
@@ -184,6 +197,8 @@ class OpenAIProvider(BaseProvider):
         thinking: bool | None = None,
         thinking_budget: int | None = None,
         temperature: float | None = None,
+        effort: str | None = None,
+        reasoning_mode: str | None = None,
     ) -> ProviderResponse:
         """Chat Completions API — used with static API keys."""
         messages: list[dict[str, str]] = []
@@ -204,6 +219,14 @@ class OpenAIProvider(BaseProvider):
         # forward it for standard chat models.
         if temperature is not None and not is_reasoning:
             token_param["temperature"] = temperature
+        if effort is not None or reasoning_mode is not None:
+            reasoning = openai_reasoning(effort, reasoning_mode, thinking=thinking)
+        elif is_reasoning and thinking is False:
+            reasoning = {"effort": "none"}
+        else:
+            reasoning = None
+        if reasoning and "effort" in reasoning:
+            token_param["reasoning_effort"] = reasoning["effort"]
         t0 = time.monotonic()
         response = await self._client.chat.completions.create(
             model=model,
@@ -282,6 +305,9 @@ class OpenAIProvider(BaseProvider):
             raw=response.model_dump() if hasattr(response, "model_dump") else None,
             outcome=outcome,
             finish_reason=finish_reason,
+            effort=normalize_effort(effort),
+            reasoning_mode=normalize_reasoning_mode(reasoning_mode),
+            reasoning_request=reasoning,
         )
 
     async def generate_with_tools(
@@ -396,6 +422,8 @@ class OpenAIProvider(BaseProvider):
         thinking: bool | None = None,
         thinking_budget: int | None = None,
         temperature: float | None = None,
+        effort: str | None = None,
+        reasoning_mode: str | None = None,
     ) -> ProviderResponse:
         """Responses API — used with OAuth tokens (ChatGPT OAuth scopes)."""
         input_items: list[dict[str, str]] = []
@@ -413,6 +441,14 @@ class OpenAIProvider(BaseProvider):
         # Reasoning models reject an explicit temperature; only forward otherwise.
         if temperature is not None and not is_reasoning:
             extra["temperature"] = temperature
+        if effort is not None or reasoning_mode is not None:
+            reasoning = openai_reasoning(effort, reasoning_mode, thinking=thinking)
+        elif is_reasoning and thinking is False:
+            reasoning = {"effort": "none"}
+        else:
+            reasoning = None
+        if reasoning:
+            extra["reasoning"] = reasoning
         t0 = time.monotonic()
         response = await self._client.responses.create(
             model=model,
@@ -531,6 +567,9 @@ class OpenAIProvider(BaseProvider):
             raw=response.model_dump() if hasattr(response, "model_dump") else None,
             outcome=outcome,
             finish_reason=finish_reason,
+            effort=normalize_effort(effort),
+            reasoning_mode=normalize_reasoning_mode(reasoning_mode),
+            reasoning_request=reasoning,
         )
 
     async def health_check(self) -> bool:

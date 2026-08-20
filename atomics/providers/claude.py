@@ -15,6 +15,7 @@ from atomics.providers._tool_dialects import (
     parse_anthropic_tool_calls,
 )
 from atomics.providers.base import BaseProvider, ProviderResponse, compute_tps
+from atomics.providers.effort import claude_request, normalize_effort
 
 # Pricing per 1M tokens (input / output). Sourced from the central pricing
 # module; re-exported here for backward compatibility.
@@ -78,21 +79,31 @@ class ClaudeProvider(BaseProvider):
         thinking: bool | None = None,
         thinking_budget: int | None = None,
         temperature: float | None = None,
+        effort: str | None = None,
+        reasoning_mode: str | None = None,
     ) -> ProviderResponse:
         model = model or self._default_model
+        _ = reasoning_mode
         messages = [{"role": "user", "content": prompt}]
-
-        use_thinking = thinking if thinking is not None else False
+        thinking_block, extra = claude_request(
+            model=model,
+            thinking=thinking,
+            thinking_budget=thinking_budget,
+            effort=effort,
+            default_budget=_DEFAULT_THINKING_BUDGET,
+        )
+        reasoning_request = {**({"thinking": thinking_block} if thinking_block else {}), **extra}
 
         kwargs: dict = {
             "model": model,
             "messages": messages,
         }
+        kwargs.update(extra)
 
-        if use_thinking:
+        if thinking_block is not None:
             budget = thinking_budget or _DEFAULT_THINKING_BUDGET
             kwargs["max_tokens"] = max_tokens + budget
-            kwargs["thinking"] = {"type": "enabled", "budget_tokens": budget}
+            kwargs["thinking"] = thinking_block
             if system:
                 kwargs["system"] = system
         else:
@@ -143,6 +154,8 @@ class ClaudeProvider(BaseProvider):
             cache_read_tokens=cache_read,
             cache_write_tokens=cache_write,
             raw=response.model_dump() if hasattr(response, "model_dump") else None,
+            effort=normalize_effort(effort),
+            reasoning_request=reasoning_request or None,
         )
 
     async def generate_with_tools(
