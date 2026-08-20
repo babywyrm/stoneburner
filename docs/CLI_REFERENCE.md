@@ -106,6 +106,7 @@ Full command reference for `atomics`. See also [QUICKSTART.md](../QUICKSTART.md)
 | `atomics rag --fixtures rag-05,rag-12` | Run a fixture subset |
 | `atomics rag --json-out rag.json` | Write results as JSON |
 | `atomics sweep` | Multi-model eval sweep with ranked comparison |
+| `atomics sweep --verbose` | Print the full prompt, model reply, thinking, and judge rationale per fixture |
 | `atomics sweep --suites redblue,refusal,toolcall,codereview --runs 3 --no-thinking --models-from ollama --status sweep.status.json --log sweep.log` | Overnight multi-suite driver: status file + detachable log. Toolcall uses `--no-skip-incapable`. |
 
 Real retrieval (`rag-index`, `rag --index`, `rag-retrieval`) requires the optional extra: `uv pip install "stoneburner-atomics[rag]"` (or `uv sync --extra rag` from a clone).

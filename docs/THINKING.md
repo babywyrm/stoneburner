@@ -17,6 +17,10 @@ uv run atomics provider-test --provider openai -m gpt-5.6-sol --effort high
 uv run atomics provider-test --provider openai -m gpt-5.6-sol --effort max --reasoning-mode pro
 uv run atomics eval --provider claude -m claude-opus-4-6 --effort high
 
+# Full prompt, model reply, thinking, and judge rationale (no truncated table)
+uv run atomics eval --provider openai -m gpt-5.6-luna --effort low --verbose \
+  --judge-provider claude --judge-model claude-haiku-4-5 --fixtures ev-01,ev-02,ev-03
+
 # Custom thinking budget (Claude)
 uv run atomics run --provider claude --thinking --thinking-budget 20000 -n 5
 
