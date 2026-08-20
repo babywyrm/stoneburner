@@ -31,6 +31,48 @@ PROVIDER_CHOICES = click.Choice(list(PROVIDER_NAMES), case_sensitive=False)
 _P = TypeVar("_P")
 
 
+def _effort_callback(_ctx: click.Context, _param: click.Parameter, value: str | None) -> str | None:
+    if value is None:
+        return None
+    from atomics.providers.effort import EffortError, normalize_effort
+
+    try:
+        return normalize_effort(value)
+    except EffortError as exc:
+        raise click.BadParameter(str(exc), param_hint="--effort") from exc
+
+
+def _reasoning_mode_callback(
+    _ctx: click.Context, _param: click.Parameter, value: str | None
+) -> str | None:
+    if value is None:
+        return None
+    from atomics.providers.effort import EffortError, normalize_reasoning_mode
+
+    try:
+        return normalize_reasoning_mode(value)
+    except EffortError as exc:
+        raise click.BadParameter(str(exc), param_hint="--reasoning-mode") from exc
+
+
+def effort_options(fn: Callable) -> Callable:
+    """Add ``--effort`` and ``--reasoning-mode`` next to thinking flags."""
+    fn = click.option(
+        "--reasoning-mode",
+        callback=_reasoning_mode_callback,
+        default=None,
+        help="OpenAI reasoning.mode: standard or pro. Ignored by other providers.",
+    )(fn)
+    fn = click.option(
+        "--effort",
+        callback=_effort_callback,
+        default=None,
+        help="Shared reasoning effort: none, minimal, low, medium, high, "
+        "xhigh (alias xl), max (alias ultra). Mapped per provider.",
+    )(fn)
+    return fn
+
+
 def extra_judges_option(fn: Callable) -> Callable:
     """Add `--extra-judges` for consensus scoring."""
     return click.option(

@@ -469,6 +469,8 @@ async def run_adversarial(
     run_id: str | None = None,
     thinking: bool | None = None,
     thinking_budget: int | None = None,
+    effort: str | None = None,
+    reasoning_mode: str | None = None,
     on_fixture_start: Callable[..., object] | None = None,
     on_fixture_done: Callable[..., object] | None = None,
     on_run_done: Callable[..., object] | None = None,
@@ -537,6 +539,8 @@ async def run_adversarial(
                     max_tokens=fixture.max_output_tokens,
                     thinking=thinking,
                     thinking_budget=thinking_budget,
+                    effort=effort,
+                    reasoning_mode=reasoning_mode,
                 )
             except Exception as exc:
                 provider_outcome = provider_outcome_from_exception(exc)

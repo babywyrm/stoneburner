@@ -15,6 +15,7 @@ from atomics.commands.common import (
     PROVIDER_CHOICES,
     _make_provider,
     budget_option,
+    effort_options,
     eval_budget_from,
     extra_judges_option,
     parse_extra_judges,
@@ -84,6 +85,7 @@ from atomics.eval.budget import share_budget
     help="Enable/disable thinking for capable models",
 )
 @click.option("--thinking-budget", type=int, default=None, help="Max thinking tokens")
+@effort_options
 @budget_option
 def eval(
     provider_name: str,
@@ -100,6 +102,8 @@ def eval(
     json_out: str | None,
     thinking_flag: bool | None,
     thinking_budget: int | None,
+    effort: str | None,
+    reasoning_mode: str | None,
     budget_usd: float | None,
 ) -> None:
     """Run the fixed eval fixture set and score quality with an LLM judge.
@@ -266,6 +270,8 @@ def eval(
                 on_fixture_done=on_done,
                 thinking=eff_thinking,
                 thinking_budget=thinking_budget,
+                effort=effort,
+                reasoning_mode=reasoning_mode,
                 extra_judges=extra_judge_pairs,
                 fixtures=selected_fixtures,
             )

@@ -147,6 +147,8 @@ class GuardedProvider(BaseProvider):
         thinking: bool | None = None,
         thinking_budget: int | None = None,
         temperature: float | None = None,
+        effort: str | None = None,
+        reasoning_mode: str | None = None,
     ) -> ProviderResponse:
         await self._await_capacity()
         return await self._metered(
@@ -158,6 +160,8 @@ class GuardedProvider(BaseProvider):
                 thinking=thinking,
                 thinking_budget=thinking_budget,
                 temperature=temperature,
+                effort=effort,
+                reasoning_mode=reasoning_mode,
             )
         )
 

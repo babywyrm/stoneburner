@@ -20,7 +20,15 @@ class FailingThenMockProvider(BaseProvider):
         return "flaky"
 
     async def generate(
-        self, prompt, *, system="", model=None, max_tokens=1024, thinking=None, thinking_budget=None
+        self,
+        prompt,
+        *,
+        system="",
+        model=None,
+        max_tokens=1024,
+        thinking=None,
+        thinking_budget=None,
+        **_kwargs,
     ):
         self.attempts += 1
         if self.attempts == 1:

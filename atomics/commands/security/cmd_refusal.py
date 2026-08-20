@@ -18,6 +18,7 @@ from atomics.commands.common import (
     _make_provider,
     budget_option,
     effective_model,
+    effort_options,
     eval_budget_from,
     evaluation_record_from_fixture,
     extra_judges_option,
@@ -69,6 +70,7 @@ if TYPE_CHECKING:
 @click.option("--save/--no-save", default=True, show_default=True)
 @click.option("--thinking/--no-thinking", "thinking_flag", default=None)
 @click.option("--thinking-budget", type=int, default=8000, show_default=True)
+@effort_options
 @click.option(
     "--allow-partial",
     is_flag=True,
@@ -90,6 +92,8 @@ def refusal(
     save: bool,
     thinking_flag: bool | None,
     thinking_budget: int,
+    effort: str | None,
+    reasoning_mode: str | None,
     allow_partial: bool,
     budget_usd: float | None,
 ) -> None:
@@ -210,6 +214,8 @@ def refusal(
                 extra_judges=extra_judge_pairs,
                 thinking=thinking_flag,
                 thinking_budget=thinking_budget,
+                effort=effort,
+                reasoning_mode=reasoning_mode,
                 run_id=run_id,
                 on_fixture_start=on_start,
                 on_fixture_done=on_done,

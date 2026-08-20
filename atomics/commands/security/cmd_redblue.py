@@ -16,6 +16,7 @@ from atomics.commands.common import (
     FixtureProgress,
     _make_provider,
     budget_option,
+    effort_options,
     eval_budget_from,
     extra_judges_option,
     parse_extra_judges,
@@ -63,6 +64,7 @@ from atomics.eval.suite_integrity import format_headline_rate
 )
 @click.option("--thinking/--no-thinking", "thinking_flag", default=None)
 @click.option("--thinking-budget", type=int, default=8000, show_default=True)
+@effort_options
 @click.option(
     "--max-output-tokens",
     type=click.IntRange(min=256),
@@ -94,6 +96,8 @@ def redblue(
     runs: int,
     thinking_flag: bool | None,
     thinking_budget: int,
+    effort: str | None,
+    reasoning_mode: str | None,
     max_output_tokens: int | None,
     save_results: bool,
     json_out: str | None,
@@ -216,6 +220,8 @@ def redblue(
                 run_id=run_id,
                 thinking=thinking_flag,
                 thinking_budget=thinking_budget,
+                effort=effort,
+                reasoning_mode=reasoning_mode,
                 min_output_tokens=max_output_tokens,
                 on_fixture_start=on_start,
                 on_fixture_done=on_done,

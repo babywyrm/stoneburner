@@ -37,6 +37,8 @@ async def run_sweep_from_request(payload: SweepRequest) -> dict[str, Any]:
                 runs=payload.runs,
                 thinking=payload.thinking,
                 thinking_budget=None,
+                effort=payload.effort,
+                reasoning_mode=payload.reasoning_mode,
             ),
             skip_incapable=False,
         )

@@ -14,6 +14,7 @@ from atomics.commands.common import (
     PROVIDER_CHOICES,
     _make_provider,
     effective_model,
+    effort_options,
     setup_logging,
 )
 from atomics.config import load_settings
@@ -448,6 +449,7 @@ def models(provider_name: str, host: str | None, vllm_host: str | None) -> None:
     "--thinking/--no-thinking", "thinking_flag", default=None, help="Enable/disable thinking mode"
 )
 @click.option("--thinking-budget", type=int, default=None, help="Max thinking tokens")
+@effort_options
 def provider_test(
     provider_name: str,
     model: str | None,
@@ -457,6 +459,8 @@ def provider_test(
     gateway_url: str | None,
     thinking_flag: bool | None,
     thinking_budget: int | None,
+    effort: str | None,
+    reasoning_mode: str | None,
 ) -> None:
     """Quick health check against the configured provider."""
     settings = load_settings()
@@ -526,6 +530,8 @@ def provider_test(
                 max_tokens=32,
                 thinking=eff_thinking,
                 thinking_budget=thinking_budget,
+                effort=effort,
+                reasoning_mode=reasoning_mode,
             )
         except Exception as exc:
             console.print(f"[red]Generate failed:[/red] {exc}")
@@ -534,6 +540,13 @@ def provider_test(
         console.print(
             f"Tokens: in={resp.input_tokens} out={resp.output_tokens} total={resp.total_tokens}"
         )
+        if effort or reasoning_mode:
+            console.print(
+                f"Effort: {effort or 'default'}"
+                + (f"  mode: {reasoning_mode}" if reasoning_mode else "")
+            )
+        if getattr(resp, "reasoning_request", None):
+            console.print(f"Reasoning request: {resp.reasoning_request}")
         if resp.thinking_tokens:
             console.print(f"Thinking tokens: {resp.thinking_tokens}")
         if resp.cache_read_tokens or resp.cache_write_tokens:

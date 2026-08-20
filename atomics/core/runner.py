@@ -21,6 +21,8 @@ async def execute_task(
     model: str | None = None,
     thinking: bool | None = None,
     thinking_budget: int | None = None,
+    effort: str | None = None,
+    reasoning_mode: str | None = None,
 ) -> TaskResult:
     """Run a single benchmark task and return the result (never raises)."""
     if "{prompt}" in task.prompt_template:
@@ -46,6 +48,8 @@ async def execute_task(
             max_tokens=task.max_output_tokens,
             thinking=thinking,
             thinking_budget=thinking_budget,
+            effort=effort,
+            reasoning_mode=reasoning_mode,
         )
         result.status = TaskStatus.SUCCESS
         result.response = resp.text

@@ -179,6 +179,9 @@ class AtomicsApiClient:
         fixtures: list[str] | None = None,
         save: bool = True,
         budget_usd: float | None = None,
+        thinking: bool | None = None,
+        effort: str | None = None,
+        reasoning_mode: str | None = None,
     ) -> Any:
         payload: dict[str, Any] = {"suite": suite, "provider": provider, "save": save}
         if model is not None:
@@ -191,6 +194,12 @@ class AtomicsApiClient:
         # stays the single definition of what an unspecified budget means.
         if budget_usd is not None:
             payload["budget_usd"] = budget_usd
+        if thinking is not None:
+            payload["thinking"] = thinking
+        if effort is not None:
+            payload["effort"] = effort
+        if reasoning_mode is not None:
+            payload["reasoning_mode"] = reasoning_mode
         return self._request("POST", "/evals", json=payload)
 
     def submit_sweep(
@@ -203,6 +212,8 @@ class AtomicsApiClient:
         judge_model: str | None = None,
         runs: int = 1,
         thinking: bool | None = None,
+        effort: str | None = None,
+        reasoning_mode: str | None = None,
     ) -> Any:
         payload: dict[str, Any] = {
             "provider": provider,
@@ -215,6 +226,10 @@ class AtomicsApiClient:
             payload["judge_model"] = judge_model
         if thinking is not None:
             payload["thinking"] = thinking
+        if effort is not None:
+            payload["effort"] = effort
+        if reasoning_mode is not None:
+            payload["reasoning_mode"] = reasoning_mode
         return self._request("POST", "/sweeps", json=payload)
 
     def submit_stress(
@@ -308,6 +323,8 @@ class AtomicsApiClient:
         model: str | None = None,
         host: str | None = None,
         thinking: bool | None = None,
+        effort: str | None = None,
+        reasoning_mode: str | None = None,
     ) -> Any:
         payload: dict[str, Any] = {"provider": provider}
         if model is not None:
@@ -316,4 +333,8 @@ class AtomicsApiClient:
             payload["host"] = host
         if thinking is not None:
             payload["thinking"] = thinking
+        if effort is not None:
+            payload["effort"] = effort
+        if reasoning_mode is not None:
+            payload["reasoning_mode"] = reasoning_mode
         return self._request("POST", "/provider-test", json=payload)

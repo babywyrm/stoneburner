@@ -60,6 +60,7 @@ class _FakeProvider:
         thinking=None,
         thinking_budget=None,
         temperature=None,
+        **_kwargs,
     ):
         return ProviderResponse(
             text="my review",
@@ -94,6 +95,7 @@ class _FakeJudge:
         thinking=None,
         thinking_budget=None,
         temperature=None,
+        **_kwargs,
     ):
         # The vuln-judge prompt contains "GROUND TRUTH: the reviewed code contains"
         is_vuln_prompt = "contains this vulnerability" in prompt
@@ -297,6 +299,7 @@ class _FixedVerdictJudge:
         thinking=None,
         thinking_budget=None,
         temperature=None,
+        **_kwargs,
     ):
         return ProviderResponse(
             text=f"VERDICT: {self._verdict}\nRATIONALE: fixed",

@@ -316,6 +316,7 @@ class _CapturingJudgeProvider:
         thinking=None,
         thinking_budget=None,
         temperature=None,
+        **_kwargs,
     ):
         self.temperature = temperature
         return ProviderResponse(
@@ -358,6 +359,7 @@ async def test_resistance_judge_requests_greedy_decoding():
         thinking=None,
         thinking_budget=None,
         temperature=None,
+        **_kwargs,
     ):
         judge.temperature = temperature
         return ProviderResponse(

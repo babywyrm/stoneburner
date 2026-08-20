@@ -12,6 +12,11 @@ uv run atomics run --provider ollama -m qwen3:14b -n 5
 uv run atomics run --provider claude -m claude-sonnet-4-6 --thinking -n 5
 uv run atomics run --provider openai -m o3 --no-thinking -n 5
 
+# Shared effort dial (mapped per provider). xl → xhigh, ultra → max.
+uv run atomics provider-test --provider openai -m gpt-5.6-sol --effort high
+uv run atomics provider-test --provider openai -m gpt-5.6-sol --effort max --reasoning-mode pro
+uv run atomics eval --provider claude -m claude-opus-4-6 --effort high
+
 # Custom thinking budget (Claude)
 uv run atomics run --provider claude --thinking --thinking-budget 20000 -n 5
 
@@ -27,7 +32,7 @@ uv run atomics provider-test -p ollama -m qwen3.8:27b --no-thinking
 | Provider | Models | Mechanism |
 |----------|--------|-----------|
 | **Claude** | Opus 4.x, Sonnet 4.x | Extended thinking API (`budget_tokens`) |
-| **OpenAI** | o3, o3-mini, o3-pro, o4-mini, gpt-5.x | Reasoning tokens (`completion_tokens_details`) |
+| **OpenAI** | o3, o3-mini, o3-pro, o4-mini, gpt-5.x (including Sol/Terra/Luna) | Reasoning tokens (`completion_tokens_details`) |
 | **Ollama** | qwen3 family (including qwen3.8), deepseek-r1, phi4-*-reasoning | Native `thinking` field, plus `<think>` tag fallback |
 
 When `--thinking` / `--no-thinking` is omitted, stoneburner checks the model against its capability registry and enables thinking automatically for known models. Use `--no-thinking` to force it off for A/B comparisons.
@@ -44,7 +49,10 @@ The core challenge: thinking/reasoning tokens are **real computation** (they con
 |----------|--------------------------|-------------------------------|
 | **Ollama** | `body.think = true` (native API field). For older builds: `/no_think` prefix disables it. `num_predict` is inflated by `thinking_budget` so the visible answer isn't starved. | Newer Ollama returns a top-level `thinking` string; older builds embed `<think>...</think>` in `response`. Both are captured. Thinking token count is **estimated** by character proportion of the total `eval_count` (Ollama doesn't report thinking tokens separately). |
 | **Claude** | `thinking.budget_tokens` in the API request (extended thinking mode). | API returns `thinking_tokens` directly in the response metadata — no estimation needed. |
-| **OpenAI** | Reasoning models (o3, o4-mini, gpt-5.x) handle it internally. | `completion_tokens_details.reasoning_tokens` from the API response. |
+| **OpenAI** | `--effort` → Chat Completions `reasoning_effort`, or Responses `reasoning.effort`. `--reasoning-mode pro` forces the Responses API and sets `reasoning.mode`. | `completion_tokens_details.reasoning_tokens` from the API response. |
+| **Claude (4.6+)** | `--effort` → `thinking: {type: "adaptive"}` plus `output_config.effort`. `--thinking` without `--effort` still uses `budget_tokens`. | Thinking blocks plus usage metadata. |
+
+`--effort` values: `none`, `minimal`, `low`, `medium`, `high`, `xhigh` (alias `xl`), `max` (alias `ultra`). Claude 4.6 maps `xhigh` to `max`. OpenAI-compatible clouds (Groq, Together, Gemini, vLLM) receive `reasoning_effort` when the backend honors it. The native payload is recorded on the response as `reasoning_request`.
 
 ### Key Behaviors
 

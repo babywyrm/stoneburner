@@ -37,6 +37,7 @@ class _PromptCapturingJudge:
         thinking=None,
         thinking_budget=None,
         temperature=None,
+        **_kwargs,
     ):
         self.last_prompt = prompt
         return ProviderResponse(
@@ -165,6 +166,7 @@ def _fixed_judge(name: str, reply: str):
             thinking=None,
             thinking_budget=None,
             temperature=None,
+            **_kwargs,
         ):
             return ProviderResponse(
                 text=reply,
@@ -291,6 +293,7 @@ class _RetryJudge:
         thinking=None,
         thinking_budget=None,
         temperature=None,
+        **_kwargs,
     ):
         self.calls += 1
         if self.calls == 1:

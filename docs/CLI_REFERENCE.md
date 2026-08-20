@@ -17,6 +17,9 @@ Full command reference for `atomics`. See also [QUICKSTART.md](../QUICKSTART.md)
 | `atomics run --thinking` | Enable thinking/reasoning mode for capable models |
 | `atomics run --no-thinking` | Force thinking off (A/B comparison) |
 | `atomics run --thinking-budget 20000` | Set max thinking tokens (provider-specific default otherwise) |
+| `atomics provider-test -p openai -m gpt-5.6-sol --effort high` | Shared effort dial (none/low/medium/high/xhigh/max; xl and ultra aliases) |
+| `atomics provider-test -p openai -m gpt-5.6-sol --effort max --reasoning-mode pro` | OpenAI pro mode via the Responses API |
+| `atomics eval --provider claude -m claude-opus-4-6 --effort high` | Claude adaptive thinking + output_config.effort |
 | `atomics run -b 5.0` | Run with $5 budget cap |
 | `atomics run -i 10` | Override interval to 10 seconds |
 | `atomics compare` | Compare providers side-by-side (cost, latency, tokens) |

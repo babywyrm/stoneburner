@@ -36,6 +36,8 @@ class LoopEngine:
         trigger: str = "manual",
         thinking: bool | None = None,
         thinking_budget: int | None = None,
+        effort: str | None = None,
+        reasoning_mode: str | None = None,
     ) -> None:
         self._provider = provider
         self._repo = repo
@@ -66,6 +68,8 @@ class LoopEngine:
         self._trigger = trigger
         self._thinking = thinking
         self._thinking_budget = thinking_budget
+        self._effort = effort
+        self._reasoning_mode = reasoning_mode
         self._shutdown = asyncio.Event()
         self._run_id: str = ""
 
@@ -140,6 +144,8 @@ class LoopEngine:
                 model=model,
                 thinking=self._thinking,
                 thinking_budget=self._thinking_budget,
+                effort=self._effort,
+                reasoning_mode=self._reasoning_mode,
             )
 
             self._repo.save_task_result(result, suite="burn")

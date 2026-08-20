@@ -21,6 +21,7 @@ from atomics.commands.common import (
     PROVIDER_CHOICES,
     _make_provider,
     budget_option,
+    effort_options,
     eval_budget_from,
     setup_logging,
 )
@@ -112,6 +113,7 @@ TIER_CHOICES = click.Choice([t.value for t in BurnTier], case_sensitive=False)
     default=None,
     help="Max thinking tokens to allocate (provider-specific defaults if omitted)",
 )
+@effort_options
 def run(
     tier: str,
     provider_name: str,
@@ -128,6 +130,8 @@ def run(
     trigger: str,
     thinking_flag: bool | None,
     thinking_budget: int | None,
+    effort: str | None,
+    reasoning_mode: str | None,
 ) -> None:
     """Start the benchmarking loop."""
     settings = load_settings()
@@ -191,6 +195,8 @@ def run(
         trigger=trigger,
         thinking=thinking_flag,
         thinking_budget=thinking_budget,
+        effort=effort,
+        reasoning_mode=reasoning_mode,
     )
 
     from atomics.reporting.hooks import hook_env, notify_run_complete, run_post_hook
@@ -561,6 +567,7 @@ def tiers() -> None:
 )
 @click.option("--thinking/--no-thinking", "thinking_flag", default=None)
 @click.option("--thinking-budget", type=int, default=None)
+@effort_options
 @click.option(
     "--verbose",
     "-v",
@@ -622,6 +629,8 @@ def sweep(
     fixtures: str | None,
     thinking_flag: bool | None,
     thinking_budget: int | None,
+    effort: str | None,
+    reasoning_mode: str | None,
     verbose: bool,
     save_results: bool,
     suites: str,
@@ -726,6 +735,8 @@ def sweep(
                     thinking=thinking_flag,
                     thinking_budget=thinking_budget,
                     fixture_ids=fixture_ids,
+                    effort=effort,
+                    reasoning_mode=reasoning_mode,
                 ),
                 status_path=Path(status_path) if status_path else None,
                 log_path=Path(log_path) if log_path else None,
@@ -807,6 +818,8 @@ def sweep(
             judge_model=judge_model,
             thinking=thinking_flag,
             thinking_budget=thinking_budget,
+            effort=effort,
+            reasoning_mode=reasoning_mode,
             on_model_done=on_model_done,
             on_fixture_done=on_fixture_done_verbose,
         )

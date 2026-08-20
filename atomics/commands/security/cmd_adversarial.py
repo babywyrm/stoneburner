@@ -17,6 +17,7 @@ from atomics.commands.common import (
     _attribution_model,
     _make_provider,
     budget_option,
+    effort_options,
     eval_budget_from,
     extra_judges_option,
     parse_extra_judges,
@@ -97,6 +98,7 @@ def _parse_model_spec(spec: str, default_provider: str) -> tuple[str, str, str |
     help="Force thinking mode on or off (default: auto-detect).",
 )
 @click.option("--thinking-budget", type=int, default=8000, show_default=True)
+@effort_options
 @click.option("--save/--no-save", "save_results", default=True, show_default=True)
 @click.option(
     "--json-out",
@@ -148,6 +150,8 @@ def adversarial(
     category: str | None,
     thinking_flag: bool | None,
     thinking_budget: int,
+    effort: str | None,
+    reasoning_mode: str | None,
     save_results: bool,
     json_out: str | None,
     compare_model: str | None,
@@ -323,6 +327,8 @@ def adversarial(
             run_id=run_id,
             thinking=thinking_flag,
             thinking_budget=thinking_budget,
+            effort=effort,
+            reasoning_mode=reasoning_mode,
             on_fixture_start=on_start,
             on_fixture_done=on_done,
             on_run_done=on_run,
@@ -436,6 +442,8 @@ def adversarial(
                 run_id=cmp_run_id,
                 thinking=thinking_flag,
                 thinking_budget=thinking_budget,
+                effort=effort,
+                reasoning_mode=reasoning_mode,
                 on_fixture_done=on_compare_done,
                 on_run_done=on_run,
             )
