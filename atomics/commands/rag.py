@@ -16,6 +16,7 @@ from atomics.commands.common import (
     PROVIDER_CHOICES,
     _make_provider,
     budget_option,
+    effort_options,
     eval_budget_from,
     extra_judges_option,
     parse_extra_judges,
@@ -89,6 +90,7 @@ from atomics.eval.budget import BudgetMeter, share_budget
     "--thinking/--no-thinking", "thinking_flag", default=None, help="Enable/disable thinking."
 )
 @click.option("--thinking-budget", type=int, default=None, help="Max thinking tokens.")
+@effort_options
 @extra_judges_option
 @budget_option
 def rag(
@@ -105,6 +107,8 @@ def rag(
     json_out: str | None,
     thinking_flag: bool | None,
     thinking_budget: int | None,
+    effort: str | None,
+    reasoning_mode: str | None,
     index_path: Path | None,
     top_k: int,
     extra_judges: str | None,
@@ -282,6 +286,8 @@ def rag(
                 on_fixture_done=on_done,
                 thinking=eff_thinking,
                 thinking_budget=thinking_budget,
+                effort=effort,
+                reasoning_mode=reasoning_mode,
                 fixtures=selected_fixtures,
                 index=index,
                 top_k=top_k,

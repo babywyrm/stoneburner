@@ -90,6 +90,7 @@ Full command reference for `atomics`. See also [QUICKSTART.md](../QUICKSTART.md)
 | `atomics archreview --tier wide --rounds 3` | Broader evidence pack with stability reporting |
 | `atomics archreview --tier expanded --rounds 3` | Largest pack for large-context/cloud backends |
 | `atomics multiturn` | Multi-turn conversation eval — context retention, coherence, contradiction detection, persona drift, long-context retention, tool-use chaining, and security scenarios |
+| `atomics multiturn --effort high` | Shared reasoning effort on each turn |
 | `atomics multiturn --extra-judges ollama:mistral:7b` | Multi-judge consensus on the conversation score only |
 | `atomics multiturn --fixtures mt-eval-01,mt-eval-05` | Run a fixture subset |
 | `atomics codegen` | Code generation eval (functional correctness) |
@@ -100,6 +101,7 @@ Full command reference for `atomics`. See also [QUICKSTART.md](../QUICKSTART.md)
 | `atomics eval --fixtures ml-01,ml-05` | Run multilingual fixtures (8 languages) |
 | `atomics rag --extra-judges ollama:mistral:7b` | Multi-judge mean ± stdev on the RAG score |
 | `atomics rag` | RAG pipeline evaluation — grounding, faithfulness, abstention (uses hand-crafted or retrieved context) |
+| `atomics rag --effort high` | Shared reasoning effort on the grounded answer |
 | `atomics rag --index ./index.vec` | Run RAG fixtures against chunks retrieved from a sqlite-vec index |
 | `atomics rag-index ./docs --db ./index.vec` | Build a sqlite-vec index from a directory of documents |
 | `atomics rag-retrieval --index ./index.vec --gold gold.json` | Report recall@k, precision@k, MRR, and nDCG@k |

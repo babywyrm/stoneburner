@@ -41,6 +41,12 @@ def test_fixture_prompts_nonempty():
         assert f.prompt.strip(), f"{f.id} has empty prompt"
 
 
+def test_ev01_prompt_asks_for_the_gold_example():
+    ev01 = next(f for f in EVAL_FIXTURES if f.id == "ev-01")
+    assert "example" in ev01.prompt.lower()
+    assert any("solarwinds" in criterion.lower() for criterion in ev01.gold_criteria)
+
+
 # ── Judge regex ───────────────────────────────────────────────────────────────
 
 
