@@ -3,6 +3,13 @@
 ## Unreleased
 
 ### Added
+- **`eval --verbose` prints the full transcript.** Prompt, model reply,
+  thinking text, effort / reasoning payload, and the complete judge
+  rationale (including ACCURACY / COMPLETENESS / FORMAT). The compact
+  truncated results table and clipped INFO progress lines are omitted
+  so the run is just full panels plus the summary. Global
+  `atomics -v eval` does the same. `--json-out` now includes those
+  fields too. `sweep --verbose` uses the same untruncated dump.
 - **Shared `--effort` / `--reasoning-mode` for cloud reasoning knobs.** One
   dial (`none` / `minimal` / `low` / `medium` / `high` / `xhigh` / `max`,
   aliases `xl` and `ultra`) maps to OpenAI `reasoning.effort`, Claude

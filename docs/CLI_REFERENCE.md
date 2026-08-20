@@ -51,6 +51,7 @@ Full command reference for `atomics`. See also [QUICKSTART.md](../QUICKSTART.md)
 | Command | Description |
 |---------|-------------|
 | `atomics eval` | Run evaluation suite against a provider |
+| `atomics eval --verbose` | Print the full prompt, model reply, thinking, and judge rationale |
 | `atomics eval --fixtures ev-19` | Run a fixture subset for a fast spot-check |
 | `atomics eval --extra-judges ollama:mistral:7b` | Multi-judge consensus scoring |
 | `atomics judge-agreement --suite refusal --judges ollama:a,ollama:b` | Generate once, judge N times; report pairwise agreement and majority-flip rate |
