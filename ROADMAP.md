@@ -130,6 +130,9 @@ in a sweep reads as a pass.
 
 Shipped items below that still carry 0.19–0.23 headings landed in
 v0.18.0. The numbers were planning labels, not unreleased versions.
+The **v0.20.0** GitHub / PyPI release (2026-08-19) is the shared
+`--effort` / `--reasoning-mode` dial and `eval --verbose`, not the
+"Per-pass live lines" heading below (that work already shipped).
 
 ## v0.19.0 — A stranger can trust a headline
 

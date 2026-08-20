@@ -1,6 +1,7 @@
 # Stoneburner
 
 [![PyPI](https://img.shields.io/pypi/v/stoneburner-atomics.svg)](https://pypi.org/project/stoneburner-atomics/)
+[![GitHub release](https://img.shields.io/github/v/release/babywyrm/stoneburner)](https://github.com/babywyrm/stoneburner/releases/latest)
 [![Python](https://img.shields.io/pypi/pyversions/stoneburner-atomics.svg)](https://pypi.org/project/stoneburner-atomics/)
 [![License: MIT](https://img.shields.io/pypi/l/stoneburner-atomics.svg)](https://github.com/babywyrm/stoneburner/blob/main/LICENSE)
 [![CI](https://github.com/babywyrm/stoneburner/actions/workflows/ci.yml/badge.svg)](https://github.com/babywyrm/stoneburner/actions/workflows/ci.yml)
@@ -98,16 +99,23 @@ uv add 'stoneburner-atomics[rag]'          # from another project
 From a clone, `uv sync --all-extras`. Bare `uv sync` drops the API, MCP,
 RAG, and test extras.
 
-Cloud providers work the same way once a key is set:
+Cloud providers work the same way once a key is set. `--effort` is the
+shared reasoning dial (`none` / `minimal` / `low` / `medium` / `high` /
+`xhigh` / `max`; aliases `xl`, `ultra`):
 
 ```bash
 export ANTHROPIC_API_KEY=sk-ant-...
-atomics provider-test
-atomics run -n 5
+atomics provider-test --effort high
+atomics run -n 5 --effort medium
 atomics report
 
-atomics run --provider openai -n 5
-atomics run --provider bedrock --region us-east-1 -n 5
+atomics provider-test --provider openai -m gpt-5.6-sol --effort high
+atomics eval --provider openai -m gpt-5.6-luna --effort low --verbose \
+  --judge-provider claude --judge-model claude-haiku-4-5 --fixtures ev-01,ev-02
+atomics run --provider bedrock --region us-east-1 --effort high -n 5
+atomics provider-test --provider groq --effort medium
+atomics provider-test --provider gemini --effort high
+atomics provider-test --provider together --effort medium
 ```
 
 ## Providers
@@ -219,7 +227,14 @@ Auto-detects reasoning-capable models (Claude extended thinking, OpenAI o-series
 uv run atomics run --provider ollama -m qwen3:14b -n 5   # auto-detected
 uv run atomics run --provider claude --thinking -n 5      # explicit
 uv run atomics run --provider openai -m o3 --no-thinking  # forced off for A/B
+
+# Shared --effort dial (mapped per provider). OpenAI pro uses Responses.
 uv run atomics eval --provider openai -m gpt-5.6-sol --effort high
+uv run atomics eval --provider openai -m gpt-5.6-sol --effort max --reasoning-mode pro
+uv run atomics eval --provider claude -m claude-opus-4-6 --effort high
+uv run atomics provider-test --provider bedrock --region us-east-1 --effort high
+uv run atomics eval --provider openai -m gpt-5.6-luna --effort low --verbose \
+  --judge-provider claude --judge-model claude-haiku-4-5 --fixtures ev-01,ev-02
 ```
 
 Full documentation: [THINKING](https://github.com/babywyrm/stoneburner/blob/main/docs/THINKING.md)
