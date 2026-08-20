@@ -11,6 +11,7 @@ from typing import Any, Protocol
 
 from atomics.providers import pricing
 from atomics.providers.base import BaseProvider, ProviderResponse, compute_tps
+from atomics.providers.effort import claude_request, normalize_effort
 
 
 class _BedrockRuntimeClient(Protocol):
@@ -73,10 +74,13 @@ class BedrockProvider(BaseProvider):
         thinking: bool | None = None,
         thinking_budget: int | None = None,
         temperature: float | None = None,
+        effort: str | None = None,
+        reasoning_mode: str | None = None,
     ) -> ProviderResponse:
         import asyncio
 
         model_id = model or self._model_id
+        _ = reasoning_mode
         loop = asyncio.get_running_loop()
 
         t0 = time.monotonic()
@@ -88,6 +92,9 @@ class BedrockProvider(BaseProvider):
                 model_id=model_id,
                 max_tokens=max_tokens,
                 temperature=temperature,
+                thinking=thinking,
+                thinking_budget=thinking_budget,
+                effort=effort,
             ),
         )
         latency = (time.monotonic() - t0) * 1000
@@ -101,6 +108,13 @@ class BedrockProvider(BaseProvider):
         inp = usage.get("inputTokens", 0)
         out = usage.get("outputTokens", 0)
 
+        thinking_block, extra = claude_request(
+            model=model_id,
+            thinking=thinking,
+            thinking_budget=thinking_budget,
+            effort=effort,
+        )
+        reasoning_request = {**({"thinking": thinking_block} if thinking_block else {}), **extra}
         return ProviderResponse(
             text=text,
             input_tokens=inp,
@@ -111,6 +125,8 @@ class BedrockProvider(BaseProvider):
             estimated_cost_usd=round(_estimate_cost(model_id, inp, out), 6),
             tokens_per_second=compute_tps(out, latency / 1000),
             raw=response,
+            effort=normalize_effort(effort),
+            reasoning_request=reasoning_request or None,
         )
 
     def _converse(
@@ -121,6 +137,9 @@ class BedrockProvider(BaseProvider):
         model_id: str,
         max_tokens: int,
         temperature: float | None = None,
+        thinking: bool | None = None,
+        thinking_budget: int | None = None,
+        effort: str | None = None,
     ) -> dict:
         inference_config: dict = {"maxTokens": max_tokens}
         if temperature is not None:
@@ -132,6 +151,18 @@ class BedrockProvider(BaseProvider):
         }
         if system:
             kwargs["system"] = [{"text": system}]
+        thinking_block, extra = claude_request(
+            model=model_id,
+            thinking=thinking,
+            thinking_budget=thinking_budget,
+            effort=effort,
+        )
+        fields: dict[str, object] = {}
+        if thinking_block is not None:
+            fields["thinking"] = thinking_block
+        fields.update(extra)
+        if fields:
+            kwargs["additionalModelRequestFields"] = fields
 
         return self._client.converse(**kwargs)
 

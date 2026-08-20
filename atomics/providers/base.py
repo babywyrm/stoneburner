@@ -39,6 +39,11 @@ class ProviderResponse:
     # Structured calls the model asked to make. Empty for every text-only
     # response, which is all of them outside the toolcall suite.
     tool_calls: tuple[ToolCall, ...] = ()
+    # Shared operator dials and the native payload actually sent. Empty
+    # when the call used provider defaults.
+    effort: str | None = None
+    reasoning_mode: str | None = None
+    reasoning_request: dict | None = field(default=None, repr=False)
 
     def __setattr__(self, name: str, value: object) -> None:
         if name == "finish_reason" and "finish_reason" in self.__dict__:
@@ -105,6 +110,8 @@ class BaseProvider(ABC):
         thinking: bool | None = None,
         thinking_budget: int | None = None,
         temperature: float | None = None,
+        effort: str | None = None,
+        reasoning_mode: str | None = None,
     ) -> ProviderResponse: ...
 
     @abstractmethod

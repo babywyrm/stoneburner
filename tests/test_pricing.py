@@ -90,6 +90,9 @@ def test_cache_multipliers_match_anthropic_docs():
 
 def test_latest_frontier_model_pricing():
     assert pricing.OPENAI_PRICING["gpt-5.6"] == (5.0, 30.0)
+    assert pricing.OPENAI_PRICING["gpt-5.6-sol"] == (5.0, 30.0)
+    assert pricing.OPENAI_PRICING["gpt-5.6-terra"] == (2.0, 12.0)
+    assert pricing.OPENAI_PRICING["gpt-5.6-luna"] == (0.20, 1.20)
     assert pricing.CLAUDE_PRICING["claude-fable-5"] == (10.0, 50.0)
 
 

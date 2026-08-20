@@ -47,6 +47,10 @@ MODEL_CLASS_MAP: dict[str, ModelClass] = {
     "gpt-5.3": ModelClass.HEAVY,
     "gpt-5.5": ModelClass.HEAVY,
     "gpt-5.5-turbo": ModelClass.MID,
+    "gpt-5.6": ModelClass.HEAVY,
+    "gpt-5.6-sol": ModelClass.HEAVY,
+    "gpt-5.6-terra": ModelClass.MID,
+    "gpt-5.6-luna": ModelClass.LIGHT,
     "o3": ModelClass.HEAVY,
     "o3-mini": ModelClass.MID,
     "o3-pro": ModelClass.HEAVY,
@@ -132,6 +136,10 @@ THINKING_CAPABLE: frozenset[str] = frozenset(
         "gpt-5-turbo",
         "gpt-5.3",
         "gpt-5.5",
+        "gpt-5.6",
+        "gpt-5.6-sol",
+        "gpt-5.6-terra",
+        "gpt-5.6-luna",
         # Ollama — qwen3 family and deepseek-r1 use <think> tags
         "qwen3:0.6b",
         "qwen3:1.7b",
@@ -168,7 +176,15 @@ def supports_thinking(model_id: str) -> bool:
     """Check if a model supports thinking/reasoning mode."""
     if model_id in THINKING_CAPABLE:
         return True
-    for prefix in ("qwen3", "o3", "o4", "deepseek-r1", "phi4-reasoning", "phi4-mini-reasoning"):
+    for prefix in (
+        "qwen3",
+        "o3",
+        "o4",
+        "deepseek-r1",
+        "phi4-reasoning",
+        "phi4-mini-reasoning",
+        "gpt-5",
+    ):
         if model_id.startswith(prefix):
             return True
     return False
