@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Changed
+- **Landing-page recipes for the effort dial.** README and QUICKSTART show
+  `--effort` on OpenAI, Claude, Bedrock, Groq, Gemini, and Together.
+  README also carries a GitHub release badge next to the live PyPI version.
+
 ## 0.20.0 (2026-08-19) — Shared effort dial and eval transcripts
 
 ### Upgrade notes

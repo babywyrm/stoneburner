@@ -16,6 +16,10 @@ uv run atomics run --provider openai -m o3 --no-thinking -n 5
 uv run atomics provider-test --provider openai -m gpt-5.6-sol --effort high
 uv run atomics provider-test --provider openai -m gpt-5.6-sol --effort max --reasoning-mode pro
 uv run atomics eval --provider claude -m claude-opus-4-6 --effort high
+uv run atomics provider-test --provider bedrock --region us-east-1 --effort high
+uv run atomics provider-test --provider groq --effort medium
+uv run atomics provider-test --provider gemini --effort high
+uv run atomics provider-test --provider together --effort medium
 
 # Full prompt, model reply, thinking, and judge rationale (no truncated table)
 uv run atomics eval --provider openai -m gpt-5.6-luna --effort low --verbose \

@@ -91,13 +91,43 @@ atomics run --provider brain-gateway --gateway-url http://localhost:30080 -n 5 -
 | Backend | Flag | Install |
 |---------|------|---------|
 | **Claude** (Anthropic) | `--provider claude` | `uv sync` (included) |
-| **OpenAI** / o-series | `--provider openai` | `uv sync --extra openai` |
+| **OpenAI** / GPT-5.6 / o-series | `--provider openai` | `uv sync --extra openai` |
 | **Bedrock** (AWS) | `--provider bedrock --region us-east-1` | `uv sync --extra bedrock` |
+| **Groq** | `--provider groq` | `uv sync` (httpx) |
+| **Gemini** | `--provider gemini` | `uv sync` (httpx) |
+| **Together** | `--provider together` | `uv sync` (httpx) |
 
 ```bash
 uv run atomics run --provider claude -n 5 -i 0
-uv run atomics run --provider openai -m gpt-4o -n 5 -i 0
+uv run atomics run --provider openai -m gpt-5.6-luna -n 5 -i 0
 uv run atomics run --provider bedrock --region us-east-1 -n 5 -i 0
+uv run atomics provider-test --provider groq
+uv run atomics provider-test --provider gemini
+uv run atomics provider-test --provider together
+```
+
+`--effort` is one dial for every cloud that has a native reasoning knob.
+`--thinking-budget` stays the local / older Claude token cap. `codegen`
+and `probe` do not take `--effort` yet.
+
+```bash
+# OpenAI — Chat Completions reasoning_effort. --reasoning-mode pro uses Responses.
+uv run atomics provider-test --provider openai -m gpt-5.6-sol --effort high
+uv run atomics provider-test --provider openai -m gpt-5.6-sol --effort max --reasoning-mode pro
+uv run atomics eval --provider openai -m gpt-5.6-luna --effort low --budget 1 \
+  --judge-provider claude --judge-model claude-haiku-4-5 \
+  --fixtures ev-01,ev-02,ev-03 --verbose
+
+# Claude — adaptive thinking + output_config.effort
+uv run atomics eval --provider claude -m claude-opus-4-6 --effort high --verbose
+
+# Bedrock — same Claude mapping, region-prefixed model IDs
+uv run atomics provider-test --provider bedrock --region us-east-1 --effort high
+
+# OpenAI-compatible clouds — reasoning_effort when the backend honors it
+uv run atomics provider-test --provider groq --effort medium
+uv run atomics provider-test --provider gemini --effort high
+uv run atomics provider-test --provider together --effort medium
 ```
 
 > **Ecosystem fit:** run private/local models for sensitive workloads and cost

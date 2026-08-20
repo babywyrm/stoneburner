@@ -20,6 +20,10 @@ Full command reference for `atomics`. See also [QUICKSTART.md](../QUICKSTART.md)
 | `atomics provider-test -p openai -m gpt-5.6-sol --effort high` | Shared effort dial (none/minimal/low/medium/high/xhigh/max; xl and ultra aliases) |
 | `atomics provider-test -p openai -m gpt-5.6-sol --effort max --reasoning-mode pro` | OpenAI pro mode via the Responses API |
 | `atomics eval --provider claude -m claude-opus-4-6 --effort high` | Claude adaptive thinking + output_config.effort |
+| `atomics provider-test -p bedrock --region us-east-1 --effort high` | Same Claude mapping on Bedrock Converse |
+| `atomics provider-test -p groq --effort medium` | `reasoning_effort` on Groq when the model honors it |
+| `atomics provider-test -p gemini --effort high` | `reasoning_effort` on Gemini when the model honors it |
+| `atomics provider-test -p together --effort medium` | `reasoning_effort` on Together when the model honors it |
 | `atomics run -b 5.0` | Run with $5 budget cap |
 | `atomics run -i 10` | Override interval to 10 seconds |
 | `atomics compare` | Compare providers side-by-side (cost, latency, tokens) |
