@@ -3,6 +3,11 @@
 ## Unreleased
 
 ### Added
+- **HTTP / MCP `effort` and `reasoning_mode` reach every generate suite
+  that accepts them.** `submit_eval` already took the fields, but
+  `adversarial`, `refusal`, `redblue`, `toolcall`, and `codereview`
+  dropped them. Unknown values now 422 at the request model, same as
+  the CLI. `codegen` still ignores the dial.
 - **`--effort` on `rag` and `multiturn`.** Same shared dial the other
   generate suites already had. Providers already accepted it; the two
   CLIs and runners now pass it through.

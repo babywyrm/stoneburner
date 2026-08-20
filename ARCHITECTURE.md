@@ -83,13 +83,18 @@ class BaseProvider(ABC):
     async def generate(self, prompt: str, *, system: str = "", model: str | None = None,
                        max_tokens: int = 1024, thinking: bool | None = None,
                        thinking_budget: int | None = None,
+                       effort: str | None = None,
+                       reasoning_mode: str | None = None,
                        temperature: float | None = None) -> ProviderResponse: ...
     async def health_check(self) -> bool: ...
 ```
 
 `ProviderResponse` carries text, token counts (incl. thinking + cache), latency,
-cost, and `tps_basis`. Adapters live in `providers/{claude,openai,bedrock,ollama,
-vllm,brain_gateway}.py`. Pricing is centralized in `providers/pricing.py`.
+cost, `tps_basis`, and the operator dial (`effort`, `reasoning_mode`) plus the
+native payload (`reasoning_request`). Adapters live in
+`providers/{claude,openai,bedrock,ollama, vllm,brain_gateway}.py`. Pricing is
+centralized in `providers/pricing.py`. The shared mapper is
+`providers/effort.py`.
 
 Build providers through the single factory `providers.factory.make_provider()` —
 do not write a new provider-name switch. It raises `ProviderConfigError`, which

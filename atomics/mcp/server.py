@@ -79,8 +79,8 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
 
         Spends a few tokens. The prompt is fixed server-side. Use this after
         `list_models` to confirm a tag answers before submitting an eval.
-        `effort` is the shared reasoning dial (none/low/medium/high/xhigh/max).
-        `reasoning_mode` is OpenAI-only (`standard`/`pro`).
+        `effort` is the shared reasoning dial (none/minimal/low/medium/high/xhigh/max;
+        aliases `xl` and `ultra`). `reasoning_mode` is OpenAI-only (`standard`/`pro`).
         """
         return api.provider_test(
             provider=provider,
@@ -142,7 +142,9 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
         `suite` is one of `accuracy`, `rag`, `multiturn`, `adversarial`,
         `codegen`, `refusal`, `redblue`, `toolcall`, or `codereview`.
         `budget_usd` caps the combined spend; leave it unset to accept
-        the server's default ceiling. Poll `get_job` for the result.
+        the server's default ceiling. `effort` / `reasoning_mode` are the
+        shared reasoning dial (same values as `provider_test`); `codegen`
+        ignores them. Poll `get_job` for the result.
         """
         return api.submit_eval(
             suite=suite,

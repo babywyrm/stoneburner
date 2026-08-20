@@ -212,6 +212,13 @@ worse).
 
 `probe` is CLI-only. Load tests have their own endpoints, not `suite` values.
 
+`POST /evals`, `POST /sweeps`, and `POST /provider-test` accept optional
+`effort` and `reasoning_mode`. Same vocabulary as the CLI: `none` /
+`minimal` / `low` / `medium` / `high` / `xhigh` / `max` (aliases `xl`,
+`ultra`) and OpenAI-only `standard` / `pro`. Unknown values are `422`.
+The dial is ignored on `codegen`. `POST /runs` has no effort fields —
+the burn loop keeps `--effort` on the CLI.
+
 ### Sweeps
 
 `POST /api/v1/sweeps` runs the overnight driver (`eval.gauntlet`) as a job.

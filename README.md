@@ -157,7 +157,7 @@ uv run atomics tiers                   # show all tier profiles
 | `atomics run` | Start benchmarking loop |
 | `atomics compare` | Provider/model side-by-side comparison |
 | `atomics report` | Usage reports and trends |
-| `atomics eval` | Quality evaluation suite (`--verbose` for full transcripts) |
+| `atomics eval` | Quality evaluation suite (`--effort` / `--verbose` for full transcripts) |
 | `atomics adversarial` | Adversarial resilience eval (72 fixtures) |
 | `atomics toolcall` | Tool-call divergence: refuses in prose, complies via function call (20 fixtures) |
 | `atomics redblue` | Red/blue security capability eval (10 fixtures) |
@@ -219,6 +219,7 @@ Auto-detects reasoning-capable models (Claude extended thinking, OpenAI o-series
 uv run atomics run --provider ollama -m qwen3:14b -n 5   # auto-detected
 uv run atomics run --provider claude --thinking -n 5      # explicit
 uv run atomics run --provider openai -m o3 --no-thinking  # forced off for A/B
+uv run atomics eval --provider openai -m gpt-5.6-sol --effort high
 ```
 
 Full documentation: [THINKING](https://github.com/babywyrm/stoneburner/blob/main/docs/THINKING.md)

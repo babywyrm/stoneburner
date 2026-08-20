@@ -93,6 +93,25 @@ def test_submit_eval_omits_budget_so_server_default_applies():
     assert payload == {"suite": "adversarial", "provider": "claude", "save": True}
 
 
+def test_submit_eval_includes_effort_when_given():
+    requests: list[httpx.Request] = []
+    with client_recording(requests) as client:
+        client.submit_eval(
+            suite="adversarial",
+            provider="openai",
+            effort="high",
+            reasoning_mode="pro",
+            thinking=False,
+        )
+
+    import json
+
+    payload = json.loads(requests[0].content)
+    assert payload["effort"] == "high"
+    assert payload["reasoning_mode"] == "pro"
+    assert payload["thinking"] is False
+
+
 def test_submit_eval_includes_budget_when_given():
     requests: list[httpx.Request] = []
     with client_recording(requests) as client:
