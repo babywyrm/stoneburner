@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+## 0.20.0 (2026-08-19) — Shared effort dial and eval transcripts
+
+### Upgrade notes
+- Install is still `stoneburner-atomics`. The import and CLI stay `atomics`.
+- Cloud reasoning is now one dial: `--effort` (`none` / `minimal` / `low` /
+  `medium` / `high` / `xhigh` / `max`, aliases `xl` and `ultra`) and
+  OpenAI-only `--reasoning-mode` (`standard` / `pro`). `--thinking-budget`
+  is unchanged. `codegen` and `probe` do not take `--effort` yet.
+- `eval --verbose` (and `atomics -v eval`) prints the full transcript
+  instead of the truncated results table. `sweep --verbose` uses the same
+  dump.
+- HTTP / MCP `effort` and `reasoning_mode` now reach the security suites.
+  Unknown values are `422`. `codegen` still ignores the dial. `POST /runs`
+  has no effort fields.
+- ev-01 now asks for the SolarWinds-style example its gold list already
+  scored, so a correct definition-only answer no longer loses completeness.
+- No breaking CLI changes.
+
 ### Added
 - **HTTP / MCP `effort` and `reasoning_mode` reach every generate suite
   that accepts them.** `submit_eval` already took the fields, but
