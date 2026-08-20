@@ -93,6 +93,7 @@ class _StubProvider:
         thinking=None,
         thinking_budget=None,
         temperature=None,
+        **_kwargs,
     ):
         from atomics.providers.base import ProviderResponse
 

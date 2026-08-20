@@ -43,7 +43,17 @@ class MockProvider(BaseProvider):
         return "mock"
 
     async def generate(
-        self, prompt, *, system="", model=None, max_tokens=1024, thinking=None, thinking_budget=None
+        self,
+        prompt,
+        *,
+        system="",
+        model=None,
+        max_tokens=1024,
+        thinking=None,
+        thinking_budget=None,
+        temperature=None,
+        effort=None,
+        reasoning_mode=None,
     ):
         self.call_count += 1
         return ProviderResponse(

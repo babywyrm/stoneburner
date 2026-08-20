@@ -382,7 +382,14 @@ async def test_run_stress_provider_basic():
     call_count = 0
 
     async def fake_generate(
-        prompt, *, system="", model=None, max_tokens=1024, thinking=None, thinking_budget=None
+        prompt,
+        *,
+        system="",
+        model=None,
+        max_tokens=1024,
+        thinking=None,
+        thinking_budget=None,
+        **_kwargs,
     ):
         nonlocal call_count
         call_count += 1

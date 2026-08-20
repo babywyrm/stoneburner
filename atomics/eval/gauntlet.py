@@ -145,6 +145,8 @@ def make_suite_runner(
     thinking: bool | None,
     thinking_budget: int | None,
     fixture_ids: list[str] | None = None,
+    effort: str | None = None,
+    reasoning_mode: str | None = None,
 ) -> RunSuite:
     """Build the in-process suite callback the CLI hands to `run_gauntlet`."""
 
@@ -166,6 +168,8 @@ def make_suite_runner(
                 thinking=thinking,
                 thinking_budget=thinking_budget,
                 fixture_ids=fixture_ids,
+                effort=effort,
+                reasoning_mode=reasoning_mode,
                 skip_incapable=skip_incapable,
             )
         except Exception as exc:
@@ -194,6 +198,8 @@ async def _dispatch_suite(
     thinking_budget: int | None,
     fixture_ids: list[str] | None,
     skip_incapable: bool,
+    effort: str | None = None,
+    reasoning_mode: str | None = None,
 ) -> SuiteJobResult:
     if suite == "eval":
         from atomics.benchmark.sweep import _filter_fixtures
@@ -206,6 +212,8 @@ async def _dispatch_suite(
             judge_model=judge_model,
             thinking=thinking,
             thinking_budget=thinking_budget,
+            effort=effort,
+            reasoning_mode=reasoning_mode,
             fixtures=_filter_fixtures(fixture_ids),
         )
         return SuiteJobResult(
@@ -225,6 +233,8 @@ async def _dispatch_suite(
             runs=runs,
             thinking=thinking,
             thinking_budget=thinking_budget,
+            effort=effort,
+            reasoning_mode=reasoning_mode,
         )
         return SuiteJobResult(
             model=model,
@@ -242,6 +252,8 @@ async def _dispatch_suite(
             judge_model=judge_model,
             thinking=thinking,
             thinking_budget=thinking_budget,
+            effort=effort,
+            reasoning_mode=reasoning_mode,
         )
         return SuiteJobResult(
             model=model,
@@ -262,6 +274,8 @@ async def _dispatch_suite(
             runs=runs,
             thinking=thinking,
             thinking_budget=thinking_budget,
+            effort=effort,
+            reasoning_mode=reasoning_mode,
         )
         if not toolcall_summary.tool_capable:
             return SuiteJobResult(
@@ -289,6 +303,8 @@ async def _dispatch_suite(
             judge_model=judge_model,
             thinking=thinking,
             thinking_budget=thinking_budget,
+            effort=effort,
+            reasoning_mode=reasoning_mode,
         )
         return SuiteJobResult(
             model=model,

@@ -74,6 +74,7 @@ class _FakeProvider:
         thinking=None,
         thinking_budget=None,
         temperature=None,
+        **_kwargs,
     ):
         return ProviderResponse(
             text="some response",
@@ -104,6 +105,7 @@ class _FakeJudge:
         thinking=None,
         thinking_budget=None,
         temperature=None,
+        **_kwargs,
     ):
         return ProviderResponse(
             text=f"CLASS: {self._c}\nRATIONALE: fixed",

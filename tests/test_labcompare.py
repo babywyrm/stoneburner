@@ -122,6 +122,7 @@ class _FakeProvider:
         thinking=None,
         thinking_budget=None,
         temperature=None,
+        **_kwargs,
     ):
         self.calls += 1
         return ProviderResponse(

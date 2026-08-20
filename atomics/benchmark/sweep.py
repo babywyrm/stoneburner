@@ -66,6 +66,8 @@ async def run_model_sweep(
     judge_model: str | None = None,
     thinking: bool | None = None,
     thinking_budget: int | None = None,
+    effort: str | None = None,
+    reasoning_mode: str | None = None,
     on_model_done: Callable[[ModelSweepResult], None] | None = None,
     on_fixture_done: Callable | None = None,
 ) -> list[ModelSweepResult]:
@@ -97,6 +99,8 @@ async def run_model_sweep(
                 judge_model=judge_model,
                 thinking=thinking,
                 thinking_budget=thinking_budget,
+                effort=effort,
+                reasoning_mode=reasoning_mode,
                 fixtures=fixtures,
                 on_fixture_done=on_fixture_done,
             )

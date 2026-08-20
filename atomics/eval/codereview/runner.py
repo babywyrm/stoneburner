@@ -204,6 +204,8 @@ async def run_codereview(
     extra_judges: list[tuple[BaseProvider, str | None]] | None = None,
     thinking: bool | None = None,
     thinking_budget: int | None = None,
+    effort: str | None = None,
+    reasoning_mode: str | None = None,
     run_id: str | None = None,
     fixtures: list[SecureCodeFixture] | None = None,
     on_fixture_start: Callable[[SecureCodeFixture], object] | None = None,
@@ -245,6 +247,8 @@ async def run_codereview(
                 max_tokens=fx.max_output_tokens,
                 thinking=thinking,
                 thinking_budget=thinking_budget,
+                effort=effort,
+                reasoning_mode=reasoning_mode,
             )
             provider_outcome = provider_outcome_from_response(response)
         except Exception as exc:

@@ -19,6 +19,7 @@ from atomics.commands.common import (
     _make_provider,
     budget_option,
     effective_model,
+    effort_options,
     eval_budget_from,
     extra_judges_option,
     parse_extra_judges,
@@ -150,6 +151,7 @@ def _rate(rate: float | None, numerator: int, denominator: int) -> str:
 )
 @click.option("--thinking/--no-thinking", "thinking_flag", default=None)
 @click.option("--thinking-budget", type=int, default=8000, show_default=True)
+@effort_options
 @budget_option
 def toolcall(
     provider_name: str,
@@ -169,6 +171,8 @@ def toolcall(
     verbose: bool,
     thinking_flag: bool | None,
     thinking_budget: int,
+    effort: str | None,
+    reasoning_mode: str | None,
     budget_usd: float | None,
 ) -> None:
     """Measure tool-call divergence: refuses in prose, complies with a function.
@@ -277,6 +281,8 @@ def toolcall(
             channel=channel,
             thinking=thinking_flag,
             thinking_budget=thinking_budget,
+            effort=effort,
+            reasoning_mode=reasoning_mode,
             on_fixture_start=on_start,
             on_fixture_done=on_done,
             on_run_done=on_run,

@@ -72,13 +72,24 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
         model: str | None = None,
         host: str | None = None,
         thinking: bool | None = None,
+        effort: str | None = None,
+        reasoning_mode: str | None = None,
     ) -> Any:
         """Health-check a provider and generate a fixed 2+2 probe.
 
         Spends a few tokens. The prompt is fixed server-side. Use this after
         `list_models` to confirm a tag answers before submitting an eval.
+        `effort` is the shared reasoning dial (none/low/medium/high/xhigh/max).
+        `reasoning_mode` is OpenAI-only (`standard`/`pro`).
         """
-        return api.provider_test(provider=provider, model=model, host=host, thinking=thinking)
+        return api.provider_test(
+            provider=provider,
+            model=model,
+            host=host,
+            thinking=thinking,
+            effort=effort,
+            reasoning_mode=reasoning_mode,
+        )
 
     @server.tool(annotations=READ_ONLY)
     def health() -> Any:
@@ -121,6 +132,9 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
         fixtures: list[str] | None = None,
         save: bool = True,
         budget_usd: float | None = None,
+        thinking: bool | None = None,
+        effort: str | None = None,
+        reasoning_mode: str | None = None,
     ) -> Any:
         """Start an eval suite and return its job id immediately.
 
@@ -138,6 +152,9 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
             fixtures=fixtures,
             save=save,
             budget_usd=budget_usd,
+            thinking=thinking,
+            effort=effort,
+            reasoning_mode=reasoning_mode,
         )
 
     @server.tool(annotations=SPENDS)
@@ -149,6 +166,8 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
         judge_model: str | None = None,
         runs: int = 1,
         thinking: bool | None = None,
+        effort: str | None = None,
+        reasoning_mode: str | None = None,
     ) -> Any:
         """Start a multi-model, multi-suite campaign and return a job id.
 
@@ -165,6 +184,8 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
             judge_model=judge_model,
             runs=runs,
             thinking=thinking,
+            effort=effort,
+            reasoning_mode=reasoning_mode,
         )
 
     @server.tool(annotations=SPENDS)

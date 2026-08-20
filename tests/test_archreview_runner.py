@@ -27,6 +27,7 @@ class _Provider:
         thinking=None,
         thinking_budget=None,
         temperature=None,
+        **_kwargs,
     ):
         self.calls.append(
             {
@@ -189,6 +190,7 @@ async def test_run_archreview_marks_tiny_length_response_as_context_exhausted():
             thinking=None,
             thinking_budget=None,
             temperature=None,
+            **_kwargs,
         ):
             self.calls.append(
                 {

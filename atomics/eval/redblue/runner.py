@@ -196,6 +196,8 @@ async def run_redblue(
     run_id: str | None = None,
     thinking: bool | None = None,
     thinking_budget: int | None = None,
+    effort: str | None = None,
+    reasoning_mode: str | None = None,
     min_output_tokens: int | None = None,
     on_fixture_start: Callable[..., object] | None = None,
     on_fixture_done: Callable[..., object] | None = None,
@@ -270,6 +272,8 @@ async def run_redblue(
                     max_tokens=output_tokens,
                     thinking=thinking,
                     thinking_budget=thinking_budget,
+                    effort=effort,
+                    reasoning_mode=reasoning_mode,
                 )
                 task_result.status = TaskStatus.SUCCESS
                 task_result.response = resp.text

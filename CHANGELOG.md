@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### Added
+- **Shared `--effort` / `--reasoning-mode` for cloud reasoning knobs.** One
+  dial (`none` / `minimal` / `low` / `medium` / `high` / `xhigh` / `max`,
+  aliases `xl` and `ultra`) maps to OpenAI `reasoning.effort`, Claude
+  adaptive thinking + `output_config.effort`, Bedrock
+  `additionalModelRequestFields`, and `reasoning_effort` on OpenAI-compatible
+  clouds. `--reasoning-mode pro` is OpenAI-only and uses the Responses API.
+  `--thinking-budget` stays the local token cap. The native payload is
+  recorded as `reasoning_request`. GPT-5.6 Sol / Terra / Luna are priced and
+  marked thinking-capable.
+
 ## 0.19.0 (2026-08-18) — Agent surface, durable schema, and housekeeping
 
 ### Upgrade notes

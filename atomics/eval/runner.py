@@ -127,6 +127,8 @@ async def run_eval(
     on_fixture_done: Callable[..., object] | None = None,
     thinking: bool | None = None,
     thinking_budget: int | None = None,
+    effort: str | None = None,
+    reasoning_mode: str | None = None,
     fixtures: list[EvalFixture] | None = None,
     extra_judges: list[tuple[BaseProvider, str | None]] | None = None,
 ) -> EvalRunSummary:
@@ -187,6 +189,8 @@ async def run_eval(
                 max_tokens=fixture.max_output_tokens,
                 thinking=thinking,
                 thinking_budget=thinking_budget,
+                effort=effort,
+                reasoning_mode=reasoning_mode,
             )
             task_result.status = TaskStatus.SUCCESS
             task_result.response = resp.text

@@ -54,6 +54,9 @@ class EvalRequest(BaseModel):
     judge_model: str | None = None
     fixtures: list[str] | None = Field(default=None, max_length=MAX_FIXTURES)
     save: bool = True
+    thinking: bool | None = None
+    effort: str | None = None
+    reasoning_mode: str | None = None
     budget_usd: float = Field(default=DEFAULT_EVAL_BUDGET_USD, gt=0, le=MAX_EVAL_BUDGET_USD)
 
 
@@ -74,6 +77,8 @@ class SweepRequest(BaseModel):
     judge_model: str | None = None
     runs: int = Field(default=1, ge=1, le=MAX_SWEEP_RUNS)
     thinking: bool | None = None
+    effort: str | None = None
+    reasoning_mode: str | None = None
     budget_usd: float = Field(gt=0, le=MAX_EVAL_BUDGET_USD)
 
     @field_validator("models")
@@ -234,6 +239,8 @@ class ProviderTestRequest(BaseModel):
     model: str | None = None
     host: str | None = None
     thinking: bool | None = None
+    effort: str | None = None
+    reasoning_mode: str | None = None
 
 
 class ProviderTestResponse(BaseModel):

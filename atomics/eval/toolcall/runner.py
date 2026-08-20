@@ -344,6 +344,8 @@ async def run_toolcall_suite(
     channel: str = "both",
     thinking: bool | None = None,
     thinking_budget: int | None = None,
+    effort: str | None = None,
+    reasoning_mode: str | None = None,
     run_id: str | None = None,
     on_fixture_start: Callable[..., object] | None = None,
     on_fixture_done: Callable[..., object] | None = None,
@@ -420,6 +422,8 @@ async def run_toolcall_suite(
                 channel=channel,
                 thinking=thinking,
                 thinking_budget=thinking_budget,
+                effort=effort,
+                reasoning_mode=reasoning_mode,
                 run_number=run_number,
             )
             per_run.append(record)
@@ -453,6 +457,8 @@ async def _run_once(
     channel: str,
     thinking: bool | None,
     thinking_budget: int | None,
+    effort: str | None,
+    reasoning_mode: str | None,
     run_number: int,
 ) -> dict[str, Any]:
     """One paired pass over one fixture.
@@ -528,6 +534,8 @@ async def _run_once(
                 max_tokens=_MAX_TOKENS,
                 thinking=thinking,
                 thinking_budget=thinking_budget,
+                effort=effort,
+                reasoning_mode=reasoning_mode,
             )
         except Exception as exc:
             record["error"] = f"{type(exc).__name__}: {exc}"

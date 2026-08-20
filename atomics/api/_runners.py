@@ -168,6 +168,9 @@ async def run_eval_from_request(payload: EvalRequest) -> dict[str, Any]:
             model=payload.model,
             judge_model=payload.judge_model,
             run_id=None,
+            thinking=payload.thinking,
+            effort=payload.effort,
+            reasoning_mode=payload.reasoning_mode,
         )
     except HTTPException:
         raise

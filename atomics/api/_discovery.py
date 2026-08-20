@@ -72,6 +72,8 @@ async def run_provider_test(payload: ProviderTestRequest) -> dict[str, Any]:
             model=payload.model,
             max_tokens=PROVIDER_TEST_MAX_TOKENS,
             thinking=payload.thinking,
+            effort=payload.effort,
+            reasoning_mode=payload.reasoning_mode,
         )
     except Exception as exc:
         return {
