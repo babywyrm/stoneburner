@@ -29,6 +29,10 @@ class FixtureResult:
     fixture: EvalFixture
     task_result: TaskResult
     judge: JudgeResult | None
+    thinking_text: str = ""
+    effort: str | None = None
+    reasoning_mode: str | None = None
+    reasoning_request: dict | None = None
 
 
 @dataclass
@@ -102,7 +106,16 @@ class EvalRunSummary:
                 {
                     "id": r.fixture.id,
                     "status": r.task_result.status.value,
+                    "prompt": r.fixture.prompt,
+                    "response": r.task_result.response,
+                    "thinking_text": r.thinking_text,
+                    "effort": r.effort,
+                    "reasoning_mode": r.reasoning_mode,
+                    "reasoning_request": r.reasoning_request,
                     "score": r.judge.score if r.judge else None,
+                    "accuracy": r.judge.accuracy if r.judge else None,
+                    "completeness": r.judge.completeness if r.judge else None,
+                    "format_score": r.judge.format_score if r.judge else None,
                     "parse_failed": r.judge.parse_failed if r.judge else True,
                     "rationale": r.judge.rationale if r.judge else "",
                     "criteria_coverage": r.judge.criteria_coverage if r.judge else None,
@@ -131,6 +144,7 @@ async def run_eval(
     reasoning_mode: str | None = None,
     fixtures: list[EvalFixture] | None = None,
     extra_judges: list[tuple[BaseProvider, str | None]] | None = None,
+    quiet: bool = False,
 ) -> EvalRunSummary:
     """Run eval fixtures against provider, score each with judge_provider.
 
@@ -146,6 +160,8 @@ async def run_eval(
             primary judge, form a consensus panel. When supplied, each fixture is
             scored by every judge and the mean score plus inter-judge stdev is
             recorded.
+        quiet: Skip the truncated per-fixture INFO lines (CLI --verbose already
+            prints the full transcript).
     """
     extra_judges = extra_judges or []
 
@@ -168,9 +184,13 @@ async def run_eval(
     effective_fixtures = fixtures if fixtures is not None else EVAL_FIXTURES
 
     for fixture in effective_fixtures:
-        logger.info(
-            "[eval] %s (%s) — %s", fixture.id, fixture.complexity.value, fixture.prompt[:60]
-        )
+        if not quiet:
+            logger.info(
+                "[eval] %s (%s) — %s",
+                fixture.id,
+                fixture.complexity.value,
+                fixture.prompt[:60],
+            )
         task_result = TaskResult(
             run_id=run_id,
             category=TaskCategory.GENERAL_QA,
@@ -213,7 +233,11 @@ async def run_eval(
             # produced blank, useless error rows/logs — fall back to repr.
             task_result.error_message = sanitize_error(exc)
             task_result.completed_at = datetime.now(UTC)
-            fr = FixtureResult(fixture=fixture, task_result=task_result, judge=None)
+            fr = FixtureResult(
+                fixture=fixture,
+                task_result=task_result,
+                judge=None,
+            )
             fixture_results.append(fr)
             logger.warning("[eval] %s failed: %s", fixture.id, task_result.error_message)
             if on_fixture_done is not None:
@@ -254,15 +278,24 @@ async def run_eval(
         task_result.criteria_coverage = judge.criteria_coverage
         task_result.judge_score_stdev = judge.score_stdev
 
-        fr = FixtureResult(fixture=fixture, task_result=task_result, judge=judge)
+        fr = FixtureResult(
+            fixture=fixture,
+            task_result=task_result,
+            judge=judge,
+            thinking_text=resp.thinking_text,
+            effort=resp.effort,
+            reasoning_mode=resp.reasoning_mode,
+            reasoning_request=resp.reasoning_request,
+        )
         fixture_results.append(fr)
 
-        logger.info(
-            "[eval] %s scored %.3f — %s",
-            fixture.id,
-            judge.score,
-            judge.rationale[:80],
-        )
+        if not quiet:
+            logger.info(
+                "[eval] %s scored %.3f — %s",
+                fixture.id,
+                judge.score,
+                judge.rationale[:80],
+            )
 
         if on_fixture_done is not None:
             if inspect.iscoroutinefunction(on_fixture_done):

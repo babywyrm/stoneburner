@@ -9,6 +9,8 @@ from pathlib import Path
 
 import click
 from rich.console import Console
+from rich.markup import escape as _rich_escape
+from rich.panel import Panel
 from rich.table import Table
 
 from atomics.commands.common import (
@@ -79,6 +81,12 @@ from atomics.eval.budget import share_budget
     help="Write the full run (per-fixture scores, rationales, latency, cost) as JSON to this file.",
 )
 @click.option(
+    "--verbose",
+    "-v",
+    is_flag=True,
+    help="Print the full prompt, model response, thinking, and judge rationale.",
+)
+@click.option(
     "--thinking/--no-thinking",
     "thinking_flag",
     default=None,
@@ -87,7 +95,9 @@ from atomics.eval.budget import share_budget
 @click.option("--thinking-budget", type=int, default=None, help="Max thinking tokens")
 @effort_options
 @budget_option
+@click.pass_context
 def eval(
+    ctx: click.Context,
     provider_name: str,
     model: str | None,
     ollama_host: str | None,
@@ -100,6 +110,7 @@ def eval(
     fixtures_filter: str | None,
     save_results: bool,
     json_out: str | None,
+    verbose: bool,
     thinking_flag: bool | None,
     thinking_budget: int | None,
     effort: str | None,
@@ -115,12 +126,17 @@ def eval(
     Example:
       atomics eval --provider ollama --model qwen2.5:7b
       atomics eval --provider claude
-      atomics eval --provider openai --model gpt-4o
+      atomics eval --provider openai --model gpt-4o --verbose
       atomics compare --narrative
     """
     settings = load_settings()
     setup_logging(settings.log_level)
     console = Console()
+    show_verbose = verbose or bool(ctx.obj and ctx.obj.get("verbose"))
+    if verbose and not (ctx.obj and ctx.obj.get("verbose")):
+        # --verbose is the transcript, not debug logs. Keep runner INFO quiet
+        # so truncated progress lines do not interrupt the full replies.
+        setup_logging("WARNING")
 
     def _build_provider(
         name: str,
@@ -239,18 +255,33 @@ def eval(
             else:
                 quality = "[yellow]?[/yellow]"
                 rationale = "judge parse failed"
-            result_table.add_row(
-                fr.fixture.id,
-                fr.fixture.complexity.value,
-                fr.fixture.prompt[:60] + "…",
-                quality,
-                f"{tr.latency_ms:.0f}ms",
-                str(tr.total_tokens),
-                f"${tr.estimated_cost_usd:.6f}",
-                rationale,
-            )
+            if not show_verbose:
+                result_table.add_row(
+                    fr.fixture.id,
+                    fr.fixture.complexity.value,
+                    fr.fixture.prompt[:60] + "…",
+                    quality,
+                    f"{tr.latency_ms:.0f}ms",
+                    str(tr.total_tokens),
+                    f"${tr.estimated_cost_usd:.6f}",
+                    rationale,
+                )
             if repo:
                 repo.save_task_result(tr)
+            if show_verbose:
+                from atomics.eval.display import format_eval_verbose_block
+
+                console.print()
+                console.print(
+                    Panel(
+                        _rich_escape(format_eval_verbose_block(fr, heading=False).rstrip()),
+                        title=(
+                            f"[bold]{fr.fixture.id}[/bold] "
+                            f"({fr.fixture.complexity.value})"
+                        ),
+                        expand=True,
+                    )
+                )
 
         # Auto-detect thinking if not explicitly set
         eff_thinking = thinking_flag
@@ -274,10 +305,12 @@ def eval(
                 reasoning_mode=reasoning_mode,
                 extra_judges=extra_judge_pairs,
                 fixtures=selected_fixtures,
+                quiet=show_verbose,
             )
         )
 
-        console.print(result_table)
+        if not show_verbose:
+            console.print(result_table)
 
         overall = summary.overall_accuracy
         quality_str = f"{overall * 100:.1f}%" if overall is not None else "—"

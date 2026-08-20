@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING
 
 import click
 from rich.console import Console
-from rich.markup import escape as _rich_escape
 from rich.table import Table
 
 from atomics.benchmark.labcompare import (
@@ -777,16 +776,10 @@ def sweep(
     def on_fixture_done_verbose(fr) -> None:
         if not verbose:
             return
-        tr = fr.task_result
-        score_str = f"{fr.judge.score:.2f}" if fr.judge else "N/A"
-        console.print(f"\n  [bold cyan]{fr.fixture.id}[/bold cyan] — score {score_str}")
-        console.print(f"  [dim]prompt:[/dim] {fr.fixture.prompt[:120]}")
-        if tr.response:
-            console.print(f"  [dim]reply:[/dim]  {_rich_escape(tr.response or '')}")
-        elif tr.error_message:
-            console.print(f"  [red]error:[/red]  {_rich_escape(tr.error_message or '')}")
-        if fr.judge and fr.judge.rationale:
-            console.print(f"  [dim]judge:[/dim]  {_rich_escape(fr.judge.rationale[:200])}")
+        from atomics.eval.display import format_eval_verbose_block
+
+        console.print()
+        console.print(format_eval_verbose_block(fr), markup=False)
 
     def on_model_done(r: ModelSweepResult) -> None:
         q = (
