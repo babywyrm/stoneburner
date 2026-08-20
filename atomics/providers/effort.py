@@ -155,5 +155,13 @@ def claude_request(
     return None, extra
 
 
+def _claude_family(model: str) -> str:
+    """Strip region / vendor prefixes so Bedrock IDs match Claude families."""
+    lowered = model.lower()
+    idx = lowered.find("claude-")
+    return lowered[idx:] if idx >= 0 else lowered
+
+
 def _claude_has_xhigh(model: str) -> bool:
-    return any(model.startswith(prefix) for prefix in _CLAUDE_XHIGH_PREFIXES)
+    family = _claude_family(model)
+    return any(family.startswith(prefix) for prefix in _CLAUDE_XHIGH_PREFIXES)

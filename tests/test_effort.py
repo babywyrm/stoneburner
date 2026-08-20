@@ -79,6 +79,29 @@ def test_claude_adaptive_plus_effort_on_opus_4_6() -> None:
 
 
 @pytest.mark.unit
+def test_claude_maps_xhigh_to_max_on_bedrock_4_6_id() -> None:
+    _thinking, extra = claude_request(
+        model="us.anthropic.claude-sonnet-4-6",
+        thinking=True,
+        thinking_budget=8000,
+        effort="xl",
+    )
+    assert extra["output_config"] == {"effort": "max"}
+
+
+@pytest.mark.unit
+def test_claude_keeps_xhigh_on_bedrock_opus_5_id() -> None:
+    thinking, extra = claude_request(
+        model="us.anthropic.claude-opus-5-20260301",
+        thinking=None,
+        thinking_budget=None,
+        effort="xhigh",
+    )
+    assert thinking == {"type": "adaptive"}
+    assert extra["output_config"] == {"effort": "xhigh"}
+
+
+@pytest.mark.unit
 def test_claude_maps_xhigh_to_max_on_4_6() -> None:
     _thinking, extra = claude_request(
         model="claude-sonnet-4-6",
@@ -211,6 +234,19 @@ def test_cli_wired_commands_expose_effort(command: str) -> None:
     assert result.exit_code == 0, result.output
     assert "--effort" in result.output
     assert "--reasoning-mode" in result.output
+
+
+@pytest.mark.unit
+@pytest.mark.unit
+@pytest.mark.parametrize("command", ["codegen", "probe"])
+def test_cli_codegen_and_probe_do_not_expose_effort(command: str) -> None:
+    from click.testing import CliRunner
+
+    from atomics.cli import cli
+
+    result = CliRunner().invoke(cli, [command, "--help"])
+    assert result.exit_code == 0, result.output
+    assert "--effort" not in result.output
 
 
 @pytest.mark.unit

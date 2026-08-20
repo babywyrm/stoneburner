@@ -17,6 +17,38 @@ from atomics.eval.budget import GuardedProvider
 from atomics.eval.gauntlet import SuiteJobResult
 
 
+def test_sweep_rejects_unknown_effort():
+    with pytest.raises(ValidationError, match="unknown effort"):
+        SweepRequest(
+            provider="ollama",
+            models=["a"],
+            suites=["eval"],
+            budget_usd=1.0,
+            effort="ludicrous",
+        )
+
+
+def test_sweep_normalizes_effort_and_rejects_unknown_mode():
+    req = SweepRequest(
+        provider="ollama",
+        models=["a"],
+        suites=["eval"],
+        budget_usd=1.0,
+        effort="xl",
+        reasoning_mode="PRO",
+    )
+    assert req.effort == "xhigh"
+    assert req.reasoning_mode == "pro"
+    with pytest.raises(ValidationError, match="unknown reasoning mode"):
+        SweepRequest(
+            provider="ollama",
+            models=["a"],
+            suites=["eval"],
+            budget_usd=1.0,
+            reasoning_mode="turbo",
+        )
+
+
 def test_sweep_requires_a_budget():
     with pytest.raises(ValidationError):
         SweepRequest(provider="ollama", models=["a"], suites=["eval"])

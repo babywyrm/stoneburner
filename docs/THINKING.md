@@ -55,6 +55,7 @@ The core challenge: thinking/reasoning tokens are **real computation** (they con
 | **Claude** | `thinking.budget_tokens` in the API request (extended thinking mode). | API returns `thinking_tokens` directly in the response metadata — no estimation needed. |
 | **OpenAI** | `--effort` → Chat Completions `reasoning_effort`, or Responses `reasoning.effort`. `--reasoning-mode pro` forces the Responses API and sets `reasoning.mode`. | `completion_tokens_details.reasoning_tokens` from the API response. |
 | **Claude (4.6+)** | `--effort` → `thinking: {type: "adaptive"}` plus `output_config.effort`. `--thinking` without `--effort` still uses `budget_tokens`. | Thinking blocks plus usage metadata. |
+| **Bedrock** | Same Claude mapping, sent in `additionalModelRequestFields`. Region-prefixed IDs (`us.anthropic.claude-…`) resolve to the Claude family. | Usage metadata from Converse. |
 
 `--effort` values: `none`, `minimal`, `low`, `medium`, `high`, `xhigh` (alias `xl`), `max` (alias `ultra`). Claude 4.6 maps `xhigh` to `max`. OpenAI-compatible clouds (Groq, Together, Gemini, vLLM) receive `reasoning_effort` when the backend honors it. The native payload is recorded on the response as `reasoning_request`.
 

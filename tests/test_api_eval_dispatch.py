@@ -108,3 +108,56 @@ def test_supported_eval_suites_cover_the_security_set():
         "toolcall",
         "codereview",
     }.issubset(SUPPORTED_EVAL_SUITES)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("suite", "runner_attr", "result_attr"),
+    [
+        ("adversarial", "run_adversarial", "fixture_results"),
+        ("refusal", "run_refusal", "fixture_results"),
+        ("redblue", "run_redblue", "fixture_results"),
+        ("codereview", "run_codereview", "fixture_results"),
+        ("toolcall", "run_toolcall_suite", "fixtures"),
+    ],
+)
+async def test_run_eval_suite_forwards_effort_to_security_runners(
+    suite, runner_attr, result_attr
+):
+    """EvalRequest already accepts effort. Dropping it here is a silent no-op
+    on a billed knob — the HTTP/MCP caller gets 200 and default reasoning."""
+    from unittest.mock import MagicMock
+
+    from atomics.api._runners import run_eval_suite
+    from atomics.api.models import EvalRequest
+
+    payload = EvalRequest(
+        suite=suite,
+        provider="ollama",
+        thinking=False,
+        effort="high",
+        reasoning_mode="standard",
+    )
+    summary = type(
+        "S",
+        (),
+        {
+            result_attr: [1],
+            "fixture_results": [1],
+            "fixtures": [1],
+            "total_tokens": 1,
+            "total_cost_usd": 0.0,
+            "overall_score": 0.5,
+        },
+    )()
+    with (
+        patch("atomics.api._runners._guarded_providers", return_value=(MagicMock(), MagicMock())),
+        patch(f"atomics.api._runners.{runner_attr}", new_callable=AsyncMock) as mock_run,
+    ):
+        mock_run.return_value = summary
+        await run_eval_suite(payload)
+
+    kwargs = mock_run.await_args.kwargs
+    assert kwargs["effort"] == "high"
+    assert kwargs["reasoning_mode"] == "standard"
+    assert kwargs["thinking"] is False

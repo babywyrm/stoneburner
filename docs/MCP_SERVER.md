@@ -137,6 +137,11 @@ open `result.run_id` with `get_run` if you need fixtures.
 Sweep suite names are `eval` (not `accuracy`), `redblue`, `refusal`,
 `toolcall`, `codereview`. Caps: 8 models, 3 runs, required `budget_usd`.
 
+`provider_test`, `submit_eval`, and `submit_sweep` take optional `effort`
+(`none` / `minimal` / `low` / `medium` / `high` / `xhigh` / `max`;
+aliases `xl`, `ultra`) and OpenAI-only `reasoning_mode` (`standard` /
+`pro`). `codegen` ignores the dial. `submit_run` has no effort fields.
+
 `probe` has no endpoint. Hours-long soaks, contention, and baselines stay
 on the CLI.
 

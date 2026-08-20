@@ -34,6 +34,24 @@ MAX_SOAK_CONCURRENCY = 4
 MAX_LOAD_PREDICT = 256
 
 
+def _normalize_effort_field(value: str | None) -> str | None:
+    from atomics.providers.effort import EffortError, normalize_effort
+
+    try:
+        return normalize_effort(value)
+    except EffortError as exc:
+        raise ValueError(str(exc)) from exc
+
+
+def _normalize_reasoning_mode_field(value: str | None) -> str | None:
+    from atomics.providers.effort import EffortError, normalize_reasoning_mode
+
+    try:
+        return normalize_reasoning_mode(value)
+    except EffortError as exc:
+        raise ValueError(str(exc)) from exc
+
+
 class RunRequest(BaseModel):
     """Request body to start a benchmark run."""
 
@@ -59,6 +77,16 @@ class EvalRequest(BaseModel):
     reasoning_mode: str | None = None
     budget_usd: float = Field(default=DEFAULT_EVAL_BUDGET_USD, gt=0, le=MAX_EVAL_BUDGET_USD)
 
+    @field_validator("effort")
+    @classmethod
+    def _known_effort(cls, value: str | None) -> str | None:
+        return _normalize_effort_field(value)
+
+    @field_validator("reasoning_mode")
+    @classmethod
+    def _known_reasoning_mode(cls, value: str | None) -> str | None:
+        return _normalize_reasoning_mode_field(value)
+
 
 class SweepRequest(BaseModel):
     """Start a multi-model, multi-suite campaign.
@@ -80,6 +108,16 @@ class SweepRequest(BaseModel):
     effort: str | None = None
     reasoning_mode: str | None = None
     budget_usd: float = Field(gt=0, le=MAX_EVAL_BUDGET_USD)
+
+    @field_validator("effort")
+    @classmethod
+    def _known_effort(cls, value: str | None) -> str | None:
+        return _normalize_effort_field(value)
+
+    @field_validator("reasoning_mode")
+    @classmethod
+    def _known_reasoning_mode(cls, value: str | None) -> str | None:
+        return _normalize_reasoning_mode_field(value)
 
     @field_validator("models")
     @classmethod
@@ -241,6 +279,16 @@ class ProviderTestRequest(BaseModel):
     thinking: bool | None = None
     effort: str | None = None
     reasoning_mode: str | None = None
+
+    @field_validator("effort")
+    @classmethod
+    def _known_effort(cls, value: str | None) -> str | None:
+        return _normalize_effort_field(value)
+
+    @field_validator("reasoning_mode")
+    @classmethod
+    def _known_reasoning_mode(cls, value: str | None) -> str | None:
+        return _normalize_reasoning_mode_field(value)
 
 
 class ProviderTestResponse(BaseModel):

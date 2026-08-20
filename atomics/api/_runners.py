@@ -233,12 +233,16 @@ async def run_eval_suite(payload: EvalRequest) -> dict[str, Any]:
                 judge_provider=judge_provider,
                 model=payload.model,
                 judge_model=payload.judge_model,
+                thinking=payload.thinking,
+                effort=payload.effort,
+                reasoning_mode=payload.reasoning_mode,
             )
             fixtures_run = len(summary.fixture_results)
         elif suite == "codegen":
             summary = await run_codegen(
                 provider,
                 model=payload.model,
+                thinking=payload.thinking,
             )
             fixtures_run = len(summary.fixture_results)
         elif suite == "refusal":
@@ -247,6 +251,9 @@ async def run_eval_suite(payload: EvalRequest) -> dict[str, Any]:
                 judge_provider=judge_provider,
                 model=payload.model,
                 judge_model=payload.judge_model,
+                thinking=payload.thinking,
+                effort=payload.effort,
+                reasoning_mode=payload.reasoning_mode,
             )
             fixtures_run = len(summary.fixture_results)
         elif suite == "redblue":
@@ -255,6 +262,9 @@ async def run_eval_suite(payload: EvalRequest) -> dict[str, Any]:
                 judge_provider=judge_provider,
                 model=payload.model,
                 judge_model=payload.judge_model,
+                thinking=payload.thinking,
+                effort=payload.effort,
+                reasoning_mode=payload.reasoning_mode,
             )
             fixtures_run = len(summary.fixture_results)
         elif suite == "codereview":
@@ -263,6 +273,9 @@ async def run_eval_suite(payload: EvalRequest) -> dict[str, Any]:
                 judge_provider=judge_provider,
                 model=payload.model,
                 judge_model=payload.judge_model,
+                thinking=payload.thinking,
+                effort=payload.effort,
+                reasoning_mode=payload.reasoning_mode,
             )
             fixtures_run = len(summary.fixture_results)
         elif suite == "toolcall":
@@ -274,6 +287,9 @@ async def run_eval_suite(payload: EvalRequest) -> dict[str, Any]:
                 judge_provider=judge_provider,
                 fixtures=TOOLCALL_FIXTURES,
                 judge_model=payload.judge_model,
+                thinking=payload.thinking,
+                effort=payload.effort,
+                reasoning_mode=payload.reasoning_mode,
             )
             fixtures_run = len(summary.fixtures)
         else:  # pragma: no cover - guarded by validate_eval_suite
