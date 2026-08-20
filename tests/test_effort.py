@@ -183,3 +183,40 @@ async def test_claude_generate_sends_adaptive_and_effort() -> None:
         "thinking": {"type": "adaptive"},
         "output_config": {"effort": "high"},
     }
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "command",
+    [
+        "eval",
+        "provider-test",
+        "run",
+        "sweep",
+        "adversarial",
+        "redblue",
+        "refusal",
+        "toolcall",
+        "codereview",
+    ],
+)
+def test_cli_wired_commands_expose_effort(command: str) -> None:
+    from click.testing import CliRunner
+
+    from atomics.cli import cli
+
+    result = CliRunner().invoke(cli, [command, "--help"])
+    assert result.exit_code == 0, result.output
+    assert "--effort" in result.output
+    assert "--reasoning-mode" in result.output
+
+
+@pytest.mark.unit
+def test_cli_eval_rejects_unknown_effort() -> None:
+    from click.testing import CliRunner
+
+    from atomics.cli import cli
+
+    result = CliRunner().invoke(cli, ["eval", "--effort", "ludicrous", "--no-save"])
+    assert result.exit_code != 0
+    assert "unknown effort" in result.output.lower()

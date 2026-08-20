@@ -140,6 +140,12 @@ uv run atomics eval --provider ollama -m qwen3:4b --fixtures ev-01,ev-19
 
 # Cloud model under test, strong local judge
 uv run atomics eval --provider claude --judge-provider ollama --judge-model qwen2.5:14b
+
+# Cloud model + cloud judge + full transcripts. Eval defaults the judge to
+# local Ollama — pass --judge-provider when Ollama is not running.
+uv run atomics eval --provider openai -m gpt-5.6-luna --effort low --budget 1 \
+  --judge-provider claude --judge-model claude-haiku-4-5 \
+  --fixtures ev-01,ev-02,ev-03 --verbose
 ```
 
 > **Never self-judge.** A model grading its own answers is biased upward. Use a
@@ -427,6 +433,8 @@ ATOMICS_OLLAMA_TIMEOUT=600   # big reasoning models on hard prompts
 |---------|-----|
 | `ReadTimeout` on a thinking model | Raise `ATOMICS_OLLAMA_TIMEOUT` (e.g. `600`). Thinking models can reason for minutes on HEAVY fixtures. |
 | Quality scores look suspiciously high | You may be self-judging — use a different `--judge-model` than the model under test. |
+| Judge scores ~50% / cannot reach `localhost:11434` | `eval` defaults the judge to local Ollama. Pass `--judge-provider` and `--judge-model`. |
+| Compact table truncates the answer and rationale | `atomics eval --verbose` prints the full transcript. |
 | `Unknown provider` | Install the extra: `uv sync --extra openai` / `--extra bedrock`. |
 | Ollama host unreachable | `uv run atomics doctor` and check `ATOMICS_OLLAMA_HOST`. |
 | Want a quick eval, not all 25 | `atomics eval --fixtures ev-01,ev-02`. |

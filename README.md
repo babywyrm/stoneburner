@@ -157,7 +157,7 @@ uv run atomics tiers                   # show all tier profiles
 | `atomics run` | Start benchmarking loop |
 | `atomics compare` | Provider/model side-by-side comparison |
 | `atomics report` | Usage reports and trends |
-| `atomics eval` | Quality evaluation suite |
+| `atomics eval` | Quality evaluation suite (`--verbose` for full transcripts) |
 | `atomics adversarial` | Adversarial resilience eval (72 fixtures) |
 | `atomics toolcall` | Tool-call divergence: refuses in prose, complies via function call (20 fixtures) |
 | `atomics redblue` | Red/blue security capability eval (10 fixtures) |
