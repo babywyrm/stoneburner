@@ -214,6 +214,8 @@ async def run_multiturn(
     on_conversation_done: Callable[[ConversationResult], None] | None = None,
     thinking: bool | None = None,
     thinking_budget: int | None = None,
+    effort: str | None = None,
+    reasoning_mode: str | None = None,
     fixtures: list[ConversationFixture] | None = None,
 ) -> MultiturnRunSummary:
     """Run the multi-turn conversation evaluation."""
@@ -248,6 +250,10 @@ async def run_multiturn(
                 gen_kwargs["thinking"] = thinking
             if thinking_budget is not None:
                 gen_kwargs["thinking_budget"] = thinking_budget
+            if effort is not None:
+                gen_kwargs["effort"] = effort
+            if reasoning_mode is not None:
+                gen_kwargs["reasoning_mode"] = reasoning_mode
 
             try:
                 resp = await provider.generate(prompt, **gen_kwargs)

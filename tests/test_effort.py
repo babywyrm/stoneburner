@@ -198,6 +198,8 @@ async def test_claude_generate_sends_adaptive_and_effort() -> None:
         "refusal",
         "toolcall",
         "codereview",
+        "rag",
+        "multiturn",
     ],
 )
 def test_cli_wired_commands_expose_effort(command: str) -> None:
@@ -220,3 +222,110 @@ def test_cli_eval_rejects_unknown_effort() -> None:
     result = CliRunner().invoke(cli, ["eval", "--effort", "ludicrous", "--no-save"])
     assert result.exit_code != 0
     assert "unknown effort" in result.output.lower()
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_run_rag_forwards_effort(monkeypatch) -> None:
+    from atomics.eval.rag import RAGChunk, RAGFixture
+    from atomics.eval.rag.judge import RAGJudgeResult
+    from atomics.eval.rag.runner import run_rag
+    from atomics.models import TaskComplexity
+    from atomics.providers.base import ProviderResponse
+
+    fixture = RAGFixture(
+        id="rag-effort",
+        complexity=TaskComplexity.LIGHT,
+        question="What is X?",
+        context_chunks=[RAGChunk(content="X is Y.", label="relevant", source="x.md")],
+        gold_criteria=["Y"],
+        max_output_tokens=32,
+    )
+    provider = MagicMock()
+    provider.name = "openai"
+    provider.generate = AsyncMock(
+        return_value=ProviderResponse(
+            text="X is Y.",
+            input_tokens=4,
+            output_tokens=4,
+            total_tokens=8,
+            model="gpt-5.6-luna",
+            latency_ms=10.0,
+            estimated_cost_usd=0.0,
+        )
+    )
+    judge = MagicMock()
+    judge.name = "judge"
+
+    async def fake_score(**_kwargs):
+        return RAGJudgeResult(
+            grounding=3,
+            faithfulness=3,
+            abstention=3,
+            score=1.0,
+            rationale="ok",
+        )
+
+    monkeypatch.setattr("atomics.eval.rag.runner.score_rag_consensus", fake_score)
+    await run_rag(
+        provider,
+        judge_provider=judge,
+        fixtures=[fixture],
+        effort="low",
+        reasoning_mode="standard",
+    )
+    kwargs = provider.generate.call_args.kwargs
+    assert kwargs["effort"] == "low"
+    assert kwargs["reasoning_mode"] == "standard"
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_run_multiturn_forwards_effort(monkeypatch) -> None:
+    from atomics.eval.multiturn import ConversationFixture, ConversationTurn
+    from atomics.eval.multiturn.judge import ConversationJudgeResult, TurnJudgeResult
+    from atomics.eval.multiturn.runner import run_multiturn
+    from atomics.models import TaskComplexity
+    from atomics.providers.base import ProviderResponse
+
+    fixture = ConversationFixture(
+        id="mt-effort",
+        complexity=TaskComplexity.LIGHT,
+        system_prompt="Be brief.",
+        turns=[ConversationTurn("Say hi", "Greet the user", ["hello"])],
+        conversation_criteria=["greet"],
+    )
+    provider = MagicMock()
+    provider.name = "openai"
+    provider.generate = AsyncMock(
+        return_value=ProviderResponse(
+            text="hello",
+            input_tokens=2,
+            output_tokens=1,
+            total_tokens=3,
+            model="gpt-5.6-luna",
+            latency_ms=8.0,
+            estimated_cost_usd=0.0,
+        )
+    )
+    judge = MagicMock()
+    judge.name = "judge"
+
+    async def fake_turn(**_kwargs):
+        return TurnJudgeResult(4, 3, 3, 1.0, "ok")
+
+    async def fake_conv(**_kwargs):
+        return ConversationJudgeResult(4, 3, 3, 1.0, "ok")
+
+    monkeypatch.setattr("atomics.eval.multiturn.runner.score_turn", fake_turn)
+    monkeypatch.setattr("atomics.eval.multiturn.runner.score_conversation", fake_conv)
+    await run_multiturn(
+        provider,
+        judge_provider=judge,
+        fixtures=[fixture],
+        effort="high",
+        reasoning_mode="pro",
+    )
+    kwargs = provider.generate.call_args.kwargs
+    assert kwargs["effort"] == "high"
+    assert kwargs["reasoning_mode"] == "pro"

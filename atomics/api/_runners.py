@@ -211,6 +211,9 @@ async def run_eval_suite(payload: EvalRequest) -> dict[str, Any]:
                 judge_provider=judge_provider,
                 model=payload.model,
                 judge_model=payload.judge_model,
+                thinking=payload.thinking,
+                effort=payload.effort,
+                reasoning_mode=payload.reasoning_mode,
             )
             fixtures_run = len(summary.fixture_results)
         elif suite == "multiturn":
@@ -219,6 +222,9 @@ async def run_eval_suite(payload: EvalRequest) -> dict[str, Any]:
                 judge_provider=judge_provider,
                 model=payload.model,
                 judge_model=payload.judge_model,
+                thinking=payload.thinking,
+                effort=payload.effort,
+                reasoning_mode=payload.reasoning_mode,
             )
             fixtures_run = len(summary.conversation_results)
         elif suite == "adversarial":

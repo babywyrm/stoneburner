@@ -38,7 +38,8 @@ EVAL_FIXTURES: list[EvalFixture] = [
         complexity=TaskComplexity.LIGHT,
         prompt=(
             "What is a supply chain attack? Give a concise 2-3 sentence definition "
-            "suitable for a technical audience."
+            "suitable for a technical audience, and one concrete real-world example "
+            "(SolarWinds or similar)."
         ),
         gold_criteria=[
             "third-party or dependency compromise",

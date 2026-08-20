@@ -3,6 +3,9 @@
 ## Unreleased
 
 ### Added
+- **`--effort` on `rag` and `multiturn`.** Same shared dial the other
+  generate suites already had. Providers already accepted it; the two
+  CLIs and runners now pass it through.
 - **`eval --verbose` prints the full transcript.** Prompt, model reply,
   thinking text, effort / reasoning payload, and the complete judge
   rationale (including ACCURACY / COMPLETENESS / FORMAT). The compact
@@ -19,6 +22,11 @@
   `--thinking-budget` stays the local token cap. The native payload is
   recorded as `reasoning_request`. GPT-5.6 Sol / Terra / Luna are priced and
   marked thinking-capable.
+
+### Changed
+- **ev-01 asks for the real-world example its gold list already scored.**
+  The prompt was definition-only, so models that answered it correctly
+  still lost completeness for omitting SolarWinds.
 
 ## 0.19.0 (2026-08-18) — Agent surface, durable schema, and housekeeping
 

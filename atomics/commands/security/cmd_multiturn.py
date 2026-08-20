@@ -15,6 +15,7 @@ from atomics.commands.common import (
     PROVIDER_CHOICES,
     _make_provider,
     budget_option,
+    effort_options,
     eval_budget_from,
     extra_judges_option,
     parse_extra_judges,
@@ -57,6 +58,7 @@ from atomics.eval.budget import share_budget
 )
 @click.option("--thinking/--no-thinking", "thinking_flag", default=None)
 @click.option("--thinking-budget", type=int, default=None)
+@effort_options
 @budget_option
 def multiturn(
     provider_name: str,
@@ -73,6 +75,8 @@ def multiturn(
     json_out: str | None,
     thinking_flag: bool | None,
     thinking_budget: int | None,
+    effort: str | None,
+    reasoning_mode: str | None,
     budget_usd: float | None,
 ) -> None:
     """Multi-turn conversation evaluation — context retention, coherence, instruction following."""
@@ -218,6 +222,8 @@ def multiturn(
                 on_conversation_done=on_done,
                 thinking=eff_thinking,
                 thinking_budget=thinking_budget,
+                effort=effort,
+                reasoning_mode=reasoning_mode,
                 fixtures=selected_fixtures,
             )
         )

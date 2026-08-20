@@ -41,7 +41,7 @@ uv run atomics provider-test -p ollama -m qwen3.8:27b --no-thinking
 
 When `--thinking` / `--no-thinking` is omitted, stoneburner checks the model against its capability registry and enables thinking automatically for known models. Use `--no-thinking` to force it off for A/B comparisons.
 
-The same `--thinking` / `--no-thinking` / `--thinking-budget` grammar is on every suite that calls `generate`: `run`, `eval`, `adversarial`, `redblue`, `refusal`, `toolcall` (prose channel), `codereview`, `multiturn`, `rag`, and `codegen`. For local thinking models on short fixtures, `--no-thinking` is the difference between a visible answer and an empty generation that spent the whole token budget on hidden reasoning. When that still happens, the attempt is `thinking_budget` (CLI: `THINK`), not a provider crash.
+The same `--thinking` / `--no-thinking` / `--thinking-budget` grammar is on every suite that calls `generate`: `run`, `eval`, `adversarial`, `redblue`, `refusal`, `toolcall` (prose channel), `codereview`, `multiturn`, `rag`, and `codegen`. `--effort` / `--reasoning-mode` are on those same suites except `codegen` and `probe`. For local thinking models on short fixtures, `--no-thinking` is the difference between a visible answer and an empty generation that spent the whole token budget on hidden reasoning. When that still happens, the attempt is `thinking_budget` (CLI: `THINK`), not a provider crash.
 
 ## How the Engine Handles Thinking Tokens
 

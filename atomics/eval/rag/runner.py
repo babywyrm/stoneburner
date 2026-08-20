@@ -206,6 +206,8 @@ async def run_rag(
     on_fixture_done: Callable[[RAGFixtureResult], None] | None = None,
     thinking: bool | None = None,
     thinking_budget: int | None = None,
+    effort: str | None = None,
+    reasoning_mode: str | None = None,
     fixtures: list[RAGFixture] | None = None,
     index: RAGIndex | None = None,
     top_k: int = 5,
@@ -255,6 +257,10 @@ async def run_rag(
             gen_kwargs["thinking"] = thinking
         if thinking_budget is not None:
             gen_kwargs["thinking_budget"] = thinking_budget
+        if effort is not None:
+            gen_kwargs["effort"] = effort
+        if reasoning_mode is not None:
+            gen_kwargs["reasoning_mode"] = reasoning_mode
 
         try:
             resp = await provider.generate(prompt, **gen_kwargs)
