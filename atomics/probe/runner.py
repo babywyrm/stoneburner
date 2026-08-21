@@ -84,6 +84,8 @@ async def run_probe(
     extra_judges: list[tuple[BaseProvider, str | None]] | None = None,
     thinking: bool | None = None,
     thinking_budget: int | None = None,
+    effort: str | None = None,
+    reasoning_mode: str | None = None,
     prev_scores: dict[str, float] | None = None,
     regression_threshold: float = 0.10,
     on_result: Callable[..., object] | None = None,
@@ -131,6 +133,8 @@ async def run_probe(
                 max_tokens=1024,
                 thinking=thinking,
                 thinking_budget=thinking_budget,
+                effort=effort,
+                reasoning_mode=reasoning_mode,
             )
             analysis = resp.text
             thinking_tokens = resp.thinking_tokens

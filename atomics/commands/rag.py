@@ -583,6 +583,7 @@ def rag_retrieval(
 )
 @click.option("--thinking/--no-thinking", "thinking_flag", default=None)
 @click.option("--thinking-budget", type=int, default=None)
+@effort_options
 @budget_option
 def codegen(
     provider_name: str,
@@ -595,6 +596,8 @@ def codegen(
     json_out: str | None,
     thinking_flag: bool | None,
     thinking_budget: int | None,
+    effort: str | None,
+    reasoning_mode: str | None,
     budget_usd: float | None,
 ) -> None:
     """Code generation evaluation — functional correctness via test execution."""
@@ -697,6 +700,8 @@ def codegen(
                 on_fixture_done=on_done,
                 thinking=eff_thinking,
                 thinking_budget=thinking_budget,
+                effort=effort,
+                reasoning_mode=reasoning_mode,
                 fixtures=selected_fixtures,
             )
         )
@@ -777,6 +782,7 @@ def codegen(
 )
 @click.option("--thinking/--no-thinking", "thinking_flag", default=None)
 @click.option("--thinking-budget", type=int, default=8000, show_default=True)
+@effort_options
 @click.option(
     "--alert-on-regression/--no-alert-on-regression",
     default=False,
@@ -805,6 +811,8 @@ def probe(
     artifact_file: str | None,
     thinking_flag: bool | None,
     thinking_budget: int,
+    effort: str | None,
+    reasoning_mode: str | None,
     alert_on_regression: bool,
     save_results: bool,
     json_out: str | None,
@@ -901,6 +909,8 @@ def probe(
                 extra_judges=extra_judge_pairs,
                 thinking=thinking_flag,
                 thinking_budget=thinking_budget,
+                effort=effort,
+                reasoning_mode=reasoning_mode,
                 regression_threshold=0.10,
                 on_result=on_result,
             )

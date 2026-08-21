@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+- **`--effort` on `codegen` and `probe`.** Last two generate suites. HTTP
+  `submit_eval` `codegen` forwards the dial too. `probe` stays CLI-only.
+
 ### Changed
 - **Landing-page recipes for the effort dial.** README and QUICKSTART show
   `--effort` on OpenAI, Claude, Bedrock, Groq, Gemini, and Together.
