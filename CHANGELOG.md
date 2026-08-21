@@ -3,6 +3,9 @@
 ## Unreleased
 
 ### Added
+- **HTTP / MCP `POST /runs` and `submit_run` take `effort`.** Same
+  shared dial as eval (`thinking`, `effort`, `reasoning_mode`). Unknown
+  values are `422`. The burn loop already forwarded `--effort` on the CLI.
 - **`--effort` on `codegen` and `probe`.** Last two generate suites. HTTP
   `submit_eval` `codegen` forwards the dial too. `probe` stays CLI-only.
 

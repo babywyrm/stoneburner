@@ -12,6 +12,9 @@ def test_run_request_defaults():
     assert req.iterations == 3
     assert req.interval == 5
     assert req.save is True
+    assert req.thinking is None
+    assert req.effort is None
+    assert req.reasoning_mode is None
 
 
 def test_eval_request_defaults():
@@ -45,6 +48,22 @@ def test_provider_test_request_normalizes_and_rejects_effort():
         ProviderTestRequest(provider="openai", effort="ludicrous")
     with pytest.raises(ValidationError, match="unknown reasoning mode"):
         ProviderTestRequest(provider="openai", reasoning_mode="turbo")
+
+
+def test_run_request_normalizes_effort_aliases():
+    req = RunRequest(provider="ollama", effort="XL", reasoning_mode="PRO")
+    assert req.effort == "xhigh"
+    assert req.reasoning_mode == "pro"
+
+
+def test_run_request_rejects_unknown_effort():
+    with pytest.raises(ValidationError, match="unknown effort"):
+        RunRequest(provider="ollama", effort="ludicrous")
+
+
+def test_run_request_rejects_unknown_reasoning_mode():
+    with pytest.raises(ValidationError, match="unknown reasoning mode"):
+        RunRequest(provider="ollama", reasoning_mode="turbo")
 
 
 def test_run_request_invalid_iterations():

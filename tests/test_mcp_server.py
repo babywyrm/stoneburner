@@ -135,6 +135,25 @@ async def test_submit_run_forwards_arguments_to_the_api():
     assert kwargs["iterations"] == 9
 
 
+async def test_submit_run_forwards_effort_to_the_api():
+    api = FakeApi()
+    await build_server(api).call_tool(
+        "submit_run",
+        {
+            "provider": "openai",
+            "effort": "high",
+            "reasoning_mode": "pro",
+            "thinking": False,
+        },
+    )
+
+    name, kwargs = api.calls[0]
+    assert name == "submit_run"
+    assert kwargs["effort"] == "high"
+    assert kwargs["reasoning_mode"] == "pro"
+    assert kwargs["thinking"] is False
+
+
 async def test_list_models_forwards_arguments_to_the_api():
     api = FakeApi(result={"provider": "ollama", "models": []})
     await build_server(api).call_tool(
@@ -259,6 +278,14 @@ async def test_instructions_tell_the_agent_to_poll_for_results():
     text = server.instructions or ""
     assert "get_job" in text
     assert "completed" in text
+
+
+async def test_submit_run_tool_advertises_effort():
+    tools = {t.name: t for t in await build_server(FakeApi()).list_tools()}
+    schema = tools["submit_run"].input_schema
+    assert "effort" in schema["properties"]
+    assert "reasoning_mode" in schema["properties"]
+    assert "thinking" in schema["properties"]
 
 
 async def test_submit_eval_tool_names_the_security_suites():

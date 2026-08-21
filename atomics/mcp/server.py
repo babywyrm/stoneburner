@@ -107,12 +107,17 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
         iterations: int = 3,
         interval: int = 5,
         save: bool = True,
+        thinking: bool | None = None,
+        effort: str | None = None,
+        reasoning_mode: str | None = None,
     ) -> Any:
         """Start a benchmark run and return its job id immediately.
 
         Spends provider tokens. `provider` is a provider name such as `claude`,
         `openai`, or `ollama`; omit `model` to use that provider's default.
-        `tier` selects the task difficulty profile. Poll `get_job` for the result.
+        `tier` selects the task difficulty profile. `effort` / `reasoning_mode`
+        are the shared reasoning dial (same values as `provider_test`). Poll
+        `get_job` for the result.
         """
         return api.submit_run(
             provider=provider,
@@ -121,6 +126,9 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
             iterations=iterations,
             interval=interval,
             save=save,
+            thinking=thinking,
+            effort=effort,
+            reasoning_mode=reasoning_mode,
         )
 
     @server.tool(annotations=SPENDS)

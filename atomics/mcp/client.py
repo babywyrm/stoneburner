@@ -157,6 +157,9 @@ class AtomicsApiClient:
         iterations: int = 3,
         interval: int = 5,
         save: bool = True,
+        thinking: bool | None = None,
+        effort: str | None = None,
+        reasoning_mode: str | None = None,
     ) -> Any:
         payload: dict[str, Any] = {
             "provider": provider,
@@ -167,6 +170,12 @@ class AtomicsApiClient:
         }
         if model is not None:
             payload["model"] = model
+        if thinking is not None:
+            payload["thinking"] = thinking
+        if effort is not None:
+            payload["effort"] = effort
+        if reasoning_mode is not None:
+            payload["reasoning_mode"] = reasoning_mode
         return self._request("POST", "/runs", json=payload)
 
     def submit_eval(

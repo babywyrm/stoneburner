@@ -58,6 +58,48 @@ async def test_run_benchmark_from_request_returns_summary_dict():
 
 
 @pytest.mark.asyncio
+async def test_run_benchmark_from_request_forwards_effort():
+    """RunRequest already accepts effort. Dropping it here is a silent no-op
+    on a billed knob — the HTTP/MCP caller gets 202 and default reasoning."""
+    payload = RunRequest(
+        provider="ollama",
+        model="llama3",
+        thinking=False,
+        effort="high",
+        reasoning_mode="standard",
+        iterations=1,
+    )
+    summary = SimpleNamespace(
+        run_id="run-effort",
+        total_tasks=1,
+        successful_tasks=1,
+        failed_tasks=0,
+        total_tokens=10,
+        total_cost_usd=0.0,
+    )
+    engine = MagicMock()
+    engine.run = AsyncMock(return_value=summary)
+    repo = MagicMock()
+
+    with (
+        patch.object(runners, "load_settings", return_value=_settings()),
+        patch.object(runners, "_provider_for", return_value=MagicMock()),
+        patch("atomics.core.engine.LoopEngine", return_value=engine) as mock_engine_cls,
+        patch("atomics.storage.repository.MetricsRepository", return_value=repo),
+        patch(
+            "atomics.tiers.get_tier_profile",
+            return_value=SimpleNamespace(preferred_model=None),
+        ),
+    ):
+        await runners.run_benchmark_from_request(payload)
+
+    kwargs = mock_engine_cls.call_args.kwargs
+    assert kwargs["effort"] == "high"
+    assert kwargs["reasoning_mode"] == "standard"
+    assert kwargs["thinking"] is False
+
+
+@pytest.mark.asyncio
 async def test_run_benchmark_none_summary_raises_http_400():
     payload = RunRequest(provider="ollama", iterations=1)
     engine = MagicMock()

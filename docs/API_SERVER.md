@@ -216,9 +216,8 @@ worse).
 `effort` and `reasoning_mode`. Same vocabulary as the CLI: `none` /
 `minimal` / `low` / `medium` / `high` / `xhigh` / `max` (aliases `xl`,
 `ultra`) and OpenAI-only `standard` / `pro`. Unknown values are `422`.
-`POST /evals` `codegen` forwards the dial onto `generate`. `POST /runs`
-has no effort fields — the burn loop keeps `--effort` on the CLI. `probe`
-stays CLI-only.
+`POST /evals` `codegen` and `POST /runs` forward the dial onto
+`generate`. `probe` stays CLI-only.
 
 ### Sweeps
 

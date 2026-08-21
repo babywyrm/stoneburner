@@ -61,6 +61,19 @@ class RunRequest(BaseModel):
     iterations: int = Field(default=3, ge=1, le=MAX_ITERATIONS)
     interval: int = Field(default=5, ge=0, le=MAX_INTERVAL_SECONDS)
     save: bool = True
+    thinking: bool | None = None
+    effort: str | None = None
+    reasoning_mode: str | None = None
+
+    @field_validator("effort")
+    @classmethod
+    def _known_effort(cls, value: str | None) -> str | None:
+        return _normalize_effort_field(value)
+
+    @field_validator("reasoning_mode")
+    @classmethod
+    def _known_reasoning_mode(cls, value: str | None) -> str | None:
+        return _normalize_reasoning_mode_field(value)
 
 
 class EvalRequest(BaseModel):

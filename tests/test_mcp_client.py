@@ -50,6 +50,24 @@ def test_submit_run_posts_expected_payload():
     }
 
 
+def test_submit_run_includes_effort_when_given():
+    requests: list[httpx.Request] = []
+    with client_recording(requests) as client:
+        client.submit_run(
+            provider="openai",
+            effort="high",
+            reasoning_mode="pro",
+            thinking=False,
+        )
+
+    import json
+
+    payload = json.loads(requests[0].content)
+    assert payload["effort"] == "high"
+    assert payload["reasoning_mode"] == "pro"
+    assert payload["thinking"] is False
+
+
 def test_submit_run_omits_model_when_not_given():
     """An absent model must not become `null`; the server picks the default."""
     requests: list[httpx.Request] = []

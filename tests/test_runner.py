@@ -116,3 +116,27 @@ async def test_execute_task_with_model_override():
         SAMPLE_TASK, "test", provider=provider, run_id="r2", model="custom-model"
     )
     assert result.model == "custom-model"
+
+
+@pytest.mark.asyncio
+async def test_execute_task_forwards_effort():
+    seen: dict[str, object] = {}
+
+    class RecordingProvider(MockProvider):
+        async def generate(self, prompt, **kwargs):
+            seen.update(kwargs)
+            return await super().generate(prompt, **kwargs)
+
+    result = await execute_task(
+        SAMPLE_TASK,
+        "test",
+        provider=RecordingProvider(),
+        run_id="r-effort",
+        effort="high",
+        reasoning_mode="pro",
+        thinking=False,
+    )
+    assert result.status == TaskStatus.SUCCESS
+    assert seen["effort"] == "high"
+    assert seen["reasoning_mode"] == "pro"
+    assert seen["thinking"] is False
