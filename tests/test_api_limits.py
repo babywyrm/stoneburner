@@ -147,6 +147,15 @@ class TestRequestCaps:
             )
             assert res.status_code == 422
 
+    def test_the_api_rejects_unknown_run_effort_with_422(self, tmp_path):
+        app = create_app(ServerSettings(no_auth=True, db_path=tmp_path / "caps.db"))
+        with TestClient(app) as client:
+            res = client.post(
+                "/api/v1/runs",
+                json={"provider": "ollama", "effort": "ludicrous"},
+            )
+            assert res.status_code == 422
+
 
 class TestSecurityHeaders:
     @pytest.fixture

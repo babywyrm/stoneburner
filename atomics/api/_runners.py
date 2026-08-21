@@ -135,6 +135,9 @@ async def run_benchmark_from_request(payload: RunRequest) -> dict[str, Any]:
             interval_override=payload.interval,
             model_override=payload.model,
             trigger="api",
+            thinking=payload.thinking,
+            effort=payload.effort,
+            reasoning_mode=payload.reasoning_mode,
         )
         summary = await engine.run(max_iterations=payload.iterations)
         if summary is None:

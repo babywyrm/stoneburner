@@ -4,9 +4,11 @@ import asyncio
 
 import pytest
 
+from atomics.core.engine import LoopEngine
 from atomics.core.guard import RateBudgetGuard
 from atomics.models import BurnTier
 from atomics.providers.base import BaseProvider, ProviderResponse
+from tests.conftest import MockProvider
 
 
 class FailingThenMockProvider(BaseProvider):
@@ -155,6 +157,32 @@ async def test_engine_stop_sets_shutdown_event(make_engine):
     engine.stop()
     assert engine._shutdown.is_set()  # noqa: SLF001
     repo.close()
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_engine_forwards_effort_to_generate(atomics_settings, metrics_repo):
+    seen: dict[str, object] = {}
+
+    class RecordingProvider(MockProvider):
+        async def generate(self, prompt, **kwargs):
+            seen.update(kwargs)
+            return await super().generate(prompt, **kwargs)
+
+    engine = LoopEngine(
+        provider=RecordingProvider(),
+        repo=metrics_repo,
+        settings=atomics_settings,
+        interval_override=0,
+        budget_override=10.0,
+        thinking=False,
+        effort="high",
+        reasoning_mode="standard",
+    )
+    await engine.run(max_iterations=1)
+    assert seen["effort"] == "high"
+    assert seen["reasoning_mode"] == "standard"
+    assert seen["thinking"] is False
 
 
 @pytest.mark.unit

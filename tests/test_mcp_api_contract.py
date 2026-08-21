@@ -69,6 +69,21 @@ def test_submit_run_is_accepted_by_the_real_api(app_client):
     assert response.json()["kind"] == "run"
 
 
+def test_submit_run_effort_is_accepted_by_the_real_api(app_client):
+    request = captured_request(
+        lambda c: c.submit_run(
+            provider="ollama",
+            thinking=False,
+            effort="high",
+            reasoning_mode="standard",
+        )
+    )
+    response = replay(app_client, request)
+
+    assert response.status_code == 202
+    assert response.json()["kind"] == "run"
+
+
 def test_submit_eval_is_accepted_by_the_real_api(app_client):
     request = captured_request(
         lambda c: c.submit_eval(suite="accuracy", provider="ollama", budget_usd=1.0)

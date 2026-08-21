@@ -61,7 +61,7 @@ The core challenge: thinking/reasoning tokens are **real computation** (they con
 | **Claude (4.6+)** | `--effort` → `thinking: {type: "adaptive"}` plus `output_config.effort`. `--thinking` without `--effort` still uses `budget_tokens`. | Thinking blocks plus usage metadata. |
 | **Bedrock** | Same Claude mapping, sent in `additionalModelRequestFields`. Region-prefixed IDs (`us.anthropic.claude-…`) resolve to the Claude family. | Usage metadata from Converse. |
 
-`--effort` values: `none`, `minimal`, `low`, `medium`, `high`, `xhigh` (alias `xl`), `max` (alias `ultra`). Claude 4.6 maps `xhigh` to `max`. OpenAI-compatible clouds (Groq, Together, Gemini, vLLM) receive `reasoning_effort` when the backend honors it. The native payload is recorded on the response as `reasoning_request`.
+`--effort` values: `none`, `minimal`, `low`, `medium`, `high`, `xhigh` (alias `xl`), `max` (alias `ultra`). Claude 4.6 maps `xhigh` to `max`. OpenAI-compatible clouds (Groq, Together, Gemini, vLLM) receive `reasoning_effort` when the backend honors it. The native payload is recorded on the response as `reasoning_request`. HTTP / MCP take the same fields on `POST /runs`, `POST /evals`, `POST /sweeps`, and `POST /provider-test` (and the matching `submit_*` / `provider_test` tools). `probe` stays CLI-only.
 
 ### Key Behaviors
 
