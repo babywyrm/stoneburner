@@ -86,7 +86,8 @@ Full command reference for `atomics`. See also [QUICKSTART.md](../QUICKSTART.md)
 | `atomics redblue --runs 3 --json-out rb.json` | Variance-aware capability scoring + JSON export. Live `run 2/3` lines print each pass |
 | `atomics redblue --no-thinking --runs 3` | Multi-run capability score with thinking forced off |
 | `atomics redblue --max-output-tokens 3072` | Floor the visible-answer budget (fixtures default to 2048) |
-| `atomics probe --probes-file probes.yaml` | Live ecosystem probe against real artifacts. No `--effort` yet. |
+| `atomics probe --probes-file probes.yaml` | Live ecosystem probe against real artifacts |
+| `atomics probe --effort high` | Shared reasoning effort on the analysis generate |
 | `atomics probe --extra-judges ollama:mistral:7b` | Multi-judge mean ± stdev on the quality score |
 | `atomics archreview --repo juice-shop --models qwen3.5:4b` | Security-architecture repo benchmark |
 | `atomics archreview --extra-judges ollama:mistral:7b` | Multi-judge mean on the reasoning score |
@@ -97,7 +98,8 @@ Full command reference for `atomics`. See also [QUICKSTART.md](../QUICKSTART.md)
 | `atomics multiturn --effort high` | Shared reasoning effort on each turn |
 | `atomics multiturn --extra-judges ollama:mistral:7b` | Multi-judge consensus on the conversation score only |
 | `atomics multiturn --fixtures mt-eval-01,mt-eval-05` | Run a fixture subset |
-| `atomics codegen` | Code generation eval (functional correctness). No `--effort` yet. |
+| `atomics codegen` | Code generation eval (functional correctness) |
+| `atomics codegen --effort high` | Shared reasoning effort on the generated function |
 | `atomics codegen --fixtures cg-01,cg-05` | Run a fixture subset |
 | `atomics advisor` | Cost optimization recommendations from benchmark history |
 | `atomics advisor --min-quality 0.9` | Higher quality threshold |

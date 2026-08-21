@@ -180,7 +180,7 @@ uv run atomics tiers                   # show all tier profiles
 | `atomics rag-retrieval` | Measure retrieval quality (recall@k, precision@k, MRR, nDCG@k) from an index |
 | `atomics multiturn` | Multi-turn conversation eval (context retention, coherence) |
 | `atomics advisor` | Cost optimization recommendations from historical data |
-| `atomics codegen` | Code generation eval (functional correctness via test execution) |
+| `atomics codegen` | Code generation eval (`--effort` on the generated function) |
 | `atomics sweep` | Overnight multi-suite driver (`--suites`, `--runs 3`, status file + detachable log) |
 | `atomics doctor` | Installation health check |
 | `atomics server` | Run atomics as an HTTP API server |

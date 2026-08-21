@@ -107,8 +107,8 @@ uv run atomics provider-test --provider together
 ```
 
 `--effort` is one dial for every cloud that has a native reasoning knob.
-`--thinking-budget` stays the local / older Claude token cap. `codegen`
-and `probe` do not take `--effort` yet.
+`--thinking-budget` stays the local / older Claude token cap. Every
+generate suite takes `--effort`, including `codegen` and `probe`.
 
 ```bash
 # OpenAI — Chat Completions reasoning_effort. --reasoning-mode pro uses Responses.

@@ -223,6 +223,8 @@ async def test_claude_generate_sends_adaptive_and_effort() -> None:
         "codereview",
         "rag",
         "multiturn",
+        "codegen",
+        "probe",
     ],
 )
 def test_cli_wired_commands_expose_effort(command: str) -> None:
@@ -234,19 +236,6 @@ def test_cli_wired_commands_expose_effort(command: str) -> None:
     assert result.exit_code == 0, result.output
     assert "--effort" in result.output
     assert "--reasoning-mode" in result.output
-
-
-@pytest.mark.unit
-@pytest.mark.unit
-@pytest.mark.parametrize("command", ["codegen", "probe"])
-def test_cli_codegen_and_probe_do_not_expose_effort(command: str) -> None:
-    from click.testing import CliRunner
-
-    from atomics.cli import cli
-
-    result = CliRunner().invoke(cli, [command, "--help"])
-    assert result.exit_code == 0, result.output
-    assert "--effort" not in result.output
 
 
 @pytest.mark.unit
@@ -365,3 +354,98 @@ async def test_run_multiturn_forwards_effort(monkeypatch) -> None:
     kwargs = provider.generate.call_args.kwargs
     assert kwargs["effort"] == "high"
     assert kwargs["reasoning_mode"] == "pro"
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_run_codegen_forwards_effort() -> None:
+    from atomics.eval.codegen import CodegenFixture, CodeTestCase
+    from atomics.eval.codegen.runner import run_codegen
+    from atomics.models import TaskComplexity
+    from atomics.providers.base import ProviderResponse
+
+    fixture = CodegenFixture(
+        id="cg-effort",
+        complexity=TaskComplexity.LIGHT,
+        language="python",
+        function_name="identity",
+        description="Return the argument.",
+        signature="def identity(x: int) -> int:",
+        test_cases=[CodeTestCase([1], 1)],
+        max_output_tokens=32,
+    )
+    provider = MagicMock()
+    provider.name = "openai"
+    provider.generate = AsyncMock(
+        return_value=ProviderResponse(
+            text="def identity(x: int) -> int:\n    return x\n",
+            input_tokens=8,
+            output_tokens=12,
+            total_tokens=20,
+            model="gpt-5.6-luna",
+            latency_ms=12.0,
+            estimated_cost_usd=0.0,
+        )
+    )
+    await run_codegen(
+        provider,
+        fixtures=[fixture],
+        effort="high",
+        reasoning_mode="standard",
+    )
+    kwargs = provider.generate.call_args.kwargs
+    assert kwargs["effort"] == "high"
+    assert kwargs["reasoning_mode"] == "standard"
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_run_probe_forwards_effort(tmp_path) -> None:
+    from atomics.probe.config import ProbeTarget
+    from atomics.probe.runner import run_probe
+    from atomics.providers.base import ProviderResponse
+
+    artifact = tmp_path / "access.log"
+    artifact.write_text("10.0.0.5 GET /admin 403\n")
+    target = ProbeTarget(
+        name="nginx",
+        artifact_type="access-log",
+        source="file",
+        path=str(artifact),
+    )
+    provider = MagicMock()
+    provider.name = "openai"
+    provider.generate = AsyncMock(
+        return_value=ProviderResponse(
+            text="Two issues.",
+            input_tokens=6,
+            output_tokens=4,
+            total_tokens=10,
+            model="gpt-5.6-luna",
+            latency_ms=9.0,
+            estimated_cost_usd=0.0,
+        )
+    )
+    judge = MagicMock()
+    judge.name = "judge"
+    judge.generate = AsyncMock(
+        return_value=ProviderResponse(
+            text="ACCURACY: 8\nCOMPLETENESS: 8\nFORMAT: 7\nRATIONALE: ok",
+            input_tokens=4,
+            output_tokens=8,
+            total_tokens=12,
+            model="judge",
+            latency_ms=5.0,
+            estimated_cost_usd=0.0,
+        )
+    )
+    await run_probe(
+        provider,
+        judge_provider=judge,
+        targets=[target],
+        effort="low",
+        reasoning_mode="standard",
+    )
+    kwargs = provider.generate.call_args.kwargs
+    assert kwargs["effort"] == "low"
+    assert kwargs["reasoning_mode"] == "standard"

@@ -143,8 +143,8 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
         `codegen`, `refusal`, `redblue`, `toolcall`, or `codereview`.
         `budget_usd` caps the combined spend; leave it unset to accept
         the server's default ceiling. `effort` / `reasoning_mode` are the
-        shared reasoning dial (same values as `provider_test`); `codegen`
-        ignores them. Poll `get_job` for the result.
+        shared reasoning dial (same values as `provider_test`). Poll
+        `get_job` for the result.
         """
         return api.submit_eval(
             suite=suite,

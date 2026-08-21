@@ -222,6 +222,7 @@ Fetches real artifacts from infrastructure (logs, API responses, scan reports) a
 ```bash
 uv run atomics probe --probes-file /path/to/probes.yaml
 uv run atomics probe --artifact access-log --file /var/log/nginx/access.log
+uv run atomics probe --probes-file probes.yaml --effort high
 uv run atomics probe --probes-file probes.yaml --alert-on-regression
 uv run atomics probe --probes-file probes.yaml --extra-judges ollama:mistral:7b
 ```

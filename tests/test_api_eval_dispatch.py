@@ -161,3 +161,40 @@ async def test_run_eval_suite_forwards_effort_to_security_runners(
     assert kwargs["effort"] == "high"
     assert kwargs["reasoning_mode"] == "standard"
     assert kwargs["thinking"] is False
+
+
+@pytest.mark.asyncio
+async def test_run_eval_suite_forwards_effort_to_codegen():
+    from unittest.mock import MagicMock
+
+    from atomics.api._runners import run_eval_suite
+    from atomics.api.models import EvalRequest
+
+    payload = EvalRequest(
+        suite="codegen",
+        provider="ollama",
+        thinking=False,
+        effort="medium",
+        reasoning_mode="standard",
+    )
+    summary = type(
+        "S",
+        (),
+        {
+            "fixture_results": [1],
+            "total_tokens": 1,
+            "total_cost_usd": 0.0,
+            "overall_pass_rate": 1.0,
+        },
+    )()
+    with (
+        patch("atomics.api._runners._guarded_providers", return_value=(MagicMock(), MagicMock())),
+        patch("atomics.api._runners.run_codegen", new_callable=AsyncMock) as mock_run,
+    ):
+        mock_run.return_value = summary
+        await run_eval_suite(payload)
+
+    kwargs = mock_run.await_args.kwargs
+    assert kwargs["effort"] == "medium"
+    assert kwargs["reasoning_mode"] == "standard"
+    assert kwargs["thinking"] is False

@@ -243,6 +243,8 @@ async def run_eval_suite(payload: EvalRequest) -> dict[str, Any]:
                 provider,
                 model=payload.model,
                 thinking=payload.thinking,
+                effort=payload.effort,
+                reasoning_mode=payload.reasoning_mode,
             )
             fixtures_run = len(summary.fixture_results)
         elif suite == "refusal":
