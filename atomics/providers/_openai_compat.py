@@ -24,6 +24,7 @@ from atomics.providers._tool_dialects import (
     parse_openai_tool_calls,
 )
 from atomics.providers.base import ProviderResponse, compute_tps
+from atomics.providers.effort import apply_chat_effort, normalize_effort
 
 # See _INJECTED_CALL_ID in providers/openai.py: a tool message's tool_call_id has
 # to match a preceding assistant call, so both sides need the same constant.
@@ -72,7 +73,12 @@ class OpenAICompatibleTools:
         model: str | None = None,
         max_tokens: int = 1024,
         injected_tool_output: str | None = None,
+        thinking: bool | None = None,
+        thinking_budget: int | None = None,
+        effort: str | None = None,
+        reasoning_mode: str | None = None,
     ) -> ProviderResponse:
+        del thinking, thinking_budget, reasoning_mode
         this: Any = self
         model = model or this._default_model
 
@@ -113,6 +119,7 @@ class OpenAICompatibleTools:
             "stream": False,
             "tools": openai_tool_payload(list(tools)),
         }
+        reasoning_request = apply_chat_effort(body, effort)
 
         url = f"{this._base_url}{self._tool_path}"
         t0 = time.monotonic()
@@ -152,4 +159,6 @@ class OpenAICompatibleTools:
             raw=data,
             finish_reason=choice.get("finish_reason"),
             tool_calls=parse_openai_tool_calls(message),
+            effort=normalize_effort(effort),
+            reasoning_request=reasoning_request,
         )

@@ -319,6 +319,10 @@ class OpenAIProvider(BaseProvider):
         model: str | None = None,
         max_tokens: int = 1024,
         injected_tool_output: str | None = None,
+        thinking: bool | None = None,
+        thinking_budget: int | None = None,
+        effort: str | None = None,
+        reasoning_mode: str | None = None,
     ) -> ProviderResponse:
         """Chat Completions with tool schemas attached.
 
@@ -369,6 +373,14 @@ class OpenAIProvider(BaseProvider):
             }
         else:
             token_param = {"max_tokens": max_tokens}
+        if effort is not None or reasoning_mode is not None:
+            reasoning = openai_reasoning(effort, reasoning_mode, thinking=thinking)
+        elif is_reasoning and thinking is False:
+            reasoning = {"effort": "none"}
+        else:
+            reasoning = None
+        if reasoning and "effort" in reasoning:
+            token_param["reasoning_effort"] = reasoning["effort"]
 
         t0 = time.monotonic()
         response = await self._client.chat.completions.create(
@@ -410,6 +422,9 @@ class OpenAIProvider(BaseProvider):
             raw=response.model_dump() if hasattr(response, "model_dump") else None,
             finish_reason=finish_reason,
             tool_calls=parse_openai_tool_calls(as_dict),
+            effort=normalize_effort(effort),
+            reasoning_mode=normalize_reasoning_mode(reasoning_mode),
+            reasoning_request=reasoning,
         )
 
     async def _generate_responses(

@@ -492,6 +492,10 @@ async def _run_once(
                 model=model,
                 max_tokens=_MAX_TOKENS,
                 injected_tool_output=fixture.injected_tool_output,
+                thinking=thinking,
+                thinking_budget=thinking_budget,
+                effort=effort,
+                reasoning_mode=reasoning_mode,
             )
         except Exception as exc:
             record["error"] = f"{type(exc).__name__}: {exc}"

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import time
 from collections.abc import Sequence
-from typing import Any, cast
+from typing import Any
 
 import anthropic
 
@@ -167,13 +167,19 @@ class ClaudeProvider(BaseProvider):
         model: str | None = None,
         max_tokens: int = 1024,
         injected_tool_output: str | None = None,
+        thinking: bool | None = None,
+        thinking_budget: int | None = None,
+        effort: str | None = None,
+        reasoning_mode: str | None = None,
     ) -> ProviderResponse:
         """Messages API with tool schemas attached.
 
         Thinking stays off here: extended thinking forces temperature=1 and
         changes the block structure, and the measurement is about which call the
-        model makes, not how it deliberates.
+        model makes, not how it deliberates. ``effort`` still forwards
+        ``output_config`` so the tool channel sees the same dial as prose.
         """
+        del thinking, thinking_budget, reasoning_mode
         model = model or self._default_model
 
         messages: list[dict[str, Any]] = [{"role": "user", "content": prompt}]
@@ -207,14 +213,22 @@ class ClaudeProvider(BaseProvider):
                 }
             )
 
-        t0 = time.monotonic()
-        response = await self._client.messages.create(
+        _thinking_block, extra = claude_request(
             model=model,
-            messages=cast("Any", messages),
-            max_tokens=max_tokens,
-            system=system or "You are a helpful assistant.",
-            tools=cast("Any", anthropic_tool_payload(list(tools))),
+            thinking=False,
+            thinking_budget=None,
+            effort=effort,
         )
+        kwargs: dict = {
+            "model": model,
+            "messages": messages,
+            "max_tokens": max_tokens,
+            "system": system or "You are a helpful assistant.",
+            "tools": anthropic_tool_payload(list(tools)),
+        }
+        kwargs.update(extra)
+        t0 = time.monotonic()
+        response = await self._client.messages.create(**kwargs)
         latency = (time.monotonic() - t0) * 1000
 
         blocks = list(response.content or [])
@@ -237,6 +251,8 @@ class ClaudeProvider(BaseProvider):
             raw=response.model_dump() if hasattr(response, "model_dump") else None,
             finish_reason=getattr(response, "stop_reason", None),
             tool_calls=parse_anthropic_tool_calls(blocks),
+            effort=normalize_effort(effort),
+            reasoning_request=extra or None,
         )
 
     async def health_check(self) -> bool:

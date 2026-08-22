@@ -14,6 +14,7 @@ from atomics.providers._tool_dialects import (
     parse_ollama_tool_calls,
 )
 from atomics.providers.base import BaseProvider, ProviderResponse, compute_tps
+from atomics.providers.effort import normalize_effort
 
 _THINK_TAG_RE = re.compile(r"<think>(.*?)</think>", re.DOTALL)
 _THINKING_MODEL_PREFIXES = ("qwen3", "deepseek-r1")
@@ -177,6 +178,10 @@ class OllamaProvider(BaseProvider):
         model: str | None = None,
         max_tokens: int = 1024,
         injected_tool_output: str | None = None,
+        thinking: bool | None = None,
+        thinking_budget: int | None = None,
+        effort: str | None = None,
+        reasoning_mode: str | None = None,
     ) -> ProviderResponse:
         """Tool-calling path, on /api/chat.
 
@@ -188,6 +193,7 @@ class OllamaProvider(BaseProvider):
         accounting for every Ollama figure in the project — including the
         published leaderboard. A test pins generate() to /api/generate.
         """
+        del thinking, thinking_budget, reasoning_mode
         model = model or self._default_model
 
         messages: list[dict[str, Any]] = []
@@ -252,6 +258,7 @@ class OllamaProvider(BaseProvider):
             tps_basis="generation",
             raw=data,
             tool_calls=parse_ollama_tool_calls(message),
+            effort=normalize_effort(effort),
         )
 
     async def list_models(self) -> list[dict[str, str | float | bool]]:

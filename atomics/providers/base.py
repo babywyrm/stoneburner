@@ -126,6 +126,10 @@ class BaseProvider(ABC):
         model: str | None = None,
         max_tokens: int = 1024,
         injected_tool_output: str | None = None,
+        thinking: bool | None = None,
+        thinking_budget: int | None = None,
+        effort: str | None = None,
+        reasoning_mode: str | None = None,
     ) -> ProviderResponse:
         """Generate with tool schemas attached, returning any calls emitted.
 
