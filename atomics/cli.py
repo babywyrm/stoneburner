@@ -13,6 +13,7 @@ from atomics.commands import distributed as distributed_commands
 from atomics.commands import eval as eval_commands
 from atomics.commands import load as load_commands
 from atomics.commands import mcp as mcp_commands
+from atomics.commands import repl as repl_commands
 from atomics.commands import rag as rag_commands
 from atomics.commands import security as security_commands
 from atomics.commands import toolcall as toolcall_commands
@@ -95,6 +96,7 @@ codereview = security_commands.codereview
 
 cli.add_command(api_commands.server)
 cli.add_command(mcp_commands.mcp)
+cli.add_command(repl_commands.repl)
 cli.add_command(worker_commands.worker)
 cli.add_command(worker_npm_commands.worker_npm)
 cli.add_command(distributed_commands.distributed)
