@@ -190,6 +190,14 @@ const payloads = {
           latency_ms: 9,
         },
       ],
+      jobs: [
+        {
+          model: "sweep-model-x",
+          suite: "eval",
+          ok: true,
+          headline: 0.81,
+        },
+      ],
     },
     error: null,
   },

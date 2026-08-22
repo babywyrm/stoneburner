@@ -10,7 +10,7 @@ from collections.abc import Sequence
 from typing import Any, Literal, TypedDict
 
 from atomics.api.jobs import Job
-from atomics.api.models import EvalRequest
+from atomics.api.models import EvalRequest, SweepRequest
 from atomics.config import AtomicsSettings
 from atomics.eval.adversarial import ALL_FIXTURES as ADVERSARIAL_FIXTURES
 from atomics.eval.codegen.fixtures import ALL_CODEGEN_FIXTURES
@@ -36,6 +36,16 @@ _SUITE_CATALOGS: dict[str, SuiteCatalog] = {
     "toolcall": TOOLCALL_FIXTURES,
     "codereview": SECURE_CODE_FIXTURES,
 }
+
+
+class SweepJobRow(TypedDict):
+    model: str
+    suite: str
+    ok: bool
+    headline: float | None
+    error: str | None
+    tool_capable: bool | None
+    exit_code: int
 
 
 class FixtureRow(TypedDict):
@@ -261,6 +271,33 @@ def fixture_row(fr: Any) -> FixtureRow:
     }
 
 
+def sweep_job_total(payload: SweepRequest) -> int:
+    return len(payload.models) * len(payload.suites)
+
+
+def initial_sweep_progress(payload: SweepRequest) -> dict[str, Any]:
+    return {"current": 0, "total": sweep_job_total(payload), "in_flight": None}
+
+
+def sweep_row(result: Any) -> SweepJobRow:
+    headline = getattr(result, "headline", None)
+    scored: float | None
+    try:
+        scored = None if headline is None else float(headline)
+    except (TypeError, ValueError):
+        scored = None
+    capable = getattr(result, "tool_capable", None)
+    return {
+        "model": str(getattr(result, "model", "") or ""),
+        "suite": str(getattr(result, "suite", "") or ""),
+        "ok": bool(getattr(result, "ok", False)),
+        "headline": scored,
+        "error": getattr(result, "error", None),
+        "tool_capable": None if capable is None else bool(capable),
+        "exit_code": int(getattr(result, "exit_code", 0) or 0),
+    }
+
+
 def payload_request(payload: Any, settings: AtomicsSettings) -> dict[str, Any]:
     """Echo a non-eval submit payload plus resolved host."""
     data = payload.model_dump(exclude_none=True)
@@ -325,6 +362,51 @@ class EvalJobReporter:
         result["total_cost_usd"] = round(float(result["total_cost_usd"]) + row_cost(fr), 6)
         self.job.progress = {
             "current": result["fixtures_run"],
+            "total": (self.job.progress or {}).get("total"),
+            "in_flight": None,
+        }
+
+
+class SweepJobReporter:
+    """Mutate a job as each models×suites cell starts and finishes."""
+
+    def __init__(
+        self,
+        job: Job,
+        *,
+        provider: str,
+        models: list[str],
+        suites: list[str],
+        runs: int,
+        budget_usd: float,
+        total: int,
+    ) -> None:
+        self.job = job
+        self._meta = {
+            "provider": provider,
+            "models": list(models),
+            "suites": list(suites),
+            "runs": runs,
+            "budget_usd": budget_usd,
+        }
+        job.progress = {"current": 0, "total": total, "in_flight": None}
+
+    def start(self, model: str, suite: str) -> None:
+        progress = dict(self.job.progress or {})
+        progress["in_flight"] = {"model": model, "suite": suite}
+        self.job.progress = progress
+
+    def done(self, result: Any) -> None:
+        row = sweep_row(result)
+        body = self.job.result
+        if body is None:
+            body = {**self._meta, "ok": 0, "fail": 0, "jobs": []}
+            self.job.result = body
+        body["jobs"].append(row)
+        body["ok"] = sum(1 for item in body["jobs"] if item.get("ok"))
+        body["fail"] = sum(1 for item in body["jobs"] if not item.get("ok"))
+        self.job.progress = {
+            "current": len(body["jobs"]),
             "total": (self.job.progress or {}).get("total"),
             "in_flight": None,
         }

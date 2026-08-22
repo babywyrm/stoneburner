@@ -149,9 +149,12 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
       container.appendChild(p);
     }
 
-    function renderTable(id, rows, headers) {
+    function renderTable(id, rows, headers, append) {
       const container = document.getElementById(id);
-      if (!rows || rows.length === 0) { emptyNote(container, "No data yet."); return; }
+      if (!rows || rows.length === 0) {
+        if (!append) emptyNote(container, "No data yet.");
+        return;
+      }
       const table = document.createElement("table");
       const headRow = document.createElement("tr");
       for (const h of headers) {
@@ -174,7 +177,7 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
         }
         table.appendChild(tr);
       }
-      container.textContent = "";
+      if (!append) container.textContent = "";
       container.appendChild(table);
     }
 
@@ -237,11 +240,28 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
           f.latency_ms == null ? "-" : Math.round(f.latency_ms) + "ms",
         ];
       });
+      const rawJobs = (jobResult && jobResult.jobs) || [];
+      const jobRows = rawJobs.map(function (j) {
+        return [
+          j.model,
+          j.suite,
+          j.ok ? "ok" : "fail",
+          j.headline == null ? "-" : Number(j.headline).toFixed(3),
+        ];
+      });
       if (fixtureRows.length) {
         renderTable(
           "job-fixtures",
           fixtureRows,
           ["Fixture", "Score", "Status", "Tokens", "Latency"],
+        );
+      }
+      if (jobRows.length) {
+        renderTable(
+          "job-fixtures",
+          jobRows,
+          ["Model", "Suite", "Status", "Headline"],
+          fixtureRows.length > 0,
         );
       }
     }

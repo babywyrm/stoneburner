@@ -35,6 +35,11 @@ def _score_color(score: float | None, *, failed: bool) -> str:
 def format_in_flight(in_flight: dict[str, Any] | None, *, color: bool = False) -> str:
     if not in_flight:
         return ""
+    if in_flight.get("suite") and not in_flight.get("fixture_id"):
+        model = str(in_flight.get("model") or "?")
+        suite = str(in_flight.get("suite") or "?")
+        suite_txt = _paint(f"{suite:<8}", _DIM, color=color)
+        return f"  {model}  {suite_txt}".rstrip()
     fixture = str(in_flight.get("fixture_id") or "?")
     phase = str(in_flight.get("phase") or "?")
     model = str(in_flight.get("model") or "")
@@ -128,6 +133,21 @@ def format_completed(body: dict[str, Any], *, color: bool = False) -> str:
         score = None if headline is None else float(headline)
     except (TypeError, ValueError):
         score = None
+    jobs = result.get("jobs")
+    if isinstance(jobs, list) and (result.get("ok") is not None or result.get("fail") is not None):
+        ok = int(result.get("ok") or 0)
+        fail = int(result.get("fail") or 0)
+        models = request.get("models") or result.get("models") or []
+        suites = request.get("suites") or result.get("suites") or []
+        if isinstance(models, list):
+            model_txt = ",".join(str(item) for item in models)
+        else:
+            model_txt = str(models)
+        if isinstance(suites, list):
+            suite_txt = ",".join(str(item) for item in suites)
+        else:
+            suite_txt = str(suites)
+        return f"sweep  {model_txt}  {suite_txt}\n{ok} ok  {fail} fail  {len(jobs)} jobs\n"
     score_txt = "-" if score is None else f"{score:.3f}"
     score_txt = _paint(score_txt, _score_color(score, failed=False), color=color)
     count = f"{current}/{total}" if total is not None else str(current or 0)
