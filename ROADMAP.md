@@ -201,14 +201,10 @@ and `--effort` on every generate path including the tool channel.
 Planning labels `v0.21.0`–`v0.23.0` above already shipped in earlier
 releases; they are not this tag.
 
-Job document parity is in: every eval suite grows `result.fixtures`.
-Next is operator comfort.
+Job document parity and operator comfort are in.
 
-- [ ] **REPL line editing.** v1 is `input()`, so up-arrow prints
-      `^[[A`. Stdlib `readline` is the small path (history in the
-      process, no new extra). `prompt_toolkit` stays out unless we
-      decide a dependency is worth a TUI later. Not session persistence
-      to disk.
+- [x] **REPL line editing.** Stdlib `readline` for in-process
+      history. No `prompt_toolkit`. Not session persistence to disk.
 - [x] **Quiet `submit_*`.** Headline + `job_id`. `get_job` /
       `--verbose` keep the document. Display-only.
 - [x] **`wait` until done, not 60s.** Polls until `completed` /
@@ -246,8 +242,8 @@ Not scheduled, roughly in order of how often they come up.
 - [x] **Interactive REPL.** `atomics repl` is an API-client prompt over a
       running `atomics server` (`docs/REPL.md`). Session `host`, quiet
       `wait` / `wait --verbose`, same verbs as MCP. Not Click-tree
-      tab-completion. Line editing and quieter submit are in
-      “After the 0.21.0 tag” above.
+      tab-completion. Line editing, quiet submit, and uncapped wait
+      shipped after the 0.21.0 tag.
 - **OpenAI SDK 3.0 / HTTPX2.** Parked. PR #9 closed. Do not mix into
   a job-progress or REPL change.
 - **HTTP MCP.** Do not invent. `atomics mcp` stays a stdio proxy over

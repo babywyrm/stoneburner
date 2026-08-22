@@ -13,6 +13,19 @@ from atomics.repl.session import Session
 PROMPT = "atomics> "
 
 
+def enable_line_editing() -> bool:
+    """Hook stdlib readline into input() for in-process history.
+
+    History is not written to disk. A missing readline module (some
+    Windows embeds) is a no-op.
+    """
+    try:
+        import readline
+    except ImportError:
+        return False
+    return bool(readline)
+
+
 def run_repl(
     client: AtomicsApiClient,
     *,
@@ -20,6 +33,8 @@ def run_repl(
     stdout: TextIO | None = None,
     stderr: TextIO | None = None,
 ) -> int:
+    if input_fn is None:
+        enable_line_editing()
     read = input_fn or input
     out = stdout or sys.stdout
     err = stderr or sys.stderr
