@@ -13,8 +13,8 @@ from atomics.commands import distributed as distributed_commands
 from atomics.commands import eval as eval_commands
 from atomics.commands import load as load_commands
 from atomics.commands import mcp as mcp_commands
-from atomics.commands import repl as repl_commands
 from atomics.commands import rag as rag_commands
+from atomics.commands import repl as repl_commands
 from atomics.commands import security as security_commands
 from atomics.commands import toolcall as toolcall_commands
 from atomics.commands import worker as worker_commands

@@ -3,6 +3,13 @@
 ## Unreleased
 
 ### Added
+- **`atomics repl`.** Human prompt over a running `atomics server`. Same
+  client and verbs as MCP, plus in-memory `set` / `show` / `wait`. Does
+  not spawn a server.
+- **Tool-channel `--effort`.** `generate_with_tools` takes the same dial
+  as `generate`. The toolcall suite's tools pass now forwards it; prose
+  already did. Claude still keeps extended thinking off on that path and
+  only sends `output_config.effort`.
 - **HTTP / MCP `POST /runs` and `submit_run` take `effort`.** Same
   shared dial as eval (`thinking`, `effort`, `reasoning_mode`). Unknown
   values are `422`. The burn loop already forwarded `--effort` on the CLI.
