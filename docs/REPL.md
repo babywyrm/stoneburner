@@ -12,7 +12,8 @@ uv run atomics repl                                 # terminal 2
 ```
 
 If nothing is listening, the command exits and tells you to start the server
-(or set `ATOMICS_API_URL`). That is deliberate.
+(or set `ATOMICS_API_URL`). That is deliberate. Up-arrow recalls lines from
+this process (stdlib `readline`); history is not written to disk.
 
 ## Session
 

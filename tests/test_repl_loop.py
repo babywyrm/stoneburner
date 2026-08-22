@@ -70,6 +70,41 @@ def test_mid_session_error_stays() -> None:
     assert "invalid API key" in stderr.getvalue()
 
 
+def test_interactive_repl_enables_line_editing(monkeypatch) -> None:
+    calls: list[int] = []
+    monkeypatch.setattr(
+        "atomics.repl.loop.enable_line_editing",
+        lambda: calls.append(1) or True,
+    )
+
+    def fake_input(_prompt: str) -> str:
+        raise EOFError
+
+    monkeypatch.setattr("builtins.input", fake_input)
+    code = run_repl(_client(), stdout=io.StringIO(), stderr=io.StringIO())
+    assert code == 0
+    assert calls == [1]
+
+
+def test_scripted_input_skips_line_editing(monkeypatch) -> None:
+    calls: list[int] = []
+    monkeypatch.setattr(
+        "atomics.repl.loop.enable_line_editing",
+        lambda: calls.append(1) or True,
+    )
+
+    def input_fn(_prompt: str) -> str:
+        raise EOFError
+
+    run_repl(
+        _client(),
+        input_fn=input_fn,
+        stdout=io.StringIO(),
+        stderr=io.StringIO(),
+    )
+    assert calls == []
+
+
 def test_ctrl_c_at_prompt_reprints() -> None:
     state = {"n": 0}
 
