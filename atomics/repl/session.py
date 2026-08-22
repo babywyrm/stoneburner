@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 
-SESSION_KEYS = ("provider", "model", "effort", "reasoning_mode", "last_job_id")
+SESSION_KEYS = ("provider", "model", "effort", "reasoning_mode", "host", "last_job_id")
 
 
 class SessionError(ValueError):
@@ -17,6 +17,7 @@ class Session:
     model: str | None = None
     effort: str | None = None
     reasoning_mode: str | None = None
+    host: str | None = None
     last_job_id: str | None = None
 
     def set(self, key: str, value: str | None) -> None:

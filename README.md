@@ -185,6 +185,7 @@ uv run atomics tiers                   # show all tier profiles
 | `atomics doctor` | Installation health check |
 | `atomics server` | Run atomics as an HTTP API server |
 | `atomics mcp` | Expose atomics to LLM agents over MCP (proxies the API server) |
+| `atomics repl` | Human prompt over a running API server (`wait` / `wait --verbose`) |
 
 Full reference: [CLI_REFERENCE](https://github.com/babywyrm/stoneburner/blob/main/docs/CLI_REFERENCE.md)
 

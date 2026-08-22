@@ -83,6 +83,7 @@ class EvalRequest(BaseModel):
     provider: str
     model: str | None = None
     judge_model: str | None = None
+    host: str | None = None
     fixtures: list[str] | None = Field(default=None, max_length=MAX_FIXTURES)
     save: bool = True
     thinking: bool | None = None
@@ -207,6 +208,8 @@ class JobResponse(BaseModel):
     error: dict | None = None
     result_url: str | None = None
     result: Any | None = None
+    request: dict | None = None
+    progress: dict | None = None
 
 
 class ErrorResponse(BaseModel):
@@ -266,6 +269,7 @@ class JobSummary(BaseModel):
     started_at: str | None = None
     completed_at: str | None = None
     error: dict | None = None
+    request: dict | None = None
 
 
 class JobsListResponse(BaseModel):

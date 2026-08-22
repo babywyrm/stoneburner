@@ -144,10 +144,12 @@ async def test_run_eval_from_request_accuracy_normalized():
         "provider": "ollama",
         "model": "m1",
         "judge_model": "j1",
+        "host": None,
         "overall_accuracy": 0.9,
         "fixtures_run": 3,
         "total_tokens": 120,
         "total_cost_usd": 0.02,
+        "fixtures": [],
     }
 
 

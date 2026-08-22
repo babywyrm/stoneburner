@@ -136,6 +136,7 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
         suite: str,
         provider: str,
         model: str | None = None,
+        host: str | None = None,
         judge_model: str | None = None,
         fixtures: list[str] | None = None,
         save: bool = True,
@@ -150,14 +151,16 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
         `suite` is one of `accuracy`, `rag`, `multiturn`, `adversarial`,
         `codegen`, `refusal`, `redblue`, `toolcall`, or `codereview`.
         `budget_usd` caps the combined spend; leave it unset to accept
-        the server's default ceiling. `effort` / `reasoning_mode` are the
+        the server's default ceiling. `host` is the inference endpoint
+        (same meaning as `list_models`). `effort` / `reasoning_mode` are the
         shared reasoning dial (same values as `provider_test`). Poll
-        `get_job` for the result.
+        `get_job` for live `request` / `progress` and the result.
         """
         return api.submit_eval(
             suite=suite,
             provider=provider,
             model=model,
+            host=host,
             judge_model=judge_model,
             fixtures=fixtures,
             save=save,

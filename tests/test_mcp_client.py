@@ -130,6 +130,21 @@ def test_submit_eval_includes_effort_when_given():
     assert payload["thinking"] is False
 
 
+def test_submit_eval_includes_host_when_given():
+    requests: list[httpx.Request] = []
+    with client_recording(requests) as client:
+        client.submit_eval(
+            suite="accuracy",
+            provider="ollama",
+            host="http://192.168.1.79:11434",
+        )
+
+    import json
+
+    payload = json.loads(requests[0].content)
+    assert payload["host"] == "http://192.168.1.79:11434"
+
+
 def test_submit_eval_includes_budget_when_given():
     requests: list[httpx.Request] = []
     with client_recording(requests) as client:

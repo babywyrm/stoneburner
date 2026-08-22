@@ -78,6 +78,18 @@ def test_submit_eval_fills_provider_from_session() -> None:
     assert '"job_id": "abc"' in result.stdout
 
 
+def test_session_host_fills_submit_eval() -> None:
+    requests: list[httpx.Request] = []
+    session = Session(provider="ollama", model="llama3.2:1b", host="http://192.168.1.79:11434")
+    handle_line(
+        "submit_eval --suite accuracy",
+        session=session,
+        client=_client(requests),
+    )
+    payload = json.loads(requests[0].content)
+    assert payload["host"] == "http://192.168.1.79:11434"
+
+
 def test_explicit_flag_wins_over_session() -> None:
     requests: list[httpx.Request] = []
     session = Session(provider="ollama")

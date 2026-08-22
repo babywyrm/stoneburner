@@ -87,8 +87,8 @@ ATOMICS_API_URL="https://atomics.internal:8000" uv run atomics mcp
 |------|-----------|--------------|
 | `health` | yes | Check the API server is reachable |
 | `list_models` | yes | List tags on Ollama or vLLM |
-| `list_jobs` | yes | In-memory API jobs (no `result`; poll `get_job`) |
-| `get_job` | yes | Status, and result once `completed`, for a submitted job |
+| `list_jobs` | yes | In-memory API jobs (short `request`; no fixture rows — poll `get_job`) |
+| `get_job` | yes | Status, resolved `request`, live `progress`, and growing `result.fixtures` |
 | `get_run` | yes | One persisted run and its fixtures (prompts omitted) |
 | `compare` | yes | Compare recorded results by provider or model |
 | `recent_runs` | yes | List recent recorded runs |
@@ -153,12 +153,14 @@ on the CLI.
 `submit_soak` return a job id immediately:
 
 ```json
-{"job_id": "3f2a...", "status": "pending", "kind": "eval"}
+{"job_id": "3f2a...", "status": "pending", "kind": "eval", "request": {"suite": "accuracy", "model": "llama3.2:1b", "host": "http://192.168.1.79:11434"}}
 ```
 
-Poll `get_job` with that id until `status` is `completed`, then read `result`.
-The API uses `completed`, not `finished`. No tool blocks on model work, which
-is what keeps a long eval from timing out an agent's tool call. The server's
+Poll `get_job` until `status` is `completed`. While it runs, `request` names
+the suite / model / host, `progress.in_flight` is the current generate or
+judge call, and `result.fixtures` grows as each fixture finishes. The API
+uses `completed`, not `finished`. No tool blocks on model work, which is
+what keeps a long eval from timing out an agent's tool call. The server's
 `instructions` tell the agent to do this.
 
 ### Errors

@@ -6,6 +6,13 @@ from typing import Any
 
 from fastapi import HTTPException
 
+from atomics.api.job_progress import (
+    EvalJobReporter,
+    eval_fixture_total,
+    fixture_row,
+    select_eval_fixtures,
+)
+from atomics.api.jobs import Job
 from atomics.api.models import EvalRequest, RunRequest
 from atomics.config import load_settings
 from atomics.eval.adversarial.runner import run_adversarial
@@ -46,10 +53,12 @@ def validate_eval_suite(suite: str) -> str:
     return normalized
 
 
-def _provider_for(name: str, model: str | None) -> BaseProvider:
+def _provider_for(name: str, model: str | None, host: str | None = None) -> BaseProvider:
     settings = load_settings()
     try:
-        return make_provider(name, model, None, settings)
+        if name == "vllm":
+            return make_provider(name, model, None, settings, vllm_host=host)
+        return make_provider(name, model, host, settings)
     except ProviderConfigError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except (ValueError, RuntimeError) as exc:
@@ -65,11 +74,20 @@ def _guarded_providers(
     deliberately; an API caller is remote and authenticated by a shared key, so
     the ceiling is the only thing between them and the account limit.
     """
-    provider = _provider_for(payload.provider, payload.model)
-    judge_provider = _provider_for("ollama", payload.judge_model)
+    provider = _provider_for(payload.provider, payload.model, payload.host)
+    judge_host = payload.host if payload.provider == "ollama" else None
+    judge_provider = _provider_for("ollama", payload.judge_model, judge_host)
     budget = EvalBudget(budget_limit_usd=payload.budget_usd)
     guarded = share_budget(budget, provider, judge_provider)
     return guarded[0], guarded[1]
+
+
+def _fixture_rows(results: Any) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for fr in results or []:
+        if hasattr(fr, "fixture") and hasattr(fr, "task_result"):
+            rows.append(fixture_row(fr))
+    return rows
 
 
 def _summary_totals(summary: Any) -> tuple[int, float]:
@@ -161,10 +179,25 @@ async def run_benchmark_from_request(payload: RunRequest) -> dict[str, Any]:
         repo.close()
 
 
-async def run_eval_from_request(payload: EvalRequest) -> dict[str, Any]:
+async def run_eval_from_request(
+    payload: EvalRequest, job: Job | None = None
+) -> dict[str, Any]:
     """Run the accuracy eval suite for an API request."""
     try:
         provider, judge_provider = _guarded_providers(payload)
+        fixtures = select_eval_fixtures(payload.fixtures)
+        reporter = None
+        if job is not None:
+            request = job.request or {}
+            reporter = EvalJobReporter(
+                job,
+                suite="accuracy",
+                provider=payload.provider,
+                model=payload.model or request.get("model"),
+                judge_model=payload.judge_model or request.get("judge_model"),
+                host=request.get("host"),
+                total=eval_fixture_total(payload),
+            )
         summary = await run_eval(
             provider,
             judge_provider=judge_provider,
@@ -174,6 +207,9 @@ async def run_eval_from_request(payload: EvalRequest) -> dict[str, Any]:
             thinking=payload.thinking,
             effort=payload.effort,
             reasoning_mode=payload.reasoning_mode,
+            fixtures=fixtures,
+            on_phase=reporter.phase if reporter is not None else None,
+            on_fixture_done=reporter.fixture_done if reporter is not None else None,
         )
     except HTTPException:
         raise
@@ -185,24 +221,30 @@ async def run_eval_from_request(payload: EvalRequest) -> dict[str, Any]:
     except (ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    host = (job.request or {}).get("host") if job is not None else None
     return {
         "provider": payload.provider,
         "model": payload.model,
         "judge_model": payload.judge_model,
+        "host": host,
         "overall_accuracy": summary.overall_accuracy,
         "fixtures_run": len(summary.fixture_results),
         "total_tokens": summary.total_tokens,
         "total_cost_usd": summary.total_cost_usd,
+        "fixtures": _fixture_rows(summary.fixture_results),
     }
 
 
-async def run_eval_suite(payload: EvalRequest) -> dict[str, Any]:
+async def run_eval_suite(payload: EvalRequest, job: Job | None = None) -> dict[str, Any]:
     """Dispatch eval request to the correct runner and normalize the response."""
     suite = validate_eval_suite(payload.suite)
 
     if suite == "accuracy":
-        result = await run_eval_from_request(payload)
+        result = await run_eval_from_request(payload, job=job)
         return {"suite": suite, **result}
+
+    if job is not None:
+        job.progress = {"current": 0, "total": None, "in_flight": {"phase": "running"}}
 
     provider, judge_provider = _guarded_providers(payload)
 

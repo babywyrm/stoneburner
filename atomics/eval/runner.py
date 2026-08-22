@@ -24,6 +24,17 @@ from atomics.validation import sanitize_error
 logger = logging.getLogger("atomics.eval.runner")
 
 
+async def _call_hook(hook: Callable[..., object] | None, *args: object) -> None:
+    if hook is None:
+        return
+    if inspect.iscoroutinefunction(hook):
+        await hook(*args)
+        return
+    maybe = hook(*args)
+    if inspect.isawaitable(maybe):
+        await maybe
+
+
 @dataclass
 class FixtureResult:
     fixture: EvalFixture
@@ -138,6 +149,7 @@ async def run_eval(
     judge_model: str | None = None,
     run_id: str | None = None,
     on_fixture_done: Callable[..., object] | None = None,
+    on_phase: Callable[..., object] | None = None,
     thinking: bool | None = None,
     thinking_budget: int | None = None,
     effort: str | None = None,
@@ -155,6 +167,7 @@ async def run_eval(
         judge_model: Model override for the judge.
         run_id: Optional run ID (auto-generated if omitted).
         on_fixture_done: Optional async callable(fixture_result) called after each fixture.
+        on_phase: Optional callable(fixture_id, phase, model) before generate/judge.
         fixtures: Optional subset of fixtures to run (default: all EVAL_FIXTURES).
         extra_judges: Optional (provider, model) pairs that, together with the
             primary judge, form a consensus panel. When supplied, each fixture is
@@ -200,6 +213,9 @@ async def run_eval(
             prompt=fixture.prompt,
         )
 
+        generate_model = model or getattr(provider, "default_model", None)
+        await _call_hook(on_phase, fixture.id, "generate", generate_model)
+
         try:
             task_result.status = TaskStatus.RUNNING
             resp = await provider.generate(
@@ -240,14 +256,13 @@ async def run_eval(
             )
             fixture_results.append(fr)
             logger.warning("[eval] %s failed: %s", fixture.id, task_result.error_message)
-            if on_fixture_done is not None:
-                if inspect.iscoroutinefunction(on_fixture_done):
-                    await on_fixture_done(fr)
-                else:
-                    on_fixture_done(fr)
+            await _call_hook(on_fixture_done, fr)
             continue
 
         task_result.completed_at = datetime.now(UTC)
+
+        judge_tag = judge_model or getattr(judge_provider, "default_model", None)
+        await _call_hook(on_phase, fixture.id, "judge", judge_tag)
 
         # Judge the full intended answer, not a fixed-cap truncation, so long
         # HEAVY responses aren't unfairly marked down on completeness.
@@ -297,11 +312,7 @@ async def run_eval(
                 judge.rationale[:80],
             )
 
-        if on_fixture_done is not None:
-            if inspect.iscoroutinefunction(on_fixture_done):
-                await on_fixture_done(fr)
-            else:
-                on_fixture_done(fr)
+        await _call_hook(on_fixture_done, fr)
 
     return EvalRunSummary(
         run_id=run_id,

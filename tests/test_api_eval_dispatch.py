@@ -35,6 +35,41 @@ async def test_post_evals_accuracy(client):
 
 
 @pytest.mark.asyncio
+async def test_post_evals_includes_resolved_request(client):
+    with patch("atomics.api._runners.run_eval", new_callable=AsyncMock) as mock_run:
+        mock_run.return_value = type(
+            "S",
+            (),
+            {
+                "overall_accuracy": 0.9,
+                "fixture_results": [],
+                "total_tokens": 0,
+                "total_cost_usd": 0.0,
+            },
+        )()
+        resp = client.post(
+            "/api/v1/evals",
+            json={
+                "suite": "accuracy",
+                "provider": "ollama",
+                "model": "llama3.2:1b",
+                "host": "http://192.168.1.79:11434",
+            },
+        )
+    assert resp.status_code == 202
+    body = resp.json()
+    assert body["request"]["suite"] == "accuracy"
+    assert body["request"]["model"] == "llama3.2:1b"
+    assert body["request"]["host"] == "http://192.168.1.79:11434"
+    assert body["request"]["judge_model"]
+    assert body["progress"]["current"] == 0
+    assert body["progress"]["total"] >= 1
+    listed = client.get("/api/v1/jobs").json()["jobs"]
+    assert listed[0]["request"]["model"] == "llama3.2:1b"
+    assert "fixtures" not in (listed[0].get("result") or {})
+
+
+@pytest.mark.asyncio
 async def test_post_evals_rag(client):
     with patch("atomics.api._runners.run_rag", new_callable=AsyncMock) as mock_run:
         mock_run.return_value = type(

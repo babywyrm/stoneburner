@@ -210,6 +210,13 @@ worse).
 | `toolcall` | dangerous-call rate | Tool-channel leaks (higher is worse) |
 | `codereview` | review score | Planted-vuln detection vs false positives |
 
+`GET /jobs/{id}` includes resolved `request` (suite, provider, model, judge,
+host) at submit time. Eval jobs also carry `progress` (`current` / `total` /
+`in_flight` with `generate` or `judge`) and grow `result.fixtures` as each
+fixture finishes (id, status, score, tokens, latency, truncated response,
+error). `POST /evals` accepts optional `host`, same meaning as
+`GET /models`. `list_jobs` includes a short `request` and omits fixture rows.
+
 `probe` is CLI-only. Load tests have their own endpoints, not `suite` values.
 
 `POST /evals`, `POST /sweeps`, and `POST /provider-test` accept optional
