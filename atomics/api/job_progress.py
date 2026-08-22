@@ -59,7 +59,9 @@ def resolve_eval_request(payload: EvalRequest, settings: AtomicsSettings) -> dic
 def short_request(request: dict[str, Any] | None) -> dict[str, Any] | None:
     if not request:
         return None
-    out = {key: request[key] for key in ("suite", "model", "host") if key in request}
+    out: dict[str, Any] = {
+        key: request[key] for key in ("suite", "model", "host") if key in request
+    }
     return out or None
 
 

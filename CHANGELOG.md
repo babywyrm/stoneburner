@@ -3,6 +3,20 @@
 ## Unreleased
 
 ### Added
+
+## 0.21.0 (2026-08-22) — REPL, live jobs, and effort on every generate path
+
+### Upgrade notes
+- Additive. `GET /jobs/{id}` now includes `request`, `progress`, and
+  (for accuracy evals) growing `result.fixtures`. Old clients ignore
+  the extra fields.
+- `generate_with_tools` accepts the same optional `thinking` /
+  `thinking_budget` / `effort` / `reasoning_mode` kwargs as `generate`.
+- `atomics repl` is new. It needs a running `atomics server` and the
+  same `$ATOMICS_API_KEY` / `$ATOMICS_API_URL` contract as `atomics mcp`.
+- No breaking CLI changes.
+
+### Added
 - **Live job progress.** `GET /jobs/{id}` stores the resolved request
   (suite, model, judge, host) and, for evals, live `progress.in_flight`
   plus growing `result.fixtures`. `submit_eval` / session take `host`.
