@@ -5,6 +5,8 @@
 ### Added
 - **REPL `wait` until done.** Polls until `completed` or `failed`.
   Ctrl-C still only stops the poll. The 30-poll / ~60s cap is gone.
+- **Quiet `submit_*`.** Headline and `job_id` instead of the pending
+  JSON. `--verbose` and `get_job` still have the document.
 
 - **Job document parity.** Every `POST /evals` suite grows
   `result.fixtures` with the accuracy row shape (id, status, score,

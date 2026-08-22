@@ -78,6 +78,34 @@ def format_fixture_row(
     return line
 
 
+def _join_list(value: Any) -> str:
+    if isinstance(value, list):
+        return ",".join(str(item) for item in value)
+    return str(value)
+
+
+def format_submitted(body: dict[str, Any]) -> str:
+    request = body.get("request")
+    request = request if isinstance(request, dict) else {}
+    parts: list[str] = [str(body.get("kind") or "job")]
+    suite = request.get("suite")
+    if suite:
+        parts.append(str(suite))
+    elif request.get("suites"):
+        parts.append(_join_list(request["suites"]))
+    model = request.get("model")
+    if model:
+        parts.append(str(model))
+    elif request.get("models"):
+        parts.append(_join_list(request["models"]))
+    host = request.get("host")
+    if host:
+        parts.append(str(host))
+    job_id = str(body.get("job_id") or "")
+    status = str(body.get("status") or "pending")
+    return f"{'  '.join(parts)}\n{job_id}  {status}\n"
+
+
 def format_completed(body: dict[str, Any], *, color: bool = False) -> str:
     request = body.get("request") or {}
     result = body.get("result") or {}

@@ -27,8 +27,8 @@ from the session (`host` goes to `submit_eval`, `list_models`, and
 The same names as the MCP tools. Semantics live in [MCP_SERVER.md](MCP_SERVER.md).
 Plus `set`, `show`, `wait [--verbose] [JOB_ID]`, `help`, `exit`.
 
-`submit_*` prints the job body (including resolved `request`) and remembers
-`job_id`. Type `wait` once: it polls every 2s and prints a **quiet line**
+`submit_*` prints a quiet headline and the `job_id` (and remembers it).
+`--verbose` keeps the full JSON. Type `wait` once: it polls every 2s and prints a **quiet line**
 per generate/judge and per scored fixture, then a two-line headline when
 `completed`. `wait --verbose` also prints latency and the truncated model
 reply (500 chars, same as the job document). Color is TTY-only. `get_job`

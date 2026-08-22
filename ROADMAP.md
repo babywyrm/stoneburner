@@ -209,10 +209,8 @@ Next is operator comfort.
       process, no new extra). `prompt_toolkit` stays out unless we
       decide a dependency is worth a TUI later. Not session persistence
       to disk.
-- [ ] **Quiet `submit_*`.** `submit_eval` still dumps the pending job
-      JSON. Match quiet `wait`: one headline and the `job_id`.
-      `get_job` / `--verbose` keep the document. Display-only; the
-      API body does not change.
+- [x] **Quiet `submit_*`.** Headline + `job_id`. `get_job` /
+      `--verbose` keep the document. Display-only.
 - [x] **`wait` until done, not 60s.** Polls until `completed` /
       `failed`. Ctrl-C stops polling, not the job. No SSE.
 - [x] **Live fixture rows on every eval suite.** Same row shape on

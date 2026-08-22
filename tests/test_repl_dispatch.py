@@ -62,20 +62,41 @@ def _client(requests: list, *, response=None) -> AtomicsApiClient:
     return AtomicsApiClient("http://api.test", "k", transport=httpx.MockTransport(handler))
 
 
+_EVAL_JOB = {
+    "job_id": "abc",
+    "status": "pending",
+    "kind": "eval",
+    "request": {"suite": "toolcall", "provider": "ollama", "model": "gpt-oss:20b"},
+}
+
+
 def test_submit_eval_fills_provider_from_session() -> None:
     requests: list[httpx.Request] = []
     session = Session(provider="ollama", model="gpt-oss:20b")
     result = handle_line(
         "submit_eval --suite toolcall",
         session=session,
-        client=_client(requests),
+        client=_client(requests, response=httpx.Response(200, json=_EVAL_JOB)),
     )
     payload = json.loads(requests[0].content)
     assert payload["provider"] == "ollama"
     assert payload["model"] == "gpt-oss:20b"
     assert payload["suite"] == "toolcall"
     assert session.last_job_id == "abc"
+    assert "abc" in result.stdout
+    assert "toolcall" in result.stdout
+    assert '"job_id"' not in result.stdout
+
+
+def test_submit_eval_verbose_keeps_json() -> None:
+    session = Session(provider="ollama", model="gpt-oss:20b")
+    result = handle_line(
+        "submit_eval --suite toolcall --verbose",
+        session=session,
+        client=_client([], response=httpx.Response(200, json=_EVAL_JOB)),
+    )
     assert '"job_id": "abc"' in result.stdout
+    assert session.last_job_id == "abc"
 
 
 def test_session_host_fills_submit_eval() -> None:

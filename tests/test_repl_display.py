@@ -2,7 +2,13 @@
 
 from __future__ import annotations
 
-from atomics.repl.display import QuietWait, format_completed, format_fixture_row, format_in_flight
+from atomics.repl.display import (
+    QuietWait,
+    format_completed,
+    format_fixture_row,
+    format_in_flight,
+    format_submitted,
+)
 
 
 def test_in_flight_line() -> None:
@@ -34,6 +40,26 @@ def test_fixture_row_line() -> None:
         )
         == "  ev-18  0.00  success  166 tok"
     )
+
+
+def test_submitted_headline() -> None:
+    text = format_submitted(
+        {
+            "job_id": "abc",
+            "status": "pending",
+            "kind": "eval",
+            "request": {
+                "suite": "toolcall",
+                "model": "llama3.2:1b",
+                "host": "http://192.168.1.79:11434",
+            },
+        }
+    )
+    assert text == (
+        "eval  toolcall  llama3.2:1b  http://192.168.1.79:11434\n"
+        "abc  pending\n"
+    )
+    assert '"job_id"' not in text
 
 
 def test_completed_headline() -> None:
