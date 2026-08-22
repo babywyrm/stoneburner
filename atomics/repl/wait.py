@@ -1,4 +1,4 @@
-"""Poll get_job until completed, a poll budget, or Ctrl-C. Does not cancel."""
+"""Poll get_job until the job is done or Ctrl-C. Does not cancel."""
 
 from __future__ import annotations
 
@@ -8,7 +8,8 @@ from typing import Any
 from atomics.mcp.client import AtomicsApiClient
 
 WAIT_INTERVAL_SECONDS = 2.0
-WAIT_MAX_POLLS = 30
+WAIT_MAX_POLLS: int | None = None
+_DONE = frozenset({"completed", "failed"})
 
 
 def _progress_sig(body: Any) -> Any:
@@ -34,11 +35,12 @@ def wait_for_job(
     *,
     sleep: Callable[[float], None],
     interval: float = WAIT_INTERVAL_SECONDS,
-    max_polls: int = WAIT_MAX_POLLS,
+    max_polls: int | None = WAIT_MAX_POLLS,
     on_update: Callable[[Any], None] | None = None,
 ) -> Any:
     last: Any = None
     printed: Any = object()
+    attempt = 0
 
     def emit(body: Any) -> None:
         nonlocal printed
@@ -47,15 +49,15 @@ def wait_for_job(
             on_update(body)
             printed = sig
 
-    for attempt in range(max_polls):
+    while True:
         last = client.get_job(job_id)
         emit(last)
-        if isinstance(last, dict) and last.get("status") == "completed":
+        if isinstance(last, dict) and last.get("status") in _DONE:
             return last
-        if attempt + 1 >= max_polls:
+        attempt += 1
+        if max_polls is not None and attempt >= max_polls:
             return last
         try:
             sleep(interval)
         except KeyboardInterrupt:
             return last
-    return last
