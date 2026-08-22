@@ -201,6 +201,10 @@ and `--effort` on every generate path including the tool channel.
 Planning labels `v0.21.0`–`v0.23.0` above already shipped in earlier
 releases; they are not this tag.
 
+The items below landed on `main` after that tag. Package version is
+still **0.21.0** until the next release. Unreleased notes are in
+`CHANGELOG.md`.
+
 Job document parity and operator comfort are in.
 
 - [x] **REPL line editing.** Stdlib `readline` for in-process
@@ -221,6 +225,22 @@ Job document parity and operator comfort are in.
       `progress.total` is models × suites. `in_flight` is
       `{model, suite}`. Dashboard `#job=` renders the jobs table.
       Stress/soak stay headline-only.
+
+## Next
+
+Unscheduled. Pick one; do not mix a parked item into it.
+
+- **Cut 0.22.0** when Unreleased is the story we want on PyPI.
+  `RELEASING.md`. Do not mix a feature into the tag commit. Do not
+  retag `v0.21.0` or `v0.20.0`.
+- **Stress / soak live rows** if load jobs should be as readable as
+  eval and sweep. Different document (concurrency, error, drift) —
+  do not reuse `FixtureRow` or `result.jobs`.
+- **Proof on a live host.** `provider-test`, then a short `submit_eval`
+  / `wait`, then a two-model sweep. Desk use, not a product change.
+- **Suite convergence** (ARCHITECTURE): `results` alias, large
+  command modules, CLI integrity exit on the five suites that only
+  report. Not user-visible. Do not start this to “warm up.”
 
 ## Beyond
 
