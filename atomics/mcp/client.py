@@ -184,6 +184,7 @@ class AtomicsApiClient:
         suite: str,
         provider: str,
         model: str | None = None,
+        host: str | None = None,
         judge_model: str | None = None,
         fixtures: list[str] | None = None,
         save: bool = True,
@@ -195,6 +196,8 @@ class AtomicsApiClient:
         payload: dict[str, Any] = {"suite": suite, "provider": provider, "save": save}
         if model is not None:
             payload["model"] = model
+        if host is not None:
+            payload["host"] = host
         if judge_model is not None:
             payload["judge_model"] = judge_model
         if fixtures is not None:

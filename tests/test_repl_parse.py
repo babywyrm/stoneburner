@@ -54,3 +54,18 @@ def test_unknown_bare_dash_is_an_error() -> None:
 def test_flag_without_value_is_an_error() -> None:
     with pytest.raises(ParseError, match="value"):
         parse_line("submit_eval --suite")
+
+
+def test_verbose_switch_does_not_eat_positional() -> None:
+    parsed = parse_line("wait --verbose abc")
+    assert parsed is not None
+    assert parsed.verb == "wait"
+    assert parsed.args == ("abc",)
+    assert parsed.flags == {"verbose": "true"}
+
+
+def test_verbose_accepts_explicit_false() -> None:
+    parsed = parse_line("wait --verbose false")
+    assert parsed is not None
+    assert parsed.flags == {"verbose": "false"}
+    assert parsed.args == ()

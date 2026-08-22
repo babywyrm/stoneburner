@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import json
+import sys
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
 from atomics.mcp.client import AtomicsApiClient, AtomicsApiError
+from atomics.repl.display import QuietWait
 from atomics.repl.parse import ParsedLine, ParseError, parse_line
 from atomics.repl.session import SESSION_KEYS, Session, SessionError
 from atomics.repl.wait import wait_for_job
@@ -16,14 +19,14 @@ HELP_TEXT = """\
 Session: set, show, help, exit
 Read:    health, list_models, list_jobs, get_job, get_run, compare, recent_runs, trends
 Spend:   provider_test, submit_run, submit_eval, submit_sweep, submit_stress, submit_soak
-Poll:    wait [JOB_ID]
+Poll:    wait [--verbose] [JOB_ID]   one-liners; --verbose adds replies
 
 set KEY [VALUE]   set or clear a session field
 show              print the session as JSON
 Verbs match MCP tools. See docs/MCP_SERVER.md and docs/REPL.md.
 """
 
-_BOOL = frozenset({"thinking", "save"})
+_BOOL = frozenset({"thinking", "save", "verbose"})
 _INT = frozenset(
     {
         "iterations",
@@ -39,7 +42,7 @@ _INT = frozenset(
 )
 _FLOAT = frozenset({"budget_usd", "since_hours", "phase_seconds"})
 _LIST = frozenset({"models", "suites", "fixtures"})
-_SESSION_FIELDS = ("provider", "model", "effort", "reasoning_mode")
+_SESSION_FIELDS = ("provider", "model", "effort", "reasoning_mode", "host")
 
 # verb -> (client method name, allowed kwargs, optional positional kwarg)
 _VERBS: dict[str, tuple[str, frozenset[str], str | None]] = {
@@ -80,6 +83,7 @@ _VERBS: dict[str, tuple[str, frozenset[str], str | None]] = {
                 "suite",
                 "provider",
                 "model",
+                "host",
                 "judge_model",
                 "fixtures",
                 "save",
@@ -138,7 +142,13 @@ class HandleResult:
     exit_code: int = 0
 
 
-def handle_line(line: str, *, session: Session, client: AtomicsApiClient) -> HandleResult:
+def handle_line(
+    line: str,
+    *,
+    session: Session,
+    client: AtomicsApiClient,
+    write: Callable[[str], object] | None = None,
+) -> HandleResult:
     try:
         parsed = parse_line(line)
     except ParseError as exc:
@@ -154,7 +164,7 @@ def handle_line(line: str, *, session: Session, client: AtomicsApiClient) -> Han
     if parsed.verb == "set":
         return _set(session, parsed.args)
     if parsed.verb == "wait":
-        return _wait(parsed, session=session, client=client)
+        return _wait(parsed, session=session, client=client, write=write)
     if parsed.verb in _VERBS:
         return _call_api(parsed, session=session, client=client)
     return HandleResult(stderr=f"unknown verb {parsed.verb!r}\n{HELP_TEXT}")
@@ -174,20 +184,45 @@ def _set(session: Session, args: tuple[str, ...]) -> HandleResult:
 
 
 def _wait(
-    parsed: ParsedLine, *, session: Session, client: AtomicsApiClient
+    parsed: ParsedLine,
+    *,
+    session: Session,
+    client: AtomicsApiClient,
+    write: Callable[[str], object] | None = None,
 ) -> HandleResult:
     job_id = parsed.args[0] if parsed.args else session.last_job_id
     if not job_id:
         return HandleResult(
             stderr="wait needs a job id; submit something first, or pass one\n"
         )
-    if len(parsed.args) > 1 or parsed.flags:
+    if len(parsed.args) > 1:
         return HandleResult(stderr="wait takes an optional JOB_ID only\n")
+    unknown = sorted(set(parsed.flags) - {"verbose"})
+    if unknown:
+        return HandleResult(stderr="wait takes --verbose and an optional JOB_ID\n")
+    verbose = False
+    if "verbose" in parsed.flags:
+        try:
+            verbose = bool(_coerce("verbose", parsed.flags["verbose"]))
+        except ValueError as exc:
+            return HandleResult(stderr=f"{exc}\n")
+
+    def emit(text: str) -> None:
+        if write is not None:
+            write(text)
+            return
+        sys.stdout.write(text)
+        sys.stdout.flush()
+
+    color = write is None and sys.stdout.isatty()
+    view = QuietWait(emit, color=color, verbose=verbose)
+
     try:
-        body = wait_for_job(client, job_id, sleep=time.sleep)
+        last = wait_for_job(client, job_id, sleep=time.sleep, on_update=view.update)
     except AtomicsApiError as exc:
         return HandleResult(stderr=f"{exc}\n")
-    return HandleResult(stdout=json.dumps(body, indent=2) + "\n")
+    view.finish(last)
+    return HandleResult()
 
 
 def _call_api(

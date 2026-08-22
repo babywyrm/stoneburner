@@ -3,6 +3,12 @@
 ## Unreleased
 
 ### Added
+- **Live job progress.** `GET /jobs/{id}` stores the resolved request
+  (suite, model, judge, host) and, for evals, live `progress.in_flight`
+  plus growing `result.fixtures`. `submit_eval` / session take `host`.
+  REPL `wait` prints quiet one-liners (TTY color) instead of the full
+  job JSON; `wait --verbose` adds latency and the truncated reply.
+  `get_job` still has the document.
 - **`atomics repl`.** Human prompt over a running `atomics server`. Same
   client and verbs as MCP, plus in-memory `set` / `show` / `wait`. Does
   not spawn a server.

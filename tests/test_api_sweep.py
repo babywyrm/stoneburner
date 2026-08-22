@@ -115,7 +115,7 @@ async def test_run_sweep_meters_every_model_against_one_budget():
     )
     captured: dict = {}
 
-    def fake_provider(name, model):
+    def fake_provider(name, model, host=None):
         return SimpleNamespace(name=name, model=model)
 
     def store_factory(**kwargs):

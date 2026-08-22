@@ -233,6 +233,10 @@ running API server. Requires the `[mcp]` extra. See
 | `atomics repl --api-key KEY` | Client API key, sent as `X-API-Key` (or `ATOMICS_API_KEY`) |
 
 `atomics repl` requires a running server. Verbs match MCP; see [REPL.md](REPL.md).
+`wait` prints a quiet line per phase/fixture, then a completed headline.
+`wait --verbose` adds latency and the truncated reply. `get_job` still
+returns the full JSON. Session `host` fills
+`submit_eval` / `list_models` / `provider_test`.
 
 Serves on stdio only: the process holds a spend-authorized API key and no
 MCP-layer credential would guard a listening port. To reach a remote atomics,

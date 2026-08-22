@@ -59,7 +59,7 @@ class TestApiProvidersAreGuarded:
 
         built = []
 
-        def fake_provider(name, model):
+        def fake_provider(name, model, host=None):
             from tests.test_eval_budget import StubProvider
 
             provider = StubProvider(name=name)
@@ -77,7 +77,7 @@ class TestApiProvidersAreGuarded:
     def test_they_share_one_guard(self, monkeypatch):
         from atomics.api import _runners
 
-        def fake_provider(name, model):
+        def fake_provider(name, model, host=None):
             from tests.test_eval_budget import StubProvider
 
             return StubProvider(name=name)
@@ -92,7 +92,7 @@ class TestApiProvidersAreGuarded:
     def test_the_requested_ceiling_reaches_the_guard(self, monkeypatch):
         from atomics.api import _runners
 
-        def fake_provider(name, model):
+        def fake_provider(name, model, host=None):
             from tests.test_eval_budget import StubProvider
 
             return StubProvider(name=name)

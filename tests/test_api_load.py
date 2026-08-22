@@ -113,7 +113,7 @@ async def test_run_stress_meters_the_provider_and_caps_predict():
     )
     captured: dict = {}
 
-    def fake_provider(name, model):
+    def fake_provider(name, model, host=None):
         return SimpleNamespace(name=name, model=model)
 
     result = StressResult(
@@ -158,7 +158,7 @@ async def test_run_soak_meters_the_provider_and_caps_predict():
     )
     captured: dict = {}
 
-    def fake_provider(name, model):
+    def fake_provider(name, model, host=None):
         return SimpleNamespace(name=name, model=model)
 
     result = SoakResult(

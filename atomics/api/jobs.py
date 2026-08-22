@@ -41,6 +41,10 @@ class Job:
     # returned long before the work finishes, so this is the only thread back
     # from a failure to who asked for it.
     request_id: str = ""
+    # Resolved submit payload (suite / model / host / …). Set at submit time.
+    request: dict[str, Any] | None = None
+    # Live eval counters. Other kinds leave this None.
+    progress: dict[str, Any] | None = None
     _task: asyncio.Task[None] | None = field(default=None, repr=False)
 
 
@@ -118,6 +122,8 @@ class JobManager:
         work: Callable[[str], Awaitable[Any]],
         *,
         owner: str = ANONYMOUS_CALLER,
+        request: dict[str, Any] | None = None,
+        progress: dict[str, Any] | None = None,
     ) -> str:
         if self.active_count >= self.max_active:
             raise TooManyActiveJobsError(
@@ -139,6 +145,8 @@ class JobManager:
             created_at=time.time(),
             owner=owner,
             request_id=current_request_id(),
+            request=request,
+            progress=progress,
         )
         self.jobs[job_id] = job
         logger.info(

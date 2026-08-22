@@ -14,6 +14,7 @@ def test_new_session_is_empty() -> None:
         "model": None,
         "effort": None,
         "reasoning_mode": None,
+        "host": None,
         "last_job_id": None,
     }
 

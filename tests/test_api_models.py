@@ -22,6 +22,7 @@ def test_eval_request_defaults():
     assert req.suite == "rag"
     assert req.provider == "ollama"
     assert req.fixtures is None
+    assert req.host is None
 
 
 def test_eval_request_normalizes_effort_aliases():

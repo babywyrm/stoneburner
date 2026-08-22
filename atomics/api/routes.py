@@ -13,6 +13,12 @@ from atomics.api._runners import (
 )
 from atomics.api._sweep import run_sweep_from_request
 from atomics.api.dependencies import require_auth
+from atomics.api.job_progress import (
+    initial_eval_progress,
+    payload_request,
+    resolve_eval_request,
+    short_request,
+)
 from atomics.api.jobs import Job, JobManager, TooManyActiveJobsError
 from atomics.api.models import (
     MAX_TREND_HOURS,
@@ -93,7 +99,10 @@ async def start_run(
 ) -> JobResponse:
     try:
         job_id = await job_manager.submit(
-            "run", lambda _jid: run_benchmark_from_request(payload), owner=caller
+            "run",
+            lambda _jid: run_benchmark_from_request(payload),
+            owner=caller,
+            request=payload_request(payload, load_settings()),
         )
     except TooManyActiveJobsError as exc:
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)) from exc
@@ -117,7 +126,11 @@ async def start_eval(
 
     try:
         job_id = await job_manager.submit(
-            "eval", lambda _jid: run_eval_suite(payload), owner=caller
+            "eval",
+            lambda jid: run_eval_suite(payload, job=job_manager.jobs[jid]),
+            owner=caller,
+            request=resolve_eval_request(payload, load_settings()),
+            progress=initial_eval_progress(payload),
         )
     except TooManyActiveJobsError as exc:
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)) from exc
@@ -134,7 +147,10 @@ async def start_sweep(
     """Start a bounded multi-model, multi-suite campaign. Budget is required."""
     try:
         job_id = await job_manager.submit(
-            "sweep", lambda _jid: run_sweep_from_request(payload), owner=caller
+            "sweep",
+            lambda _jid: run_sweep_from_request(payload),
+            owner=caller,
+            request=payload_request(payload, load_settings()),
         )
     except TooManyActiveJobsError as exc:
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)) from exc
@@ -151,7 +167,10 @@ async def start_stress(
     """Ramp concurrency to find saturation. One model, required budget, capped."""
     try:
         job_id = await job_manager.submit(
-            "stress", lambda _jid: run_stress_from_request(payload), owner=caller
+            "stress",
+            lambda _jid: run_stress_from_request(payload),
+            owner=caller,
+            request=payload_request(payload, load_settings()),
         )
     except TooManyActiveJobsError as exc:
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)) from exc
@@ -168,7 +187,10 @@ async def start_soak(
     """Hold concurrency and classify drift. Duration is seconds, max 300."""
     try:
         job_id = await job_manager.submit(
-            "soak", lambda _jid: run_soak_from_request(payload), owner=caller
+            "soak",
+            lambda _jid: run_soak_from_request(payload),
+            owner=caller,
+            request=payload_request(payload, load_settings()),
         )
     except TooManyActiveJobsError as exc:
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)) from exc
@@ -308,6 +330,7 @@ def _job_to_summary(job: Job) -> JobSummary:
         started_at=str(job.started_at) if job.started_at is not None else None,
         completed_at=str(job.completed_at) if job.completed_at is not None else None,
         error=job.error,
+        request=short_request(job.request),
     )
 
 
@@ -321,4 +344,6 @@ def _job_to_response(job: Job) -> JobResponse:
         completed_at=str(job.completed_at) if job.completed_at is not None else None,
         error=job.error,
         result=job.result,
+        request=job.request,
+        progress=job.progress,
     )

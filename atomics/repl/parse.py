@@ -10,6 +10,9 @@ class ParseError(ValueError):
     """The line is not verb / args / --flag value."""
 
 
+_SWITCHES = frozenset({"verbose"})
+
+
 @dataclass(frozen=True)
 class ParsedLine:
     verb: str
@@ -38,6 +41,14 @@ def parse_line(line: str) -> ParsedLine | None:
             name = tok[2:]
             if not name:
                 raise ParseError(f"bad flag {tok!r}")
+            if name in _SWITCHES:
+                if i + 1 < len(rest) and rest[i + 1].lower() in {"true", "false"}:
+                    flags[name] = rest[i + 1].lower()
+                    i += 2
+                    continue
+                flags[name] = "true"
+                i += 1
+                continue
             if i + 1 >= len(rest) or rest[i + 1].startswith("-"):
                 raise ParseError(f"flag --{name} needs a value")
             flags[name] = rest[i + 1]
