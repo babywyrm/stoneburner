@@ -16,6 +16,7 @@ def _progress_sig(body: Any) -> Any:
         return None
     progress = body.get("progress") or {}
     in_flight = progress.get("in_flight")
+    in_flight_sig: Any
     if isinstance(in_flight, dict):
         in_flight_sig = (
             in_flight.get("fixture_id"),

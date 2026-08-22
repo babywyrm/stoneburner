@@ -133,6 +133,8 @@ v0.18.0. The numbers were planning labels, not unreleased versions.
 The **v0.20.0** GitHub / PyPI release (2026-08-19) is the shared
 `--effort` / `--reasoning-mode` dial and `eval --verbose`, not the
 "Per-pass live lines" heading below (that work already shipped).
+The **v0.21.0** release (2026-08-22) is `atomics repl`, live job
+progress, and `--effort` on every generate path including tools.
 
 ## v0.19.0 — A stranger can trust a headline
 
@@ -191,6 +193,41 @@ had the id.
 - [x] Hourly trends including eval/adversarial fixtures
 - [x] `GET /api/v1/jobs` without `result`; dashboard `#job=` poll
 
+## After the 0.21.0 tag
+
+**v0.21.0** (2026-08-22) shipped `atomics repl`, live job `request` /
+`progress` / accuracy fixture rows, quiet `wait` and `wait --verbose`,
+and `--effort` on every generate path including the tool channel.
+Planning labels `v0.21.0`–`v0.23.0` above already shipped in earlier
+releases; they are not this tag.
+
+Next is operator comfort, then the same job document everywhere else.
+
+- [ ] **REPL line editing.** v1 is `input()`, so up-arrow prints
+      `^[[A`. Stdlib `readline` is the small path (history in the
+      process, no new extra). `prompt_toolkit` stays out unless we
+      decide a dependency is worth a TUI later. Not session persistence
+      to disk.
+- [ ] **Quiet `submit_*`.** `submit_eval` still dumps the pending job
+      JSON. Match quiet `wait`: one headline and the `job_id`.
+      `get_job` / `--verbose` keep the document. Display-only; the
+      API body does not change.
+- [ ] **`wait` until done, not 60s.** A 25-fixture accuracy run is
+      already ~50s; the cap returns the prompt while the job is still
+      scoring. Keep Ctrl-C as “stop polling, not the job.” A higher
+      default or `wait` with no cap (Ctrl-C only) is the product
+      question; do not invent SSE to solve it.
+- [ ] **Live fixture rows on every eval suite.** Accuracy grows
+      `result.fixtures` and `progress.in_flight` (`generate` /
+      `judge`). rag, multiturn, adversarial, codegen, refusal,
+      redblue, toolcall, and codereview still sit on coarse
+      `in_flight: running`. Same job document, more reporters. No
+      second schema.
+- [ ] **Dashboard job fixtures.** `#job=` polls status. It should
+      render the growing `result.fixtures` table the same way
+      `#run=` renders a recorded run. The fake-DOM harness already
+      exists (`tests/test_dashboard_script.py`).
+
 ## Beyond
 
 Not scheduled, roughly in order of how often they come up.
@@ -214,8 +251,14 @@ Not scheduled, roughly in order of how often they come up.
   headline, including `--suite rag`. Probe and archreview stay out of the
   study command: they need live artifacts or a repo pack.
 - [x] **Interactive REPL.** `atomics repl` is an API-client prompt over a
-      running `atomics server` (`docs/REPL.md`). Session state and `wait`
-      for jobs; not Click-tree tab-completion.
+      running `atomics server` (`docs/REPL.md`). Session `host`, quiet
+      `wait` / `wait --verbose`, same verbs as MCP. Not Click-tree
+      tab-completion. Line editing and quieter submit are in
+      “After the 0.21.0 tag” above.
+- **OpenAI SDK 3.0 / HTTPX2.** Parked. PR #9 closed. Do not mix into
+  a job-progress or REPL change.
+- **HTTP MCP.** Do not invent. `atomics mcp` stays a stdio proxy over
+  a running API server. Remote reach is `--api-url` on that API.
 
 ## Design Principles
 
