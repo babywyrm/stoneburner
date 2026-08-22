@@ -5,7 +5,7 @@ from __future__ import annotations
 from click.testing import CliRunner
 
 from atomics.cli import cli
-from atomics.mcp.client import API_KEY_ENV, API_URL_ENV
+from atomics.mcp.client import API_URL_ENV
 
 
 def test_help_lists_api_flags() -> None:

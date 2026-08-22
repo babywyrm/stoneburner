@@ -2,7 +2,8 @@
 
 `atomics mcp` exposes atomics to LLM agents over the [Model Context
 Protocol](https://modelcontextprotocol.io/). It is a proxy: every tool call is
-one authenticated HTTP request to a running `atomics server`.
+one authenticated HTTP request to a running `atomics server`. Humans who want
+the same client with session state use `atomics repl` ([REPL.md](REPL.md)).
 
 ```bash
 uv sync --extra mcp --extra api

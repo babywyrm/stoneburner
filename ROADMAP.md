@@ -213,11 +213,9 @@ Not scheduled, roughly in order of how often they come up.
   `atomics judge-agreement` measures how often a single judge would flip the
   headline, including `--suite rag`. Probe and archreview stay out of the
   study command: they need live artifacts or a repo pack.
-- **Interactive REPL.** Tab-completion over the existing Click tree is cheap;
-  the useful part is session state (selected provider/model, last result set)
-  for exploratory work. Heavy ops (`soak`, `sweep`) should submit jobs, not
-  block the prompt. Lower priority than the MCP surface, which already has a
-  consumer.
+- [x] **Interactive REPL.** `atomics repl` is an API-client prompt over a
+      running `atomics server` (`docs/REPL.md`). Session state and `wait`
+      for jobs; not Click-tree tab-completion.
 
 ## Design Principles
 

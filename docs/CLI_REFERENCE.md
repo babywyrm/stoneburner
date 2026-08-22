@@ -228,6 +228,11 @@ running API server. Requires the `[mcp]` extra. See
 | `atomics mcp` | Serve atomics over MCP on stdio, proxying `http://127.0.0.1:8000` |
 | `atomics mcp --api-url URL` | API server to proxy (or `ATOMICS_API_URL`) |
 | `atomics mcp --api-key KEY` | Client API key, sent as `X-API-Key` (or `ATOMICS_API_KEY`) |
+| `atomics repl` | Interactive prompt over a running API server |
+| `atomics repl --api-url URL` | API server to call (or `ATOMICS_API_URL`) |
+| `atomics repl --api-key KEY` | Client API key, sent as `X-API-Key` (or `ATOMICS_API_KEY`) |
+
+`atomics repl` requires a running server. Verbs match MCP; see [REPL.md](REPL.md).
 
 Serves on stdio only: the process holds a spend-authorized API key and no
 MCP-layer credential would guard a listening port. To reach a remote atomics,

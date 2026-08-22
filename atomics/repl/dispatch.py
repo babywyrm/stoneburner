@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from atomics.mcp.client import AtomicsApiClient, AtomicsApiError
-from atomics.repl.parse import ParseError, ParsedLine, parse_line
+from atomics.repl.parse import ParsedLine, ParseError, parse_line
 from atomics.repl.session import SESSION_KEYS, Session, SessionError
 from atomics.repl.wait import wait_for_job
 
