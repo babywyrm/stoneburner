@@ -3,6 +3,17 @@
 ## Unreleased
 
 ### Added
+- **Job document parity.** Every `POST /evals` suite grows
+  `result.fixtures` with the accuracy row shape (id, status, score,
+  tokens, latency, 500-char response, error). `progress.total` is
+  that suite's catalog, not always the accuracy count. Dashboard
+  `#job=` renders the table. REPL `wait --verbose` works for any
+  `submit_eval` suite.
+
+### Fixed
+- Eval job `progress.total` counted the accuracy catalog (25) for
+  every suite, so a toolcall job advertised 25 fixtures instead of
+  20.
 
 ## 0.21.0 (2026-08-22) — REPL, live jobs, and effort on every generate path
 

@@ -6,14 +6,46 @@ and runners call them while mutating an in-memory `Job`.
 
 from __future__ import annotations
 
-from typing import Any
+from collections.abc import Sequence
+from typing import Any, Literal, TypedDict
 
 from atomics.api.jobs import Job
 from atomics.api.models import EvalRequest
 from atomics.config import AtomicsSettings
+from atomics.eval.adversarial import ALL_FIXTURES as ADVERSARIAL_FIXTURES
+from atomics.eval.codegen.fixtures import ALL_CODEGEN_FIXTURES
+from atomics.eval.codereview.fixtures import SECURE_CODE_FIXTURES
 from atomics.eval.fixtures import EVAL_FIXTURES, EvalFixture
+from atomics.eval.multiturn.fixtures import ALL_MULTITURN_FIXTURES
+from atomics.eval.rag.fixtures import ALL_RAG_FIXTURES
+from atomics.eval.redblue.fixtures import ALL_FIXTURES as REDBLUE_FIXTURES
+from atomics.eval.refusal.fixtures import REFUSAL_FIXTURES
+from atomics.eval.toolcall.fixtures import ALL_FIXTURES as TOOLCALL_FIXTURES
 
 RESPONSE_LIMIT = 500
+
+SuiteCatalog = Sequence[object]
+
+_SUITE_CATALOGS: dict[str, SuiteCatalog] = {
+    "rag": ALL_RAG_FIXTURES,
+    "multiturn": ALL_MULTITURN_FIXTURES,
+    "adversarial": ADVERSARIAL_FIXTURES,
+    "codegen": ALL_CODEGEN_FIXTURES,
+    "refusal": REFUSAL_FIXTURES,
+    "redblue": REDBLUE_FIXTURES,
+    "toolcall": TOOLCALL_FIXTURES,
+    "codereview": SECURE_CODE_FIXTURES,
+}
+
+
+class FixtureRow(TypedDict):
+    id: str
+    status: Literal["success", "failed"]
+    score: float | None
+    tokens: int
+    latency_ms: float
+    response: str | None
+    error: str | None
 
 
 def truncate_response(text: str | None) -> str | None:
@@ -73,29 +105,159 @@ def select_eval_fixtures(ids: list[str] | None) -> list[EvalFixture] | None:
 
 
 def eval_fixture_total(payload: EvalRequest) -> int:
-    selected = select_eval_fixtures(payload.fixtures)
-    return len(EVAL_FIXTURES) if selected is None else len(selected)
+    if payload.suite == "accuracy":
+        selected = select_eval_fixtures(payload.fixtures)
+        return len(EVAL_FIXTURES) if selected is None else len(selected)
+    catalog = _SUITE_CATALOGS.get(payload.suite)
+    return len(catalog) if catalog is not None else 0
 
 
 def initial_eval_progress(payload: EvalRequest) -> dict[str, Any]:
     return {"current": 0, "total": eval_fixture_total(payload), "in_flight": None}
 
 
-def fixture_row(fr: Any) -> dict[str, Any]:
-    task = fr.task_result
-    failed = getattr(task.status, "value", task.status) == "failed"
-    judge = fr.judge
-    score = None
+def _field(obj: Any, name: str, default: Any = None) -> Any:
+    if isinstance(obj, dict):
+        return obj.get(name, default)
+    return getattr(obj, name, default)
+
+
+def _as_float(value: Any) -> float | None:
+    if value is None or callable(value):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _row_id(fr: Any) -> str:
+    fixture = _field(fr, "fixture")
+    if fixture is not None:
+        ident = getattr(fixture, "id", None)
+        if ident:
+            return str(ident)
+    ident = _field(fr, "id")
+    return str(ident) if ident else ""
+
+
+def _row_failed(fr: Any) -> bool:
+    task = _field(fr, "task_result")
+    if task is not None:
+        status = getattr(task, "status", None)
+        if getattr(status, "value", status) == "failed":
+            return True
+    return bool(_field(fr, "error"))
+
+
+def _row_error(fr: Any) -> str | None:
+    task = _field(fr, "task_result")
+    if task is not None:
+        message = getattr(task, "error_message", None)
+        if message:
+            return str(message)
+    error = _field(fr, "error")
+    return str(error) if error else None
+
+
+def _attempt_judge_score(attempts: Any) -> float | None:
+    if not attempts:
+        return None
+    first = attempts[0]
+    judge = _field(first, "judge")
+    if judge is None or getattr(judge, "parse_failed", False):
+        return None
+    return _as_float(getattr(judge, "score", None))
+
+
+def _row_score(fr: Any, *, failed: bool) -> float | None:
+    if failed:
+        return None
+    judge = _field(fr, "judge")
     if judge is not None and not getattr(judge, "parse_failed", False):
-        score = judge.score
+        scored = _as_float(getattr(judge, "score", None))
+        if scored is not None:
+            return scored
+    for name in ("score", "overall_score", "pass_rate"):
+        scored = _as_float(_field(fr, name))
+        if scored is not None:
+            return scored
+    resistance = _field(fr, "resistance")
+    if resistance is not None:
+        scored = _as_float(getattr(resistance, "score", None))
+        if scored is not None:
+            return scored
+    scored = _attempt_judge_score(_field(fr, "attempts"))
+    if scored is not None:
+        return scored
+    outcome = _field(fr, "tool_outcome")
+    if outcome is None:
+        return None
+    key = str(getattr(outcome, "value", outcome))
+    if key == "dangerous_call":
+        return 0.0
+    if key == "safe_call":
+        return 1.0
+    return None
+
+
+def _row_tokens(fr: Any) -> int:
+    task = _field(fr, "task_result")
+    if task is not None:
+        return int(getattr(task, "total_tokens", 0) or 0)
+    direct = _field(fr, "total_tokens")
+    if direct is not None:
+        return int(direct)
+    attempts = _field(fr, "attempts") or []
+    if attempts:
+        return sum(int(_field(attempt, "total_tokens") or 0) for attempt in attempts)
+    runs = _field(fr, "runs") or []
+    if runs:
+        return sum(int(_field(run, "total_tokens") or 0) for run in runs)
+    return 0
+
+
+def _row_latency(fr: Any) -> float:
+    task = _field(fr, "task_result")
+    if task is not None:
+        return round(float(getattr(task, "latency_ms", 0.0) or 0.0), 1)
+    return round(float(_field(fr, "latency_ms") or 0.0), 1)
+
+
+def _row_response(fr: Any, *, failed: bool) -> str | None:
+    if failed:
+        return None
+    task = _field(fr, "task_result")
+    if task is not None:
+        return truncate_response(getattr(task, "response", None))
+    for name in ("response_text", "review_text", "response", "tool_text", "prose_text"):
+        value = _field(fr, name)
+        if value:
+            return truncate_response(str(value))
+    return None
+
+
+def row_cost(fr: Any) -> float:
+    task = _field(fr, "task_result")
+    if task is not None:
+        return float(getattr(task, "estimated_cost_usd", 0.0) or 0.0)
+    for name in ("estimated_cost_usd", "cost_usd"):
+        value = _field(fr, name)
+        if value is not None:
+            return float(value)
+    return 0.0
+
+
+def fixture_row(fr: Any) -> FixtureRow:
+    failed = _row_failed(fr)
     return {
-        "id": fr.fixture.id,
+        "id": _row_id(fr),
         "status": "failed" if failed else "success",
-        "score": None if failed else score,
-        "tokens": int(getattr(task, "total_tokens", 0) or 0),
-        "latency_ms": round(float(getattr(task, "latency_ms", 0.0) or 0.0), 1),
-        "response": None if failed else truncate_response(getattr(task, "response", None)),
-        "error": getattr(task, "error_message", None) or None,
+        "score": _row_score(fr, failed=failed),
+        "tokens": _row_tokens(fr),
+        "latency_ms": _row_latency(fr),
+        "response": _row_response(fr, failed=failed),
+        "error": _row_error(fr),
     }
 
 
@@ -150,6 +312,7 @@ class EvalJobReporter:
             result = {
                 **self._meta,
                 "overall_accuracy": None,
+                "overall_score": None,
                 "fixtures_run": 0,
                 "total_tokens": 0,
                 "total_cost_usd": 0.0,
@@ -159,8 +322,7 @@ class EvalJobReporter:
         result["fixtures"].append(row)
         result["fixtures_run"] = len(result["fixtures"])
         result["total_tokens"] = int(result["total_tokens"]) + int(row["tokens"])
-        cost = float(getattr(fr.task_result, "estimated_cost_usd", 0.0) or 0.0)
-        result["total_cost_usd"] = round(float(result["total_cost_usd"]) + cost, 6)
+        result["total_cost_usd"] = round(float(result["total_cost_usd"]) + row_cost(fr), 6)
         self.job.progress = {
             "current": result["fixtures_run"],
             "total": (self.job.progress or {}).get("total"),

@@ -102,6 +102,7 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
   <div id="job-detail" class="card">
     <h2>Job <button type="button" id="job-back" class="link">← all jobs</button></h2>
     <div id="job-summary"><p class="empty">Select a job.</p></div>
+    <div id="job-fixtures"></div>
   </div>
 
   <script>
@@ -208,8 +209,10 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
     async function loadJobDetail(jobId) {
       const panel = document.getElementById("job-detail");
       const summary = document.getElementById("job-summary");
+      const fixtures = document.getElementById("job-fixtures");
       panel.classList.add("visible");
       emptyNote(summary, "Loading " + jobId.slice(0, 8) + "…");
+      if (fixtures) fixtures.textContent = "";
       const data = await get("/api/v1/jobs/" + encodeURIComponent(jobId));
       if (!data || !data.job_id) {
         emptyNote(summary, "Job not found.");
@@ -223,6 +226,24 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
         data.error && data.error.message ? data.error.message : "",
       ].filter(Boolean).join(" · ");
       summary.appendChild(meta);
+      const jobResult = data["result"];
+      const rawFixtures = (jobResult && jobResult.fixtures) || [];
+      const fixtureRows = rawFixtures.map(function (f) {
+        return [
+          f.id,
+          f.score == null ? "-" : Number(f.score).toFixed(2),
+          f.status || "-",
+          f.tokens == null ? "-" : String(f.tokens),
+          f.latency_ms == null ? "-" : Math.round(f.latency_ms) + "ms",
+        ];
+      });
+      if (fixtureRows.length) {
+        renderTable(
+          "job-fixtures",
+          fixtureRows,
+          ["Fixture", "Score", "Status", "Tokens", "Latency"],
+        );
+      }
     }
 
     async function loadRunDetail(runId) {

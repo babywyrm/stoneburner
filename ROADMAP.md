@@ -201,7 +201,8 @@ and `--effort` on every generate path including the tool channel.
 Planning labels `v0.21.0`–`v0.23.0` above already shipped in earlier
 releases; they are not this tag.
 
-Next is operator comfort, then the same job document everywhere else.
+Job document parity is in: every eval suite grows `result.fixtures`.
+Next is operator comfort.
 
 - [ ] **REPL line editing.** v1 is `input()`, so up-arrow prints
       `^[[A`. Stdlib `readline` is the small path (history in the
@@ -217,16 +218,13 @@ Next is operator comfort, then the same job document everywhere else.
       scoring. Keep Ctrl-C as “stop polling, not the job.” A higher
       default or `wait` with no cap (Ctrl-C only) is the product
       question; do not invent SSE to solve it.
-- [ ] **Live fixture rows on every eval suite.** Accuracy grows
-      `result.fixtures` and `progress.in_flight` (`generate` /
-      `judge`). rag, multiturn, adversarial, codegen, refusal,
-      redblue, toolcall, and codereview still sit on coarse
-      `in_flight: running`. Same job document, more reporters. No
-      second schema.
-- [ ] **Dashboard job fixtures.** `#job=` polls status. It should
-      render the growing `result.fixtures` table the same way
-      `#run=` renders a recorded run. The fake-DOM harness already
-      exists (`tests/test_dashboard_script.py`).
+- [x] **Live fixture rows on every eval suite.** Same row shape on
+      every `POST /evals` job. `progress.total` is the suite catalog.
+      Accuracy still records generate/judge `in_flight`; other suites
+      append rows as each fixture finishes. No second schema.
+- [x] **Dashboard job fixtures.** `#job=` renders the growing
+      `result.fixtures` table (id, score, status, tokens, latency)
+      via `textContent`. Responses stay on `get_job`.
 
 ## Beyond
 

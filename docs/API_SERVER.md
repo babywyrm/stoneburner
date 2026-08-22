@@ -179,8 +179,10 @@ The dashboard auto-refreshes every 10 seconds and shows:
   open `#run=<id>`) to see fixture scores. Prompts and raw judge JSON are
   not sent to the browser.
 - Hourly token trends (eval and benchmark fixtures)
-- In-memory API jobs. Click a job id (or `#job=<id>`) to watch status on
-  the 10s refresh. The list omits `result`; the panel never renders it.
+- In-memory API jobs. Click a job id (or `#job=<id>`) to watch status and
+  the `result.fixtures` table (id, score, status, tokens, latency) on the
+  10s refresh. The list omits `result`; the panel never dumps responses
+  or the raw JSON.
 - Active distributed jobs and their mode
 - Registered workers and their capabilities/labels
 - Provider/model success-rate comparison bars
@@ -211,11 +213,13 @@ worse).
 | `codereview` | review score | Planted-vuln detection vs false positives |
 
 `GET /jobs/{id}` includes resolved `request` (suite, provider, model, judge,
-host) at submit time. Eval jobs also carry `progress` (`current` / `total` /
-`in_flight` with `generate` or `judge`) and grow `result.fixtures` as each
-fixture finishes (id, status, score, tokens, latency, truncated response,
-error). `POST /evals` accepts optional `host`, same meaning as
-`GET /models`. `list_jobs` includes a short `request` and omits fixture rows.
+host) at submit time. Every eval suite carries `progress` (`current` /
+`total` from that suite's catalog; accuracy honours a fixture-id subset)
+and grows `result.fixtures` as each fixture finishes — same row shape
+(id, status, score, tokens, latency, truncated response, error). Accuracy
+also sets `in_flight` to `generate` or `judge`. `POST /evals` accepts
+optional `host`, same meaning as `GET /models`. `list_jobs` includes a
+short `request` and omits fixture rows.
 
 `probe` is CLI-only. Load tests have their own endpoints, not `suite` values.
 

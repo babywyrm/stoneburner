@@ -154,7 +154,8 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
         the server's default ceiling. `host` is the inference endpoint
         (same meaning as `list_models`). `effort` / `reasoning_mode` are the
         shared reasoning dial (same values as `provider_test`). Poll
-        `get_job` for live `request` / `progress` and the result.
+        `get_job` for live `request` / `progress` and growing
+        `result.fixtures` (every suite).
         """
         return api.submit_eval(
             suite=suite,
@@ -249,7 +250,11 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
 
     @server.tool(annotations=READ_ONLY)
     def get_job(job_id: str) -> Any:
-        """Fetch a submitted job's status and, once `completed`, its result."""
+        """Fetch a submitted job's status, live progress, and growing result.
+
+        Eval jobs append `result.fixtures` as each fixture finishes (every
+        suite). Status is `completed`, not `finished`.
+        """
         return api.get_job(job_id)
 
     @server.tool(annotations=READ_ONLY)
