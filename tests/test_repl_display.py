@@ -11,6 +11,12 @@ from atomics.repl.display import (
 )
 
 
+def test_sweep_in_flight_line() -> None:
+    assert format_in_flight({"model": "qwen3:14b", "suite": "eval"}) == (
+        "  qwen3:14b  eval"
+    )
+
+
 def test_in_flight_line() -> None:
     assert format_in_flight(
         {"fixture_id": "ev-25", "phase": "judge", "model": "llama3.2:1b"}

@@ -11,6 +11,7 @@ from pydantic import ValidationError
 
 from atomics.api._sweep import run_sweep_from_request
 from atomics.api.config import ServerSettings
+from atomics.api.jobs import Job, JobStatus
 from atomics.api.models import MAX_SWEEP_MODELS, MAX_SWEEP_RUNS, SweepRequest
 from atomics.api.server import create_app
 from atomics.eval.budget import GuardedProvider
@@ -173,6 +174,57 @@ async def test_post_sweeps_returns_a_job():
         )
     assert resp.status_code == 202
     assert resp.json()["kind"] == "sweep"
+
+
+@pytest.mark.asyncio
+async def test_run_sweep_grows_job_rows():
+    payload = SweepRequest(
+        provider="ollama",
+        models=["a", "b"],
+        suites=["eval"],
+        budget_usd=2.0,
+    )
+
+    async def instant_suite(*, model: str, suite: str, skip_incapable: bool):
+        return SuiteJobResult(model=model, suite=suite, ok=True, headline=0.8)
+
+    job = Job(job_id="sw", kind="sweep", status=JobStatus.RUNNING, created_at=0.0)
+    with (
+        patch("atomics.api._sweep._provider_for", return_value=SimpleNamespace(name="ollama")),
+        patch("atomics.api._sweep.make_suite_runner", return_value=instant_suite),
+    ):
+        result = await run_sweep_from_request(payload, job=job)
+
+    assert job.progress["total"] == 2
+    assert job.progress["current"] == 2
+    assert job.result["jobs"][0]["model"] == "a"
+    assert job.result["jobs"][1]["model"] == "b"
+    assert result["jobs"][0]["headline"] == 0.8
+
+
+@pytest.mark.asyncio
+async def test_post_sweeps_includes_progress_total():
+    app = create_app(settings=ServerSettings(no_auth=True))
+    with (
+        patch(
+            "atomics.api.routes.run_sweep_from_request",
+            new_callable=AsyncMock,
+            return_value={"ok": 1, "fail": 0, "jobs": []},
+        ),
+        TestClient(app) as client,
+    ):
+        resp = client.post(
+            "/api/v1/sweeps",
+            json={
+                "provider": "ollama",
+                "models": ["qwen3:14b", "granite4.1:8b"],
+                "suites": ["eval", "refusal"],
+                "budget_usd": 1.5,
+            },
+        )
+    assert resp.status_code == 202
+    assert resp.json()["progress"]["total"] == 4
+    assert resp.json()["progress"]["current"] == 0
 
 
 def test_post_sweeps_without_budget_is_422():
