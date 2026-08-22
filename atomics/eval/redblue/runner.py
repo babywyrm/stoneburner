@@ -24,6 +24,7 @@ from atomics.eval.judge import (
 )
 from atomics.eval.outcomes import RunIntegrity
 from atomics.eval.redblue.fixtures import ALL_FIXTURES, BLUE_FIXTURES, RED_FIXTURES, RedBlueFixture
+from atomics.eval.runner import _call_hook
 from atomics.eval.suite_integrity import fixture_outcome, headline_rate, integrity_of
 from atomics.models import TaskCategory, TaskResult, TaskStatus
 from atomics.providers.base import BaseProvider
@@ -201,6 +202,7 @@ async def run_redblue(
     min_output_tokens: int | None = None,
     on_fixture_start: Callable[..., object] | None = None,
     on_fixture_done: Callable[..., object] | None = None,
+    on_phase: Callable[..., object] | None = None,
     on_run_done: Callable[..., object] | None = None,
 ) -> RedBlueSummary:
     """Run red/blue fixtures against provider, judge with quality scorer.
@@ -265,6 +267,8 @@ async def run_redblue(
                     model=model,
                     min_output_tokens=min_output_tokens,
                 )
+                generate_model = model or getattr(provider, "default_model", None)
+                await _call_hook(on_phase, fixture.id, "generate", generate_model)
                 resp = await provider.generate(
                     fixture.prompt,
                     system="You are a highly knowledgeable security engineering assistant.",
@@ -310,6 +314,8 @@ async def run_redblue(
                 )
                 continue
 
+            judge_tag = judge_model or getattr(judge_provider, "default_model", None)
+            await _call_hook(on_phase, fixture.id, "judge", judge_tag)
             judge = await score_consensus(
                 fixture.prompt,
                 resp.text,

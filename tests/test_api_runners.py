@@ -9,6 +9,7 @@ import pytest
 from fastapi import HTTPException
 
 from atomics.api import _runners as runners
+from atomics.api.jobs import Job, JobStatus
 from atomics.api.models import EvalRequest, RunRequest
 from atomics.eval.budget import GuardedProvider
 from atomics.providers.factory import ProviderConfigError
@@ -304,6 +305,66 @@ async def test_run_eval_suite_dispatches(
     assert result["fixtures_run"] == len(getattr(summary, fixtures_attr))
     assert result["total_tokens"] == summary.total_tokens
     assert result["total_cost_usd"] == summary.total_cost_usd
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "suite,runner_attr,summary",
+    [
+        (
+            "rag",
+            "run_rag",
+            SimpleNamespace(fixture_results=[], total_tokens=0, total_cost_usd=0.0),
+        ),
+        (
+            "multiturn",
+            "run_multiturn",
+            SimpleNamespace(conversation_results=[], total_tokens=0, total_cost_usd=0.0),
+        ),
+        (
+            "adversarial",
+            "run_adversarial",
+            SimpleNamespace(fixture_results=[], total_tokens=0, total_cost_usd=0.0),
+        ),
+        (
+            "codegen",
+            "run_codegen",
+            SimpleNamespace(fixture_results=[], total_tokens=0, total_cost_usd=0.0),
+        ),
+        (
+            "refusal",
+            "run_refusal",
+            SimpleNamespace(fixture_results=[], total_tokens=0, total_cost_usd=0.0),
+        ),
+        (
+            "redblue",
+            "run_redblue",
+            SimpleNamespace(fixture_results=[], total_tokens=0, total_cost_usd=0.0),
+        ),
+        (
+            "codereview",
+            "run_codereview",
+            SimpleNamespace(fixture_results=[], total_tokens=0, total_cost_usd=0.0),
+        ),
+        (
+            "toolcall",
+            "run_toolcall_suite",
+            SimpleNamespace(fixtures=[], total_tokens=0, total_cost_usd=0.0),
+        ),
+    ],
+)
+async def test_run_eval_suite_forwards_on_phase_when_job_set(suite, runner_attr, summary):
+    payload = EvalRequest(suite=suite, provider="ollama", model="m1")
+    job = Job(job_id="j", kind="eval", status=JobStatus.RUNNING, created_at=0.0)
+    with (
+        patch.object(runners, "_provider_for", side_effect=[MagicMock(), MagicMock()]),
+        patch.object(
+            runners, runner_attr, new_callable=AsyncMock, return_value=summary
+        ) as mock_run,
+    ):
+        await runners.run_eval_suite(payload, job=job)
+
+    assert callable(mock_run.await_args.kwargs["on_phase"])
 
 
 @pytest.mark.asyncio

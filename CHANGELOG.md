@@ -16,6 +16,13 @@
   that suite's catalog, not always the accuracy count. Dashboard
   `#job=` renders the table. REPL `wait --verbose` works for any
   `submit_eval` suite.
+- **Sweep job progress.** `POST /sweeps` grows `result.jobs` as each
+  models×suites cell finishes. `progress.total` is that cell count.
+  `in_flight` is `{model, suite}`. Dashboard `#job=` and REPL `wait`
+  print the cells.
+- **Generate/judge `in_flight` on every eval suite.** Same
+  `on_phase(fixture_id, phase, model)` hook as accuracy. Codegen is
+  generate only (sandbox tests, no LLM judge).
 
 ### Fixed
 - Eval job `progress.total` counted the accuracy catalog (25) for

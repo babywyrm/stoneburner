@@ -3,22 +3,24 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from atomics.api.job_progress import (
     RESPONSE_LIMIT,
     EvalJobReporter,
+    SweepJobReporter,
     eval_fixture_total,
     fixture_row,
     resolve_eval_request,
     resolve_inference_host,
     short_request,
+    sweep_job_total,
     truncate_response,
 )
 from atomics.api.jobs import Job, JobStatus
-from atomics.api.models import EvalRequest
+from atomics.api.models import EvalRequest, SweepRequest
 from atomics.config import AtomicsSettings
 from atomics.eval.fixtures import EVAL_FIXTURES
 from atomics.eval.runner import run_eval
@@ -212,6 +214,52 @@ def test_fixture_row_truncates_response() -> None:
     assert row["response"] == "z" * RESPONSE_LIMIT
 
 
+def test_sweep_job_total_is_models_times_suites() -> None:
+    payload = SweepRequest(
+        provider="ollama",
+        models=["a", "b"],
+        suites=["eval", "refusal"],
+        budget_usd=1.0,
+    )
+    assert sweep_job_total(payload) == 4
+
+
+def test_sweep_reporter_grows_jobs_and_clears_in_flight() -> None:
+    job = Job(job_id="s", kind="sweep", status=JobStatus.RUNNING, created_at=0.0)
+    reporter = SweepJobReporter(
+        job,
+        provider="ollama",
+        models=["a", "b"],
+        suites=["eval"],
+        runs=1,
+        budget_usd=2.0,
+        total=2,
+    )
+    reporter.start("a", "eval")
+    assert job.progress == {
+        "current": 0,
+        "total": 2,
+        "in_flight": {"model": "a", "suite": "eval"},
+    }
+    reporter.done(
+        SimpleNamespace(
+            model="a",
+            suite="eval",
+            ok=True,
+            headline=0.9,
+            error=None,
+            tool_capable=None,
+            exit_code=0,
+        )
+    )
+    assert job.progress["current"] == 1
+    assert job.progress["in_flight"] is None
+    assert job.result is not None
+    assert job.result["jobs"][0]["model"] == "a"
+    assert job.result["jobs"][0]["headline"] == 0.9
+    assert job.result["ok"] == 1
+
+
 def test_reporter_grows_result_and_clears_in_flight() -> None:
     job = Job(job_id="j", kind="eval", status=JobStatus.RUNNING, created_at=0.0)
     reporter = EvalJobReporter(
@@ -321,6 +369,70 @@ async def test_run_eval_skips_judge_phase_on_generate_failure() -> None:
         provider,
         judge_provider=judge,
         fixtures=[EVAL_FIXTURES[0]],
+        on_phase=lambda _fid, phase, _model: phases.append(phase),
+    )
+    assert phases == ["generate"]
+
+
+@pytest.mark.asyncio
+async def test_run_rag_on_phase_generate_then_judge() -> None:
+    from atomics.eval.rag.fixtures import ALL_RAG_FIXTURES
+    from atomics.eval.rag.runner import run_rag
+
+    phases: list[tuple[str, str, str | None]] = []
+    resp = ProviderResponse(
+        text="ok",
+        input_tokens=1,
+        output_tokens=1,
+        total_tokens=2,
+        model="m",
+        latency_ms=1.0,
+        estimated_cost_usd=0.0,
+    )
+    provider = MagicMock()
+    provider.name = "test"
+    provider.generate = AsyncMock(return_value=resp)
+    provider.default_model = "under-test"
+    judge = MagicMock()
+    judge.name = "ollama"
+    judge.default_model = "judge-tag"
+    scored = SimpleNamespace(
+        score=0.8,
+        rationale="ok",
+        parse_failed=False,
+        grounding=3,
+        faithfulness=3,
+        abstention=2,
+    )
+
+    with patch("atomics.eval.rag.runner.score_rag_consensus", new=AsyncMock(return_value=scored)):
+        await run_rag(
+            provider,
+            judge_provider=judge,
+            model="under-test",
+            judge_model="judge-tag",
+            fixtures=[ALL_RAG_FIXTURES[0]],
+            on_phase=lambda fid, phase, model: phases.append((fid, phase, model)),
+        )
+    assert phases[0] == (ALL_RAG_FIXTURES[0].id, "generate", "under-test")
+    assert phases[1] == (ALL_RAG_FIXTURES[0].id, "judge", "judge-tag")
+
+
+@pytest.mark.asyncio
+async def test_run_codegen_on_phase_generate_only() -> None:
+    from atomics.eval.codegen.fixtures import ALL_CODEGEN_FIXTURES
+    from atomics.eval.codegen.runner import run_codegen
+
+    phases: list[str] = []
+    provider = MagicMock()
+    provider.name = "test"
+    provider.generate = AsyncMock(side_effect=ConnectionError("down"))
+    provider.default_model = "m"
+
+    await run_codegen(
+        provider,
+        model="m",
+        fixtures=[ALL_CODEGEN_FIXTURES[0]],
         on_phase=lambda _fid, phase, _model: phases.append(phase),
     )
     assert phases == ["generate"]

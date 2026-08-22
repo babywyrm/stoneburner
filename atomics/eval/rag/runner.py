@@ -16,6 +16,7 @@ from atomics.eval.rag import RAGFixture
 from atomics.eval.rag.fixtures import ALL_RAG_FIXTURES
 from atomics.eval.rag.judge import RAGJudgeResult, compute_hallucination, score_rag_consensus
 from atomics.eval.rag.retrieval import RAGIndex
+from atomics.eval.runner import _call_hook
 from atomics.eval.suite_integrity import fixture_outcome, integrity_of
 from atomics.models import TaskCategory, TaskResult, TaskStatus
 from atomics.providers.base import BaseProvider
@@ -204,6 +205,7 @@ async def run_rag(
     extra_judges: list[tuple[BaseProvider, str | None]] | None = None,
     run_id: str | None = None,
     on_fixture_done: Callable[[RAGFixtureResult], None] | None = None,
+    on_phase: Callable[..., object] | None = None,
     thinking: bool | None = None,
     thinking_budget: int | None = None,
     effort: str | None = None,
@@ -262,6 +264,9 @@ async def run_rag(
         if reasoning_mode is not None:
             gen_kwargs["reasoning_mode"] = reasoning_mode
 
+        generate_model = model or getattr(provider, "default_model", None)
+        await _call_hook(on_phase, fixture.id, "generate", generate_model)
+
         try:
             resp = await provider.generate(prompt, **gen_kwargs)
             tr = TaskResult(
@@ -303,6 +308,8 @@ async def run_rag(
                 on_fixture_done(fr)
             continue
 
+        judge_tag = judge_model or getattr(effective_judge, "default_model", None)
+        await _call_hook(on_phase, fixture.id, "judge", judge_tag)
         judge_result = await score_rag_consensus(
             response=resp.text,
             fixture=effective_fixture,

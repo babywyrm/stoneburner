@@ -19,6 +19,7 @@ from atomics.eval.multiturn.judge import (
     score_turn,
 )
 from atomics.eval.outcomes import RunIntegrity
+from atomics.eval.runner import _call_hook
 from atomics.eval.suite_integrity import fixture_outcome, integrity_of
 from atomics.models import TaskCategory, TaskResult, TaskStatus
 from atomics.providers.base import BaseProvider
@@ -212,6 +213,7 @@ async def run_multiturn(
     extra_judges: list[tuple[BaseProvider, str | None]] | None = None,
     run_id: str | None = None,
     on_conversation_done: Callable[[ConversationResult], None] | None = None,
+    on_phase: Callable[..., object] | None = None,
     thinking: bool | None = None,
     thinking_budget: int | None = None,
     effort: str | None = None,
@@ -255,6 +257,9 @@ async def run_multiturn(
             if reasoning_mode is not None:
                 gen_kwargs["reasoning_mode"] = reasoning_mode
 
+            generate_model = model or getattr(provider, "default_model", None)
+            await _call_hook(on_phase, fixture.id, "generate", generate_model)
+
             try:
                 resp = await provider.generate(prompt, **gen_kwargs)
                 response_text = resp.text
@@ -276,6 +281,8 @@ async def run_multiturn(
 
             if response_text and not conversation_failed:
                 full_transcript = _build_transcript(fixture.system_prompt, completed_turns)
+                judge_tag = judge_model or getattr(effective_judge, "default_model", None)
+                await _call_hook(on_phase, fixture.id, "judge", judge_tag)
                 turn_judge = await score_turn(
                     transcript=full_transcript,
                     user_message=turn.user_message,
@@ -304,6 +311,8 @@ async def run_multiturn(
 
         full_transcript = _build_transcript(fixture.system_prompt, completed_turns)
         if not conversation_failed:
+            judge_tag = judge_model or getattr(effective_judge, "default_model", None)
+            await _call_hook(on_phase, fixture.id, "judge", judge_tag)
             panel = [
                 await score_conversation(
                     transcript=full_transcript,

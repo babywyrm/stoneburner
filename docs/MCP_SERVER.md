@@ -88,7 +88,7 @@ ATOMICS_API_URL="https://atomics.internal:8000" uv run atomics mcp
 | `health` | yes | Check the API server is reachable |
 | `list_models` | yes | List tags on Ollama or vLLM |
 | `list_jobs` | yes | In-memory API jobs (short `request`; no fixture rows — poll `get_job`) |
-| `get_job` | yes | Status, resolved `request`, live `progress`, and growing `result.fixtures` |
+| `get_job` | yes | Status, resolved `request`, live `progress`, growing `result.fixtures`, and sweep `result.jobs` |
 | `get_run` | yes | One persisted run and its fixtures (prompts omitted) |
 | `compare` | yes | Compare recorded results by provider or model |
 | `recent_runs` | yes | List recent recorded runs |
@@ -161,10 +161,12 @@ on the CLI.
 Poll `get_job` until `status` is `completed`. While it runs, `request` names
 the suite / model / host, `progress` counts fixtures, and `result.fixtures`
 grows as each fixture finishes — every `submit_eval` suite, not only
-accuracy. Accuracy also sets `progress.in_flight` to the current generate
-or judge call. The API uses `completed`, not `finished`. No tool blocks on
-model work, which is what keeps a long eval from timing out an agent's
-tool call. The server's `instructions` tell the agent to do this.
+accuracy. Every suite sets `progress.in_flight` to the current generate
+or judge call (codegen is generate only). A sweep counts models × suites
+instead, grows `result.jobs`, and sets `in_flight` to `{model, suite}`.
+The API uses `completed`, not `finished`. No tool blocks on model work,
+which is what keeps a long eval from timing out an agent's tool call.
+The server's `instructions` tell the agent to do this.
 
 ### Errors
 
