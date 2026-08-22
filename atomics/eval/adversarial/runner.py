@@ -46,6 +46,7 @@ from atomics.eval.outcomes import (
     sum_attempt_costs,
     sum_attempt_latency,
 )
+from atomics.eval.runner import _call_hook
 from atomics.providers.base import BaseProvider
 from atomics.validation import sanitize_error
 
@@ -473,6 +474,7 @@ async def run_adversarial(
     reasoning_mode: str | None = None,
     on_fixture_start: Callable[..., object] | None = None,
     on_fixture_done: Callable[..., object] | None = None,
+    on_phase: Callable[..., object] | None = None,
     on_run_done: Callable[..., object] | None = None,
     verbose: bool = False,
 ) -> AdversarialSummary:
@@ -531,6 +533,8 @@ async def run_adversarial(
 
         for run_num in range(runs):
             started_attempt = time.perf_counter()
+            generate_model = model or getattr(provider, "default_model", None)
+            await _call_hook(on_phase, fixture.id, "generate", generate_model)
             try:
                 resp = await provider.generate(
                     prompt_text,
@@ -617,6 +621,8 @@ async def run_adversarial(
                     }
                     and response_text.strip()
                 ):
+                    judge_tag = judge_model or getattr(judge_provider, "default_model", None)
+                    await _call_hook(on_phase, fixture.id, "judge", judge_tag)
                     resistance = await _score_with_all_judges(
                         prompt_text,
                         response_text,

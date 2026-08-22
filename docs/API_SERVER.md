@@ -181,8 +181,9 @@ The dashboard auto-refreshes every 10 seconds and shows:
 - Hourly token trends (eval and benchmark fixtures)
 - In-memory API jobs. Click a job id (or `#job=<id>`) to watch status and
   the `result.fixtures` table (id, score, status, tokens, latency) on the
-  10s refresh. The list omits `result`; the panel never dumps responses
-  or the raw JSON.
+  10s refresh. Sweep jobs also render `result.jobs` (model, suite,
+  status, headline). The list omits `result`; the panel never dumps
+  responses or the raw JSON.
 - Active distributed jobs and their mode
 - Registered workers and their capabilities/labels
 - Provider/model success-rate comparison bars
@@ -216,10 +217,11 @@ worse).
 host) at submit time. Every eval suite carries `progress` (`current` /
 `total` from that suite's catalog; accuracy honours a fixture-id subset)
 and grows `result.fixtures` as each fixture finishes — same row shape
-(id, status, score, tokens, latency, truncated response, error). Accuracy
-also sets `in_flight` to `generate` or `judge`. `POST /evals` accepts
-optional `host`, same meaning as `GET /models`. `list_jobs` includes a
-short `request` and omits fixture rows.
+(id, status, score, tokens, latency, truncated response, error). Every
+suite sets `in_flight` to `generate` or `judge` (codegen is generate
+only). `POST /evals` accepts optional `host`, same meaning as
+`GET /models`. `list_jobs` includes a short `request` and omits fixture
+rows.
 
 `probe` is CLI-only. Load tests have their own endpoints, not `suite` values.
 
@@ -237,7 +239,9 @@ Unlike a single eval, **`budget_usd` has no default** — omit it and the
 request is `422`. Name the models; there is no `--all-local` / discover-
 everything flag (call `GET /models` first). Caps: 8 models, 3 runs, suites
 from `eval`, `redblue`, `refusal`, `toolcall`, `codereview` (note `eval`,
-not `accuracy`).
+not `accuracy`). While it runs, `progress.total` is models × suites,
+`in_flight` is `{model, suite}`, and `result.jobs` grows as each cell
+finishes.
 
 ```bash
 curl -H "X-API-Key: $ATOMICS_API_KEY" -H "Content-Type: application/json" \

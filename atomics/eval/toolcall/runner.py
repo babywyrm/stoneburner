@@ -38,6 +38,7 @@ from atomics.eval.attempt_serialization import integrity_to_dict
 from atomics.eval.consensus import NumericVote, combine_numeric
 from atomics.eval.judge import detect_self_judge
 from atomics.eval.outcomes import RunIntegrity
+from atomics.eval.runner import _call_hook
 from atomics.eval.suite_integrity import fixture_outcome, integrity_of
 from atomics.eval.toolcall.catalog import PROBE_PROMPT, PROBE_TOOL, schemas_for
 from atomics.eval.toolcall.fixtures import ToolCallFixture
@@ -349,6 +350,7 @@ async def run_toolcall_suite(
     run_id: str | None = None,
     on_fixture_start: Callable[..., object] | None = None,
     on_fixture_done: Callable[..., object] | None = None,
+    on_phase: Callable[..., object] | None = None,
     on_run_done: Callable[..., object] | None = None,
 ) -> ToolCallSummary:
     """Run the suite, returning per-fixture results and the divergence measures.
@@ -410,6 +412,9 @@ async def run_toolcall_suite(
             if inspect.isawaitable(result):
                 await result
 
+        generate_model = model or getattr(provider, "default_model", None)
+        await _call_hook(on_phase, fixture.id, "generate", generate_model)
+
         per_run: list[dict[str, Any]] = []
         for run_number in range(runs):
             record = await _run_once(
@@ -425,6 +430,7 @@ async def run_toolcall_suite(
                 effort=effort,
                 reasoning_mode=reasoning_mode,
                 run_number=run_number,
+                on_phase=on_phase,
             )
             per_run.append(record)
             if on_run_done:
@@ -460,6 +466,7 @@ async def _run_once(
     effort: str | None,
     reasoning_mode: str | None,
     run_number: int,
+    on_phase: Callable[..., object] | None = None,
 ) -> dict[str, Any]:
     """One paired pass over one fixture.
 
@@ -547,6 +554,9 @@ async def _run_once(
 
         record["cost_usd"] += prose.estimated_cost_usd
         record["prose_text"] = prose.text
+        if judge_provider is not None and prose.text.strip():
+            judge_tag = judge_model or getattr(judge_provider, "default_model", None)
+            await _call_hook(on_phase, fixture.id, "judge", judge_tag)
         judged = await _judge(
             fixture,
             prose.text,

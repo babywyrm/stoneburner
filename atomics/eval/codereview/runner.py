@@ -53,6 +53,7 @@ from atomics.eval.outcomes import (
     provider_outcome_from_exception,
 )
 from atomics.eval.provider_attempt import build_attempt, provider_outcome_from_response
+from atomics.eval.runner import _call_hook
 from atomics.eval.suite_integrity import headline_rate
 from atomics.providers.base import BaseProvider
 
@@ -210,6 +211,7 @@ async def run_codereview(
     fixtures: list[SecureCodeFixture] | None = None,
     on_fixture_start: Callable[[SecureCodeFixture], object] | None = None,
     on_fixture_done: Callable[[CodeReviewResult], object] | None = None,
+    on_phase: Callable[..., object] | None = None,
 ) -> CodeReviewSummary:
     """Run secure-code-review fixtures and score detection vs false positives."""
     extra_judges = extra_judges or []
@@ -233,6 +235,8 @@ async def run_codereview(
     for fx in fixture_set:
         await _invoke_callback(on_fixture_start, fx)
         response = None
+        generate_model = model or getattr(provider, "default_model", None)
+        await _call_hook(on_phase, fx.id, "generate", generate_model)
         try:
             unit = "unified diff" if fx.mode == "diff" else "code snippet"
             review_prompt = _REVIEW_TEMPLATE.format(
@@ -257,6 +261,8 @@ async def run_codereview(
         judge_outcome: JudgeOutcome | None = None
         judge_agreement: float | None = None
         if provider_outcome.is_scorable and response is not None and response.text.strip():
+            judge_tag = judge_model or getattr(judge_provider, "default_model", None)
+            await _call_hook(on_phase, fx.id, "judge", judge_tag)
             judge_outcome, judge_agreement = await _judge_with_panel(
                 fx,
                 response.text,

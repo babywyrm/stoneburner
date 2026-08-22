@@ -211,11 +211,16 @@ Job document parity and operator comfort are in.
       `failed`. Ctrl-C stops polling, not the job. No SSE.
 - [x] **Live fixture rows on every eval suite.** Same row shape on
       every `POST /evals` job. `progress.total` is the suite catalog.
-      Accuracy still records generate/judge `in_flight`; other suites
-      append rows as each fixture finishes. No second schema.
+      Every suite records generate/judge `in_flight` (codegen is
+      generate only) and appends rows as each fixture finishes.
+      No second schema.
 - [x] **Dashboard job fixtures.** `#job=` renders the growing
       `result.fixtures` table (id, score, status, tokens, latency)
       via `textContent`. Responses stay on `get_job`.
+- [x] **Sweep live cells.** `POST /sweeps` grows `result.jobs`.
+      `progress.total` is models × suites. `in_flight` is
+      `{model, suite}`. Dashboard `#job=` renders the jobs table.
+      Stress/soak stay headline-only.
 
 ## Beyond
 

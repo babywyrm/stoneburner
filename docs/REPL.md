@@ -47,8 +47,10 @@ accuracy  llama3.2:1b  http://192.168.1.79:11434
 
 `--verbose` adds latency and the truncated reply under each score line.
 The same quiet / `--verbose` lines work for every `submit_eval` suite
-once `result.fixtures` grows. Accuracy still prints generate/judge
-phase lines; other suites print a score line as each fixture lands.
+once `result.fixtures` grows. Every suite prints generate/judge phase
+lines (codegen is generate only) and a score line as each fixture
+lands. Sweep `wait` prints `model  suite` per cell, then
+`N ok  M fail  K jobs`.
 
 `probe`, hours-long soak, contention, and profiles stay on the CLI.
 

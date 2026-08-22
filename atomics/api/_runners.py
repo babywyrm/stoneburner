@@ -292,6 +292,7 @@ async def run_eval_suite(payload: EvalRequest, job: Job | None = None) -> dict[s
 
     reporter = _eval_reporter(payload, job, suite)
     on_done = reporter.fixture_done if reporter is not None else None
+    on_phase = reporter.phase if reporter is not None else None
 
     def on_toolcall_done(_index: int, _fixture: object, aggregated: object) -> None:
         if reporter is not None:
@@ -311,6 +312,7 @@ async def run_eval_suite(payload: EvalRequest, job: Job | None = None) -> dict[s
                 effort=payload.effort,
                 reasoning_mode=payload.reasoning_mode,
                 on_fixture_done=on_done,
+                on_phase=on_phase,
             )
             fixtures_run = len(summary.fixture_results)
         elif suite == "multiturn":
@@ -323,6 +325,7 @@ async def run_eval_suite(payload: EvalRequest, job: Job | None = None) -> dict[s
                 effort=payload.effort,
                 reasoning_mode=payload.reasoning_mode,
                 on_conversation_done=on_done,
+                on_phase=on_phase,
             )
             fixtures_run = len(summary.conversation_results)
         elif suite == "adversarial":
@@ -335,6 +338,7 @@ async def run_eval_suite(payload: EvalRequest, job: Job | None = None) -> dict[s
                 effort=payload.effort,
                 reasoning_mode=payload.reasoning_mode,
                 on_fixture_done=on_done,
+                on_phase=on_phase,
             )
             fixtures_run = len(summary.fixture_results)
         elif suite == "codegen":
@@ -345,6 +349,7 @@ async def run_eval_suite(payload: EvalRequest, job: Job | None = None) -> dict[s
                 effort=payload.effort,
                 reasoning_mode=payload.reasoning_mode,
                 on_fixture_done=on_done,
+                on_phase=on_phase,
             )
             fixtures_run = len(summary.fixture_results)
         elif suite == "refusal":
@@ -357,6 +362,7 @@ async def run_eval_suite(payload: EvalRequest, job: Job | None = None) -> dict[s
                 effort=payload.effort,
                 reasoning_mode=payload.reasoning_mode,
                 on_fixture_done=on_done,
+                on_phase=on_phase,
             )
             fixtures_run = len(summary.fixture_results)
         elif suite == "redblue":
@@ -369,6 +375,7 @@ async def run_eval_suite(payload: EvalRequest, job: Job | None = None) -> dict[s
                 effort=payload.effort,
                 reasoning_mode=payload.reasoning_mode,
                 on_fixture_done=on_done,
+                on_phase=on_phase,
             )
             fixtures_run = len(summary.fixture_results)
         elif suite == "codereview":
@@ -381,6 +388,7 @@ async def run_eval_suite(payload: EvalRequest, job: Job | None = None) -> dict[s
                 effort=payload.effort,
                 reasoning_mode=payload.reasoning_mode,
                 on_fixture_done=on_done,
+                on_phase=on_phase,
             )
             fixtures_run = len(summary.fixture_results)
         elif suite == "toolcall":
@@ -396,6 +404,7 @@ async def run_eval_suite(payload: EvalRequest, job: Job | None = None) -> dict[s
                 effort=payload.effort,
                 reasoning_mode=payload.reasoning_mode,
                 on_fixture_done=on_toolcall_done if reporter is not None else None,
+                on_phase=on_phase,
             )
             fixtures_run = len(summary.fixtures)
         else:  # pragma: no cover - guarded by validate_eval_suite

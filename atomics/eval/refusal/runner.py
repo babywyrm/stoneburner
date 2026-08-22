@@ -55,6 +55,7 @@ from atomics.eval.refusal.scorer import (
     classification_to_score,
     classify_response,
 )
+from atomics.eval.runner import _call_hook
 from atomics.eval.suite_integrity import headline_rate
 from atomics.providers.base import BaseProvider
 
@@ -195,6 +196,7 @@ async def run_refusal(
     fixtures: list[RefusalFixture] | None = None,
     on_fixture_start: Callable[[RefusalFixture], object] | None = None,
     on_fixture_done: Callable[[RefusalResult], object] | None = None,
+    on_phase: Callable[..., object] | None = None,
 ) -> RefusalSummary:
     """Run refusal-calibration fixtures and score over/under-refusal."""
     extra_judges = extra_judges or []
@@ -218,6 +220,8 @@ async def run_refusal(
     for fx in fixture_set:
         await _invoke_callback(on_fixture_start, fx)
         response = None
+        generate_model = model or getattr(provider, "default_model", None)
+        await _call_hook(on_phase, fx.id, "generate", generate_model)
         try:
             response = await provider.generate(
                 fx.prompt,
@@ -236,6 +240,8 @@ async def run_refusal(
         judge_outcome: JudgeOutcome | None = None
         judge_agreement: float | None = None
         if provider_outcome.is_scorable and response is not None and response.text.strip():
+            judge_tag = judge_model or getattr(judge_provider, "default_model", None)
+            await _call_hook(on_phase, fx.id, "judge", judge_tag)
             judge_outcome, judge_agreement = await _classify_with_panel(
                 fx.prompt,
                 response.text,
