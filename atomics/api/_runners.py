@@ -8,6 +8,7 @@ from fastapi import HTTPException
 
 from atomics.api.job_progress import (
     EvalJobReporter,
+    FixtureRow,
     eval_fixture_total,
     fixture_row,
     select_eval_fixtures,
@@ -82,12 +83,58 @@ def _guarded_providers(
     return guarded[0], guarded[1]
 
 
-def _fixture_rows(results: Any) -> list[dict[str, Any]]:
-    rows: list[dict[str, Any]] = []
+def _can_row(fr: Any) -> bool:
+    if isinstance(fr, (int, float, str, bool)) or fr is None:
+        return False
+    if isinstance(fr, dict):
+        return bool(fr.get("id") or fr.get("fixture"))
+    return hasattr(fr, "fixture") or bool(getattr(fr, "id", None))
+
+
+def _fixture_rows(results: Any) -> list[FixtureRow]:
+    rows: list[FixtureRow] = []
     for fr in results or []:
-        if hasattr(fr, "fixture") and hasattr(fr, "task_result"):
-            rows.append(fixture_row(fr))
+        if not _can_row(fr):
+            continue
+        try:
+            row = fixture_row(fr)
+        except (AttributeError, TypeError, KeyError, ValueError):
+            continue
+        if row["id"]:
+            rows.append(row)
     return rows
+
+
+def _summary_fixture_items(summary: Any) -> Any:
+    for attr in ("fixture_results", "conversation_results", "fixtures", "results"):
+        items = getattr(summary, attr, None)
+        if items:
+            return items
+    return []
+
+
+def _completed_fixtures(summary: Any, job: Job | None) -> list[FixtureRow]:
+    if job is not None and isinstance(job.result, dict):
+        live = job.result.get("fixtures")
+        if isinstance(live, list) and live:
+            return list(live)
+    return _fixture_rows(_summary_fixture_items(summary))
+
+
+def _eval_reporter(payload: EvalRequest, job: Job | None, suite: str) -> EvalJobReporter | None:
+    if job is None:
+        return None
+    request = job.request or {}
+    host = request.get("host")
+    return EvalJobReporter(
+        job,
+        suite=suite,
+        provider=payload.provider,
+        model=payload.model or request.get("model"),
+        judge_model=payload.judge_model or request.get("judge_model"),
+        host=host if isinstance(host, str) else None,
+        total=eval_fixture_total(payload),
+    )
 
 
 def _summary_totals(summary: Any) -> tuple[int, float]:
@@ -243,8 +290,12 @@ async def run_eval_suite(payload: EvalRequest, job: Job | None = None) -> dict[s
         result = await run_eval_from_request(payload, job=job)
         return {"suite": suite, **result}
 
-    if job is not None:
-        job.progress = {"current": 0, "total": None, "in_flight": {"phase": "running"}}
+    reporter = _eval_reporter(payload, job, suite)
+    on_done = reporter.fixture_done if reporter is not None else None
+
+    def on_toolcall_done(_index: int, _fixture: object, aggregated: object) -> None:
+        if reporter is not None:
+            reporter.fixture_done(aggregated)
 
     provider, judge_provider = _guarded_providers(payload)
 
@@ -259,6 +310,7 @@ async def run_eval_suite(payload: EvalRequest, job: Job | None = None) -> dict[s
                 thinking=payload.thinking,
                 effort=payload.effort,
                 reasoning_mode=payload.reasoning_mode,
+                on_fixture_done=on_done,
             )
             fixtures_run = len(summary.fixture_results)
         elif suite == "multiturn":
@@ -270,6 +322,7 @@ async def run_eval_suite(payload: EvalRequest, job: Job | None = None) -> dict[s
                 thinking=payload.thinking,
                 effort=payload.effort,
                 reasoning_mode=payload.reasoning_mode,
+                on_conversation_done=on_done,
             )
             fixtures_run = len(summary.conversation_results)
         elif suite == "adversarial":
@@ -281,6 +334,7 @@ async def run_eval_suite(payload: EvalRequest, job: Job | None = None) -> dict[s
                 thinking=payload.thinking,
                 effort=payload.effort,
                 reasoning_mode=payload.reasoning_mode,
+                on_fixture_done=on_done,
             )
             fixtures_run = len(summary.fixture_results)
         elif suite == "codegen":
@@ -290,6 +344,7 @@ async def run_eval_suite(payload: EvalRequest, job: Job | None = None) -> dict[s
                 thinking=payload.thinking,
                 effort=payload.effort,
                 reasoning_mode=payload.reasoning_mode,
+                on_fixture_done=on_done,
             )
             fixtures_run = len(summary.fixture_results)
         elif suite == "refusal":
@@ -301,6 +356,7 @@ async def run_eval_suite(payload: EvalRequest, job: Job | None = None) -> dict[s
                 thinking=payload.thinking,
                 effort=payload.effort,
                 reasoning_mode=payload.reasoning_mode,
+                on_fixture_done=on_done,
             )
             fixtures_run = len(summary.fixture_results)
         elif suite == "redblue":
@@ -312,6 +368,7 @@ async def run_eval_suite(payload: EvalRequest, job: Job | None = None) -> dict[s
                 thinking=payload.thinking,
                 effort=payload.effort,
                 reasoning_mode=payload.reasoning_mode,
+                on_fixture_done=on_done,
             )
             fixtures_run = len(summary.fixture_results)
         elif suite == "codereview":
@@ -323,6 +380,7 @@ async def run_eval_suite(payload: EvalRequest, job: Job | None = None) -> dict[s
                 thinking=payload.thinking,
                 effort=payload.effort,
                 reasoning_mode=payload.reasoning_mode,
+                on_fixture_done=on_done,
             )
             fixtures_run = len(summary.fixture_results)
         elif suite == "toolcall":
@@ -337,6 +395,7 @@ async def run_eval_suite(payload: EvalRequest, job: Job | None = None) -> dict[s
                 thinking=payload.thinking,
                 effort=payload.effort,
                 reasoning_mode=payload.reasoning_mode,
+                on_fixture_done=on_toolcall_done if reporter is not None else None,
             )
             fixtures_run = len(summary.fixtures)
         else:  # pragma: no cover - guarded by validate_eval_suite
@@ -349,12 +408,15 @@ async def run_eval_suite(payload: EvalRequest, job: Job | None = None) -> dict[s
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     total_tokens, total_cost_usd = _summary_totals(summary)
+    host = (job.request or {}).get("host") if job is not None else None
     return {
         "suite": suite,
         "provider": payload.provider,
         "model": payload.model,
+        "host": host,
         "overall_score": _overall_score(summary),
         "fixtures_run": fixtures_run,
         "total_tokens": total_tokens,
         "total_cost_usd": total_cost_usd,
+        "fixtures": _completed_fixtures(summary, job),
     }

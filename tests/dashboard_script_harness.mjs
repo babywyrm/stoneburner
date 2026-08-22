@@ -98,6 +98,7 @@ const ids = {
   "run-back": el("run-back"),
   "job-detail": el("job-detail"),
   "job-summary": el("job-summary"),
+  "job-fixtures": el("job-fixtures"),
   "job-back": el("job-back"),
 };
 ids["key-input"].value = "";
@@ -177,7 +178,19 @@ const payloads = {
     job_id: "job-1",
     kind: "eval-job",
     status: "completed",
-    result: "SECRET_RESULT",
+    result: {
+      suite: "toolcall",
+      overall_score: 0.0,
+      fixtures: [
+        {
+          id: "ev-jc-01",
+          status: "success",
+          score: 0.0,
+          tokens: 20,
+          latency_ms: 9,
+        },
+      ],
+    },
     error: null,
   },
 };

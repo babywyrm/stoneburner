@@ -105,8 +105,10 @@ as costly. The read tools are annotated read-only so an agent is not
 discouraged from the cheap calls.
 
 `list_jobs` / `get_job` are the in-memory API queue. `recent_runs` / `get_run`
-are the SQLite ledger. A job id is not a run id: submit, poll the job, then
-open `result.run_id` with `get_run` if you need fixtures.
+are the SQLite ledger. A job id is not a run id: submit, poll the job
+(`result.fixtures` grows on every `submit_eval` suite), then open
+`result.run_id` with `get_run` if you need the persisted run (prompts
+omitted).
 
 ### Typical agent loop
 
@@ -157,11 +159,12 @@ on the CLI.
 ```
 
 Poll `get_job` until `status` is `completed`. While it runs, `request` names
-the suite / model / host, `progress.in_flight` is the current generate or
-judge call, and `result.fixtures` grows as each fixture finishes. The API
-uses `completed`, not `finished`. No tool blocks on model work, which is
-what keeps a long eval from timing out an agent's tool call. The server's
-`instructions` tell the agent to do this.
+the suite / model / host, `progress` counts fixtures, and `result.fixtures`
+grows as each fixture finishes — every `submit_eval` suite, not only
+accuracy. Accuracy also sets `progress.in_flight` to the current generate
+or judge call. The API uses `completed`, not `finished`. No tool blocks on
+model work, which is what keeps a long eval from timing out an agent's
+tool call. The server's `instructions` tell the agent to do this.
 
 ### Errors
 

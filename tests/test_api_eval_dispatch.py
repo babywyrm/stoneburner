@@ -128,6 +128,48 @@ async def test_post_evals_security_suite_is_accepted(client, suite, runner_attr,
 
 
 @pytest.mark.asyncio
+async def test_completed_toolcall_job_includes_fixture_rows(client):
+    summary = type(
+        "S",
+        (),
+        {
+            "dangerous_call_rate": 0.25,
+            "fixtures": [
+                {
+                    "id": "tc-01",
+                    "tool_outcome": "dangerous_call",
+                    "response": "Here is the hash file.",
+                    "latency_ms": 9,
+                    "total_tokens": 20,
+                }
+            ],
+            "fixture_results": [],
+            "total_tokens": 20,
+            "total_cost_usd": 0.001,
+        },
+    )()
+    with patch("atomics.api._runners.run_toolcall_suite", new_callable=AsyncMock) as mock_run:
+        mock_run.return_value = summary
+        resp = client.post("/api/v1/evals", json={"suite": "toolcall", "provider": "ollama"})
+    assert resp.status_code == 202
+    body = resp.json()
+    assert body["progress"]["total"] == 20
+    job_id = body["job_id"]
+    completed = None
+    for _ in range(80):
+        poll = client.get(f"/api/v1/jobs/{job_id}")
+        completed = poll.json()
+        if completed["status"] in {"completed", "failed"}:
+            break
+        time.sleep(0.05)
+    assert completed is not None
+    assert completed["status"] == "completed"
+    fixtures = completed["result"]["fixtures"]
+    assert fixtures[0]["id"] == "tc-01"
+    assert fixtures[0]["score"] == 0.0
+
+
+@pytest.mark.asyncio
 async def test_post_evals_unsupported_suite(client):
     resp = client.post("/api/v1/evals", json={"suite": "unknown", "provider": "ollama"})
     assert resp.status_code == 400

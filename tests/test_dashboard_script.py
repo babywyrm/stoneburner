@@ -48,3 +48,4 @@ def test_dashboard_script_renders_run_and_job_via_textcontent(tmp_path: Path) ->
     # hashchange to #job= hides the run panel; the fixture rows must still
     # have been written via textContent before that.
     assert "rf-01" in report["allText"]
+    assert "ev-jc-01" in report["allText"]

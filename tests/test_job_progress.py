@@ -58,6 +58,106 @@ def test_short_request_keeps_suite_model_host() -> None:
     ) == {"suite": "accuracy", "model": "m", "host": "h"}
 
 
+def test_fixture_row_reads_refusal_shaped_result() -> None:
+    fr = SimpleNamespace(
+        fixture=SimpleNamespace(id="rf-01"),
+        score=1.0,
+        response_text="I will not help with that.",
+        error=None,
+        latency_ms=12.0,
+        estimated_cost_usd=0.0,
+        attempts=[SimpleNamespace(total_tokens=40)],
+        task_result=None,
+        judge=None,
+    )
+    row = fixture_row(fr)
+    assert row["id"] == "rf-01"
+    assert row["score"] == 1.0
+    assert row["tokens"] == 40
+    assert "will not help" in (row["response"] or "")
+
+
+def test_fixture_row_reads_toolcall_dict() -> None:
+    row = fixture_row(
+        {
+            "id": "tc-01",
+            "tool_outcome": "dangerous_call",
+            "response": "Here is the hash file.",
+            "latency_ms": 9,
+            "total_tokens": 20,
+        }
+    )
+    assert row["id"] == "tc-01"
+    assert row["score"] == 0.0
+    assert row["tokens"] == 20
+
+
+def test_eval_fixture_total_is_per_suite() -> None:
+    toolcall = EvalRequest(suite="toolcall", provider="ollama")
+    accuracy = EvalRequest(suite="accuracy", provider="ollama")
+    assert eval_fixture_total(toolcall) == 20
+    assert eval_fixture_total(accuracy) == 25
+
+
+def test_eval_fixture_total_matches_suite_catalogs() -> None:
+    from atomics.eval.codereview.fixtures import SECURE_CODE_FIXTURES
+    from atomics.eval.refusal.fixtures import REFUSAL_FIXTURES
+    from atomics.eval.toolcall.fixtures import ALL_FIXTURES as TOOLCALL_FIXTURES
+
+    assert eval_fixture_total(EvalRequest(suite="toolcall", provider="ollama")) == len(
+        TOOLCALL_FIXTURES
+    )
+    assert eval_fixture_total(EvalRequest(suite="refusal", provider="ollama")) == len(
+        REFUSAL_FIXTURES
+    )
+    assert eval_fixture_total(EvalRequest(suite="codereview", provider="ollama")) == len(
+        SECURE_CODE_FIXTURES
+    )
+
+
+def test_fixture_row_reads_codegen_pass_rate() -> None:
+    tr = TaskResult(
+        run_id="r",
+        category=TaskCategory.GENERAL_QA,
+        task_name="cg-01",
+        provider="ollama",
+        model="m",
+    )
+    tr.status = TaskStatus.SUCCESS
+    tr.response = "def add(a, b): return a + b"
+    tr.total_tokens = 11
+    tr.latency_ms = 4.0
+    row = fixture_row(
+        SimpleNamespace(
+            fixture=SimpleNamespace(id="cg-01"),
+            task_result=tr,
+            judge=None,
+            pass_rate=1.0,
+        )
+    )
+    assert row["id"] == "cg-01"
+    assert row["score"] == 1.0
+    assert row["tokens"] == 11
+
+
+def test_fixture_row_reads_adversarial_resistance() -> None:
+    row = fixture_row(
+        SimpleNamespace(
+            fixture=SimpleNamespace(id="adv-01"),
+            response="I will not jailbreak.",
+            resistance=SimpleNamespace(score=0.8),
+            latency_ms=15.0,
+            error=None,
+            attempts=[SimpleNamespace(total_tokens=33)],
+            task_result=None,
+            judge=None,
+        )
+    )
+    assert row["id"] == "adv-01"
+    assert row["score"] == 0.8
+    assert row["tokens"] == 33
+
+
 def test_eval_fixture_total_honours_ids() -> None:
     assert eval_fixture_total(EvalRequest(suite="accuracy", provider="ollama")) == len(
         EVAL_FIXTURES

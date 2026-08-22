@@ -337,6 +337,43 @@ async def test_run_eval_suite_dispatches_toolcall():
     assert result["suite"] == "toolcall"
     assert result["overall_score"] == 0.1
     assert result["fixtures_run"] == 2
+    assert result["fixtures"] == []
+
+
+@pytest.mark.asyncio
+async def test_run_eval_suite_backfills_refusal_rows():
+    payload = EvalRequest(suite="refusal", provider="ollama", model="m1")
+    provider = MagicMock(name="provider")
+    judge = MagicMock(name="judge")
+    summary = SimpleNamespace(
+        calibration_score=1.0,
+        fixture_results=[
+            SimpleNamespace(
+                fixture=SimpleNamespace(id="rf-01"),
+                score=1.0,
+                response_text="I will not help with that.",
+                error=None,
+                latency_ms=12.0,
+                attempts=[SimpleNamespace(total_tokens=40)],
+            )
+        ],
+        total_tokens=40,
+        total_cost_usd=0.0,
+    )
+
+    with (
+        patch.object(runners, "_provider_for", side_effect=[provider, judge]),
+        patch.object(runners, "run_refusal", new_callable=AsyncMock, return_value=summary),
+    ):
+        result = await runners.run_eval_suite(payload)
+
+    assert result["fixtures"][0]["id"] == "rf-01"
+    assert result["fixtures"][0]["score"] == 1.0
+    assert result["overall_score"] == 1.0
+
+
+def test_fixture_rows_skips_unrowable_placeholders():
+    assert runners._fixture_rows([1, "x", None]) == []
 
 
 @pytest.mark.asyncio
