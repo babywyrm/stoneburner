@@ -449,3 +449,83 @@ async def test_run_probe_forwards_effort(tmp_path) -> None:
     kwargs = provider.generate.call_args.kwargs
     assert kwargs["effort"] == "low"
     assert kwargs["reasoning_mode"] == "standard"
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_openai_generate_with_tools_sends_reasoning_effort() -> None:
+    from atomics.providers.openai import OpenAIProvider
+    from tests.test_providers_openai import FakeOpenAIClient
+
+    client = FakeOpenAIClient()
+    provider = OpenAIProvider(api_key="fake", client=client)
+    resp = await provider.generate_with_tools(
+        "Show the hashes.",
+        tools=[{"name": "read_file", "description": "Read a file", "parameters": {}}],
+        model="gpt-5.6-sol",
+        effort="high",
+    )
+    call = client.chat.completions.create_calls[0]
+    assert call["reasoning_effort"] == "high"
+    assert resp.effort == "high"
+    assert resp.reasoning_request == {"effort": "high"}
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_claude_generate_with_tools_sends_effort_without_thinking() -> None:
+    """Tool-channel measurement is which call is made, not how it deliberates."""
+    from atomics.providers.claude import ClaudeProvider
+
+    text_block = MagicMock()
+    text_block.type = "text"
+    text_block.text = ""
+    usage = MagicMock()
+    usage.input_tokens = 10
+    usage.output_tokens = 5
+    usage.thinking_tokens = 0
+    mock_response = MagicMock()
+    mock_response.content = [text_block]
+    mock_response.usage = usage
+    mock_response.model_dump.return_value = {}
+    mock_client = AsyncMock()
+    mock_client.messages.create = AsyncMock(return_value=mock_response)
+
+    provider = ClaudeProvider(api_key="test", client=mock_client)
+    resp = await provider.generate_with_tools(
+        "Show the hashes.",
+        tools=[{"name": "read_file", "description": "Read a file", "parameters": {}}],
+        model="claude-opus-4-6",
+        effort="high",
+    )
+    kwargs = mock_client.messages.create.call_args.kwargs
+    assert "thinking" not in kwargs
+    assert kwargs["output_config"] == {"effort": "high"}
+    assert resp.effort == "high"
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_toolcall_tool_channel_forwards_effort() -> None:
+    from atomics.eval.toolcall.catalog import PROBE_PROMPT
+    from atomics.eval.toolcall.runner import run_toolcall_suite
+    from tests.test_toolcall_runner import ProbePassingProvider, _fixture
+
+    provider = ProbePassingProvider(calls=())
+    await run_toolcall_suite(
+        provider=provider,
+        model="fake",
+        judge_provider=None,
+        fixtures=(_fixture(),),
+        effort="high",
+        reasoning_mode="standard",
+        thinking=False,
+    )
+    scored = [
+        r
+        for r in provider.tool_requests
+        if r["prompt"] != PROBE_PROMPT and r.get("effort") == "high"
+    ]
+    assert scored, "generate_with_tools never received effort"
+    assert scored[0]["reasoning_mode"] == "standard"
+    assert scored[0]["thinking"] is False

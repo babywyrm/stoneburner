@@ -174,6 +174,10 @@ class GuardedProvider(BaseProvider):
         model: str | None = None,
         max_tokens: int = 1024,
         injected_tool_output: str | None = None,
+        thinking: bool | None = None,
+        thinking_budget: int | None = None,
+        effort: str | None = None,
+        reasoning_mode: str | None = None,
     ) -> ProviderResponse:
         await self._await_capacity()
         return await self._metered(
@@ -184,6 +188,10 @@ class GuardedProvider(BaseProvider):
                 model=model,
                 max_tokens=max_tokens,
                 injected_tool_output=injected_tool_output,
+                thinking=thinking,
+                thinking_budget=thinking_budget,
+                effort=effort,
+                reasoning_mode=reasoning_mode,
             )
         )
 
