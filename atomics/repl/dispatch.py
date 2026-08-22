@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from atomics.mcp.client import AtomicsApiClient, AtomicsApiError
-from atomics.repl.display import QuietWait
+from atomics.repl.display import QuietWait, format_submitted
 from atomics.repl.parse import ParsedLine, ParseError, parse_line
 from atomics.repl.session import SESSION_KEYS, Session, SessionError
 from atomics.repl.wait import wait_for_job
@@ -20,6 +20,7 @@ Session: set, show, help, exit
 Read:    health, list_models, list_jobs, get_job, get_run, compare, recent_runs, trends
 Spend:   provider_test, submit_run, submit_eval, submit_sweep, submit_stress, submit_soak
 Poll:    wait [--verbose] [JOB_ID]   one-liners; --verbose adds replies
+Submit:  quiet headline + job id; --verbose keeps the JSON document
 
 set KEY [VALUE]   set or clear a session field
 show              print the session as JSON
@@ -229,12 +230,18 @@ def _call_api(
     parsed: ParsedLine, *, session: Session, client: AtomicsApiClient
 ) -> HandleResult:
     method_name, allowed, positional = _VERBS[parsed.verb]
-    unknown = sorted(set(parsed.flags) - allowed)
+    display_only = frozenset({"verbose"}) if parsed.verb.startswith("submit_") else frozenset()
+    unknown = sorted(set(parsed.flags) - allowed - display_only)
     if unknown:
         return HandleResult(stderr=f"unknown flag --{unknown[0]}\n{HELP_TEXT}")
     kwargs: dict[str, Any] = {}
+    verbose = False
     try:
         for name, raw in parsed.flags.items():
+            if name in display_only:
+                if name == "verbose":
+                    verbose = bool(_coerce("verbose", raw))
+                continue
             kwargs[name] = _coerce(name, raw)
     except ValueError as exc:
         return HandleResult(stderr=f"{exc}\n")
@@ -261,6 +268,8 @@ def _call_api(
         return HandleResult(stderr=f"{exc}\n")
     if isinstance(body, dict) and body.get("job_id") and parsed.verb.startswith("submit_"):
         session.last_job_id = str(body["job_id"])
+        if not verbose:
+            return HandleResult(stdout=format_submitted(body))
     return HandleResult(stdout=json.dumps(body, indent=2) + "\n")
 
 
