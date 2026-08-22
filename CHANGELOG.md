@@ -3,6 +3,9 @@
 ## Unreleased
 
 ### Added
+- **REPL `wait` until done.** Polls until `completed` or `failed`.
+  Ctrl-C still only stops the poll. The 30-poll / ~60s cap is gone.
+
 - **Job document parity.** Every `POST /evals` suite grows
   `result.fixtures` with the accuracy row shape (id, status, score,
   tokens, latency, 500-char response, error). `progress.total` is

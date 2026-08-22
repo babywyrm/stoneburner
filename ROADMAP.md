@@ -213,11 +213,8 @@ Next is operator comfort.
       JSON. Match quiet `wait`: one headline and the `job_id`.
       `get_job` / `--verbose` keep the document. Display-only; the
       API body does not change.
-- [ ] **`wait` until done, not 60s.** A 25-fixture accuracy run is
-      already ~50s; the cap returns the prompt while the job is still
-      scoring. Keep Ctrl-C as “stop polling, not the job.” A higher
-      default or `wait` with no cap (Ctrl-C only) is the product
-      question; do not invent SSE to solve it.
+- [x] **`wait` until done, not 60s.** Polls until `completed` /
+      `failed`. Ctrl-C stops polling, not the job. No SSE.
 - [x] **Live fixture rows on every eval suite.** Same row shape on
       every `POST /evals` job. `progress.total` is the suite catalog.
       Accuracy still records generate/judge `in_flight`; other suites

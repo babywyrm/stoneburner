@@ -1,4 +1,4 @@
-"""Bounded job poll: completed, cap, Ctrl-C. Never cancels the job."""
+"""Job poll: completed, failed, optional cap, Ctrl-C. Never cancels the job."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import httpx
 from atomics.mcp.client import AtomicsApiClient
 from atomics.repl.dispatch import handle_line
 from atomics.repl.session import Session
-from atomics.repl.wait import WAIT_INTERVAL_SECONDS, WAIT_MAX_POLLS, wait_for_job
+from atomics.repl.wait import WAIT_INTERVAL_SECONDS, wait_for_job
 
 
 def _client(bodies: list[dict]) -> AtomicsApiClient:
@@ -38,9 +38,29 @@ def test_wait_stops_on_completed() -> None:
 def test_wait_stops_at_max_polls() -> None:
     sleeps: list[float] = []
     client = _client([{"job_id": "abc", "status": "pending"}])
-    body = wait_for_job(client, "abc", sleep=sleeps.append)
+    body = wait_for_job(client, "abc", sleep=sleeps.append, max_polls=30)
     assert body["status"] == "pending"
-    assert len(sleeps) == WAIT_MAX_POLLS - 1
+    assert len(sleeps) == 29
+
+
+def test_wait_default_polls_past_thirty_until_completed() -> None:
+    sleeps: list[float] = []
+    bodies = [{"job_id": "abc", "status": "running"}] * 35
+    bodies.append({"job_id": "abc", "status": "completed", "result": {"ok": True}})
+    client = _client(bodies)
+    body = wait_for_job(client, "abc", sleep=sleeps.append)
+    assert body["status"] == "completed"
+    assert len(sleeps) == 35
+
+
+def test_wait_stops_on_failed() -> None:
+    sleeps: list[float] = []
+    client = _client(
+        [{"job_id": "abc", "status": "failed", "error": {"message": "budget"}}]
+    )
+    body = wait_for_job(client, "abc", sleep=sleeps.append)
+    assert body["status"] == "failed"
+    assert sleeps == []
 
 
 def test_wait_ctrl_c_stops_the_poll() -> None:

@@ -32,9 +32,8 @@ Plus `set`, `show`, `wait [--verbose] [JOB_ID]`, `help`, `exit`.
 per generate/judge and per scored fixture, then a two-line headline when
 `completed`. `wait --verbose` also prints latency and the truncated model
 reply (500 chars, same as the job document). Color is TTY-only. `get_job`
-still returns the full JSON. A 60-second cap or Ctrl-C returns the prompt;
-the job keeps running. Type `wait` again only if it is still `running`
-after the cap.
+still returns the full JSON. Ctrl-C returns the prompt; the job keeps
+running. Type `wait` again to resume watching.
 
 Quiet:
 
