@@ -198,6 +198,27 @@ const payloads = {
           headline: 0.81,
         },
       ],
+      phases: [
+        {
+          concurrency: 1,
+          requests: 7,
+          failed: 0,
+          aggregate_tps: 337.0,
+          avg_latency_ms: 725,
+          p95_latency_ms: 733,
+        },
+      ],
+      samples: [
+        {
+          elapsed_seconds: 10,
+          requests: 8,
+          failed: 0,
+          aggregate_tps: 256.0,
+          avg_latency_ms: 100,
+          p95_latency_ms: 110,
+        },
+      ],
+      verdict: "STABLE",
     },
     error: null,
   },

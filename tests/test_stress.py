@@ -461,6 +461,41 @@ async def test_run_stress_provider_on_phase_callback():
 
 
 @pytest.mark.asyncio
+async def test_run_stress_provider_on_phase_start_fires_before_phase():
+    from atomics.providers.base import ProviderResponse
+    from atomics.stress import run_stress_provider
+
+    async def fake_generate(prompt, **kwargs):
+        return ProviderResponse(
+            text="ok",
+            input_tokens=10,
+            output_tokens=50,
+            total_tokens=60,
+            model="m",
+            latency_ms=200.0,
+            estimated_cost_usd=0.0005,
+            tokens_per_second=250.0,
+        )
+
+    mock_provider = MagicMock()
+    mock_provider.name = "claude"
+    mock_provider.generate = fake_generate
+
+    events: list[tuple[str, int]] = []
+
+    await run_stress_provider(
+        provider=mock_provider,
+        model="m",
+        max_concurrency=2,
+        phase_seconds=0.2,
+        on_phase_start=lambda conc: events.append(("start", conc)),
+        on_phase=lambda p: events.append(("done", p.concurrency)),
+    )
+
+    assert events == [("start", 1), ("done", 1), ("start", 2), ("done", 2)]
+
+
+@pytest.mark.asyncio
 async def test_run_stress_provider_handles_failures():
     """Failed requests don't crash; they increment failed counter."""
     from atomics.providers.base import ProviderResponse

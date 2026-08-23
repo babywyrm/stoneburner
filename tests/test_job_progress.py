@@ -10,17 +10,20 @@ import pytest
 from atomics.api.job_progress import (
     RESPONSE_LIMIT,
     EvalJobReporter,
+    LoadJobReporter,
     SweepJobReporter,
     eval_fixture_total,
     fixture_row,
     resolve_eval_request,
     resolve_inference_host,
     short_request,
+    soak_job_total,
+    stress_job_total,
     sweep_job_total,
     truncate_response,
 )
 from atomics.api.jobs import Job, JobStatus
-from atomics.api.models import EvalRequest, SweepRequest
+from atomics.api.models import EvalRequest, SoakRequest, StressRequest, SweepRequest
 from atomics.config import AtomicsSettings
 from atomics.eval.fixtures import EVAL_FIXTURES
 from atomics.eval.runner import run_eval
@@ -212,6 +215,59 @@ def test_fixture_row_truncates_response() -> None:
     assert row["score"] == 0.8
     assert row["tokens"] == 9
     assert row["response"] == "z" * RESPONSE_LIMIT
+
+
+def test_stress_job_total_is_concurrency_ladder() -> None:
+    payload = StressRequest(
+        provider="ollama",
+        model="m",
+        budget_usd=1.0,
+        max_concurrency=2,
+        phase_seconds=5.0,
+    )
+    assert stress_job_total(payload) == 2
+
+
+def test_soak_job_total_is_duration_over_interval() -> None:
+    payload = SoakRequest(
+        provider="ollama",
+        model="m",
+        budget_usd=1.0,
+        duration_seconds=30,
+        sample_interval=10,
+    )
+    assert soak_job_total(payload) == 2
+
+
+def test_load_reporter_grows_phases_and_clears_in_flight() -> None:
+    job = Job(job_id="l", kind="stress", status=JobStatus.RUNNING, created_at=0.0)
+    reporter = LoadJobReporter(
+        job,
+        kind="stress",
+        meta={"provider": "ollama", "model": "m"},
+        rows_key="phases",
+        total=2,
+    )
+    reporter.start({"concurrency": 1, "phase_seconds": 5.0})
+    assert job.progress == {
+        "current": 0,
+        "total": 2,
+        "in_flight": {"concurrency": 1, "phase_seconds": 5.0},
+    }
+    reporter.done(
+        {
+            "concurrency": 1,
+            "requests": 7,
+            "failed": 0,
+            "aggregate_tps": 337.0,
+            "avg_latency_ms": 725.0,
+            "p95_latency_ms": 733.0,
+        }
+    )
+    assert job.progress["current"] == 1
+    assert job.progress["in_flight"] is None
+    assert job.result is not None
+    assert job.result["phases"][0]["concurrency"] == 1
 
 
 def test_sweep_job_total_is_models_times_suites() -> None:

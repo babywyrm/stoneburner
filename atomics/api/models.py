@@ -159,6 +159,7 @@ class StressRequest(BaseModel):
     budget_usd: float = Field(gt=0, le=MAX_EVAL_BUDGET_USD)
     max_concurrency: int = Field(default=4, ge=1, le=MAX_STRESS_CONCURRENCY)
     phase_seconds: float = Field(default=10.0, gt=0, le=MAX_STRESS_PHASE_SECONDS)
+    host: str | None = None
 
     @field_validator("model")
     @classmethod
@@ -180,6 +181,7 @@ class SoakRequest(BaseModel):
     duration_seconds: int = Field(default=60, ge=30, le=MAX_SOAK_DURATION_SECONDS)
     concurrency: int = Field(default=2, ge=1, le=MAX_SOAK_CONCURRENCY)
     sample_interval: int = Field(default=15, ge=10, le=60)
+    host: str | None = None
 
     @field_validator("model")
     @classmethod

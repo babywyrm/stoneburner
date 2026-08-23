@@ -23,6 +23,33 @@ async def test_job_manager_lifecycle():
 
 
 @pytest.mark.asyncio
+async def test_job_manager_clears_in_flight_on_complete():
+    manager = JobManager()
+
+    async def work(job_id):
+        job = manager.jobs[job_id]
+        job.progress = {
+            "current": 2,
+            "total": 2,
+            "in_flight": {"elapsed_seconds": 30.0, "concurrency": 1},
+        }
+        return {"samples": []}
+
+    job_id = await manager.submit(
+        "soak",
+        work,
+        progress={"current": 0, "total": 2, "in_flight": None},
+    )
+    await manager.wait_for(job_id, timeout=1.0)
+    assert manager.jobs[job_id].status == JobStatus.COMPLETED
+    assert manager.jobs[job_id].progress == {
+        "current": 2,
+        "total": 2,
+        "in_flight": None,
+    }
+
+
+@pytest.mark.asyncio
 async def test_job_manager_failure():
     manager = JobManager()
 

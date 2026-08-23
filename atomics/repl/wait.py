@@ -23,6 +23,9 @@ def _progress_sig(body: Any) -> Any:
             in_flight.get("fixture_id"),
             in_flight.get("phase"),
             in_flight.get("model"),
+            in_flight.get("suite"),
+            in_flight.get("concurrency"),
+            in_flight.get("elapsed_seconds"),
         )
     else:
         in_flight_sig = in_flight

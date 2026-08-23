@@ -43,7 +43,7 @@ class Job:
     request_id: str = ""
     # Resolved submit payload (suite / model / host / …). Set at submit time.
     request: dict[str, Any] | None = None
-    # Live eval counters. Other kinds leave this None.
+    # Live counters (eval fixtures, sweep cells, stress phases, soak samples).
     progress: dict[str, Any] | None = None
     _task: asyncio.Task[None] | None = field(default=None, repr=False)
 
@@ -187,6 +187,8 @@ class JobManager:
         try:
             job.result = await work(job.job_id)
             job.status = JobStatus.COMPLETED
+            if job.progress is not None:
+                job.progress = {**job.progress, "in_flight": None}
         except asyncio.CancelledError:
             job.error = {"type": "CancelledError", "message": "job cancelled"}
             job.status = JobStatus.FAILED

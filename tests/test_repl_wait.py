@@ -141,6 +141,53 @@ def test_wait_prints_when_progress_changes() -> None:
     assert text.count("generate") == 1
 
 
+def test_wait_prints_stress_in_flight_when_concurrency_changes() -> None:
+    session = Session(last_job_id="abc")
+    client = _client(
+        [
+            {
+                "job_id": "abc",
+                "status": "running",
+                "progress": {
+                    "current": 0,
+                    "total": 2,
+                    "in_flight": {"concurrency": 1, "phase_seconds": 5.0},
+                },
+            },
+            {
+                "job_id": "abc",
+                "status": "running",
+                "progress": {
+                    "current": 0,
+                    "total": 2,
+                    "in_flight": {"concurrency": 2, "phase_seconds": 5.0},
+                },
+            },
+            {
+                "job_id": "abc",
+                "status": "completed",
+                "kind": "stress",
+                "request": {"model": "m", "host": "h"},
+                "progress": {"current": 2, "total": 2, "in_flight": None},
+                "result": {
+                    "peak_tps": 10.0,
+                    "saturation_concurrency": 2,
+                    "phases": [
+                        {"concurrency": 1, "requests": 3, "aggregate_tps": 8.0},
+                        {"concurrency": 2, "requests": 4, "aggregate_tps": 10.0},
+                    ],
+                },
+            },
+        ]
+    )
+    written: list[str] = []
+    handle_line("wait", session=session, client=client, write=written.append)
+    text = "".join(written)
+    assert "c=1  5s" in text
+    assert "c=2  5s" in text
+    assert "sat=2" in text
+
+
 def test_wait_verbose_prints_replies() -> None:
     session = Session(last_job_id="abc")
     body = {

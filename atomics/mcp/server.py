@@ -209,12 +209,15 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
         budget_usd: float,
         max_concurrency: int = 4,
         phase_seconds: float = 10.0,
+        host: str | None = None,
     ) -> Any:
         """Ramp concurrency to find saturation and return a job id.
 
         Spends tokens. `budget_usd` is required. One named model. Concurrency
         is 1–8; each phase is at most 15 seconds. Not a hours-long CLI soak.
-        Poll `get_job` until `status` is `completed`.
+        `host` is the inference endpoint (same meaning as `list_models`).
+        Poll `get_job` until `status` is `completed`. Live `progress` and
+        growing `result.phases` appear while it runs.
         """
         return api.submit_stress(
             provider=provider,
@@ -222,6 +225,7 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
             budget_usd=budget_usd,
             max_concurrency=max_concurrency,
             phase_seconds=phase_seconds,
+            host=host,
         )
 
     @server.tool(annotations=SPENDS)
@@ -232,12 +236,15 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
         duration_seconds: int = 60,
         concurrency: int = 2,
         sample_interval: int = 15,
+        host: str | None = None,
     ) -> Any:
         """Hold concurrency, classify drift, and return a job id.
 
         Spends tokens. `budget_usd` is required. `duration_seconds` is 30–300
         (not hours). Concurrency is 1–4. Verdict is STABLE / DEGRADED /
-        UNSTABLE. Poll `get_job` until `status` is `completed`.
+        UNSTABLE. `host` is the inference endpoint (same meaning as
+        `list_models`). Poll `get_job` until `status` is `completed`. Live
+        `progress` and growing `result.samples` appear while it runs.
         """
         return api.submit_soak(
             provider=provider,
@@ -246,6 +253,7 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
             duration_seconds=duration_seconds,
             concurrency=concurrency,
             sample_interval=sample_interval,
+            host=host,
         )
 
     @server.tool(annotations=READ_ONLY)
@@ -253,7 +261,8 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
         """Fetch a submitted job's status, live progress, and growing result.
 
         Eval jobs append `result.fixtures` as each fixture finishes (every
-        suite). Status is `completed`, not `finished`.
+        suite). Sweeps grow `result.jobs`. Stress grows `result.phases`.
+        Soak grows `result.samples`. Status is `completed`, not `finished`.
         """
         return api.get_job(job_id)
 

@@ -252,18 +252,18 @@ class AtomicsApiClient:
         budget_usd: float,
         max_concurrency: int = 4,
         phase_seconds: float = 10.0,
+        host: str | None = None,
     ) -> Any:
-        return self._request(
-            "POST",
-            "/stress",
-            json={
-                "provider": provider,
-                "model": model,
-                "budget_usd": budget_usd,
-                "max_concurrency": max_concurrency,
-                "phase_seconds": phase_seconds,
-            },
-        )
+        payload: dict[str, Any] = {
+            "provider": provider,
+            "model": model,
+            "budget_usd": budget_usd,
+            "max_concurrency": max_concurrency,
+            "phase_seconds": phase_seconds,
+        }
+        if host is not None:
+            payload["host"] = host
+        return self._request("POST", "/stress", json=payload)
 
     def submit_soak(
         self,
@@ -274,19 +274,19 @@ class AtomicsApiClient:
         duration_seconds: int = 60,
         concurrency: int = 2,
         sample_interval: int = 15,
+        host: str | None = None,
     ) -> Any:
-        return self._request(
-            "POST",
-            "/soak",
-            json={
-                "provider": provider,
-                "model": model,
-                "budget_usd": budget_usd,
-                "duration_seconds": duration_seconds,
-                "concurrency": concurrency,
-                "sample_interval": sample_interval,
-            },
-        )
+        payload: dict[str, Any] = {
+            "provider": provider,
+            "model": model,
+            "budget_usd": budget_usd,
+            "duration_seconds": duration_seconds,
+            "concurrency": concurrency,
+            "sample_interval": sample_interval,
+        }
+        if host is not None:
+            payload["host"] = host
+        return self._request("POST", "/soak", json=payload)
 
     def get_job(self, job_id: str) -> Any:
         return self._request("GET", f"/jobs/{job_id}")

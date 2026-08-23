@@ -267,6 +267,7 @@ async def run_soak_provider(
     num_predict: int = 2048,
     think_time_seconds: float = 0.0,
     on_sample: Callable[[SoakSample], None] | None = None,
+    on_sample_start: Callable[[float], None] | None = None,
 ) -> SoakResult:
     """Run a soak test against any provider (cloud or local)."""
     from atomics.load.stress import STRESS_PROMPTS, _single_request_provider
@@ -315,6 +316,11 @@ async def run_soak_provider(
     async def _sampler() -> None:
         nonlocal window_latencies, window_tokens, window_requests, window_failed, window_cost
         while not stop_event.is_set():
+            next_elapsed = float((len(result.samples) + 1) * sample_interval)
+            # A tick at t == duration is cancelled with the run. Do not
+            # advertise a window that cannot finish.
+            if on_sample_start and next_elapsed < duration_seconds:
+                on_sample_start(next_elapsed)
             await asyncio.sleep(sample_interval)
             if stop_event.is_set():
                 break

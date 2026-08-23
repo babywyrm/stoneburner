@@ -115,7 +115,16 @@ _VERBS: dict[str, tuple[str, frozenset[str], str | None]] = {
     ),
     "submit_stress": (
         "submit_stress",
-        frozenset({"provider", "model", "budget_usd", "max_concurrency", "phase_seconds"}),
+        frozenset(
+            {
+                "provider",
+                "model",
+                "budget_usd",
+                "max_concurrency",
+                "phase_seconds",
+                "host",
+            }
+        ),
         None,
     ),
     "submit_soak": (
@@ -128,6 +137,7 @@ _VERBS: dict[str, tuple[str, frozenset[str], str | None]] = {
                 "duration_seconds",
                 "concurrency",
                 "sample_interval",
+                "host",
             }
         ),
         None,
