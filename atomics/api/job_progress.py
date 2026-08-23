@@ -10,7 +10,7 @@ from collections.abc import Sequence
 from typing import Any, Literal, TypedDict
 
 from atomics.api.jobs import Job
-from atomics.api.models import EvalRequest, SweepRequest
+from atomics.api.models import EvalRequest, SoakRequest, StressRequest, SweepRequest
 from atomics.config import AtomicsSettings
 from atomics.eval.adversarial import ALL_FIXTURES as ADVERSARIAL_FIXTURES
 from atomics.eval.codegen.fixtures import ALL_CODEGEN_FIXTURES
@@ -21,6 +21,7 @@ from atomics.eval.rag.fixtures import ALL_RAG_FIXTURES
 from atomics.eval.redblue.fixtures import ALL_FIXTURES as REDBLUE_FIXTURES
 from atomics.eval.refusal.fixtures import REFUSAL_FIXTURES
 from atomics.eval.toolcall.fixtures import ALL_FIXTURES as TOOLCALL_FIXTURES
+from atomics.load.stress import stress_concurrency_levels
 
 RESPONSE_LIMIT = 500
 
@@ -279,6 +280,32 @@ def initial_sweep_progress(payload: SweepRequest) -> dict[str, Any]:
     return {"current": 0, "total": sweep_job_total(payload), "in_flight": None}
 
 
+def stress_job_total(payload: StressRequest) -> int:
+    return len(stress_concurrency_levels(payload.max_concurrency))
+
+
+def soak_job_total(payload: SoakRequest) -> int:
+    """How many sampler windows finish before duration cancels the last sleep.
+
+    The sampler sleeps `sample_interval`, records, repeats. Stop fires at
+    `duration_seconds`, so a tick at t == duration is cancelled. 30s / 10s
+    yields samples at 10s and 20s — two rows, not three.
+    """
+    duration = int(payload.duration_seconds)
+    interval = int(payload.sample_interval)
+    if interval <= 0:
+        return 0
+    return max(0, (duration - 1) // interval)
+
+
+def initial_stress_progress(payload: StressRequest) -> dict[str, Any]:
+    return {"current": 0, "total": stress_job_total(payload), "in_flight": None}
+
+
+def initial_soak_progress(payload: SoakRequest) -> dict[str, Any]:
+    return {"current": 0, "total": soak_job_total(payload), "in_flight": None}
+
+
 def sweep_row(result: Any) -> SweepJobRow:
     headline = getattr(result, "headline", None)
     scored: float | None
@@ -303,7 +330,9 @@ def payload_request(payload: Any, settings: AtomicsSettings) -> dict[str, Any]:
     data = payload.model_dump(exclude_none=True)
     provider = getattr(payload, "provider", None)
     if provider:
-        host = resolve_inference_host(str(provider), None, settings)
+        host = resolve_inference_host(
+            str(provider), getattr(payload, "host", None), settings
+        )
         if host:
             data["host"] = host
     return data
@@ -407,6 +436,42 @@ class SweepJobReporter:
         body["fail"] = sum(1 for item in body["jobs"] if not item.get("ok"))
         self.job.progress = {
             "current": len(body["jobs"]),
+            "total": (self.job.progress or {}).get("total"),
+            "in_flight": None,
+        }
+
+
+class LoadJobReporter:
+    """Mutate a job as each stress phase or soak sample starts and finishes."""
+
+    def __init__(
+        self,
+        job: Job,
+        *,
+        kind: str,
+        meta: dict[str, Any],
+        rows_key: str,
+        total: int,
+    ) -> None:
+        self.job = job
+        self._kind = kind
+        self._meta = dict(meta)
+        self._rows_key = rows_key
+        job.progress = {"current": 0, "total": total, "in_flight": None}
+
+    def start(self, in_flight: dict[str, Any]) -> None:
+        progress = dict(self.job.progress or {})
+        progress["in_flight"] = dict(in_flight)
+        self.job.progress = progress
+
+    def done(self, row: dict[str, Any]) -> None:
+        body = self.job.result
+        if body is None:
+            body = {**self._meta, self._rows_key: []}
+            self.job.result = body
+        body[self._rows_key].append(row)
+        self.job.progress = {
+            "current": len(body[self._rows_key]),
             "total": (self.job.progress or {}).get("total"),
             "in_flight": None,
         }

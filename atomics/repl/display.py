@@ -32,6 +32,26 @@ def _score_color(score: float | None, *, failed: bool) -> str:
     return _GREEN
 
 
+def _seconds_label(value: Any) -> str:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return "?"
+    if number == int(number):
+        return f"{int(number)}s"
+    return f"{number}s"
+
+
+def _tps_label(value: Any) -> str:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return "-"
+    if number == int(number):
+        return str(int(number))
+    return f"{number:.1f}"
+
+
 def format_in_flight(in_flight: dict[str, Any] | None, *, color: bool = False) -> str:
     if not in_flight:
         return ""
@@ -40,11 +60,32 @@ def format_in_flight(in_flight: dict[str, Any] | None, *, color: bool = False) -
         suite = str(in_flight.get("suite") or "?")
         suite_txt = _paint(f"{suite:<8}", _DIM, color=color)
         return f"  {model}  {suite_txt}".rstrip()
+    if "elapsed_seconds" in in_flight and not in_flight.get("fixture_id"):
+        elapsed = _seconds_label(in_flight.get("elapsed_seconds"))
+        conc = in_flight.get("concurrency")
+        return f"  {elapsed}  c={conc}"
+    if "concurrency" in in_flight and not in_flight.get("fixture_id"):
+        conc = in_flight.get("concurrency")
+        return f"  c={conc}  {_seconds_label(in_flight.get('phase_seconds'))}"
     fixture = str(in_flight.get("fixture_id") or "?")
     phase = str(in_flight.get("phase") or "?")
     model = str(in_flight.get("model") or "")
     phase_txt = _paint(f"{phase:<8}", _DIM, color=color)
     return f"  {fixture}  {phase_txt}  {model}".rstrip()
+
+
+def format_phase_row(row: dict[str, Any], *, color: bool = False) -> str:
+    conc = row.get("concurrency")
+    tps = _tps_label(row.get("aggregate_tps"))
+    reqs = row.get("requests") or 0
+    return f"  c={conc}  {tps} tps  {reqs} req"
+
+
+def format_sample_row(row: dict[str, Any], *, color: bool = False) -> str:
+    elapsed = _seconds_label(row.get("elapsed_seconds"))
+    tps = _tps_label(row.get("aggregate_tps"))
+    reqs = row.get("requests") or 0
+    return f"  {elapsed}  {tps} tps  {reqs} req"
 
 
 def format_fixture_row(
@@ -148,6 +189,31 @@ def format_completed(body: dict[str, Any], *, color: bool = False) -> str:
         else:
             suite_txt = str(suites)
         return f"sweep  {model_txt}  {suite_txt}\n{ok} ok  {fail} fail  {len(jobs)} jobs\n"
+    host_txt = f"  {host}" if host else ""
+    phases = result.get("phases")
+    if isinstance(phases, list) and phases:
+        peak = result.get("peak_tps")
+        sat = result.get("saturation_concurrency")
+        peak_txt = _tps_label(peak)
+        return (
+            f"stress  {model}{host_txt}\n"
+            f"{peak_txt} tps  sat={sat}  {len(phases)} phases\n"
+        )
+    samples = result.get("samples")
+    verdict = result.get("verdict")
+    if isinstance(samples, list) and samples and verdict:
+        drift = result.get("throughput_drift_pct")
+        latency = result.get("latency_drift_pct")
+        extras: list[str] = []
+        if drift is not None:
+            extras.append(f"drift {drift}% tps")
+        if latency is not None:
+            extras.append(f"{latency}% p95")
+        drift_txt = f"  {' / '.join(extras)}" if extras else ""
+        return (
+            f"soak  {model}{host_txt}\n"
+            f"{verdict}{drift_txt}  {len(samples)} samples\n"
+        )
     score_txt = "-" if score is None else f"{score:.3f}"
     score_txt = _paint(score_txt, _score_color(score, failed=False), color=color)
     count = f"{current}/{total}" if total is not None else str(current or 0)
@@ -198,14 +264,11 @@ class QuietWait:
             line = format_in_flight(inflight, color=self.color)
             if line:
                 self._emit(line + "\n")
-        fixtures = ((body.get("result") or {}).get("fixtures")) or []
-        for row in fixtures[self._seen :]:
+        rows, render = _live_rows(body)
+        for row in rows[self._seen :]:
             if isinstance(row, dict):
-                self._emit(
-                    format_fixture_row(row, color=self.color, verbose=self.verbose)
-                    + "\n"
-                )
-        self._seen = len(fixtures)
+                self._emit(render(row, color=self.color, verbose=self.verbose) + "\n")
+        self._seen = len(rows)
         if body.get("status") == "completed" and not self._summarized:
             self._summarized = True
             self._emit(format_completed(body, color=self.color))
@@ -220,7 +283,34 @@ class QuietWait:
             self._emit(format_still_running(body, color=self.color) + "\n")
 
 
+def _live_rows(
+    body: dict[str, Any],
+) -> tuple[list[Any], Callable[..., str]]:
+    result = body.get("result") or {}
+    fixtures = result.get("fixtures") or []
+    if fixtures:
+        return fixtures, lambda row, **kwargs: format_fixture_row(row, **kwargs)
+    phases = result.get("phases") or []
+    if phases:
+        return phases, lambda row, **kwargs: format_phase_row(
+            row, color=kwargs.get("color", False)
+        )
+    samples = result.get("samples") or []
+    if samples:
+        return samples, lambda row, **kwargs: format_sample_row(
+            row, color=kwargs.get("color", False)
+        )
+    return [], lambda row, **kwargs: ""
+
+
 def _inflight_sig(in_flight: Any) -> tuple[Any, ...] | None:
     if not isinstance(in_flight, dict):
         return None
-    return (in_flight.get("fixture_id"), in_flight.get("phase"), in_flight.get("model"))
+    return (
+        in_flight.get("fixture_id"),
+        in_flight.get("phase"),
+        in_flight.get("model"),
+        in_flight.get("suite"),
+        in_flight.get("concurrency"),
+        in_flight.get("elapsed_seconds"),
+    )

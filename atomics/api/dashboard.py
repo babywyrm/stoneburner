@@ -264,6 +264,47 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
           fixtureRows.length > 0,
         );
       }
+      const rawPhases = (jobResult && jobResult.phases) || [];
+      const phaseRows = rawPhases.map(function (p) {
+        return [
+          p.concurrency == null ? "-" : "c=" + String(p.concurrency),
+          p.requests == null ? "-" : String(p.requests),
+          p.failed == null ? "-" : String(p.failed),
+          p.aggregate_tps == null ? "-" : String(p.aggregate_tps),
+          p.p95_latency_ms == null ? "-" : Math.round(p.p95_latency_ms) + "ms",
+        ];
+      });
+      if (phaseRows.length) {
+        renderTable(
+          "job-fixtures",
+          phaseRows,
+          ["Concurrency", "Requests", "Failed", "TPS", "P95"],
+          fixtureRows.length > 0 || jobRows.length > 0,
+        );
+      }
+      const rawSamples = (jobResult && jobResult.samples) || [];
+      const sampleRows = rawSamples.map(function (s) {
+        return [
+          s.elapsed_seconds == null ? "-" : String(s.elapsed_seconds) + "s",
+          s.requests == null ? "-" : String(s.requests),
+          s.failed == null ? "-" : String(s.failed),
+          s.aggregate_tps == null ? "-" : String(s.aggregate_tps),
+          s.p95_latency_ms == null ? "-" : Math.round(s.p95_latency_ms) + "ms",
+        ];
+      });
+      if (sampleRows.length) {
+        renderTable(
+          "job-fixtures",
+          sampleRows,
+          ["Elapsed", "Requests", "Failed", "TPS", "P95"],
+          fixtureRows.length > 0 || jobRows.length > 0 || phaseRows.length > 0,
+        );
+      }
+      if (jobResult && jobResult.verdict) {
+        const verdict = document.createElement("p");
+        verdict.textContent = String(jobResult.verdict);
+        fixtures.appendChild(verdict);
+      }
     }
 
     async function loadRunDetail(runId) {

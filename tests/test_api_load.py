@@ -11,6 +11,7 @@ from pydantic import ValidationError
 
 from atomics.api._load import run_soak_from_request, run_stress_from_request
 from atomics.api.config import ServerSettings
+from atomics.api.jobs import Job, JobStatus
 from atomics.api.models import (
     MAX_LOAD_PREDICT,
     MAX_SOAK_CONCURRENCY,
@@ -147,6 +148,90 @@ async def test_run_stress_meters_the_provider_and_caps_predict():
 
 
 @pytest.mark.asyncio
+async def test_run_stress_forwards_host_to_provider():
+    payload = StressRequest(
+        provider="ollama",
+        model="qwen3:14b",
+        budget_usd=1.0,
+        host="http://192.168.1.79:11434",
+    )
+    seen: dict = {}
+
+    def fake_provider(name, model, host=None):
+        seen["host"] = host
+        return SimpleNamespace(name=name, model=model)
+
+    result = StressResult(model="qwen3:14b", host="api", phases=[])
+
+    async def fake_run(provider, **kwargs):
+        return result
+
+    with (
+        patch("atomics.api._load._provider_for", side_effect=fake_provider),
+        patch("atomics.api._load.run_stress_provider", side_effect=fake_run),
+    ):
+        await run_stress_from_request(payload)
+
+    assert seen["host"] == "http://192.168.1.79:11434"
+
+
+@pytest.mark.asyncio
+async def test_run_stress_from_request_reports_start_then_done():
+    payload = StressRequest(
+        provider="ollama",
+        model="qwen3:14b",
+        budget_usd=1.0,
+        max_concurrency=1,
+        phase_seconds=5.0,
+    )
+    job = Job(job_id="s", kind="stress", status=JobStatus.RUNNING, created_at=0.0)
+    snapshots: list[dict] = []
+
+    result = StressResult(
+        model="qwen3:14b",
+        host="api",
+        peak_tps=10.0,
+        saturation_concurrency=1,
+        phases=[
+            ConcurrencyResult(
+                concurrency=1,
+                requests=3,
+                failed=0,
+                aggregate_tps=10.0,
+                avg_latency_ms=100.0,
+                p95_latency_ms=110.0,
+            )
+        ],
+    )
+
+    async def fake_run(provider, **kwargs):
+        start = kwargs["on_phase_start"]
+        done = kwargs["on_phase"]
+        start(1)
+        snapshots.append(dict(job.progress or {}))
+        done(result.phases[0])
+        snapshots.append(
+            {
+                "current": (job.progress or {}).get("current"),
+                "in_flight": (job.progress or {}).get("in_flight"),
+                "phases": list((job.result or {}).get("phases") or []),
+            }
+        )
+        return result
+
+    with (
+        patch("atomics.api._load._provider_for", return_value=SimpleNamespace(name="ollama")),
+        patch("atomics.api._load.run_stress_provider", side_effect=fake_run),
+    ):
+        await run_stress_from_request(payload, job=job)
+
+    assert snapshots[0]["in_flight"] == {"concurrency": 1, "phase_seconds": 5.0}
+    assert snapshots[1]["current"] == 1
+    assert snapshots[1]["in_flight"] is None
+    assert snapshots[1]["phases"][0]["concurrency"] == 1
+
+
+@pytest.mark.asyncio
 async def test_run_soak_meters_the_provider_and_caps_predict():
     payload = SoakRequest(
         provider="ollama",
@@ -211,6 +296,31 @@ async def test_post_stress_returns_a_job():
     assert resp.json()["kind"] == "stress"
 
 
+@pytest.mark.asyncio
+async def test_post_stress_202_progress_total_is_ladder_length():
+    app = create_app(settings=ServerSettings(no_auth=True))
+    with (
+        patch(
+            "atomics.api.routes.run_stress_from_request",
+            new_callable=AsyncMock,
+            return_value={"peak_tps": 1.0},
+        ),
+        TestClient(app) as client,
+    ):
+        resp = client.post(
+            "/api/v1/stress",
+            json={
+                "provider": "ollama",
+                "model": "qwen3:14b",
+                "budget_usd": 1.5,
+                "max_concurrency": 2,
+                "phase_seconds": 5.0,
+            },
+        )
+    assert resp.status_code == 202
+    assert resp.json()["progress"] == {"current": 0, "total": 2, "in_flight": None}
+
+
 def test_post_stress_without_budget_is_422():
     app = create_app(settings=ServerSettings(no_auth=True))
     with TestClient(app) as client:
@@ -243,6 +353,31 @@ async def test_post_soak_returns_a_job():
         )
     assert resp.status_code == 202
     assert resp.json()["kind"] == "soak"
+
+
+@pytest.mark.asyncio
+async def test_post_soak_202_progress_total_matches_actual_samples():
+    app = create_app(settings=ServerSettings(no_auth=True))
+    with (
+        patch(
+            "atomics.api.routes.run_soak_from_request",
+            new_callable=AsyncMock,
+            return_value={"verdict": "STABLE"},
+        ),
+        TestClient(app) as client,
+    ):
+        resp = client.post(
+            "/api/v1/soak",
+            json={
+                "provider": "ollama",
+                "model": "qwen3:14b",
+                "budget_usd": 1.0,
+                "duration_seconds": 30,
+                "sample_interval": 10,
+            },
+        )
+    assert resp.status_code == 202
+    assert resp.json()["progress"] == {"current": 0, "total": 2, "in_flight": None}
 
 
 def test_post_soak_hour_long_duration_is_422():

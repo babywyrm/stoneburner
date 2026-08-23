@@ -161,6 +161,136 @@ def test_quiet_wait_still_running_after_cap() -> None:
     assert "still running  24/25" in text
 
 
+def test_stress_in_flight_line() -> None:
+    assert format_in_flight({"concurrency": 2, "phase_seconds": 5.0}) == "  c=2  5s"
+
+
+def test_soak_in_flight_line() -> None:
+    assert format_in_flight({"elapsed_seconds": 10, "concurrency": 1}) == "  10s  c=1"
+
+
+def test_completed_stress_headline() -> None:
+    text = format_completed(
+        {
+            "status": "completed",
+            "kind": "stress",
+            "request": {
+                "model": "llama3.2:1b",
+                "host": "http://192.168.1.79:11434",
+            },
+            "result": {
+                "peak_tps": 435.2,
+                "saturation_concurrency": 2,
+                "total_tokens": 5736,
+                "phases": [
+                    {"concurrency": 1, "requests": 7, "aggregate_tps": 337.0},
+                    {"concurrency": 2, "requests": 10, "aggregate_tps": 435.2},
+                ],
+            },
+        }
+    )
+    assert "stress  llama3.2:1b  http://192.168.1.79:11434" in text
+    assert "435" in text
+    assert "sat=2" in text
+    assert "2 phases" in text
+    assert text.splitlines()[1].startswith("-") is False
+
+
+def test_completed_soak_headline() -> None:
+    text = format_completed(
+        {
+            "status": "completed",
+            "kind": "soak",
+            "request": {
+                "model": "llama3.2:1b",
+                "host": "http://192.168.1.79:11434",
+            },
+            "result": {
+                "verdict": "STABLE",
+                "throughput_drift_pct": -1.2,
+                "latency_drift_pct": 0.4,
+                "total_tokens": 6656,
+                "samples": [
+                    {"elapsed_seconds": 10, "requests": 8, "aggregate_tps": 256.0},
+                    {"elapsed_seconds": 20, "requests": 9, "aggregate_tps": 240.0},
+                ],
+            },
+        }
+    )
+    assert "soak  llama3.2:1b  http://192.168.1.79:11434" in text
+    assert "STABLE" in text
+    assert "2 samples" in text
+    assert "-  0" not in text
+
+
+def test_quiet_wait_walks_stress_phases() -> None:
+    lines: list[str] = []
+    view = QuietWait(lines.append, color=False)
+    view.update(
+        {
+            "status": "running",
+            "progress": {
+                "current": 0,
+                "total": 2,
+                "in_flight": {"concurrency": 1, "phase_seconds": 5.0},
+            },
+            "result": None,
+        }
+    )
+    view.update(
+        {
+            "status": "running",
+            "progress": {
+                "current": 1,
+                "total": 2,
+                "in_flight": {"concurrency": 2, "phase_seconds": 5.0},
+            },
+            "result": {
+                "phases": [
+                    {
+                        "concurrency": 1,
+                        "requests": 7,
+                        "failed": 0,
+                        "aggregate_tps": 337.0,
+                    }
+                ]
+            },
+        }
+    )
+    view.update(
+        {
+            "status": "completed",
+            "kind": "stress",
+            "request": {"model": "m", "host": "h"},
+            "progress": {"current": 2, "total": 2, "in_flight": None},
+            "result": {
+                "peak_tps": 435.0,
+                "saturation_concurrency": 2,
+                "phases": [
+                    {
+                        "concurrency": 1,
+                        "requests": 7,
+                        "failed": 0,
+                        "aggregate_tps": 337.0,
+                    },
+                    {
+                        "concurrency": 2,
+                        "requests": 10,
+                        "failed": 0,
+                        "aggregate_tps": 435.0,
+                    },
+                ],
+            },
+        }
+    )
+    text = "".join(lines)
+    assert "c=1  5s" in text
+    assert "c=2  5s" in text
+    assert "c=1  337" in text
+    assert "sat=2" in text
+    assert text.count("c=1  337") == 1
+
+
 def test_color_off_has_no_ansi() -> None:
     line = format_fixture_row(
         {"id": "ev-01", "score": 1.0, "status": "success", "tokens": 10},

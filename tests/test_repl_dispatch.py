@@ -99,6 +99,18 @@ def test_submit_eval_verbose_keeps_json() -> None:
     assert session.last_job_id == "abc"
 
 
+def test_session_host_fills_submit_stress() -> None:
+    requests: list[httpx.Request] = []
+    session = Session(provider="ollama", model="llama3.2:1b", host="http://192.168.1.79:11434")
+    handle_line(
+        "submit_stress --budget_usd 1",
+        session=session,
+        client=_client(requests),
+    )
+    payload = json.loads(requests[0].content)
+    assert payload["host"] == "http://192.168.1.79:11434"
+
+
 def test_session_host_fills_submit_eval() -> None:
     requests: list[httpx.Request] = []
     session = Session(provider="ollama", model="llama3.2:1b", host="http://192.168.1.79:11434")

@@ -82,6 +82,18 @@ class ConcurrencyResult:
     total_cost_usd: float = 0.0
 
 
+def stress_concurrency_levels(max_concurrency: int) -> list[int]:
+    """The 1, 2, 4, … ladder, plus the cap when it is not already a power of two."""
+    levels: list[int] = []
+    step = 1
+    while step <= max_concurrency:
+        levels.append(step)
+        step *= 2
+    if max_concurrency not in levels:
+        levels.append(max_concurrency)
+    return levels
+
+
 @dataclass
 class StressResult:
     model: str
@@ -226,13 +238,7 @@ async def run_stress(
         vram_total_mb=vram_total,
     )
 
-    concurrency_levels = []
-    c = 1
-    while c <= max_concurrency:
-        concurrency_levels.append(c)
-        c *= 2
-    if max_concurrency not in concurrency_levels:
-        concurrency_levels.append(max_concurrency)
+    concurrency_levels = stress_concurrency_levels(max_concurrency)
 
     t0 = time.monotonic()
     peak_vram: float | None = None
@@ -337,6 +343,7 @@ async def run_stress_provider(
     phase_seconds: float = 15.0,
     num_predict: int = 2048,
     on_phase: Callable[[object], None] | None = None,
+    on_phase_start: Callable[[int], None] | None = None,
 ) -> StressResult:
     """Ramp concurrency against any BaseProvider (cloud or local)."""
     result = StressResult(
@@ -345,17 +352,13 @@ async def run_stress_provider(
         provider=getattr(provider, "name", ""),
     )
 
-    concurrency_levels: list[int] = []
-    c = 1
-    while c <= max_concurrency:
-        concurrency_levels.append(c)
-        c *= 2
-    if max_concurrency not in concurrency_levels:
-        concurrency_levels.append(max_concurrency)
+    concurrency_levels = stress_concurrency_levels(max_concurrency)
 
     t0 = time.monotonic()
 
     for conc in concurrency_levels:
+        if on_phase_start:
+            on_phase_start(conc)
         phase = await _run_phase_provider(provider, conc, phase_seconds, num_predict)
         result.phases.append(phase)
         result.total_tokens += phase.total_output_tokens + phase.total_input_tokens

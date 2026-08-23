@@ -201,6 +201,22 @@ def test_submit_stress_posts_required_budget():
     assert payload["max_concurrency"] == 4
 
 
+def test_submit_stress_includes_host_when_given():
+    requests: list[httpx.Request] = []
+    with client_recording(requests) as client:
+        client.submit_stress(
+            provider="ollama",
+            model="qwen3:14b",
+            budget_usd=2.0,
+            host="http://192.168.1.79:11434",
+        )
+
+    import json
+
+    payload = json.loads(requests[0].content)
+    assert payload["host"] == "http://192.168.1.79:11434"
+
+
 def test_submit_soak_posts_duration_in_seconds():
     requests: list[httpx.Request] = []
     with client_recording(requests) as client:

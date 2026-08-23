@@ -50,3 +50,5 @@ def test_dashboard_script_renders_run_and_job_via_textcontent(tmp_path: Path) ->
     assert "rf-01" in report["allText"]
     assert "ev-jc-01" in report["allText"]
     assert "sweep-model-x" in report["allText"]
+    assert "337" in report["allText"]
+    assert "STABLE" in report["allText"] or "10s" in report["allText"] or "256" in report["allText"]

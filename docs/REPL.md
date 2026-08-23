@@ -20,8 +20,9 @@ this process (stdlib `readline`); history is not written to disk.
 In-memory only. `set provider ollama`, `set model llama3.2:1b`,
 `set host http://192.168.1.79:11434`, `set effort high`, `show`.
 `set model` with no value clears it. Submit verbs fill omitted fields
-from the session (`host` goes to `submit_eval`, `list_models`, and
-`provider_test`). An explicit flag wins.
+from the session (`host` goes to `submit_eval`, `submit_stress`,
+`submit_soak`, `list_models`, and `provider_test`). An explicit flag
+wins.
 
 ## Verbs
 
@@ -50,7 +51,11 @@ The same quiet / `--verbose` lines work for every `submit_eval` suite
 once `result.fixtures` grows. Every suite prints generate/judge phase
 lines (codegen is generate only) and a score line as each fixture
 lands. Sweep `wait` prints `model  suite` per cell, then
-`N ok  M fail  K jobs`.
+`N ok  M fail  K jobs`. Stress `wait` prints `c=N  5s` while a
+phase is open, then `c=N  T tps  R req` as each phase finishes,
+then `peak tps  sat=N  K phases`. Soak `wait` prints `10s  c=1`
+while a window is open, then each sample, then
+`STABLE  drift …  K samples`.
 
 `probe`, hours-long soak, contention, and profiles stay on the CLI.
 

@@ -23,6 +23,14 @@
 - **Generate/judge `in_flight` on every eval suite.** Same
   `on_phase(fixture_id, phase, model)` hook as accuracy. Codegen is
   generate only (sandbox tests, no LLM judge).
+- **Stress / soak live rows.** `POST /stress` grows `result.phases`
+  and sets `in_flight` to `{concurrency, phase_seconds}`.
+  `POST /soak` grows `result.samples` and sets `in_flight` to
+  `{elapsed_seconds, concurrency}`. `progress.total` is the
+  concurrency ladder (stress) or the samples the runner actually
+  emits (soak: 30s/10s → 2). Optional `host` on both, same meaning
+  as eval. Dashboard `#job=` and REPL `wait` print the rows and a
+  peak-tps / verdict headline instead of a dash-and-zero.
 
 ### Fixed
 - Eval job `progress.total` counted the accuracy catalog (25) for

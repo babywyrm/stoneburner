@@ -224,7 +224,11 @@ Job document parity and operator comfort are in.
 - [x] **Sweep live cells.** `POST /sweeps` grows `result.jobs`.
       `progress.total` is models × suites. `in_flight` is
       `{model, suite}`. Dashboard `#job=` renders the jobs table.
-      Stress/soak stay headline-only.
+- [x] **Stress / soak live rows.** `POST /stress` grows
+      `result.phases`; `POST /soak` grows `result.samples`. Different
+      document (concurrency, drift, verdict) — not `FixtureRow` or
+      `result.jobs`. Optional `host`. REPL `wait` and `#job=` print
+      the rows.
 
 ## Next
 
@@ -233,9 +237,6 @@ Unscheduled. Pick one; do not mix a parked item into it.
 - **Cut 0.22.0** when Unreleased is the story we want on PyPI.
   `RELEASING.md`. Do not mix a feature into the tag commit. Do not
   retag `v0.21.0` or `v0.20.0`.
-- **Stress / soak live rows** if load jobs should be as readable as
-  eval and sweep. Different document (concurrency, error, drift) —
-  do not reuse `FixtureRow` or `result.jobs`.
 - **Proof on a live host.** `provider-test`, then a short `submit_eval`
   / `wait`, then a two-model sweep. Desk use, not a product change.
 - **Suite convergence** (ARCHITECTURE): `results` alias, large

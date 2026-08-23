@@ -88,7 +88,7 @@ ATOMICS_API_URL="https://atomics.internal:8000" uv run atomics mcp
 | `health` | yes | Check the API server is reachable |
 | `list_models` | yes | List tags on Ollama or vLLM |
 | `list_jobs` | yes | In-memory API jobs (short `request`; no fixture rows — poll `get_job`) |
-| `get_job` | yes | Status, resolved `request`, live `progress`, growing `result.fixtures`, and sweep `result.jobs` |
+| `get_job` | yes | Status, resolved `request`, live `progress`, growing `result.fixtures`, sweep `result.jobs`, stress `result.phases`, soak `result.samples` |
 | `get_run` | yes | One persisted run and its fixtures (prompts omitted) |
 | `compare` | yes | Compare recorded results by provider or model |
 | `recent_runs` | yes | List recent recorded runs |
@@ -120,6 +120,8 @@ omitted).
    name the models (`list_models` first). No discover-everything flag.
 6. `submit_stress` / `submit_soak` — load tests. `budget_usd` is required.
    Stress: one model, c≤8, phase ≤15s. Soak: duration is seconds, 30–300.
+   Optional `host` (same meaning as `list_models`). Live `result.phases`
+   / `result.samples` grow while the job runs.
 7. `get_job` / `list_jobs` — poll until `status` is `completed`
 8. `get_run` / `compare` / `trends` — read what was stored
 
@@ -164,6 +166,9 @@ grows as each fixture finishes — every `submit_eval` suite, not only
 accuracy. Every suite sets `progress.in_flight` to the current generate
 or judge call (codegen is generate only). A sweep counts models × suites
 instead, grows `result.jobs`, and sets `in_flight` to `{model, suite}`.
+A stress job grows `result.phases` and sets `in_flight` to
+`{concurrency, phase_seconds}`. A soak job grows `result.samples` and
+sets `in_flight` to `{elapsed_seconds, concurrency}`.
 The API uses `completed`, not `finished`. No tool blocks on model work,
 which is what keeps a long eval from timing out an agent's tool call.
 The server's `instructions` tell the agent to do this.

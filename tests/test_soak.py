@@ -652,6 +652,35 @@ class TestRunSoakProvider:
         assert len(received) >= 2
 
     @pytest.mark.asyncio
+    async def test_provider_on_sample_start_fires_before_sample(self):
+        from atomics.soak import run_soak_provider
+
+        events: list[str] = []
+
+        def on_sample_start(elapsed: float) -> None:
+            events.append(f"start:{elapsed}")
+
+        def on_sample(s: SoakSample) -> None:
+            events.append(f"done:{s.elapsed_seconds}")
+
+        with patch("atomics.stress._single_request_provider", side_effect=_async_req_provider()):
+            await run_soak_provider(
+                provider=_make_mock_provider("start-prov"),
+                model="m",
+                concurrency=1,
+                duration_seconds=0.6,
+                sample_interval=0.2,
+                on_sample_start=on_sample_start,
+                on_sample=on_sample,
+            )
+        starts = [e for e in events if e.startswith("start:")]
+        dones = [e for e in events if e.startswith("done:")]
+        assert starts
+        assert dones
+        assert events.index(starts[0]) < events.index(dones[0])
+        assert "start:0.6" not in events
+
+    @pytest.mark.asyncio
     async def test_provider_failure_handling(self):
         from atomics.soak import run_soak_provider
 

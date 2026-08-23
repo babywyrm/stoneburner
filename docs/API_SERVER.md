@@ -257,6 +257,15 @@ UNSTABLE. Both require `budget_usd`. These are not the CLI's hours-long
 path: concurrency is 1–8 (stress) or 1–4 (soak), each stress phase is at
 most 15 seconds, soak duration is 30–300 seconds, and `num_predict` is
 fixed at 256. No contention mode, no profile YAML, no baselines.
+Optional `host` has the same meaning as `POST /evals`.
+
+While a stress job runs, `progress.total` is the concurrency ladder
+(`1, 2, 4, …` plus the cap), `in_flight` is `{concurrency,
+phase_seconds}`, and `result.phases` grows as each phase finishes.
+While a soak job runs, `progress.total` is the number of sampler
+windows that finish before duration cancels the last sleep (30s / 10s
+→ 2), `in_flight` is `{elapsed_seconds, concurrency}`, and
+`result.samples` grows as each sample lands.
 
 ```bash
 curl -H "X-API-Key: $ATOMICS_API_KEY" -H "Content-Type: application/json" \
