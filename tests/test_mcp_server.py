@@ -125,7 +125,13 @@ async def test_spending_tools_are_not_labelled_read_only(name):
 async def test_submit_run_forwards_arguments_to_the_api():
     api = FakeApi()
     await build_server(api).call_tool(
-        "submit_run", {"provider": "claude", "model": "sonnet", "iterations": 9}
+        "submit_run",
+        {
+            "provider": "claude",
+            "model": "sonnet",
+            "iterations": 9,
+            "host": "http://127.0.0.1:11434",
+        },
     )
 
     name, kwargs = api.calls[0]
@@ -133,6 +139,7 @@ async def test_submit_run_forwards_arguments_to_the_api():
     assert kwargs["provider"] == "claude"
     assert kwargs["model"] == "sonnet"
     assert kwargs["iterations"] == 9
+    assert kwargs["host"] == "http://127.0.0.1:11434"
 
 
 async def test_submit_run_forwards_effort_to_the_api():
@@ -191,6 +198,22 @@ async def test_submit_sweep_forwards_required_budget():
     assert kwargs["models"] == ["qwen3:14b"]
     assert kwargs["suites"] == ["redblue", "refusal"]
     assert kwargs["runs"] == 3
+
+
+async def test_submit_sweep_forwards_host():
+    api = FakeApi()
+    await build_server(api).call_tool(
+        "submit_sweep",
+        {
+            "provider": "ollama",
+            "models": ["qwen3:14b"],
+            "suites": ["eval"],
+            "budget_usd": 1.0,
+            "host": "http://127.0.0.1:11434",
+        },
+    )
+    _, kwargs = api.calls[0]
+    assert kwargs["host"] == "http://127.0.0.1:11434"
 
 
 async def test_submit_stress_forwards_required_budget():

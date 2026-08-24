@@ -141,6 +141,97 @@ def test_wait_prints_when_progress_changes() -> None:
     assert text.count("generate") == 1
 
 
+def test_wait_prints_new_trail_entries_on_same_in_flight() -> None:
+    session = Session(last_job_id="abc")
+    client = _client(
+        [
+            {
+                "job_id": "abc",
+                "status": "running",
+                "progress": {
+                    "current": 0,
+                    "total": 1,
+                    "in_flight": {
+                        "fixture_id": "ev-01",
+                        "phase": "generate",
+                        "model": "m",
+                    },
+                    "trail": [
+                        {"fixture_id": "ev-01", "phase": "generate", "model": "m"},
+                    ],
+                },
+            },
+            {
+                "job_id": "abc",
+                "status": "running",
+                "progress": {
+                    "current": 0,
+                    "total": 1,
+                    "in_flight": {
+                        "fixture_id": "ev-01",
+                        "phase": "generate",
+                        "model": "m",
+                    },
+                    "trail": [
+                        {"fixture_id": "ev-01", "phase": "generate", "model": "m"},
+                        {"fixture_id": "ev-01", "phase": "judge", "model": "m"},
+                    ],
+                },
+            },
+            {
+                "job_id": "abc",
+                "status": "completed",
+                "progress": {
+                    "current": 1,
+                    "total": 1,
+                    "in_flight": None,
+                    "trail": [
+                        {"fixture_id": "ev-01", "phase": "generate", "model": "m"},
+                        {"fixture_id": "ev-01", "phase": "judge", "model": "m"},
+                    ],
+                },
+                "result": {
+                    "overall_accuracy": 1.0,
+                    "fixtures_run": 1,
+                    "total_tokens": 10,
+                    "fixtures": [
+                        {"id": "ev-01", "score": 1.0, "status": "success", "tokens": 10}
+                    ],
+                },
+            },
+        ]
+    )
+    written: list[str] = []
+    handle_line("wait", session=session, client=client, write=written.append)
+    text = "".join(written)
+    assert text.count("generate") == 1
+    assert "judge" in text
+
+
+def test_wait_failed_prints_headline() -> None:
+    session = Session(last_job_id="abc")
+    written: list[str] = []
+    handle_line(
+        "wait",
+        session=session,
+        client=_client(
+            [
+                {
+                    "job_id": "abc",
+                    "status": "failed",
+                    "kind": "eval",
+                    "error": {"message": "budget exceeded"},
+                }
+            ]
+        ),
+        write=written.append,
+    )
+    text = "".join(written)
+    assert "eval  failed" in text
+    assert "budget exceeded" in text
+    assert "still running" not in text
+
+
 def test_wait_prints_stress_in_flight_when_concurrency_changes() -> None:
     session = Session(last_job_id="abc")
     client = _client(

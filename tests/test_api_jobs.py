@@ -50,6 +50,40 @@ async def test_job_manager_clears_in_flight_on_complete():
 
 
 @pytest.mark.asyncio
+async def test_job_manager_keeps_trail_on_complete():
+    manager = JobManager()
+
+    async def work(job_id):
+        job = manager.jobs[job_id]
+        job.progress = {
+            "current": 1,
+            "total": 1,
+            "in_flight": {"fixture_id": "ev-01", "phase": "judge", "model": "m"},
+            "trail": [
+                {"fixture_id": "ev-01", "phase": "generate", "model": "m"},
+                {"fixture_id": "ev-01", "phase": "judge", "model": "m"},
+            ],
+        }
+        return {"overall_score": 1.0}
+
+    job_id = await manager.submit(
+        "eval",
+        work,
+        progress={"current": 0, "total": 1, "in_flight": None, "trail": []},
+    )
+    await manager.wait_for(job_id, timeout=1.0)
+    assert manager.jobs[job_id].progress == {
+        "current": 1,
+        "total": 1,
+        "in_flight": None,
+        "trail": [
+            {"fixture_id": "ev-01", "phase": "generate", "model": "m"},
+            {"fixture_id": "ev-01", "phase": "judge", "model": "m"},
+        ],
+    }
+
+
+@pytest.mark.asyncio
 async def test_job_manager_failure():
     manager = JobManager()
 

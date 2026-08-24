@@ -103,7 +103,9 @@ def short_request(request: dict[str, Any] | None) -> dict[str, Any] | None:
     if not request:
         return None
     out: dict[str, Any] = {
-        key: request[key] for key in ("suite", "model", "host") if key in request
+        key: request[key]
+        for key in ("suite", "model", "host", "models", "suites")
+        if key in request
     }
     return out or None
 
@@ -124,7 +126,12 @@ def eval_fixture_total(payload: EvalRequest) -> int:
 
 
 def initial_eval_progress(payload: EvalRequest) -> dict[str, Any]:
-    return {"current": 0, "total": eval_fixture_total(payload), "in_flight": None}
+    return {
+        "current": 0,
+        "total": eval_fixture_total(payload),
+        "in_flight": None,
+        "trail": [],
+    }
 
 
 def _field(obj: Any, name: str, default: Any = None) -> Any:
@@ -360,15 +367,21 @@ class EvalJobReporter:
             "judge_model": judge_model,
             "host": host,
         }
-        job.progress = {"current": 0, "total": total, "in_flight": None}
+        job.progress = {"current": 0, "total": total, "in_flight": None, "trail": []}
 
     def phase(self, fixture_id: str, phase: str, model: str | None) -> None:
         progress = dict(self.job.progress or {})
-        progress["in_flight"] = {
+        entry = {
             "fixture_id": fixture_id,
             "phase": phase,
             "model": model,
         }
+        progress["in_flight"] = entry
+        trail = list(progress.get("trail") or [])
+        cap = 2 * int(progress.get("total") or 0)
+        if cap <= 0 or len(trail) < cap:
+            trail.append(entry)
+        progress["trail"] = trail
         self.job.progress = progress
 
     def fixture_done(self, fr: Any) -> None:
@@ -389,10 +402,12 @@ class EvalJobReporter:
         result["fixtures_run"] = len(result["fixtures"])
         result["total_tokens"] = int(result["total_tokens"]) + int(row["tokens"])
         result["total_cost_usd"] = round(float(result["total_cost_usd"]) + row_cost(fr), 6)
+        prior = self.job.progress or {}
         self.job.progress = {
             "current": result["fixtures_run"],
-            "total": (self.job.progress or {}).get("total"),
+            "total": prior.get("total"),
             "in_flight": None,
+            "trail": list(prior.get("trail") or []),
         }
 
 

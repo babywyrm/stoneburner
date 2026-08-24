@@ -219,9 +219,16 @@ host) at submit time. Every eval suite carries `progress` (`current` /
 and grows `result.fixtures` as each fixture finishes — same row shape
 (id, status, score, tokens, latency, truncated response, error). Every
 suite sets `in_flight` to `generate` or `judge` (codegen is generate
-only). `POST /evals` accepts optional `host`, same meaning as
-`GET /models`. `list_jobs` includes a short `request` and omits fixture
-rows.
+only) and appends that dict to `progress.trail` (cap `2 × total`) so a
+2s poll can still show both phases. Accuracy fits the cap (one
+generate and one judge per fixture). Suites that fire `on_phase` more
+often (multiturn turns, redblue/adversarial runs) drop later trail
+entries; REPL `wait` then cannot fall back to current `in_flight`.
+Dashboard `#job=` still shows the current `in_flight` plus the
+fixture / phase / sample tables, not the trail. `POST /evals` accepts
+optional `host`, same meaning as `GET /models`. `list_jobs` includes a
+short `request` (suite / model / host, plus sweep `models` / `suites`)
+and omits fixture rows.
 
 `probe` is CLI-only. Load tests have their own endpoints, not `suite` values.
 
@@ -230,7 +237,8 @@ rows.
 `minimal` / `low` / `medium` / `high` / `xhigh` / `max` (aliases `xl`,
 `ultra`) and OpenAI-only `standard` / `pro`. Unknown values are `422`.
 `POST /evals` `codegen` and `POST /runs` forward the dial onto
-`generate`. `probe` stays CLI-only.
+`generate`. `POST /runs` also accepts optional `host`. `probe` stays
+CLI-only.
 
 ### Sweeps
 
@@ -239,7 +247,8 @@ Unlike a single eval, **`budget_usd` has no default** — omit it and the
 request is `422`. Name the models; there is no `--all-local` / discover-
 everything flag (call `GET /models` first). Caps: 8 models, 3 runs, suites
 from `eval`, `redblue`, `refusal`, `toolcall`, `codereview` (note `eval`,
-not `accuracy`). While it runs, `progress.total` is models × suites,
+not `accuracy`). Optional `host` has the same meaning as `POST /evals`.
+While it runs, `progress.total` is models × suites,
 `in_flight` is `{model, suite}`, and `result.jobs` grows as each cell
 finishes.
 

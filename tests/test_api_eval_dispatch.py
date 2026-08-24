@@ -64,6 +64,8 @@ async def test_post_evals_includes_resolved_request(client):
     assert body["request"]["judge_model"]
     assert body["progress"]["current"] == 0
     assert body["progress"]["total"] >= 1
+    assert body["progress"]["trail"] == []
+    assert body["progress"]["in_flight"] is None
     listed = client.get("/api/v1/jobs").json()["jobs"]
     assert listed[0]["request"]["model"] == "llama3.2:1b"
     assert "fixtures" not in (listed[0].get("result") or {})
