@@ -169,10 +169,12 @@ accuracy. Every suite sets `progress.in_flight` to the current generate
 or judge call (codegen is generate only) and appends it to
 `progress.trail` (cap `2 × total`; later phases on multiturn /
 redblue / adversarial are dropped). A sweep counts models × suites
-instead, grows `result.jobs`, and sets `in_flight` to `{model, suite}`.
-A stress job grows `result.phases` and sets `in_flight` to
+instead, grows `result.jobs`, sets `in_flight` to `{model, suite}`,
+and appends that to `progress.trail` (cap `total`). A stress job
+grows `result.phases` and sets `in_flight` to
 `{concurrency, phase_seconds}`. A soak job grows `result.samples` and
-sets `in_flight` to `{elapsed_seconds, concurrency}`.
+sets `in_flight` to `{elapsed_seconds, concurrency}`. Load jobs
+append `in_flight` to `progress.trail` (cap `total`) the same way.
 The API uses `completed`, not `finished`. No tool blocks on model work,
 which is what keeps a long eval from timing out an agent's tool call.
 The server's `instructions` tell the agent to do this.

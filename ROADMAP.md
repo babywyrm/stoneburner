@@ -230,7 +230,8 @@ Job document parity and operator comfort are in.
       `result.jobs`. Optional `host`. REPL `wait` and `#job=` print
       the rows.
 - [x] **Wait honesty + remaining `host` + quiet reads.** Eval
-      `progress.trail` so a 2s poll cannot skip `judge`. `failed`
+      `progress.trail` so a 2s poll cannot skip `judge`. Sweep /
+      stress / soak trail the same way (cap `total`). `failed`
       headline. Optional `host` on sweep/run. Quiet `list_jobs` /
       `list_models` / `provider_test` / `get_run` / `recent_runs` /
       `compare` / `trends`.

@@ -235,7 +235,8 @@ running API server. Requires the `[mcp]` extra. See
 `atomics repl` requires a running server. Verbs match MCP; see [REPL.md](REPL.md).
 `wait` prints a quiet line per generate/judge and per scored fixture,
 then a `completed` or `failed` headline. Eval jobs keep `progress.trail`
-so a 2s poll that missed `judge` still prints it. `wait --verbose` adds
+so a 2s poll that missed `judge` still prints it. Sweep, stress, and
+soak keep a trail of each start (cap `total`). `wait --verbose` adds
 latency and the truncated reply. `get_job` still returns the full JSON.
 `list_jobs` / `list_models` / `provider_test` / `get_run` /
 `recent_runs` / `compare` / `trends` are quiet one-liners;

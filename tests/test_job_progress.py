@@ -264,6 +264,7 @@ def test_load_reporter_grows_phases_and_clears_in_flight() -> None:
         "current": 0,
         "total": 2,
         "in_flight": {"concurrency": 1, "phase_seconds": 5.0},
+        "trail": [{"concurrency": 1, "phase_seconds": 5.0}],
     }
     reporter.done(
         {
@@ -277,7 +278,7 @@ def test_load_reporter_grows_phases_and_clears_in_flight() -> None:
     )
     assert job.progress["current"] == 1
     assert job.progress["in_flight"] is None
-    assert "trail" not in job.progress
+    assert job.progress["trail"] == [{"concurrency": 1, "phase_seconds": 5.0}]
     assert job.result is not None
     assert job.result["phases"][0]["concurrency"] == 1
 
@@ -308,6 +309,7 @@ def test_sweep_reporter_grows_jobs_and_clears_in_flight() -> None:
         "current": 0,
         "total": 2,
         "in_flight": {"model": "a", "suite": "eval"},
+        "trail": [{"model": "a", "suite": "eval"}],
     }
     reporter.done(
         SimpleNamespace(
@@ -322,11 +324,30 @@ def test_sweep_reporter_grows_jobs_and_clears_in_flight() -> None:
     )
     assert job.progress["current"] == 1
     assert job.progress["in_flight"] is None
-    assert "trail" not in job.progress
+    assert job.progress["trail"] == [{"model": "a", "suite": "eval"}]
     assert job.result is not None
     assert job.result["jobs"][0]["model"] == "a"
     assert job.result["jobs"][0]["headline"] == 0.9
     assert job.result["ok"] == 1
+
+
+def test_sweep_reporter_appends_start_to_trail() -> None:
+    job = Job(job_id="s", kind="sweep", status=JobStatus.RUNNING, created_at=0.0)
+    reporter = SweepJobReporter(
+        job,
+        provider="ollama",
+        models=["a", "b"],
+        suites=["eval"],
+        runs=1,
+        budget_usd=2.0,
+        total=2,
+    )
+    reporter.start("a", "eval")
+    reporter.start("b", "eval")
+    assert job.progress["trail"] == [
+        {"model": "a", "suite": "eval"},
+        {"model": "b", "suite": "eval"},
+    ]
 
 
 def test_eval_trail_caps_at_twice_total() -> None:

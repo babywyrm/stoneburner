@@ -256,7 +256,7 @@ async def test_post_sweeps_includes_progress_total():
     assert body["progress"]["total"] == 4
     assert body["progress"]["current"] == 0
     assert body["request"]["host"] == "http://127.0.0.1:11434"
-    assert "trail" not in (body.get("progress") or {})
+    assert body["progress"]["trail"] == []
 
 
 def test_post_sweeps_without_budget_is_422():
