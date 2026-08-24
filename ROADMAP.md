@@ -135,6 +135,9 @@ The **v0.20.0** GitHub / PyPI release (2026-08-19) is the shared
 "Per-pass live lines" heading below (that work already shipped).
 The **v0.21.0** release (2026-08-22) is `atomics repl`, live job
 progress, and `--effort` on every generate path including tools.
+The **v0.22.0** release (2026-08-23) is wait-until-done, live rows
+on every job kind, `progress.trail`, quiet leftover REPL reads, and
+`host` on sweep/run.
 
 ## v0.19.0 — A stranger can trust a headline
 
@@ -201,11 +204,8 @@ and `--effort` on every generate path including the tool channel.
 Planning labels `v0.21.0`–`v0.23.0` above already shipped in earlier
 releases; they are not this tag.
 
-The items below landed on `main` after that tag. Package version is
-still **0.21.0** until the next release. Unreleased notes are in
-`CHANGELOG.md`.
-
-Job document parity and operator comfort are in.
+**v0.22.0** (2026-08-23) shipped the items below. Package version is
+**0.22.0**. Unreleased notes start empty again in `CHANGELOG.md`.
 
 - [x] **REPL line editing.** Stdlib `readline` for in-process
       history. No `prompt_toolkit`. Not session persistence to disk.
@@ -244,14 +244,11 @@ Job document parity and operator comfort are in.
 
 Unscheduled. Pick one; do not mix a parked item into it.
 
-- **Cut 0.22.0** when Unreleased is the story we want on PyPI.
-  `RELEASING.md`. Do not mix a feature into the tag commit. Do not
-  retag `v0.21.0` or `v0.20.0`.
-- **Proof on a live host.** `provider-test`, then a short `submit_eval`
-  / `wait`, then a two-model sweep. Desk use, not a product change.
 - **Suite convergence** (ARCHITECTURE): `results` alias, large
   command modules, CLI integrity exit on the five suites that only
   report. Not user-visible. Do not start this to “warm up.”
+- Do not retag `v0.21.0` or `v0.20.0`. Do not mix a feature into a
+  tag commit. `RELEASING.md`.
 
 ## Beyond
 
