@@ -268,7 +268,8 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
 
         Eval jobs append `result.fixtures` as each fixture finishes (every
         suite). Sweeps grow `result.jobs`. Stress grows `result.phases`.
-        Soak grows `result.samples`. Status is `completed`, not `finished`.
+        Soak grows `result.samples`. Runs grow `result.task_rows`. Status
+        is `completed`, not `finished`.
         """
         return api.get_job(job_id)
 

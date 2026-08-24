@@ -237,7 +237,11 @@ and omits fixture rows.
 `minimal` / `low` / `medium` / `high` / `xhigh` / `max` (aliases `xl`,
 `ultra`) and OpenAI-only `standard` / `pro`. Unknown values are `422`.
 `POST /evals` `codegen` and `POST /runs` forward the dial onto
-`generate`. `POST /runs` also accepts optional `host`. `probe` stays
+`generate`. `POST /runs` also accepts optional `host`. While it runs,
+`progress.total` is `iterations`, `in_flight` is `{task, model}`,
+that dict is appended to `progress.trail` (cap `total`), and
+`result.task_rows` grows as each burn-loop task finishes. The integer
+`tasks` count is unchanged. `probe` stays
 CLI-only.
 
 ### Sweeps

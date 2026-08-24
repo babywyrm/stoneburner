@@ -59,6 +59,64 @@ async def test_run_benchmark_from_request_returns_summary_dict():
 
 
 @pytest.mark.asyncio
+async def test_run_benchmark_from_request_grows_task_rows():
+    payload = RunRequest(provider="ollama", model="llama3", iterations=1)
+    job = Job(job_id="r", kind="run", status=JobStatus.RUNNING, created_at=0.0)
+    summary = SimpleNamespace(
+        run_id="run-123",
+        total_tasks=1,
+        successful_tasks=1,
+        failed_tasks=0,
+        total_tokens=90,
+        total_cost_usd=0.01,
+    )
+    captured: dict[str, object] = {}
+
+    class FakeEngine:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+        async def run(self, max_iterations=None):
+            start = captured["on_task_start"]
+            done = captured["on_task_done"]
+            assert callable(start) and callable(done)
+            start("web_summary")
+            done(
+                SimpleNamespace(
+                    task_name="web_summary",
+                    status=SimpleNamespace(value="success"),
+                    total_tokens=90,
+                    latency_ms=12.0,
+                    error_message="",
+                    estimated_cost_usd=0.0,
+                )
+            )
+            return summary
+
+    with (
+        patch.object(runners, "load_settings", return_value=_settings()),
+        patch.object(runners, "_provider_for", return_value=MagicMock()),
+        patch("atomics.core.engine.LoopEngine", FakeEngine),
+        patch("atomics.storage.repository.MetricsRepository", return_value=MagicMock()),
+        patch("atomics.tiers.get_tier_profile", return_value=SimpleNamespace(preferred_model="p")),
+    ):
+        result = await runners.run_benchmark_from_request(payload, job=job)
+
+    assert result["tasks"] == 1
+    assert result["task_rows"] == [
+        {
+            "id": "web_summary",
+            "status": "success",
+            "tokens": 90,
+            "latency_ms": 12.0,
+            "error": None,
+        }
+    ]
+    assert job.progress["current"] == 1
+    assert job.progress["trail"] == [{"task": "web_summary", "model": "llama3"}]
+
+
+@pytest.mark.asyncio
 async def test_run_benchmark_from_request_forwards_host():
     payload = RunRequest(
         provider="ollama",

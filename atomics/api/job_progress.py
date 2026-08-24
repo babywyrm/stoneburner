@@ -10,7 +10,7 @@ from collections.abc import Sequence
 from typing import Any, Literal, TypedDict
 
 from atomics.api.jobs import Job
-from atomics.api.models import EvalRequest, SoakRequest, StressRequest, SweepRequest
+from atomics.api.models import EvalRequest, RunRequest, SoakRequest, StressRequest, SweepRequest
 from atomics.config import AtomicsSettings
 from atomics.eval.adversarial import ALL_FIXTURES as ADVERSARIAL_FIXTURES
 from atomics.eval.codegen.fixtures import ALL_CODEGEN_FIXTURES
@@ -123,6 +123,15 @@ def eval_fixture_total(payload: EvalRequest) -> int:
         return len(EVAL_FIXTURES) if selected is None else len(selected)
     catalog = _SUITE_CATALOGS.get(payload.suite)
     return len(catalog) if catalog is not None else 0
+
+
+def initial_run_progress(payload: RunRequest) -> dict[str, Any]:
+    return {
+        "current": 0,
+        "total": int(payload.iterations),
+        "in_flight": None,
+        "trail": [],
+    }
 
 
 def initial_eval_progress(payload: EvalRequest) -> dict[str, Any]:
@@ -318,6 +327,20 @@ def initial_stress_progress(payload: StressRequest) -> dict[str, Any]:
 
 def initial_soak_progress(payload: SoakRequest) -> dict[str, Any]:
     return {"current": 0, "total": soak_job_total(payload), "in_flight": None, "trail": []}
+
+
+def burn_row(result: Any) -> dict[str, Any]:
+    status = getattr(result, "status", None)
+    key = str(getattr(status, "value", status) or "")
+    failed = key == "failed"
+    error = getattr(result, "error_message", None) or None
+    return {
+        "id": str(getattr(result, "task_name", "") or ""),
+        "status": "failed" if failed else "success",
+        "tokens": int(getattr(result, "total_tokens", 0) or 0),
+        "latency_ms": round(float(getattr(result, "latency_ms", 0.0) or 0.0), 1),
+        "error": str(error) if failed and error else None,
+    }
 
 
 def sweep_row(result: Any) -> SweepJobRow:

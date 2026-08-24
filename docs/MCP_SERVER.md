@@ -175,6 +175,9 @@ grows `result.phases` and sets `in_flight` to
 `{concurrency, phase_seconds}`. A soak job grows `result.samples` and
 sets `in_flight` to `{elapsed_seconds, concurrency}`. Load jobs
 append `in_flight` to `progress.trail` (cap `total`) the same way.
+A `submit_run` job grows `result.task_rows` (the integer `tasks`
+count is unchanged), sets `in_flight` to `{task, model}`, and
+appends that to `progress.trail` (cap `iterations`).
 The API uses `completed`, not `finished`. No tool blocks on model work,
 which is what keeps a long eval from timing out an agent's tool call.
 The server's `instructions` tell the agent to do this.

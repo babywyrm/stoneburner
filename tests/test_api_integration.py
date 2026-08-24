@@ -57,7 +57,7 @@ async def test_poll_slow_job_returns_running(client):
     started = threading.Event()
     release = threading.Event()
 
-    async def slow_run(_payload):
+    async def slow_run(_payload, job=None):
         started.set()
         while not release.is_set():
             await asyncio.sleep(0.01)
