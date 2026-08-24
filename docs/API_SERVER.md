@@ -249,7 +249,8 @@ everything flag (call `GET /models` first). Caps: 8 models, 3 runs, suites
 from `eval`, `redblue`, `refusal`, `toolcall`, `codereview` (note `eval`,
 not `accuracy`). Optional `host` has the same meaning as `POST /evals`.
 While it runs, `progress.total` is models × suites,
-`in_flight` is `{model, suite}`, and `result.jobs` grows as each cell
+`in_flight` is `{model, suite}`, that dict is appended to
+`progress.trail` (cap `total`), and `result.jobs` grows as each cell
 finishes.
 
 ```bash
@@ -270,11 +271,13 @@ Optional `host` has the same meaning as `POST /evals`.
 
 While a stress job runs, `progress.total` is the concurrency ladder
 (`1, 2, 4, …` plus the cap), `in_flight` is `{concurrency,
-phase_seconds}`, and `result.phases` grows as each phase finishes.
+phase_seconds}`, that dict is appended to `progress.trail` (cap
+`total`), and `result.phases` grows as each phase finishes.
 While a soak job runs, `progress.total` is the number of sampler
 windows that finish before duration cancels the last sleep (30s / 10s
-→ 2), `in_flight` is `{elapsed_seconds, concurrency}`, and
-`result.samples` grows as each sample lands.
+→ 2), `in_flight` is `{elapsed_seconds, concurrency}`, that dict is
+appended to `progress.trail` (cap `total`), and `result.samples`
+grows as each sample lands.
 
 ```bash
 curl -H "X-API-Key: $ATOMICS_API_KEY" -H "Content-Type: application/json" \

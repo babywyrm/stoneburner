@@ -51,10 +51,12 @@ accuracy  llama3.2:1b  http://127.0.0.1:11434
 0.700  1/1  267 tok  $0.00
 ```
 
-The trail is capped at `2 × progress.total` (generate + judge per
+The eval trail is capped at `2 × progress.total` (generate + judge per
 fixture). Suites that call `on_phase` more than twice per fixture
 (multiturn turns, redblue/adversarial runs) drop later phase lines;
 `wait` does not fall back to the current `in_flight` once a trail exists.
+Sweep, stress, and soak trails cap at `progress.total` (one start per
+cell, phase, or sample).
 
 `--verbose` adds latency and the truncated reply under each score line.
 The same quiet / `--verbose` lines work for every `submit_eval` suite

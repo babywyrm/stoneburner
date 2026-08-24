@@ -318,7 +318,12 @@ async def test_post_stress_202_progress_total_is_ladder_length():
             },
         )
     assert resp.status_code == 202
-    assert resp.json()["progress"] == {"current": 0, "total": 2, "in_flight": None}
+    assert resp.json()["progress"] == {
+        "current": 0,
+        "total": 2,
+        "in_flight": None,
+        "trail": [],
+    }
 
 
 def test_post_stress_without_budget_is_422():
@@ -377,7 +382,12 @@ async def test_post_soak_202_progress_total_matches_actual_samples():
             },
         )
     assert resp.status_code == 202
-    assert resp.json()["progress"] == {"current": 0, "total": 2, "in_flight": None}
+    assert resp.json()["progress"] == {
+        "current": 0,
+        "total": 2,
+        "in_flight": None,
+        "trail": [],
+    }
 
 
 def test_post_soak_hour_long_duration_is_422():

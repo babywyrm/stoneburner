@@ -134,6 +134,13 @@ def initial_eval_progress(payload: EvalRequest) -> dict[str, Any]:
     }
 
 
+def _append_trail(progress: dict[str, Any], entry: dict[str, Any], *, cap: int) -> None:
+    trail = list(progress.get("trail") or [])
+    if cap <= 0 or len(trail) < cap:
+        trail.append(entry)
+    progress["trail"] = trail
+
+
 def _field(obj: Any, name: str, default: Any = None) -> Any:
     if isinstance(obj, dict):
         return obj.get(name, default)
@@ -284,7 +291,7 @@ def sweep_job_total(payload: SweepRequest) -> int:
 
 
 def initial_sweep_progress(payload: SweepRequest) -> dict[str, Any]:
-    return {"current": 0, "total": sweep_job_total(payload), "in_flight": None}
+    return {"current": 0, "total": sweep_job_total(payload), "in_flight": None, "trail": []}
 
 
 def stress_job_total(payload: StressRequest) -> int:
@@ -306,11 +313,11 @@ def soak_job_total(payload: SoakRequest) -> int:
 
 
 def initial_stress_progress(payload: StressRequest) -> dict[str, Any]:
-    return {"current": 0, "total": stress_job_total(payload), "in_flight": None}
+    return {"current": 0, "total": stress_job_total(payload), "in_flight": None, "trail": []}
 
 
 def initial_soak_progress(payload: SoakRequest) -> dict[str, Any]:
-    return {"current": 0, "total": soak_job_total(payload), "in_flight": None}
+    return {"current": 0, "total": soak_job_total(payload), "in_flight": None, "trail": []}
 
 
 def sweep_row(result: Any) -> SweepJobRow:
@@ -377,11 +384,7 @@ class EvalJobReporter:
             "model": model,
         }
         progress["in_flight"] = entry
-        trail = list(progress.get("trail") or [])
-        cap = 2 * int(progress.get("total") or 0)
-        if cap <= 0 or len(trail) < cap:
-            trail.append(entry)
-        progress["trail"] = trail
+        _append_trail(progress, entry, cap=2 * int(progress.get("total") or 0))
         self.job.progress = progress
 
     def fixture_done(self, fr: Any) -> None:
@@ -433,11 +436,13 @@ class SweepJobReporter:
             "runs": runs,
             "budget_usd": budget_usd,
         }
-        job.progress = {"current": 0, "total": total, "in_flight": None}
+        job.progress = {"current": 0, "total": total, "in_flight": None, "trail": []}
 
     def start(self, model: str, suite: str) -> None:
         progress = dict(self.job.progress or {})
-        progress["in_flight"] = {"model": model, "suite": suite}
+        entry = {"model": model, "suite": suite}
+        progress["in_flight"] = entry
+        _append_trail(progress, entry, cap=int(progress.get("total") or 0))
         self.job.progress = progress
 
     def done(self, result: Any) -> None:
@@ -449,10 +454,12 @@ class SweepJobReporter:
         body["jobs"].append(row)
         body["ok"] = sum(1 for item in body["jobs"] if item.get("ok"))
         body["fail"] = sum(1 for item in body["jobs"] if not item.get("ok"))
+        prior = self.job.progress or {}
         self.job.progress = {
             "current": len(body["jobs"]),
-            "total": (self.job.progress or {}).get("total"),
+            "total": prior.get("total"),
             "in_flight": None,
+            "trail": list(prior.get("trail") or []),
         }
 
 
@@ -472,11 +479,13 @@ class LoadJobReporter:
         self._kind = kind
         self._meta = dict(meta)
         self._rows_key = rows_key
-        job.progress = {"current": 0, "total": total, "in_flight": None}
+        job.progress = {"current": 0, "total": total, "in_flight": None, "trail": []}
 
     def start(self, in_flight: dict[str, Any]) -> None:
         progress = dict(self.job.progress or {})
-        progress["in_flight"] = dict(in_flight)
+        entry = dict(in_flight)
+        progress["in_flight"] = entry
+        _append_trail(progress, entry, cap=int(progress.get("total") or 0))
         self.job.progress = progress
 
     def done(self, row: dict[str, Any]) -> None:
@@ -485,8 +494,10 @@ class LoadJobReporter:
             body = {**self._meta, self._rows_key: []}
             self.job.result = body
         body[self._rows_key].append(row)
+        prior = self.job.progress or {}
         self.job.progress = {
             "current": len(body[self._rows_key]),
-            "total": (self.job.progress or {}).get("total"),
+            "total": prior.get("total"),
             "in_flight": None,
+            "trail": list(prior.get("trail") or []),
         }

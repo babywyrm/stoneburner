@@ -33,7 +33,8 @@
   peak-tps / verdict headline instead of a dash-and-zero.
 - **Eval `progress.trail`.** Each generate/judge `in_flight` is
   appended (cap `2 × total`) so `wait` can print both phases after a
-  2s poll that missed `judge`. `failed` jobs get a headline, not
+  2s poll that missed `judge`. Sweep / stress / soak append each
+  start the same way (cap `total`). `failed` jobs get a headline, not
   `still running`.
 - **`host` on sweep and run.** Optional on `POST /sweeps` and
   `POST /runs`, same meaning as eval. Session `host` forwards.
