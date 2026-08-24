@@ -15,6 +15,7 @@ def test_run_request_defaults():
     assert req.thinking is None
     assert req.effort is None
     assert req.reasoning_mode is None
+    assert req.host is None
 
 
 def test_eval_request_defaults():

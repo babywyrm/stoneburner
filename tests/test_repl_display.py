@@ -143,6 +143,59 @@ def test_quiet_wait_emits_phase_then_row_then_headline() -> None:
     assert text.count("ev-01  0.60") == 1
 
 
+def test_quiet_wait_prints_trail_then_score_in_one_poll() -> None:
+    lines: list[str] = []
+    view = QuietWait(lines.append, color=False)
+    view.update(
+        {
+            "status": "completed",
+            "request": {"suite": "accuracy", "model": "m", "host": "h"},
+            "progress": {
+                "current": 1,
+                "total": 1,
+                "in_flight": None,
+                "trail": [
+                    {"fixture_id": "ev-01", "phase": "generate", "model": "m"},
+                    {"fixture_id": "ev-01", "phase": "judge", "model": "m"},
+                ],
+            },
+            "result": {
+                "overall_accuracy": 1.0,
+                "fixtures_run": 1,
+                "total_tokens": 190,
+                "total_cost_usd": 0.0,
+                "fixtures": [
+                    {"id": "ev-01", "score": 1.0, "status": "success", "tokens": 190}
+                ],
+            },
+        }
+    )
+    text = "".join(lines)
+    generate_at = text.index("generate")
+    judge_at = text.index("judge")
+    score_at = text.index("ev-01  1.00")
+    assert generate_at < judge_at < score_at
+    assert text.count("generate") == 1
+    assert text.count("judge") == 1
+
+
+def test_quiet_wait_failed_headline() -> None:
+    lines: list[str] = []
+    view = QuietWait(lines.append, color=False)
+    body = {
+        "status": "failed",
+        "kind": "eval",
+        "error": {"type": "EvalBudgetExceededError", "message": "budget exceeded"},
+        "progress": {"current": 0, "total": 1, "in_flight": None, "trail": []},
+    }
+    view.update(body)
+    view.finish(body)
+    text = "".join(lines)
+    assert "eval  failed" in text
+    assert "budget exceeded" in text
+    assert "still running" not in text
+
+
 def test_quiet_wait_still_running_after_cap() -> None:
     lines: list[str] = []
     view = QuietWait(lines.append, color=False)

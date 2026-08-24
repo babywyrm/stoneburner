@@ -88,7 +88,7 @@ ATOMICS_API_URL="https://atomics.internal:8000" uv run atomics mcp
 | `health` | yes | Check the API server is reachable |
 | `list_models` | yes | List tags on Ollama or vLLM |
 | `list_jobs` | yes | In-memory API jobs (short `request`; no fixture rows — poll `get_job`) |
-| `get_job` | yes | Status, resolved `request`, live `progress`, growing `result.fixtures`, sweep `result.jobs`, stress `result.phases`, soak `result.samples` |
+| `get_job` | yes | Status, resolved `request`, live `progress` (eval `trail` of generate/judge), growing `result.fixtures`, sweep `result.jobs`, stress `result.phases`, soak `result.samples` |
 | `get_run` | yes | One persisted run and its fixtures (prompts omitted) |
 | `compare` | yes | Compare recorded results by provider or model |
 | `recent_runs` | yes | List recent recorded runs |
@@ -118,6 +118,7 @@ omitted).
 4. `submit_eval` — start one suite; you get a job id immediately
 5. `submit_sweep` — same, but models × suites. `budget_usd` is required;
    name the models (`list_models` first). No discover-everything flag.
+   Optional `host` (same meaning as `submit_eval`).
 6. `submit_stress` / `submit_soak` — load tests. `budget_usd` is required.
    Stress: one model, c≤8, phase ≤15s. Soak: duration is seconds, 30–300.
    Optional `host` (same meaning as `list_models`). Live `result.phases`
@@ -146,7 +147,8 @@ Sweep suite names are `eval` (not `accuracy`), `redblue`, `refusal`,
 optional `effort` (`none` / `minimal` / `low` / `medium` / `high` /
 `xhigh` / `max`; aliases `xl`, `ultra`) and OpenAI-only
 `reasoning_mode` (`standard` / `pro`). `submit_eval` `codegen` and
-`submit_run` forward the dial.
+`submit_run` forward the dial. `submit_run` and `submit_sweep` take
+optional `host` (same meaning as `submit_eval`).
 
 `probe` has no endpoint. Hours-long soaks, contention, and baselines stay
 on the CLI.
@@ -157,14 +159,16 @@ on the CLI.
 `submit_soak` return a job id immediately:
 
 ```json
-{"job_id": "3f2a...", "status": "pending", "kind": "eval", "request": {"suite": "accuracy", "model": "llama3.2:1b", "host": "http://192.168.1.79:11434"}}
+{"job_id": "3f2a...", "status": "pending", "kind": "eval", "request": {"suite": "accuracy", "model": "llama3.2:1b", "host": "http://127.0.0.1:11434"}}
 ```
 
 Poll `get_job` until `status` is `completed`. While it runs, `request` names
 the suite / model / host, `progress` counts fixtures, and `result.fixtures`
 grows as each fixture finishes — every `submit_eval` suite, not only
 accuracy. Every suite sets `progress.in_flight` to the current generate
-or judge call (codegen is generate only). A sweep counts models × suites
+or judge call (codegen is generate only) and appends it to
+`progress.trail` (cap `2 × total`; later phases on multiturn /
+redblue / adversarial are dropped). A sweep counts models × suites
 instead, grows `result.jobs`, and sets `in_flight` to `{model, suite}`.
 A stress job grows `result.phases` and sets `in_flight` to
 `{concurrency, phase_seconds}`. A soak job grows `result.samples` and

@@ -50,6 +50,22 @@ def test_sweep_normalizes_effort_and_rejects_unknown_mode():
         )
 
 
+def test_sweep_request_host_defaults_none():
+    req = SweepRequest(provider="ollama", models=["a"], suites=["eval"], budget_usd=1.0)
+    assert req.host is None
+
+
+def test_sweep_request_accepts_host():
+    req = SweepRequest(
+        provider="ollama",
+        models=["a"],
+        suites=["eval"],
+        budget_usd=1.0,
+        host="http://192.168.1.79:11434",
+    )
+    assert req.host == "http://192.168.1.79:11434"
+
+
 def test_sweep_requires_a_budget():
     with pytest.raises(ValidationError):
         SweepRequest(provider="ollama", models=["a"], suites=["eval"])
@@ -117,7 +133,7 @@ async def test_run_sweep_meters_every_model_against_one_budget():
     captured: dict = {}
 
     def fake_provider(name, model, host=None):
-        return SimpleNamespace(name=name, model=model)
+        return SimpleNamespace(name=name, model=model, host=host)
 
     def store_factory(**kwargs):
         captured.update(kwargs)
@@ -153,27 +169,39 @@ async def test_run_sweep_meters_every_model_against_one_budget():
 
 
 @pytest.mark.asyncio
-async def test_post_sweeps_returns_a_job():
-    app = create_app(settings=ServerSettings(no_auth=True))
+async def test_run_sweep_forwards_host_to_model_and_judge():
+    payload = SweepRequest(
+        provider="ollama",
+        models=["a"],
+        suites=["eval"],
+        budget_usd=1.0,
+        host="http://192.168.1.79:11434",
+    )
+    seen: list[tuple[str, str | None, str | None]] = []
+    captured: dict = {}
+
+    def fake_provider(name, model, host=None):
+        seen.append((name, model, host))
+        return SimpleNamespace(name=name, model=model)
+
+    def store_factory(**kwargs):
+        captured.update(kwargs)
+        return AsyncMock()
+
     with (
+        patch("atomics.api._sweep._provider_for", side_effect=fake_provider),
+        patch("atomics.api._sweep.make_suite_runner", side_effect=store_factory),
         patch(
-            "atomics.api.routes.run_sweep_from_request",
+            "atomics.api._sweep.run_gauntlet",
             new_callable=AsyncMock,
-            return_value={"ok": 1, "fail": 0, "jobs": []},
+            return_value=[SuiteJobResult(model="a", suite="eval", ok=True, headline=1.0)],
         ),
-        TestClient(app) as client,
     ):
-        resp = client.post(
-            "/api/v1/sweeps",
-            json={
-                "provider": "ollama",
-                "models": ["qwen3:14b"],
-                "suites": ["eval"],
-                "budget_usd": 1.5,
-            },
-        )
-    assert resp.status_code == 202
-    assert resp.json()["kind"] == "sweep"
+        await run_sweep_from_request(payload)
+        captured["provider_factory"]("a")
+
+    assert ("ollama", "a", "http://192.168.1.79:11434") in seen
+    assert ("ollama", None, "http://192.168.1.79:11434") in seen
 
 
 @pytest.mark.asyncio
@@ -220,11 +248,15 @@ async def test_post_sweeps_includes_progress_total():
                 "models": ["qwen3:14b", "granite4.1:8b"],
                 "suites": ["eval", "refusal"],
                 "budget_usd": 1.5,
+                "host": "http://127.0.0.1:11434",
             },
         )
     assert resp.status_code == 202
-    assert resp.json()["progress"]["total"] == 4
-    assert resp.json()["progress"]["current"] == 0
+    body = resp.json()
+    assert body["progress"]["total"] == 4
+    assert body["progress"]["current"] == 0
+    assert body["request"]["host"] == "http://127.0.0.1:11434"
+    assert "trail" not in (body.get("progress") or {})
 
 
 def test_post_sweeps_without_budget_is_422():

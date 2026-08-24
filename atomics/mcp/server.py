@@ -110,13 +110,15 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
         thinking: bool | None = None,
         effort: str | None = None,
         reasoning_mode: str | None = None,
+        host: str | None = None,
     ) -> Any:
         """Start a benchmark run and return its job id immediately.
 
         Spends provider tokens. `provider` is a provider name such as `claude`,
         `openai`, or `ollama`; omit `model` to use that provider's default.
         `tier` selects the task difficulty profile. `effort` / `reasoning_mode`
-        are the shared reasoning dial (same values as `provider_test`). Poll
+        are the shared reasoning dial (same values as `provider_test`). `host`
+        is the inference endpoint (same meaning as `submit_eval`). Poll
         `get_job` for the result.
         """
         return api.submit_run(
@@ -129,6 +131,7 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
             thinking=thinking,
             effort=effort,
             reasoning_mode=reasoning_mode,
+            host=host,
         )
 
     @server.tool(annotations=SPENDS)
@@ -182,13 +185,15 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
         thinking: bool | None = None,
         effort: str | None = None,
         reasoning_mode: str | None = None,
+        host: str | None = None,
     ) -> Any:
         """Start a multi-model, multi-suite campaign and return a job id.
 
         Spends tokens. `budget_usd` is required. Name the models — there is no
         discover-everything flag; call `list_models` first. `suites` is a list
         from `eval`, `redblue`, `refusal`, `toolcall`, `codereview`. `runs` is
-        1–3. Poll `get_job` until `status` is `completed`.
+        1–3. `host` is the inference endpoint (same meaning as `submit_eval`).
+        Poll `get_job` until `status` is `completed`.
         """
         return api.submit_sweep(
             provider=provider,
@@ -200,6 +205,7 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
             thinking=thinking,
             effort=effort,
             reasoning_mode=reasoning_mode,
+            host=host,
         )
 
     @server.tool(annotations=SPENDS)

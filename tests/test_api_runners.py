@@ -59,6 +59,41 @@ async def test_run_benchmark_from_request_returns_summary_dict():
 
 
 @pytest.mark.asyncio
+async def test_run_benchmark_from_request_forwards_host():
+    payload = RunRequest(
+        provider="ollama",
+        model="llama3",
+        host="http://192.168.1.79:11434",
+    )
+    seen: dict[str, str | None] = {}
+    summary = SimpleNamespace(
+        run_id="run-123",
+        total_tasks=1,
+        successful_tasks=1,
+        failed_tasks=0,
+        total_tokens=1,
+        total_cost_usd=0.0,
+    )
+    engine = MagicMock()
+    engine.run = AsyncMock(return_value=summary)
+
+    def fake_provider(name, model, host=None):
+        seen["host"] = host
+        return MagicMock()
+
+    with (
+        patch.object(runners, "load_settings", return_value=_settings()),
+        patch.object(runners, "_provider_for", side_effect=fake_provider),
+        patch("atomics.core.engine.LoopEngine", return_value=engine),
+        patch("atomics.storage.repository.MetricsRepository", return_value=MagicMock()),
+        patch("atomics.tiers.get_tier_profile", return_value=SimpleNamespace(preferred_model="p")),
+    ):
+        await runners.run_benchmark_from_request(payload)
+
+    assert seen["host"] == "http://192.168.1.79:11434"
+
+
+@pytest.mark.asyncio
 async def test_run_benchmark_from_request_forwards_effort():
     """RunRequest already accepts effort. Dropping it here is a silent no-op
     on a billed knob — the HTTP/MCP caller gets 202 and default reasoning."""

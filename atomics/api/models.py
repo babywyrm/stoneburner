@@ -64,6 +64,7 @@ class RunRequest(BaseModel):
     thinking: bool | None = None
     effort: str | None = None
     reasoning_mode: str | None = None
+    host: str | None = None
 
     @field_validator("effort")
     @classmethod
@@ -122,6 +123,7 @@ class SweepRequest(BaseModel):
     effort: str | None = None
     reasoning_mode: str | None = None
     budget_usd: float = Field(gt=0, le=MAX_EVAL_BUDGET_USD)
+    host: str | None = None
 
     @field_validator("effort")
     @classmethod

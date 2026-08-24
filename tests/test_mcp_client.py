@@ -79,6 +79,16 @@ def test_submit_run_omits_model_when_not_given():
     assert "model" not in json.loads(requests[0].content)
 
 
+def test_submit_run_includes_host_when_given():
+    requests: list[httpx.Request] = []
+    with client_recording(requests) as client:
+        client.submit_run(provider="ollama", host="http://192.168.1.79:11434")
+
+    import json
+
+    assert json.loads(requests[0].content)["host"] == "http://192.168.1.79:11434"
+
+
 def test_api_key_is_sent_as_x_api_key_header():
     requests: list[httpx.Request] = []
     with client_recording(requests, api_key="s3cret") as client:
@@ -179,6 +189,22 @@ def test_submit_sweep_posts_required_budget():
     assert payload["budget_usd"] == 4.0
     assert payload["models"] == ["a"]
     assert payload["runs"] == 2
+
+
+def test_submit_sweep_includes_host_when_given():
+    requests: list[httpx.Request] = []
+    with client_recording(requests) as client:
+        client.submit_sweep(
+            provider="ollama",
+            models=["a"],
+            suites=["eval"],
+            budget_usd=4.0,
+            host="http://192.168.1.79:11434",
+        )
+
+    import json
+
+    assert json.loads(requests[0].content)["host"] == "http://192.168.1.79:11434"
 
 
 def test_submit_stress_posts_required_budget():

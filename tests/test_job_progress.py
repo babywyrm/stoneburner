@@ -63,6 +63,17 @@ def test_short_request_keeps_suite_model_host() -> None:
     ) == {"suite": "accuracy", "model": "m", "host": "h"}
 
 
+def test_short_request_keeps_sweep_models_and_suites() -> None:
+    assert short_request(
+        {
+            "provider": "ollama",
+            "models": ["a", "b"],
+            "suites": ["eval", "refusal"],
+            "budget_usd": 2,
+        }
+    ) == {"models": ["a", "b"], "suites": ["eval", "refusal"]}
+
+
 def test_fixture_row_reads_refusal_shaped_result() -> None:
     fr = SimpleNamespace(
         fixture=SimpleNamespace(id="rf-01"),
@@ -266,6 +277,7 @@ def test_load_reporter_grows_phases_and_clears_in_flight() -> None:
     )
     assert job.progress["current"] == 1
     assert job.progress["in_flight"] is None
+    assert "trail" not in job.progress
     assert job.result is not None
     assert job.result["phases"][0]["concurrency"] == 1
 
@@ -310,10 +322,29 @@ def test_sweep_reporter_grows_jobs_and_clears_in_flight() -> None:
     )
     assert job.progress["current"] == 1
     assert job.progress["in_flight"] is None
+    assert "trail" not in job.progress
     assert job.result is not None
     assert job.result["jobs"][0]["model"] == "a"
     assert job.result["jobs"][0]["headline"] == 0.9
     assert job.result["ok"] == 1
+
+
+def test_eval_trail_caps_at_twice_total() -> None:
+    job = Job(job_id="j", kind="eval", status=JobStatus.RUNNING, created_at=0.0)
+    reporter = EvalJobReporter(
+        job,
+        suite="accuracy",
+        provider="ollama",
+        model="m",
+        judge_model="m",
+        host=None,
+        total=1,
+    )
+    reporter.phase("ev-01", "generate", "m")
+    reporter.phase("ev-01", "judge", "m")
+    reporter.phase("ev-02", "generate", "m")
+    assert len(job.progress["trail"]) == 2
+    assert job.progress["trail"][-1]["fixture_id"] == "ev-01"
 
 
 def test_reporter_grows_result_and_clears_in_flight() -> None:
@@ -327,14 +358,19 @@ def test_reporter_grows_result_and_clears_in_flight() -> None:
         host="http://192.168.1.79:11434",
         total=2,
     )
-    assert job.progress == {"current": 0, "total": 2, "in_flight": None}
+    assert job.progress == {"current": 0, "total": 2, "in_flight": None, "trail": []}
     assert job.result is None
     reporter.phase("ev-01", "generate", "llama3.2:1b")
+    reporter.phase("ev-01", "judge", "llama3.2:1b")
     assert job.progress["in_flight"] == {
         "fixture_id": "ev-01",
-        "phase": "generate",
+        "phase": "judge",
         "model": "llama3.2:1b",
     }
+    assert job.progress["trail"] == [
+        {"fixture_id": "ev-01", "phase": "generate", "model": "llama3.2:1b"},
+        {"fixture_id": "ev-01", "phase": "judge", "model": "llama3.2:1b"},
+    ]
     fixture = EVAL_FIXTURES[0]
     tr = TaskResult(
         run_id="r",
@@ -357,6 +393,10 @@ def test_reporter_grows_result_and_clears_in_flight() -> None:
     )
     assert job.progress["current"] == 1
     assert job.progress["in_flight"] is None
+    assert job.progress["trail"] == [
+        {"fixture_id": "ev-01", "phase": "generate", "model": "llama3.2:1b"},
+        {"fixture_id": "ev-01", "phase": "judge", "model": "llama3.2:1b"},
+    ]
     assert job.result is not None
     assert job.result["fixtures_run"] == 1
     assert job.result["fixtures"][0]["id"] == fixture.id

@@ -29,7 +29,9 @@ def _progress_sig(body: Any) -> Any:
         )
     else:
         in_flight_sig = in_flight
-    return (progress.get("current"), in_flight_sig, body.get("status"))
+    trail = progress.get("trail") or []
+    trail_len = len(trail) if isinstance(trail, list) else 0
+    return (progress.get("current"), in_flight_sig, body.get("status"), trail_len)
 
 
 def wait_for_job(

@@ -10,7 +10,17 @@ from dataclasses import dataclass
 from typing import Any
 
 from atomics.mcp.client import AtomicsApiClient, AtomicsApiError
-from atomics.repl.display import QuietWait, format_submitted
+from atomics.repl.display import (
+    QuietWait,
+    format_compare,
+    format_get_run,
+    format_jobs_list,
+    format_models_list,
+    format_provider_test,
+    format_recent_runs,
+    format_submitted,
+    format_trends,
+)
 from atomics.repl.parse import ParsedLine, ParseError, parse_line
 from atomics.repl.session import SESSION_KEYS, Session, SessionError
 from atomics.repl.wait import wait_for_job
@@ -21,6 +31,8 @@ Read:    health, list_models, list_jobs, get_job, get_run, compare, recent_runs,
 Spend:   provider_test, submit_run, submit_eval, submit_sweep, submit_stress, submit_soak
 Poll:    wait [--verbose] [JOB_ID]   one-liners; --verbose adds replies
 Submit:  quiet headline + job id; --verbose keeps the JSON document
+Reads:   list_jobs / list_models / provider_test / get_run / recent_runs /
+         compare / trends are quiet; --verbose keeps JSON
 
 set KEY [VALUE]   set or clear a session field
 show              print the session as JSON
@@ -44,6 +56,16 @@ _INT = frozenset(
 _FLOAT = frozenset({"budget_usd", "since_hours", "phase_seconds"})
 _LIST = frozenset({"models", "suites", "fixtures"})
 _SESSION_FIELDS = ("provider", "model", "effort", "reasoning_mode", "host")
+_QUIET_FORMATTERS: dict[str, Callable[[dict[str, Any]], str]] = {
+    "list_jobs": format_jobs_list,
+    "list_models": format_models_list,
+    "provider_test": format_provider_test,
+    "recent_runs": format_recent_runs,
+    "get_run": format_get_run,
+    "compare": format_compare,
+    "trends": format_trends,
+}
+_QUIET_READS = frozenset(_QUIET_FORMATTERS)
 
 # verb -> (client method name, allowed kwargs, optional positional kwarg)
 _VERBS: dict[str, tuple[str, frozenset[str], str | None]] = {
@@ -73,6 +95,7 @@ _VERBS: dict[str, tuple[str, frozenset[str], str | None]] = {
                 "thinking",
                 "effort",
                 "reasoning_mode",
+                "host",
             }
         ),
         None,
@@ -109,6 +132,7 @@ _VERBS: dict[str, tuple[str, frozenset[str], str | None]] = {
                 "thinking",
                 "effort",
                 "reasoning_mode",
+                "host",
             }
         ),
         None,
@@ -240,7 +264,11 @@ def _call_api(
     parsed: ParsedLine, *, session: Session, client: AtomicsApiClient
 ) -> HandleResult:
     method_name, allowed, positional = _VERBS[parsed.verb]
-    display_only = frozenset({"verbose"}) if parsed.verb.startswith("submit_") else frozenset()
+    display_only = (
+        frozenset({"verbose"})
+        if parsed.verb.startswith("submit_") or parsed.verb in _QUIET_READS
+        else frozenset()
+    )
     unknown = sorted(set(parsed.flags) - allowed - display_only)
     if unknown:
         return HandleResult(stderr=f"unknown flag --{unknown[0]}\n{HELP_TEXT}")
@@ -280,6 +308,10 @@ def _call_api(
         session.last_job_id = str(body["job_id"])
         if not verbose:
             return HandleResult(stdout=format_submitted(body))
+    if parsed.verb in _QUIET_READS and not verbose and isinstance(body, dict):
+        formatter = _QUIET_FORMATTERS.get(parsed.verb)
+        if formatter is not None:
+            return HandleResult(stdout=formatter(body))
     return HandleResult(stdout=json.dumps(body, indent=2) + "\n")
 
 

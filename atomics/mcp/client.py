@@ -160,6 +160,7 @@ class AtomicsApiClient:
         thinking: bool | None = None,
         effort: str | None = None,
         reasoning_mode: str | None = None,
+        host: str | None = None,
     ) -> Any:
         payload: dict[str, Any] = {
             "provider": provider,
@@ -176,6 +177,8 @@ class AtomicsApiClient:
             payload["effort"] = effort
         if reasoning_mode is not None:
             payload["reasoning_mode"] = reasoning_mode
+        if host is not None:
+            payload["host"] = host
         return self._request("POST", "/runs", json=payload)
 
     def submit_eval(
@@ -226,6 +229,7 @@ class AtomicsApiClient:
         thinking: bool | None = None,
         effort: str | None = None,
         reasoning_mode: str | None = None,
+        host: str | None = None,
     ) -> Any:
         payload: dict[str, Any] = {
             "provider": provider,
@@ -242,6 +246,8 @@ class AtomicsApiClient:
             payload["effort"] = effort
         if reasoning_mode is not None:
             payload["reasoning_mode"] = reasoning_mode
+        if host is not None:
+            payload["host"] = host
         return self._request("POST", "/sweeps", json=payload)
 
     def submit_stress(

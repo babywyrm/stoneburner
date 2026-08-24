@@ -130,6 +130,143 @@ def _join_list(value: Any) -> str:
     return str(value)
 
 
+def _money(value: Any) -> str:
+    try:
+        return f"${float(value):.2f}"
+    except (TypeError, ValueError):
+        return "$?"
+
+
+def format_jobs_list(body: dict[str, Any]) -> str:
+    jobs = body.get("jobs") or []
+    if not jobs:
+        return "no jobs\n"
+    lines: list[str] = []
+    for job in jobs:
+        if not isinstance(job, dict):
+            continue
+        kind = str(job.get("kind") or "job")
+        status = str(job.get("status") or "?")
+        job_id = str(job.get("job_id") or "")[:8]
+        parts = [kind, status, job_id]
+        request = job.get("request") or {}
+        if isinstance(request, dict):
+            for key in ("suite", "model", "host"):
+                if request.get(key):
+                    parts.append(str(request[key]))
+            if request.get("models"):
+                parts.append(_join_list(request["models"]))
+            if request.get("suites"):
+                parts.append(_join_list(request["suites"]))
+        lines.append("  ".join(parts))
+    return "\n".join(lines) + "\n"
+
+
+def format_models_list(body: dict[str, Any]) -> str:
+    provider = str(body.get("provider") or "?")
+    models = body.get("models") or []
+    names: list[str] = []
+    for item in models:
+        if isinstance(item, dict):
+            names.append(str(item.get("name") or item.get("id") or "?"))
+        else:
+            names.append(str(item))
+    header = f"{provider}  {len(names)}"
+    if not names:
+        return header + "\n"
+    return header + "\n" + "\n".join(names) + "\n"
+
+
+def format_recent_runs(body: dict[str, Any]) -> str:
+    runs = body.get("runs") or []
+    if not runs:
+        return "no runs\n"
+    lines: list[str] = []
+    for run in runs:
+        if not isinstance(run, dict):
+            continue
+        run_id = str(run.get("run_id") or "")
+        provider = str(run.get("provider") or "-")
+        model = str(run.get("model") or "-")
+        tier = str(run.get("tier") or "-")
+        ok = int(run.get("successful_tasks") or 0)
+        fail = int(run.get("failed_tasks") or 0)
+        tokens = int(run.get("total_tokens") or 0)
+        lines.append(
+            f"{run_id}  {provider}  {model}  {tier}  {ok} ok  {fail} fail  "
+            f"{tokens} tok  {_money(run.get('total_cost_usd'))}"
+        )
+    return "\n".join(lines) + "\n" if lines else "no runs\n"
+
+
+def format_get_run(body: dict[str, Any]) -> str:
+    raw_run = body.get("run")
+    run: dict[str, Any] = raw_run if isinstance(raw_run, dict) else {}
+    run_id = str(run.get("run_id") or "")
+    provider = str(run.get("provider") or "-")
+    model = str(run.get("model") or "-")
+    tier = str(run.get("tier") or "-")
+    lines = [f"{run_id}  {provider}  {model}  {tier}"]
+    for row in body.get("fixtures") or []:
+        if not isinstance(row, dict):
+            continue
+        ident = str(row.get("id") or "?")
+        status = str(row.get("status") or "")
+        raw = row.get("score")
+        try:
+            score_txt = "-" if raw is None else f"{float(raw):.2f}"
+        except (TypeError, ValueError):
+            score_txt = "-"
+        lines.append(f"  {ident}  {score_txt}  {status}".rstrip())
+    return "\n".join(lines) + "\n"
+
+
+def format_compare(body: dict[str, Any]) -> str:
+    rows = body.get("rows") or []
+    by = str(body.get("by") or "provider")
+    lines = [f"{by}  {len(rows)}"]
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        key = str(row.get("group_key") or "-")
+        raw = row.get("avg_accuracy_score")
+        try:
+            score_txt = "-" if raw is None else f"{float(raw):.2f}"
+        except (TypeError, ValueError):
+            score_txt = "-"
+        tasks = int(row.get("task_count") or 0)
+        lines.append(f"{key}  {score_txt}  {tasks} tasks  {_money(row.get('total_cost'))}")
+    return "\n".join(lines) + "\n"
+
+
+def format_trends(body: dict[str, Any]) -> str:
+    rows = body.get("rows") or []
+    hours = body.get("hours") or 0
+    lines = [f"{hours}h  {len(rows)}"]
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        hour = str(row.get("hour") or "-")
+        tasks = int(row.get("task_count") or 0)
+        tokens = int(row.get("total_tokens") or 0)
+        lines.append(f"{hour}  {tasks}  {tokens} tok  {_money(row.get('cost'))}")
+    return "\n".join(lines) + "\n"
+
+
+def format_provider_test(body: dict[str, Any]) -> str:
+    model = str(body.get("model") or "-")
+    if body.get("ok"):
+        latency = body.get("latency_ms")
+        try:
+            ms = "?ms" if latency is None else f"{int(round(float(latency)))}ms"
+        except (TypeError, ValueError):
+            ms = "?ms"
+        reply = str(body.get("response") or "").replace("\n", " ")
+        return f"ok  {model}  {ms}  {reply}\n"
+    error = body.get("error") or "failed"
+    return f"fail  {model}\n{error}\n"
+
+
 def format_submitted(body: dict[str, Any]) -> str:
     request = body.get("request")
     request = request if isinstance(request, dict) else {}
@@ -150,6 +287,17 @@ def format_submitted(body: dict[str, Any]) -> str:
     job_id = str(body.get("job_id") or "")
     status = str(body.get("status") or "pending")
     return f"{'  '.join(parts)}\n{job_id}  {status}\n"
+
+
+def format_failed(body: dict[str, Any], *, color: bool = False) -> str:
+    kind = str(body.get("kind") or "job")
+    error = body.get("error") or {}
+    if isinstance(error, dict):
+        message = error.get("message") or "failed"
+    else:
+        message = str(error) or "failed"
+    line = f"{kind}  failed\n{message}\n"
+    return _paint(line, _RED, color=color)
 
 
 def format_completed(body: dict[str, Any], *, color: bool = False) -> str:
@@ -250,6 +398,7 @@ class QuietWait:
         self.color = color
         self.verbose = verbose
         self._seen = 0
+        self._trail_seen = 0
         self._inflight: tuple[Any, ...] | None = None
         self._summarized = False
 
@@ -257,13 +406,23 @@ class QuietWait:
         if not isinstance(body, dict):
             return
         progress = body.get("progress") or {}
-        inflight = progress.get("in_flight")
-        sig = _inflight_sig(inflight)
-        if inflight and sig != self._inflight:
-            self._inflight = sig
-            line = format_in_flight(inflight, color=self.color)
-            if line:
-                self._emit(line + "\n")
+        trail = progress.get("trail") or []
+        if isinstance(trail, list) and trail:
+            for entry in trail[self._trail_seen :]:
+                if isinstance(entry, dict):
+                    line = format_in_flight(entry, color=self.color)
+                    if line:
+                        self._emit(line + "\n")
+            self._trail_seen = len(trail)
+            self._inflight = _inflight_sig(progress.get("in_flight"))
+        else:
+            inflight = progress.get("in_flight")
+            sig = _inflight_sig(inflight)
+            if inflight and sig != self._inflight:
+                self._inflight = sig
+                line = format_in_flight(inflight, color=self.color)
+                if line:
+                    self._emit(line + "\n")
         rows, render = _live_rows(body)
         for row in rows[self._seen :]:
             if isinstance(row, dict):
@@ -272,11 +431,14 @@ class QuietWait:
         if body.get("status") == "completed" and not self._summarized:
             self._summarized = True
             self._emit(format_completed(body, color=self.color))
+        elif body.get("status") == "failed" and not self._summarized:
+            self._summarized = True
+            self._emit(format_failed(body, color=self.color))
 
     def finish(self, body: Any) -> None:
         if not isinstance(body, dict):
             return
-        if body.get("status") == "completed":
+        if body.get("status") in {"completed", "failed"}:
             self.update(body)
             return
         if not self._summarized:

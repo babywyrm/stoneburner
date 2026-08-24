@@ -184,7 +184,7 @@ async def run_benchmark_from_request(payload: RunRequest) -> dict[str, Any]:
 
     settings = load_settings()
     try:
-        provider = _provider_for(payload.provider, payload.model)
+        provider = _provider_for(payload.provider, payload.model, payload.host)
         tier = BurnTier(payload.tier)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

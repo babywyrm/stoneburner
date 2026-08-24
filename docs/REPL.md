@@ -18,11 +18,11 @@ this process (stdlib `readline`); history is not written to disk.
 ## Session
 
 In-memory only. `set provider ollama`, `set model llama3.2:1b`,
-`set host http://192.168.1.79:11434`, `set effort high`, `show`.
+`set host http://127.0.0.1:11434`, `set effort high`, `show`.
 `set model` with no value clears it. Submit verbs fill omitted fields
-from the session (`host` goes to `submit_eval`, `submit_stress`,
-`submit_soak`, `list_models`, and `provider_test`). An explicit flag
-wins.
+from the session (`host` goes to `submit_eval`, `submit_sweep`,
+`submit_run`, `submit_stress`, `submit_soak`, `list_models`, and
+`provider_test`). An explicit flag wins.
 
 ## Verbs
 
@@ -30,21 +30,31 @@ The same names as the MCP tools. Semantics live in [MCP_SERVER.md](MCP_SERVER.md
 Plus `set`, `show`, `wait [--verbose] [JOB_ID]`, `help`, `exit`.
 
 `submit_*` prints a quiet headline and the `job_id` (and remembers it).
-`--verbose` keeps the full JSON. Type `wait` once: it polls every 2s and prints a **quiet line**
-per generate/judge and per scored fixture, then a two-line headline when
-`completed`. `wait --verbose` also prints latency and the truncated model
-reply (500 chars, same as the job document). Color is TTY-only. `get_job`
-still returns the full JSON. Ctrl-C returns the prompt; the job keeps
-running. Type `wait` again to resume watching.
+`--verbose` keeps the full JSON. `list_jobs`, `list_models`,
+`provider_test`, `get_run`, `recent_runs`, `compare`, and `trends` are
+quiet the same way; `--verbose` keeps JSON. Type `wait` once: it polls
+every 2s and prints a **quiet line** per generate/judge and per scored
+fixture, then a two-line headline when `completed` or `failed`. Eval
+jobs keep a `progress.trail` of those phases so a poll that missed
+`judge` still prints it. `wait --verbose` also prints latency and the
+truncated model reply (500 chars, same as the job document). Color is
+TTY-only. `get_job` still returns the full JSON. Ctrl-C returns the
+prompt; the job keeps running. Type `wait` again to resume watching.
 
 Quiet:
 
 ```
   ev-01  generate  llama3.2:1b
+  ev-01  judge  qwen2.5:1.5b
   ev-01  0.70  success  267 tok
-accuracy  llama3.2:1b  http://192.168.1.79:11434
+accuracy  llama3.2:1b  http://127.0.0.1:11434
 0.700  1/1  267 tok  $0.00
 ```
+
+The trail is capped at `2 × progress.total` (generate + judge per
+fixture). Suites that call `on_phase` more than twice per fixture
+(multiturn turns, redblue/adversarial runs) drop later phase lines;
+`wait` does not fall back to the current `in_flight` once a trail exists.
 
 `--verbose` adds latency and the truncated reply under each score line.
 The same quiet / `--verbose` lines work for every `submit_eval` suite

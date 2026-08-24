@@ -31,6 +31,16 @@
   emits (soak: 30s/10s → 2). Optional `host` on both, same meaning
   as eval. Dashboard `#job=` and REPL `wait` print the rows and a
   peak-tps / verdict headline instead of a dash-and-zero.
+- **Eval `progress.trail`.** Each generate/judge `in_flight` is
+  appended (cap `2 × total`) so `wait` can print both phases after a
+  2s poll that missed `judge`. `failed` jobs get a headline, not
+  `still running`.
+- **`host` on sweep and run.** Optional on `POST /sweeps` and
+  `POST /runs`, same meaning as eval. Session `host` forwards.
+- **Quiet `list_jobs` / `list_models` / `provider_test` /
+  `get_run` / `recent_runs` / `compare` / `trends`.** One-liners
+  in the REPL. `--verbose` keeps JSON. `list_jobs` short `request`
+  also keeps sweep `models` / `suites`. `get_job` stays the document.
 
 ### Fixed
 - Eval job `progress.total` counted the accuracy catalog (25) for

@@ -233,10 +233,15 @@ running API server. Requires the `[mcp]` extra. See
 | `atomics repl --api-key KEY` | Client API key, sent as `X-API-Key` (or `ATOMICS_API_KEY`) |
 
 `atomics repl` requires a running server. Verbs match MCP; see [REPL.md](REPL.md).
-`wait` prints a quiet line per phase/fixture, then a completed headline.
-`wait --verbose` adds latency and the truncated reply. `get_job` still
-returns the full JSON. Session `host` fills
-`submit_eval` / `list_models` / `provider_test`.
+`wait` prints a quiet line per generate/judge and per scored fixture,
+then a `completed` or `failed` headline. Eval jobs keep `progress.trail`
+so a 2s poll that missed `judge` still prints it. `wait --verbose` adds
+latency and the truncated reply. `get_job` still returns the full JSON.
+`list_jobs` / `list_models` / `provider_test` / `get_run` /
+`recent_runs` / `compare` / `trends` are quiet one-liners;
+`--verbose` keeps JSON. Session `host` fills `submit_eval` /
+`submit_sweep` / `submit_run` / `submit_stress` / `submit_soak` /
+`list_models` / `provider_test`. An explicit flag wins.
 
 Serves on stdio only: the process holds a spend-authorized API key and no
 MCP-layer credential would guard a listening port. To reach a remote atomics,
