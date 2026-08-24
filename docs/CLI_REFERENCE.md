@@ -1,6 +1,7 @@
 # CLI Reference
 
-Full command reference for `atomics`. See also [QUICKSTART.md](../QUICKSTART.md) for recipe-first usage.
+Full command reference for `atomics`. Landing page: [README.md](../README.md).
+Recipes: [QUICKSTART.md](../QUICKSTART.md).
 
 ## Core Commands
 

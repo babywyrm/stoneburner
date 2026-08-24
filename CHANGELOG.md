@@ -2,7 +2,17 @@
 
 ## Unreleased
 
-### Added
+## 0.22.1 (2026-08-23) — Landing page is a storefront again
+
+### Upgrade notes
+- Docs only. No API or CLI changes.
+
+### Changed
+- **README is a storefront again.** Pitch, captured `doctor` / `toolcall`,
+  one install block, and a job-to-doc table. Recipes stay in QUICKSTART;
+  flags stay in CLI_REFERENCE. `docs/REPL.md` is linked from the landing
+  page. A 160-line ceiling in `tests/test_distribution.py` keeps it from
+  becoming a second manual.
 
 ## 0.22.0 (2026-08-23) — Wait until done, live rows on every job, and quiet REPL
 

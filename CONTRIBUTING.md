@@ -13,7 +13,7 @@ Requires **Python 3.11+** and [`uv`](https://docs.astral.sh/uv/getting-started/i
 ```bash
 git clone https://github.com/babywyrm/stoneburner.git
 cd stoneburner
-uv sync --extra dev --extra api --extra mcp
+uv sync --all-extras
 uv run atomics doctor      # checks providers, credentials, and state paths
 # atomics mcp needs the extras above and a running `atomics server`
 ```
@@ -76,7 +76,7 @@ Providers implement the contract in `atomics/providers/base.py` and are
 constructed through `atomics/providers/factory.py`. Add the provider module,
 register it in the factory, add it to `PROVIDER_CHOICES`, give it pricing
 metadata if the API is paid, and add tests that stub the HTTP layer. Document
-it in `README.md` and `docs/CLI_REFERENCE.md`.
+it in `docs/CLI_REFERENCE.md`. First-run recipes belong in `QUICKSTART.md`.
 
 ## Questions
 

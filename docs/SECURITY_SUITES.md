@@ -268,7 +268,8 @@ JUICE_SHOP_PATH=~/juice-shop atomics archreview --repo juice-shop \
   --extra-judges ollama:mistral:7b
 ```
 
-Answer keys are pluggable per repo (`atomics/archreview/repos/<name>.yaml`). See the README's archreview section for parser tolerance, taxonomy, and tier details.
+Answer keys are pluggable per repo (`atomics/archreview/repos/<name>.yaml`).
+Tiers, flags, and examples: [CLI_REFERENCE](CLI_REFERENCE.md).
 
 
 ## `atomics rag` — RAG Pipeline Evaluation
