@@ -2,8 +2,9 @@
 
 Recipe-first guide to **`atomics`** — local-first LLM eval (cost, quality,
 security). The PyPI listing is `stoneburner-atomics`; the CLI stays
-`atomics`. Every block below is copy-pasteable. For the full reference see
-[`README.md`](README.md).
+`atomics`. Every block below is copy-pasteable. Pitch and install:
+[`README.md`](README.md). Full flags:
+[`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md).
 
 > **Mental model:** point `atomics` at a provider (cloud API or a local
 > Ollama/vLLM box), pick a *goal* (cost, quality, safety, scale), run the

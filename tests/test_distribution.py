@@ -69,3 +69,35 @@ def test_readme_landing_is_a_storefront_not_only_a_manual():
     assert "brainbox" not in lowered
     assert "garak" not in lowered
     assert "promptfoo" not in lowered
+
+
+def test_readme_stays_a_storefront():
+    """Landing page, not a second CLI manual.
+
+    ponytail: 160-line ceiling. Raise it only if a stranger still cannot
+    tell what the tool is; recipes belong in QUICKSTART / CLI_REFERENCE.
+    """
+    lines = Path("README.md").read_text().splitlines()
+    assert len(lines) <= 160, f"README is {len(lines)} lines; keep storefront-only"
+
+
+def test_readme_links_the_operator_manuals():
+    """PyPI renders README, so these have to be absolute GitHub URLs."""
+    text = Path("README.md").read_text()
+    root = "https://github.com/babywyrm/stoneburner/blob/main/"
+    for path in (
+        "QUICKSTART.md",
+        "CONTRIBUTING.md",
+        "ARCHITECTURE.md",
+        "docs/CLI_REFERENCE.md",
+        "docs/REPL.md",
+        "docs/API_SERVER.md",
+        "docs/MCP_SERVER.md",
+        "docs/SECURITY_SUITES.md",
+        "docs/LOAD_TESTING.md",
+        "docs/THINKING.md",
+        "docs/INFERENCE_ENV.md",
+        "docs/COMPARING.md",
+        "docs/LEADERBOARD.md",
+    ):
+        assert f"{root}{path}" in text, path
