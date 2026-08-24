@@ -15,6 +15,7 @@ from atomics.api._sweep import run_sweep_from_request
 from atomics.api.dependencies import require_auth
 from atomics.api.job_progress import (
     initial_eval_progress,
+    initial_run_progress,
     initial_soak_progress,
     initial_stress_progress,
     initial_sweep_progress,
@@ -103,9 +104,10 @@ async def start_run(
     try:
         job_id = await job_manager.submit(
             "run",
-            lambda _jid: run_benchmark_from_request(payload),
+            lambda jid: run_benchmark_from_request(payload, job=job_manager.jobs[jid]),
             owner=caller,
             request=payload_request(payload, load_settings()),
+            progress=initial_run_progress(payload),
         )
     except TooManyActiveJobsError as exc:
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)) from exc

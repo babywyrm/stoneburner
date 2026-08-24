@@ -39,6 +39,20 @@ def test_post_runs_with_auth():
         assert body["status"] == "pending"
 
 
+def test_post_runs_advertises_iteration_progress(client):
+    resp = client.post(
+        "/api/v1/runs",
+        json={"provider": "ollama", "iterations": 2},
+    )
+    assert resp.status_code == 202
+    assert resp.json()["progress"] == {
+        "current": 0,
+        "total": 2,
+        "in_flight": None,
+        "trail": [],
+    }
+
+
 def test_get_job_not_found(client):
     resp = client.get("/api/v1/jobs/invalid")
     assert resp.status_code == 404
@@ -52,7 +66,7 @@ def test_get_job_returns_running_while_in_progress(client):
     started = threading.Event()
     release = threading.Event()
 
-    async def slow_run(_payload):
+    async def slow_run(_payload, job=None):
         started.set()
         while not release.is_set():
             await asyncio.sleep(0.01)

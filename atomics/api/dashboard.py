@@ -300,6 +300,24 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
           fixtureRows.length > 0 || jobRows.length > 0 || phaseRows.length > 0,
         );
       }
+      const rawTasks = (jobResult && jobResult.task_rows) || [];
+      const taskRows = rawTasks.map(function (t) {
+        return [
+          t.id || "-",
+          t.status || "-",
+          t.tokens == null ? "-" : String(t.tokens),
+          t.latency_ms == null ? "-" : Math.round(t.latency_ms) + "ms",
+        ];
+      });
+      if (taskRows.length) {
+        renderTable(
+          "job-fixtures",
+          taskRows,
+          ["Task", "Status", "Tokens", "Latency"],
+          fixtureRows.length > 0 || jobRows.length > 0 || phaseRows.length > 0
+            || sampleRows.length > 0,
+        );
+      }
       if (jobResult && jobResult.verdict) {
         const verdict = document.createElement("p");
         verdict.textContent = String(jobResult.verdict);

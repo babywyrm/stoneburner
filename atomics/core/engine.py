@@ -7,12 +7,13 @@ import logging
 import random
 import signal
 import uuid
+from collections.abc import Callable
 
 from atomics.benchmark.tiers import TierProfile, get_tier_profile
 from atomics.config import AtomicsSettings
 from atomics.core.guard import GuardConfig, RateBudgetGuard
 from atomics.core.runner import execute_task
-from atomics.models import BurnTier, RunSummary, TaskStatus
+from atomics.models import BurnTier, RunSummary, TaskResult, TaskStatus
 from atomics.providers.base import BaseProvider
 from atomics.storage.repository import MetricsRepository
 from atomics.tasks import get_weighted_task
@@ -38,6 +39,8 @@ class LoopEngine:
         thinking_budget: int | None = None,
         effort: str | None = None,
         reasoning_mode: str | None = None,
+        on_task_start: Callable[[str], None] | None = None,
+        on_task_done: Callable[[TaskResult], None] | None = None,
     ) -> None:
         self._provider = provider
         self._repo = repo
@@ -70,6 +73,8 @@ class LoopEngine:
         self._thinking_budget = thinking_budget
         self._effort = effort
         self._reasoning_mode = reasoning_mode
+        self._on_task_start = on_task_start
+        self._on_task_done = on_task_done
         self._shutdown = asyncio.Event()
         self._run_id: str = ""
 
@@ -126,6 +131,8 @@ class LoopEngine:
                     continue
 
             task_def, topic = get_weighted_task(self._tier)
+            if self._on_task_start is not None:
+                self._on_task_start(task_def.name)
             logger.info(
                 "[iter %d] [%s] Running %s/%s (%s) — topic: %s",
                 iteration,
@@ -156,6 +163,8 @@ class LoopEngine:
             )
 
             self._log_result(iteration, result)
+            if self._on_task_done is not None:
+                self._on_task_done(result)
             iteration += 1
 
             interval = self._interval + random.uniform(

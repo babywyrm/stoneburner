@@ -42,6 +42,10 @@
   `get_run` / `recent_runs` / `compare` / `trends`.** One-liners
   in the REPL. `--verbose` keeps JSON. `list_jobs` short `request`
   also keeps sweep `models` / `suites`. `get_job` stays the document.
+- **Live rows on `submit_run`.** `POST /runs` grows `result.task_rows`
+  as each burn-loop task finishes. `progress.total` is `iterations`.
+  `in_flight` is `{task, model}`. The integer `tasks` count is
+  unchanged. REPL `wait` and dashboard `#job=` print the rows.
 
 ### Fixed
 - Eval job `progress.total` counted the accuracy catalog (25) for

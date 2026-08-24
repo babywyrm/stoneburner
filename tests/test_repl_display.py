@@ -94,6 +94,34 @@ def test_completed_headline() -> None:
     assert "16450" in text
 
 
+def test_run_in_flight_line() -> None:
+    assert format_in_flight({"task": "web_summary", "model": "llama3"}) == (
+        "  web_summary  llama3"
+    )
+
+
+def test_run_completed_headline() -> None:
+    text = format_completed(
+        {
+            "kind": "run",
+            "status": "completed",
+            "request": {"model": "llama3", "host": "h", "tier": "ez"},
+            "result": {
+                "run_id": "abc",
+                "tasks": 2,
+                "success": 2,
+                "failed": 0,
+                "total_tokens": 180,
+                "total_cost_usd": 0.01,
+                "task_rows": [
+                    {"id": "web_summary", "status": "success", "tokens": 90},
+                ],
+            },
+        }
+    )
+    assert text == "run  llama3  h\n2 ok  0 fail  180 tok  $0.01\n"
+
+
 def test_quiet_wait_emits_phase_then_row_then_headline() -> None:
     lines: list[str] = []
     view = QuietWait(lines.append, color=False)

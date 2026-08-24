@@ -83,6 +83,27 @@ async def test_engine_records_metrics(make_engine):
 
 @pytest.mark.unit
 @pytest.mark.asyncio
+async def test_engine_calls_task_hooks(atomics_settings, metrics_repo):
+    started: list[str] = []
+    finished: list[str] = []
+    provider = MockProvider()
+    engine = LoopEngine(
+        provider=provider,
+        repo=metrics_repo,
+        settings=atomics_settings,
+        interval_override=0,
+        budget_override=10.0,
+        on_task_start=started.append,
+        on_task_done=lambda result: finished.append(result.task_name),
+    )
+    await engine.run(max_iterations=2)
+    assert len(started) == 2
+    assert started == finished
+    metrics_repo.close()
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
 async def test_engine_stops_on_budget(make_engine):
     engine, provider, repo = make_engine(budget=0.0008)
     await engine.run(max_iterations=100)

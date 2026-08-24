@@ -67,7 +67,9 @@ lands. Sweep `wait` prints `model  suite` per cell, then
 phase is open, then `c=N  T tps  R req` as each phase finishes,
 then `peak tps  sat=N  K phases`. Soak `wait` prints `10s  c=1`
 while a window is open, then each sample, then
-`STABLE  drift …  K samples`.
+`STABLE  drift …  K samples`. `submit_run` `wait` prints the task
+name while a burn-loop iteration is open, then `name  success  N tok`
+as each task finishes, then `N ok  M fail  K tok`.
 
 `probe`, hours-long soak, contention, and profiles stay on the CLI.
 

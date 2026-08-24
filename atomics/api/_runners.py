@@ -9,6 +9,8 @@ from fastapi import HTTPException
 from atomics.api.job_progress import (
     EvalJobReporter,
     FixtureRow,
+    LoadJobReporter,
+    burn_row,
     eval_fixture_total,
     fixture_row,
     select_eval_fixtures,
@@ -177,7 +179,9 @@ def _overall_score(summary: Any) -> float | None:
     return None
 
 
-async def run_benchmark_from_request(payload: RunRequest) -> dict[str, Any]:
+async def run_benchmark_from_request(
+    payload: RunRequest, job: Job | None = None
+) -> dict[str, Any]:
     from atomics.benchmark.tiers import get_tier_profile
     from atomics.core.engine import LoopEngine
     from atomics.storage.repository import MetricsRepository
@@ -191,6 +195,22 @@ async def run_benchmark_from_request(payload: RunRequest) -> dict[str, Any]:
 
     profile = get_tier_profile(tier)
     repo = MetricsRepository(settings.db_path)
+    reporter = None
+    request: dict[str, Any] = {}
+    if job is not None:
+        request = job.request or {}
+        reporter = LoadJobReporter(
+            job,
+            kind="run",
+            meta={
+                "provider": payload.provider,
+                "model": payload.model or request.get("model"),
+                "tier": payload.tier,
+                "host": request.get("host"),
+            },
+            rows_key="task_rows",
+            total=int(payload.iterations),
+        )
     try:
         engine = LoopEngine(
             provider=provider,
@@ -203,11 +223,21 @@ async def run_benchmark_from_request(payload: RunRequest) -> dict[str, Any]:
             thinking=payload.thinking,
             effort=payload.effort,
             reasoning_mode=payload.reasoning_mode,
+            on_task_start=(
+                None
+                if reporter is None
+                else lambda name: reporter.start(
+                    {"task": name, "model": payload.model or request.get("model")}
+                )
+            ),
+            on_task_done=(
+                None if reporter is None else lambda result: reporter.done(burn_row(result))
+            ),
         )
         summary = await engine.run(max_iterations=payload.iterations)
         if summary is None:
             raise RuntimeError("Benchmark run produced no summary")
-        return {
+        body: dict[str, Any] = {
             "run_id": summary.run_id,
             "tasks": summary.total_tasks,
             "success": summary.successful_tasks,
@@ -218,6 +248,9 @@ async def run_benchmark_from_request(payload: RunRequest) -> dict[str, Any]:
             "model": payload.model or profile.preferred_model or settings.default_model,
             "tier": payload.tier,
         }
+        if reporter is not None and job is not None and isinstance(job.result, dict):
+            body["task_rows"] = list(job.result.get("task_rows") or [])
+        return body
     except HTTPException:
         raise
     except (ValueError, RuntimeError) as exc:

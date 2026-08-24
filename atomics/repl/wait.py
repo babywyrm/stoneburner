@@ -26,6 +26,7 @@ def _progress_sig(body: Any) -> Any:
             in_flight.get("suite"),
             in_flight.get("concurrency"),
             in_flight.get("elapsed_seconds"),
+            in_flight.get("task"),
         )
     else:
         in_flight_sig = in_flight

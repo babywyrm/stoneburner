@@ -218,6 +218,14 @@ const payloads = {
           p95_latency_ms: 110,
         },
       ],
+      task_rows: [
+        {
+          id: "web_summary",
+          status: "success",
+          tokens: 90,
+          latency_ms: 12,
+        },
+      ],
       verdict: "STABLE",
     },
     error: null,

@@ -55,6 +55,10 @@ def _tps_label(value: Any) -> str:
 def format_in_flight(in_flight: dict[str, Any] | None, *, color: bool = False) -> str:
     if not in_flight:
         return ""
+    if in_flight.get("task") and not in_flight.get("fixture_id"):
+        task = str(in_flight.get("task") or "?")
+        model = str(in_flight.get("model") or "")
+        return f"  {task}  {model}".rstrip()
     if in_flight.get("suite") and not in_flight.get("fixture_id"):
         model = str(in_flight.get("model") or "?")
         suite = str(in_flight.get("suite") or "?")
@@ -72,6 +76,27 @@ def format_in_flight(in_flight: dict[str, Any] | None, *, color: bool = False) -
     model = str(in_flight.get("model") or "")
     phase_txt = _paint(f"{phase:<8}", _DIM, color=color)
     return f"  {fixture}  {phase_txt}  {model}".rstrip()
+
+
+def format_task_row(row: dict[str, Any], *, color: bool = False, verbose: bool = False) -> str:
+    name = str(row.get("id") or "?")
+    status = str(row.get("status") or "")
+    failed = status == "failed"
+    tokens = int(row.get("tokens") or 0)
+    status_txt = _paint(status, _RED if failed else _GREEN, color=color)
+    line = f"  {name}  {status_txt}  {tokens} tok"
+    if not verbose:
+        return line
+    latency = row.get("latency_ms")
+    if latency is not None:
+        try:
+            line += f"  {int(round(float(latency)))}ms"
+        except (TypeError, ValueError):
+            pass
+    error = row.get("error")
+    if error:
+        line += f"\n    error: {error}"
+    return line
 
 
 def format_phase_row(row: dict[str, Any], *, color: bool = False) -> str:
@@ -362,6 +387,14 @@ def format_completed(body: dict[str, Any], *, color: bool = False) -> str:
             f"soak  {model}{host_txt}\n"
             f"{verdict}{drift_txt}  {len(samples)} samples\n"
         )
+    if body.get("kind") == "run" or isinstance(result.get("task_rows"), list):
+        ok = int(result.get("success") or 0)
+        fail = int(result.get("failed") or 0)
+        cost_txt = "" if cost is None else f"  ${float(cost):.2f}"
+        return (
+            f"run  {model}{host_txt}\n"
+            f"{ok} ok  {fail} fail  {tokens} tok{cost_txt}\n"
+        )
     score_txt = "-" if score is None else f"{score:.3f}"
     score_txt = _paint(score_txt, _score_color(score, failed=False), color=color)
     count = f"{current}/{total}" if total is not None else str(current or 0)
@@ -378,7 +411,7 @@ def format_still_running(body: dict[str, Any], *, color: bool = False) -> str:
     current = progress.get("current") or 0
     total = progress.get("total") or "?"
     inflight = progress.get("in_flight") or {}
-    fixture = inflight.get("fixture_id") or ""
+    fixture = inflight.get("fixture_id") or inflight.get("task") or ""
     phase = inflight.get("phase") or "running"
     line = f"still running  {current}/{total}  {fixture}  {phase}"
     return _paint(line, _YELLOW, color=color)
@@ -462,6 +495,9 @@ def _live_rows(
         return samples, lambda row, **kwargs: format_sample_row(
             row, color=kwargs.get("color", False)
         )
+    task_rows = result.get("task_rows") or []
+    if task_rows:
+        return task_rows, lambda row, **kwargs: format_task_row(row, **kwargs)
     return [], lambda row, **kwargs: ""
 
 
@@ -475,4 +511,5 @@ def _inflight_sig(in_flight: Any) -> tuple[Any, ...] | None:
         in_flight.get("suite"),
         in_flight.get("concurrency"),
         in_flight.get("elapsed_seconds"),
+        in_flight.get("task"),
     )

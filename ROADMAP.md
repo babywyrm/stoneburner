@@ -235,6 +235,10 @@ Job document parity and operator comfort are in.
       headline. Optional `host` on sweep/run. Quiet `list_jobs` /
       `list_models` / `provider_test` / `get_run` / `recent_runs` /
       `compare` / `trends`.
+- [x] **Live rows on `submit_run`.** `POST /runs` grows
+      `result.task_rows`. `progress.total` is `iterations`.
+      `in_flight` is `{task, model}`. Integer `tasks` stays the
+      count. REPL `wait` and `#job=` print the rows.
 
 ## Next
 
