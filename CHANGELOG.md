@@ -3,6 +3,24 @@
 ## Unreleased
 
 ### Added
+
+## 0.22.0 (2026-08-23) — Wait until done, live rows on every job, and quiet REPL
+
+### Upgrade notes
+- Additive. Eval / sweep / stress / soak / run jobs now grow live
+  rows (`result.fixtures`, `jobs`, `phases`, `samples`, `task_rows`)
+  and `progress.trail`. The integer `tasks` count on a run is
+  unchanged. Old clients ignore the extra fields.
+- REPL `wait` polls until `completed` or `failed`. The 30-poll /
+  ~60s cap is gone. Ctrl-C still only stops the poll.
+- Optional `host` on `POST /sweeps` and `POST /runs`, same meaning
+  as eval.
+- Quiet REPL reads (`list_jobs`, `list_models`, `provider_test`,
+  `get_run`, `recent_runs`, `compare`, `trends`). `--verbose` and
+  `get_job` keep JSON.
+- No breaking CLI changes.
+
+### Added
 - **REPL `wait` until done.** Polls until `completed` or `failed`.
   Ctrl-C still only stops the poll. The 30-poll / ~60s cap is gone.
 - **Quiet `submit_*`.** Headline and `job_id` instead of the pending
