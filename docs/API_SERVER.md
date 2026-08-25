@@ -215,7 +215,8 @@ worse).
 
 `GET /jobs/{id}` includes resolved `request` (suite, provider, model, judge,
 host) at submit time. Every eval suite carries `progress` (`current` /
-`total` from that suite's catalog; accuracy honours a fixture-id subset)
+`total` from that suite's catalog; `fixtures` is an id subset on every
+suite, unknown ids dropped)
 and grows `result.fixtures` as each fixture finishes — same row shape
 (id, status, score, tokens, latency, truncated response, error). Every
 suite sets `in_flight` to `generate` or `judge` (codegen is generate

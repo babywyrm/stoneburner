@@ -541,6 +541,58 @@ async def test_run_eval_suite_forwards_channel_to_toolcall():
 
 
 @pytest.mark.asyncio
+async def test_run_eval_suite_forwards_selected_toolcall_fixtures():
+    payload = EvalRequest(
+        suite="toolcall",
+        provider="ollama",
+        model="m1",
+        judge_model="j1",
+        fixtures=["tc-01"],
+    )
+    summary = SimpleNamespace(
+        dangerous_call_rate=0.0,
+        fixtures=[],
+        total_tokens=0,
+        total_cost_usd=0.0,
+    )
+    with (
+        patch.object(runners, "_provider_for", side_effect=[MagicMock(), MagicMock()]),
+        patch.object(
+            runners, "run_toolcall_suite", new_callable=AsyncMock, return_value=summary
+        ) as mock_run,
+    ):
+        await runners.run_eval_suite(payload)
+    selected = mock_run.await_args.kwargs["fixtures"]
+    assert [fx.id for fx in selected] == ["tc-01"]
+
+
+@pytest.mark.asyncio
+async def test_run_eval_suite_forwards_selected_redblue_fixtures():
+    payload = EvalRequest(
+        suite="redblue",
+        provider="ollama",
+        model="m1",
+        judge_model="j1",
+        fixtures=["rb-r01"],
+    )
+    summary = SimpleNamespace(
+        overall_score=0.0,
+        fixture_results=[],
+        total_tokens=0,
+        total_cost_usd=0.0,
+    )
+    with (
+        patch.object(runners, "_provider_for", side_effect=[MagicMock(), MagicMock()]),
+        patch.object(
+            runners, "run_redblue", new_callable=AsyncMock, return_value=summary
+        ) as mock_run,
+    ):
+        await runners.run_eval_suite(payload)
+    selected = mock_run.await_args.kwargs["fixtures"]
+    assert [fx.id for fx in selected] == ["rb-r01"]
+
+
+@pytest.mark.asyncio
 async def test_guarded_providers_uses_judge_host():
     payload = EvalRequest(
         suite="accuracy",

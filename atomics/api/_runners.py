@@ -13,7 +13,7 @@ from atomics.api.job_progress import (
     burn_row,
     eval_fixture_total,
     fixture_row,
-    select_eval_fixtures,
+    fixtures_for_request,
 )
 from atomics.api.jobs import Job
 from atomics.api.models import EvalRequest, RunRequest
@@ -27,7 +27,6 @@ from atomics.eval.rag.runner import run_rag
 from atomics.eval.redblue.runner import run_redblue
 from atomics.eval.refusal.runner import run_refusal
 from atomics.eval.runner import run_eval
-from atomics.eval.toolcall.fixtures import ALL_FIXTURES as TOOLCALL_FIXTURES
 from atomics.eval.toolcall.runner import run_toolcall_suite
 from atomics.models import BurnTier
 from atomics.providers.base import BaseProvider
@@ -267,7 +266,7 @@ async def run_eval_from_request(
     """Run the accuracy eval suite for an API request."""
     try:
         provider, judge_provider = _guarded_providers(payload)
-        fixtures = select_eval_fixtures(payload.fixtures)
+        fixtures = fixtures_for_request(payload)
         reporter = None
         if job is not None:
             request = job.request or {}
@@ -328,6 +327,7 @@ async def run_eval_suite(payload: EvalRequest, job: Job | None = None) -> dict[s
     reporter = _eval_reporter(payload, job, suite)
     on_done = reporter.fixture_done if reporter is not None else None
     on_phase = reporter.phase if reporter is not None else None
+    selected = fixtures_for_request(payload)
 
     def on_toolcall_done(_index: int, _fixture: object, aggregated: object) -> None:
         if reporter is not None:
@@ -346,6 +346,7 @@ async def run_eval_suite(payload: EvalRequest, job: Job | None = None) -> dict[s
                 thinking=payload.thinking,
                 effort=payload.effort,
                 reasoning_mode=payload.reasoning_mode,
+                fixtures=selected,
                 on_fixture_done=on_done,
                 on_phase=on_phase,
             )
@@ -359,6 +360,7 @@ async def run_eval_suite(payload: EvalRequest, job: Job | None = None) -> dict[s
                 thinking=payload.thinking,
                 effort=payload.effort,
                 reasoning_mode=payload.reasoning_mode,
+                fixtures=selected,
                 on_conversation_done=on_done,
                 on_phase=on_phase,
             )
@@ -373,6 +375,7 @@ async def run_eval_suite(payload: EvalRequest, job: Job | None = None) -> dict[s
                 effort=payload.effort,
                 reasoning_mode=payload.reasoning_mode,
                 runs=payload.runs,
+                fixtures=selected,
                 on_fixture_done=on_done,
                 on_phase=on_phase,
             )
@@ -384,6 +387,7 @@ async def run_eval_suite(payload: EvalRequest, job: Job | None = None) -> dict[s
                 thinking=payload.thinking,
                 effort=payload.effort,
                 reasoning_mode=payload.reasoning_mode,
+                fixtures=selected,
                 on_fixture_done=on_done,
                 on_phase=on_phase,
             )
@@ -397,6 +401,7 @@ async def run_eval_suite(payload: EvalRequest, job: Job | None = None) -> dict[s
                 thinking=payload.thinking,
                 effort=payload.effort,
                 reasoning_mode=payload.reasoning_mode,
+                fixtures=selected,
                 on_fixture_done=on_done,
                 on_phase=on_phase,
             )
@@ -411,6 +416,7 @@ async def run_eval_suite(payload: EvalRequest, job: Job | None = None) -> dict[s
                 effort=payload.effort,
                 reasoning_mode=payload.reasoning_mode,
                 runs=payload.runs,
+                fixtures=selected,
                 on_fixture_done=on_done,
                 on_phase=on_phase,
             )
@@ -424,18 +430,17 @@ async def run_eval_suite(payload: EvalRequest, job: Job | None = None) -> dict[s
                 thinking=payload.thinking,
                 effort=payload.effort,
                 reasoning_mode=payload.reasoning_mode,
+                fixtures=selected,
                 on_fixture_done=on_done,
                 on_phase=on_phase,
             )
             fixtures_run = len(summary.fixture_results)
         elif suite == "toolcall":
-            # Keyword-only runner; fixtures default to the full catalog so an
-            # API caller gets the same suite the CLI does without a prompt list.
             summary = await run_toolcall_suite(
                 provider=provider,
                 model=payload.model,
                 judge_provider=judge_provider,
-                fixtures=TOOLCALL_FIXTURES,
+                fixtures=selected,
                 judge_model=payload.judge_model,
                 thinking=payload.thinking,
                 effort=payload.effort,

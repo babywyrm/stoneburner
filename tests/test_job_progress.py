@@ -216,6 +216,16 @@ def test_eval_fixture_total_honours_ids() -> None:
     assert eval_fixture_total(payload) == 1
 
 
+def test_eval_fixture_total_honours_ids_on_toolcall() -> None:
+    payload = EvalRequest(suite="toolcall", provider="ollama", fixtures=["tc-01"])
+    assert eval_fixture_total(payload) == 1
+
+
+def test_eval_fixture_total_honours_ids_on_redblue() -> None:
+    payload = EvalRequest(suite="redblue", provider="ollama", fixtures=["rb-r01"])
+    assert eval_fixture_total(payload) == 1
+
+
 def test_fixture_row_failed_has_error_and_no_score() -> None:
     fixture = EVAL_FIXTURES[0]
     tr = TaskResult(

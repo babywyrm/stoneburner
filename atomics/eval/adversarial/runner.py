@@ -466,6 +466,7 @@ async def run_adversarial(
     judge_model: str | None = None,
     extra_judges: list[tuple[BaseProvider, str | None]] | None = None,
     categories: list[str] | None = None,
+    fixtures: list[AdversarialFixture] | None = None,
     runs: int = 1,
     run_id: str | None = None,
     thinking: bool | None = None,
@@ -499,9 +500,9 @@ async def run_adversarial(
 
     fixture_results: list[AdversarialFixtureResult] = []
 
-    # `select_fixtures` (in __init__) is the single source of truth for the full
-    # fixture set and group-alias expansion, so runner/CLI/docs never diverge.
-    fixtures = select_fixtures(categories)
+    # `select_fixtures` is the catalog source; an explicit list (API subset)
+    # wins so progress.total and the run stay the same length.
+    selected = fixtures if fixtures is not None else select_fixtures(categories)
 
     all_judge_names = [
         _attribution_model(
@@ -511,7 +512,7 @@ async def run_adversarial(
         )
     ] + [_attribution_model(p, m, fallback_to_provider=True) for p, m in extra_judges]
 
-    for idx, fixture in enumerate(fixtures):
+    for idx, fixture in enumerate(selected):
         if on_fixture_start:
             if inspect.iscoroutinefunction(on_fixture_start):
                 await on_fixture_start(idx, fixture)
