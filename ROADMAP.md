@@ -138,6 +138,8 @@ progress, and `--effort` on every generate path including tools.
 The **v0.22.0** release (2026-08-23) is wait-until-done, live rows
 on every job kind, `progress.trail`, quiet leftover REPL reads, and
 `host` on sweep/run. **v0.22.1** is the storefront README.
+**v0.22.2** (2026-08-24) is uncapped eval trails and CLI knobs on
+HTTP (`runs`, `judge_host`, `channel`, `fixtures`).
 
 ## v0.19.0 — A stranger can trust a headline
 
@@ -205,7 +207,8 @@ Planning labels `v0.21.0`–`v0.23.0` above already shipped in earlier
 releases; they are not this tag.
 
 **v0.22.0** (2026-08-23) shipped the items below. **v0.22.1** is the
-storefront README. Package version is **0.22.1**.
+storefront README. **v0.22.2** is uncapped eval trails and CLI knobs
+on HTTP. Package version is **0.22.2**.
 
 - [x] **REPL line editing.** Stdlib `readline` for in-process
       history. No `prompt_toolkit`. Not session persistence to disk.
