@@ -7,6 +7,8 @@
   `2 × total` cap dropped later multiturn conversation judges and
   `--runs` phases, so REPL `wait` went quiet after the first two
   phases per fixture. Sweep / stress / soak still cap at `total`.
+- **Unknown fields on `POST /evals` are `422`.** Same `extra=forbid` as
+  sweeps. A typo (`run` instead of `runs`) no longer disappears.
 
 ### Added
 - **`runs` and `judge_host` on `POST /evals`.** Same meaning as CLI

@@ -82,6 +82,8 @@ class RunRequest(BaseModel):
 class EvalRequest(BaseModel):
     """Request body to start an eval suite."""
 
+    model_config = ConfigDict(extra="forbid")
+
     suite: str
     provider: str
     model: str | None = None
