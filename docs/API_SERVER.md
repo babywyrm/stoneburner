@@ -227,7 +227,7 @@ Dashboard `#job=` still shows the current `in_flight` plus the
 fixture / phase / sample tables, not the trail. `POST /evals` accepts
 optional `host` and `judge_host` (CLI `--judge-host`: judge on a second
 Ollama). `runs` is 1–3 on `adversarial` / `redblue` / `toolcall`; other
-suites return `422` if `runs > 1`. `list_jobs` includes a
+suites return `422` if `runs > 1`. Unknown keys are `422`. `list_jobs` includes a
 short `request` (suite / model / host, plus sweep `models` / `suites`)
 and omits fixture rows.
 

@@ -54,6 +54,13 @@ def test_eval_request_accepts_judge_host() -> None:
     assert req.judge_host == "http://192.168.1.79:11434"
 
 
+def test_eval_request_rejects_unknown_fields() -> None:
+    with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+        EvalRequest.model_validate(
+            {"suite": "accuracy", "provider": "ollama", "run": 3}
+        )
+
+
 def test_eval_request_normalizes_effort_aliases():
     req = EvalRequest(suite="rag", provider="ollama", effort="XL", reasoning_mode="PRO")
     assert req.effort == "xhigh"
