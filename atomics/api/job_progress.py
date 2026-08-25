@@ -7,7 +7,7 @@ and runners call them while mutating an in-memory `Job`.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any, Literal, TypedDict
+from typing import Any, Literal, TypedDict, cast
 
 from atomics.api.jobs import Job
 from atomics.api.models import EvalRequest, RunRequest, SoakRequest, StressRequest, SweepRequest
@@ -115,19 +115,40 @@ def short_request(request: dict[str, Any] | None) -> dict[str, Any] | None:
     return out or None
 
 
-def select_eval_fixtures(ids: list[str] | None) -> list[EvalFixture] | None:
+def select_catalog_fixtures(
+    catalog: SuiteCatalog, ids: list[str] | None
+) -> list[Any] | None:
     if ids is None:
         return None
-    by_id = {fixture.id: fixture for fixture in EVAL_FIXTURES}
+    by_id: dict[str, Any] = {}
+    for item in catalog:
+        ident = getattr(item, "id", None)
+        if ident:
+            by_id[str(ident)] = item
     return [by_id[item] for item in ids if item in by_id]
 
 
-def eval_fixture_total(payload: EvalRequest) -> int:
+def select_eval_fixtures(ids: list[str] | None) -> list[EvalFixture] | None:
+    selected = select_catalog_fixtures(EVAL_FIXTURES, ids)
+    if selected is None:
+        return None
+    return cast(list[EvalFixture], selected)
+
+
+def fixtures_for_request(payload: EvalRequest) -> list[Any]:
     if payload.suite == "accuracy":
-        selected = select_eval_fixtures(payload.fixtures)
-        return len(EVAL_FIXTURES) if selected is None else len(selected)
-    catalog = _SUITE_CATALOGS.get(payload.suite)
-    return len(catalog) if catalog is not None else 0
+        catalog: SuiteCatalog = EVAL_FIXTURES
+    else:
+        found = _SUITE_CATALOGS.get(payload.suite)
+        if found is None:
+            return []
+        catalog = found
+    selected = select_catalog_fixtures(catalog, payload.fixtures)
+    return list(catalog) if selected is None else selected
+
+
+def eval_fixture_total(payload: EvalRequest) -> int:
+    return len(fixtures_for_request(payload))
 
 
 def initial_run_progress(payload: RunRequest) -> dict[str, Any]:

@@ -190,6 +190,7 @@ async def run_redblue(
     *,
     judge_provider: BaseProvider,
     mode: str = "all",
+    fixtures: list[RedBlueFixture] | None = None,
     model: str | None = None,
     judge_model: str | None = None,
     extra_judges: list[tuple[BaseProvider, str | None]] | None = None,
@@ -222,11 +223,14 @@ async def run_redblue(
     run_id = run_id or uuid.uuid4().hex[:12]
     started_at = datetime.now(UTC)
 
-    fixture_set: list[RedBlueFixture] = {
-        "red": RED_FIXTURES,
-        "blue": BLUE_FIXTURES,
-        "all": ALL_FIXTURES,
-    }.get(mode, ALL_FIXTURES)
+    if fixtures is not None:
+        fixture_set = fixtures
+    else:
+        fixture_set = {
+            "red": RED_FIXTURES,
+            "blue": BLUE_FIXTURES,
+            "all": ALL_FIXTURES,
+        }.get(mode, ALL_FIXTURES)
 
     results: list[RedBlueFixtureResult] = []
 

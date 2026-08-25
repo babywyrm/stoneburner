@@ -19,6 +19,8 @@
   `--judge-host`. MCP `submit_sweep` and REPL forward it.
 - **`channel` on `POST /evals` toolcall.** Same meaning as CLI
   `--channel` (`both` / `tools` / `prose`). Other suites reject it.
+- **`fixtures` id subset on every `POST /evals` suite.** Accuracy already
+  did this. Other suites ignored the list and still ran the full catalog.
 
 ## 0.22.1 (2026-08-23) — Landing page is a storefront again
 
