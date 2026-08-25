@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## 0.22.2 (2026-08-24) — Uncapped eval trails and CLI knobs on HTTP
+
+### Upgrade notes
+- Additive for well-formed clients. No CLI flag changes.
+- Unknown JSON keys on `POST /evals` are `422` (same as sweeps).
+- `fixtures` now subsets every eval suite, not only accuracy. A list
+  that used to be ignored on toolcall / redblue / … now selects the
+  run.
+- Eval `progress.trail` is uncapped. Sweep / stress / soak still cap
+  at `total`.
+
 ### Fixed
 - **Eval `progress.trail` keeps every generate/judge phase.** The
   `2 × total` cap dropped later multiturn conversation judges and
