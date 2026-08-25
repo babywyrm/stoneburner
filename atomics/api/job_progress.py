@@ -92,6 +92,8 @@ def resolve_eval_request(payload: EvalRequest, settings: AtomicsSettings) -> dic
     }
     if payload.judge_host:
         request["judge_host"] = payload.judge_host
+    if payload.channel:
+        request["channel"] = payload.channel
     if payload.effort is not None:
         request["effort"] = payload.effort
     if payload.reasoning_mode is not None:

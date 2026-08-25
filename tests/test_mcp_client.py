@@ -172,6 +172,16 @@ def test_submit_eval_includes_runs_and_judge_host_when_given():
     assert payload["runs"] == 3
 
 
+def test_submit_eval_includes_channel_when_given():
+    requests: list[httpx.Request] = []
+    with client_recording(requests) as client:
+        client.submit_eval(suite="toolcall", provider="ollama", channel="tools")
+
+    import json
+
+    assert json.loads(requests[0].content)["channel"] == "tools"
+
+
 def test_submit_eval_includes_budget_when_given():
     requests: list[httpx.Request] = []
     with client_recording(requests) as client:

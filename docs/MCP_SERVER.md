@@ -150,7 +150,8 @@ optional `effort` (`none` / `minimal` / `low` / `medium` / `high` /
 `submit_run` forward the dial. `submit_run` and `submit_sweep` take
 optional `host` (same meaning as `submit_eval`). `submit_eval` and
 `submit_sweep` also take optional `judge_host`. `submit_eval` takes
-`runs` (1–3 on adversarial / redblue / toolcall).
+`runs` (1–3 on adversarial / redblue / toolcall) and `channel`
+(`both` / `tools` / `prose` on toolcall only).
 
 `probe` has no endpoint. Hours-long soaks, contention, and baselines stay
 on the CLI.

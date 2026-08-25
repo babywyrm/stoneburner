@@ -278,6 +278,16 @@ async def test_submit_eval_forwards_budget():
     assert kwargs["budget_usd"] == 4.0
 
 
+async def test_submit_eval_forwards_channel():
+    api = FakeApi()
+    await build_server(api).call_tool(
+        "submit_eval",
+        {"suite": "toolcall", "provider": "ollama", "channel": "tools"},
+    )
+    _, kwargs = api.calls[0]
+    assert kwargs["channel"] == "tools"
+
+
 async def test_get_job_returns_the_api_payload():
     api = FakeApi(result={"job_id": "abc", "status": "finished", "result": {"score": 1}})
     result = await build_server(api).call_tool("get_job", {"job_id": "abc"})

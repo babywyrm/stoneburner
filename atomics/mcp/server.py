@@ -149,6 +149,7 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
         reasoning_mode: str | None = None,
         judge_host: str | None = None,
         runs: int = 1,
+        channel: str | None = None,
     ) -> Any:
         """Start an eval suite and return its job id immediately.
 
@@ -159,10 +160,11 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
         the server's default ceiling. `host` is the inference endpoint
         (same meaning as `list_models`). `judge_host` is the judge endpoint
         when it differs from `host`. `runs` is 1–3 on `adversarial`,
-        `redblue`, and `toolcall` only. `effort` / `reasoning_mode` are the
-        shared reasoning dial (same values as `provider_test`). Poll
-        `get_job` for live `request` / `progress` and growing
-        `result.fixtures` (every suite).
+        `redblue`, and `toolcall` only. `channel` is `both`, `tools`, or
+        `prose` on `toolcall` only (CLI `--channel`). `effort` /
+        `reasoning_mode` are the shared reasoning dial (same values as
+        `provider_test`). Poll `get_job` for live `request` / `progress`
+        and growing `result.fixtures` (every suite).
         """
         return api.submit_eval(
             suite=suite,
@@ -178,6 +180,7 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
             reasoning_mode=reasoning_mode,
             judge_host=judge_host,
             runs=runs,
+            channel=channel,
         )
 
     @server.tool(annotations=SPENDS)

@@ -441,6 +441,7 @@ async def run_eval_suite(payload: EvalRequest, job: Job | None = None) -> dict[s
                 effort=payload.effort,
                 reasoning_mode=payload.reasoning_mode,
                 runs=payload.runs,
+                channel=payload.channel or "both",
                 on_fixture_done=on_toolcall_done if reporter is not None else None,
                 on_phase=on_phase,
             )

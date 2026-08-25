@@ -17,6 +17,8 @@
   previously ignored.
 - **`judge_host` on `POST /sweeps`.** Same meaning as eval / CLI
   `--judge-host`. MCP `submit_sweep` and REPL forward it.
+- **`channel` on `POST /evals` toolcall.** Same meaning as CLI
+  `--channel` (`both` / `tools` / `prose`). Other suites reject it.
 
 ## 0.22.1 (2026-08-23) — Landing page is a storefront again
 
