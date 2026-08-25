@@ -78,7 +78,9 @@ def _guarded_providers(
     the ceiling is the only thing between them and the account limit.
     """
     provider = _provider_for(payload.provider, payload.model, payload.host)
-    judge_host = payload.host if payload.provider == "ollama" else None
+    judge_host = payload.judge_host
+    if judge_host is None and payload.provider == "ollama":
+        judge_host = payload.host
     judge_provider = _provider_for("ollama", payload.judge_model, judge_host)
     budget = EvalBudget(budget_limit_usd=payload.budget_usd)
     guarded = share_budget(budget, provider, judge_provider)
@@ -370,6 +372,7 @@ async def run_eval_suite(payload: EvalRequest, job: Job | None = None) -> dict[s
                 thinking=payload.thinking,
                 effort=payload.effort,
                 reasoning_mode=payload.reasoning_mode,
+                runs=payload.runs,
                 on_fixture_done=on_done,
                 on_phase=on_phase,
             )
@@ -407,6 +410,7 @@ async def run_eval_suite(payload: EvalRequest, job: Job | None = None) -> dict[s
                 thinking=payload.thinking,
                 effort=payload.effort,
                 reasoning_mode=payload.reasoning_mode,
+                runs=payload.runs,
                 on_fixture_done=on_done,
                 on_phase=on_phase,
             )
@@ -436,6 +440,7 @@ async def run_eval_suite(payload: EvalRequest, job: Job | None = None) -> dict[s
                 thinking=payload.thinking,
                 effort=payload.effort,
                 reasoning_mode=payload.reasoning_mode,
+                runs=payload.runs,
                 on_fixture_done=on_toolcall_done if reporter is not None else None,
                 on_phase=on_phase,
             )

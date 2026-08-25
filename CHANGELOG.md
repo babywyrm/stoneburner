@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### Fixed
+- **Eval `progress.trail` keeps every generate/judge phase.** The
+  `2 × total` cap dropped later multiturn conversation judges and
+  `--runs` phases, so REPL `wait` went quiet after the first two
+  phases per fixture. Sweep / stress / soak still cap at `total`.
+
+### Added
+- **`runs` and `judge_host` on `POST /evals`.** Same meaning as CLI
+  `--runs` / `--judge-host`. `runs` is 1–3 on adversarial, redblue, and
+  toolcall; other suites reject `runs > 1`. Extra JSON `runs` was
+  previously ignored.
+
 ## 0.22.1 (2026-08-23) — Landing page is a storefront again
 
 ### Upgrade notes

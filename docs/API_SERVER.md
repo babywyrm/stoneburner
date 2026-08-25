@@ -219,14 +219,15 @@ host) at submit time. Every eval suite carries `progress` (`current` /
 and grows `result.fixtures` as each fixture finishes — same row shape
 (id, status, score, tokens, latency, truncated response, error). Every
 suite sets `in_flight` to `generate` or `judge` (codegen is generate
-only) and appends that dict to `progress.trail` (cap `2 × total`) so a
-2s poll can still show both phases. Accuracy fits the cap (one
-generate and one judge per fixture). Suites that fire `on_phase` more
-often (multiturn turns, redblue/adversarial runs) drop later trail
-entries; REPL `wait` then cannot fall back to current `in_flight`.
+only) and appends that dict to `progress.trail` (uncapped) so a 2s
+poll can still show every phase, including extra multiturn turns and
+`--runs` generate/judge pairs. Sweep / stress / soak trails still cap
+at `total`.
 Dashboard `#job=` still shows the current `in_flight` plus the
 fixture / phase / sample tables, not the trail. `POST /evals` accepts
-optional `host`, same meaning as `GET /models`. `list_jobs` includes a
+optional `host` and `judge_host` (CLI `--judge-host`: judge on a second
+Ollama). `runs` is 1–3 on `adversarial` / `redblue` / `toolcall`; other
+suites return `422` if `runs > 1`. `list_jobs` includes a
 short `request` (suite / model / host, plus sweep `models` / `suites`)
 and omits fixture rows.
 
