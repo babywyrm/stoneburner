@@ -224,6 +224,22 @@ def test_submit_sweep_includes_host_when_given():
     assert json.loads(requests[0].content)["host"] == "http://192.168.1.79:11434"
 
 
+def test_submit_sweep_includes_judge_host_when_given():
+    requests: list[httpx.Request] = []
+    with client_recording(requests) as client:
+        client.submit_sweep(
+            provider="ollama",
+            models=["a"],
+            suites=["eval"],
+            budget_usd=4.0,
+            judge_host="http://192.168.1.79:11434",
+        )
+
+    import json
+
+    assert json.loads(requests[0].content)["judge_host"] == "http://192.168.1.79:11434"
+
+
 def test_submit_stress_posts_required_budget():
     requests: list[httpx.Request] = []
     with client_recording(requests) as client:

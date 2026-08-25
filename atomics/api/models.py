@@ -139,6 +139,7 @@ class SweepRequest(BaseModel):
     reasoning_mode: str | None = None
     budget_usd: float = Field(gt=0, le=MAX_EVAL_BUDGET_USD)
     host: str | None = None
+    judge_host: str | None = None
 
     @field_validator("effort")
     @classmethod

@@ -179,6 +179,17 @@ def test_explicit_host_wins_on_sweep_and_run() -> None:
     assert json.loads(requests[1].content)["host"] == "http://127.0.0.1:11435"
 
 
+def test_submit_sweep_forwards_judge_host() -> None:
+    requests: list[httpx.Request] = []
+    session = Session(provider="ollama", model="a")
+    handle_line(
+        "submit_sweep --suites eval --budget_usd 1 --judge_host http://192.168.1.79:11434",
+        session=session,
+        client=_client(requests),
+    )
+    assert json.loads(requests[0].content)["judge_host"] == "http://192.168.1.79:11434"
+
+
 def test_submit_sweep_models_from_session_model() -> None:
     requests: list[httpx.Request] = []
     session = Session(provider="ollama", model="a")

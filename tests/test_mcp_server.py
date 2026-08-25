@@ -216,6 +216,22 @@ async def test_submit_sweep_forwards_host():
     assert kwargs["host"] == "http://127.0.0.1:11434"
 
 
+async def test_submit_sweep_forwards_judge_host():
+    api = FakeApi()
+    await build_server(api).call_tool(
+        "submit_sweep",
+        {
+            "provider": "ollama",
+            "models": ["qwen3:14b"],
+            "suites": ["eval"],
+            "budget_usd": 1.0,
+            "judge_host": "http://127.0.0.1:11434",
+        },
+    )
+    _, kwargs = api.calls[0]
+    assert kwargs["judge_host"] == "http://127.0.0.1:11434"
+
+
 async def test_submit_stress_forwards_required_budget():
     api = FakeApi()
     await build_server(api).call_tool(

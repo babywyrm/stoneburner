@@ -66,6 +66,18 @@ def test_sweep_request_accepts_host():
     assert req.host == "http://192.168.1.79:11434"
 
 
+def test_sweep_request_accepts_judge_host():
+    req = SweepRequest(
+        provider="ollama",
+        models=["a"],
+        suites=["eval"],
+        budget_usd=1.0,
+        host="http://192.168.1.239:11434",
+        judge_host="http://192.168.1.79:11434",
+    )
+    assert req.judge_host == "http://192.168.1.79:11434"
+
+
 def test_sweep_requires_a_budget():
     with pytest.raises(ValidationError):
         SweepRequest(provider="ollama", models=["a"], suites=["eval"])
@@ -205,6 +217,44 @@ async def test_run_sweep_forwards_host_to_model_and_judge():
 
 
 @pytest.mark.asyncio
+async def test_run_sweep_forwards_judge_host_separately():
+    payload = SweepRequest(
+        provider="ollama",
+        models=["a"],
+        suites=["eval"],
+        budget_usd=1.0,
+        host="http://192.168.1.239:11434",
+        judge_host="http://192.168.1.79:11434",
+        judge_model="llama3.2:3b",
+    )
+    seen: list[tuple[str, str | None, str | None]] = []
+    captured: dict = {}
+
+    def fake_provider(name, model, host=None):
+        seen.append((name, model, host))
+        return SimpleNamespace(name=name, model=model)
+
+    def store_factory(**kwargs):
+        captured.update(kwargs)
+        return AsyncMock()
+
+    with (
+        patch("atomics.api._sweep._provider_for", side_effect=fake_provider),
+        patch("atomics.api._sweep.make_suite_runner", side_effect=store_factory),
+        patch(
+            "atomics.api._sweep.run_gauntlet",
+            new_callable=AsyncMock,
+            return_value=[SuiteJobResult(model="a", suite="eval", ok=True, headline=1.0)],
+        ),
+    ):
+        await run_sweep_from_request(payload)
+        captured["provider_factory"]("a")
+
+    assert ("ollama", "a", "http://192.168.1.239:11434") in seen
+    assert ("ollama", "llama3.2:3b", "http://192.168.1.79:11434") in seen
+
+
+@pytest.mark.asyncio
 async def test_run_sweep_grows_job_rows():
     payload = SweepRequest(
         provider="ollama",
@@ -249,6 +299,7 @@ async def test_post_sweeps_includes_progress_total():
                 "suites": ["eval", "refusal"],
                 "budget_usd": 1.5,
                 "host": "http://127.0.0.1:11434",
+                "judge_host": "http://192.168.1.79:11434",
             },
         )
     assert resp.status_code == 202
@@ -256,6 +307,7 @@ async def test_post_sweeps_includes_progress_total():
     assert body["progress"]["total"] == 4
     assert body["progress"]["current"] == 0
     assert body["request"]["host"] == "http://127.0.0.1:11434"
+    assert body["request"]["judge_host"] == "http://192.168.1.79:11434"
     assert body["progress"]["trail"] == []
 
 

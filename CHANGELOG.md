@@ -15,6 +15,8 @@
   `--runs` / `--judge-host`. `runs` is 1–3 on adversarial, redblue, and
   toolcall; other suites reject `runs > 1`. Extra JSON `runs` was
   previously ignored.
+- **`judge_host` on `POST /sweeps`.** Same meaning as eval / CLI
+  `--judge-host`. MCP `submit_sweep` and REPL forward it.
 
 ## 0.22.1 (2026-08-23) — Landing page is a storefront again
 

@@ -192,6 +192,7 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
         effort: str | None = None,
         reasoning_mode: str | None = None,
         host: str | None = None,
+        judge_host: str | None = None,
     ) -> Any:
         """Start a multi-model, multi-suite campaign and return a job id.
 
@@ -199,6 +200,7 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
         discover-everything flag; call `list_models` first. `suites` is a list
         from `eval`, `redblue`, `refusal`, `toolcall`, `codereview`. `runs` is
         1–3. `host` is the inference endpoint (same meaning as `submit_eval`).
+        `judge_host` is the judge endpoint when it differs from `host`.
         Poll `get_job` until `status` is `completed`.
         """
         return api.submit_sweep(
@@ -212,6 +214,7 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
             effort=effort,
             reasoning_mode=reasoning_mode,
             host=host,
+            judge_host=judge_host,
         )
 
     @server.tool(annotations=SPENDS)
