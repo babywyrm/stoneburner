@@ -26,6 +26,7 @@ def test_eval_request_defaults():
     assert req.host is None
     assert req.judge_host is None
     assert req.runs == 1
+    assert req.channel is None
 
 
 def test_eval_request_accepts_runs_on_toolcall() -> None:
@@ -39,6 +40,27 @@ def test_eval_request_rejects_runs_on_accuracy() -> None:
     with pytest.raises(ValidationError, match="runs"):
         EvalRequest.model_validate(
             {"suite": "accuracy", "provider": "ollama", "runs": 3}
+        )
+
+
+def test_eval_request_accepts_channel_on_toolcall() -> None:
+    req = EvalRequest.model_validate(
+        {"suite": "toolcall", "provider": "ollama", "channel": "tools"}
+    )
+    assert req.channel == "tools"
+
+
+def test_eval_request_rejects_channel_on_accuracy() -> None:
+    with pytest.raises(ValidationError, match="channel"):
+        EvalRequest.model_validate(
+            {"suite": "accuracy", "provider": "ollama", "channel": "tools"}
+        )
+
+
+def test_eval_request_rejects_unknown_channel() -> None:
+    with pytest.raises(ValidationError, match="channel"):
+        EvalRequest.model_validate(
+            {"suite": "toolcall", "provider": "ollama", "channel": "voice"}
         )
 
 

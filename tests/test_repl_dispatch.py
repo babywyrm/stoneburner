@@ -99,6 +99,17 @@ def test_submit_eval_verbose_keeps_json() -> None:
     assert session.last_job_id == "abc"
 
 
+def test_submit_eval_forwards_channel() -> None:
+    requests: list[httpx.Request] = []
+    session = Session(provider="ollama", model="a")
+    handle_line(
+        "submit_eval --suite toolcall --channel tools",
+        session=session,
+        client=_client(requests, response=httpx.Response(200, json=_EVAL_JOB)),
+    )
+    assert json.loads(requests[0].content)["channel"] == "tools"
+
+
 def test_session_host_fills_submit_stress() -> None:
     requests: list[httpx.Request] = []
     session = Session(provider="ollama", model="llama3.2:1b", host="http://192.168.1.79:11434")

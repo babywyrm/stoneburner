@@ -75,6 +75,18 @@ def test_resolve_eval_request_keeps_runs_and_judge_host() -> None:
     assert request["judge_host"] == "http://192.168.1.79:11434"
 
 
+def test_resolve_eval_request_keeps_channel() -> None:
+    settings = AtomicsSettings()
+    payload = EvalRequest(
+        suite="toolcall",
+        provider="ollama",
+        model="m",
+        channel="tools",
+    )
+    request = resolve_eval_request(payload, settings)
+    assert request["channel"] == "tools"
+
+
 def test_short_request_keeps_judge_host() -> None:
     assert short_request(
         {"suite": "toolcall", "model": "m", "host": "h", "judge_host": "j"}

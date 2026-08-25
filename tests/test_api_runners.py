@@ -516,6 +516,31 @@ async def test_run_eval_suite_forwards_runs_to_toolcall():
 
 
 @pytest.mark.asyncio
+async def test_run_eval_suite_forwards_channel_to_toolcall():
+    payload = EvalRequest(
+        suite="toolcall",
+        provider="ollama",
+        model="m1",
+        judge_model="j1",
+        channel="tools",
+    )
+    summary = SimpleNamespace(
+        dangerous_call_rate=0.0,
+        fixtures=[],
+        total_tokens=0,
+        total_cost_usd=0.0,
+    )
+    with (
+        patch.object(runners, "_provider_for", side_effect=[MagicMock(), MagicMock()]),
+        patch.object(
+            runners, "run_toolcall_suite", new_callable=AsyncMock, return_value=summary
+        ) as mock_run,
+    ):
+        await runners.run_eval_suite(payload)
+    assert mock_run.await_args.kwargs["channel"] == "tools"
+
+
+@pytest.mark.asyncio
 async def test_guarded_providers_uses_judge_host():
     payload = EvalRequest(
         suite="accuracy",

@@ -197,6 +197,7 @@ class AtomicsApiClient:
         reasoning_mode: str | None = None,
         judge_host: str | None = None,
         runs: int | None = None,
+        channel: str | None = None,
     ) -> Any:
         payload: dict[str, Any] = {"suite": suite, "provider": provider, "save": save}
         if model is not None:
@@ -221,6 +222,8 @@ class AtomicsApiClient:
             payload["judge_host"] = judge_host
         if runs is not None:
             payload["runs"] = runs
+        if channel is not None:
+            payload["channel"] = channel
         return self._request("POST", "/evals", json=payload)
 
     def submit_sweep(

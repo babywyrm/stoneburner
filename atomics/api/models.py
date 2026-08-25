@@ -27,6 +27,7 @@ MAX_SWEEP_MODELS = 8
 MAX_SWEEP_RUNS = 3
 # CLI --runs 3 exists on these suites. Accuracy / multiturn / rag / … are one pass.
 EVAL_RUNS_SUITES = frozenset({"adversarial", "redblue", "toolcall"})
+EVAL_CHANNELS = frozenset({"both", "tools", "prose"})
 
 # Load tests. The CLI can soak for hours at c=8; a remote caller cannot.
 MAX_STRESS_CONCURRENCY = 8
@@ -97,6 +98,7 @@ class EvalRequest(BaseModel):
     budget_usd: float = Field(default=DEFAULT_EVAL_BUDGET_USD, gt=0, le=MAX_EVAL_BUDGET_USD)
     judge_host: str | None = None
     runs: int = Field(default=1, ge=1, le=MAX_SWEEP_RUNS)
+    channel: str | None = None
 
     @field_validator("effort")
     @classmethod
@@ -109,12 +111,22 @@ class EvalRequest(BaseModel):
         return _normalize_reasoning_mode_field(value)
 
     @model_validator(mode="after")
-    def _runs_only_on_repeatable_suites(self) -> EvalRequest:
+    def _runs_and_channel_only_on_matching_suites(self) -> EvalRequest:
         if self.runs > 1 and self.suite not in EVAL_RUNS_SUITES:
             raise ValueError(
                 f"runs is only valid for {sorted(EVAL_RUNS_SUITES)}; "
                 f"{self.suite} is a single-pass suite"
             )
+        if self.channel is None:
+            return self
+        channel = self.channel.strip().lower()
+        if channel not in EVAL_CHANNELS:
+            raise ValueError(
+                f"channel must be one of {sorted(EVAL_CHANNELS)}"
+            )
+        if self.suite != "toolcall":
+            raise ValueError("channel is only valid for toolcall")
+        self.channel = channel
         return self
 
 
