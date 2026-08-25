@@ -88,7 +88,10 @@ def resolve_eval_request(payload: EvalRequest, settings: AtomicsSettings) -> dic
         "model": payload.model or settings.ollama_model,
         "judge_model": payload.judge_model or settings.ollama_model,
         "host": resolve_inference_host(payload.provider, payload.host, settings),
+        "runs": payload.runs,
     }
+    if payload.judge_host:
+        request["judge_host"] = payload.judge_host
     if payload.effort is not None:
         request["effort"] = payload.effort
     if payload.reasoning_mode is not None:
@@ -104,7 +107,7 @@ def short_request(request: dict[str, Any] | None) -> dict[str, Any] | None:
         return None
     out: dict[str, Any] = {
         key: request[key]
-        for key in ("suite", "model", "host", "models", "suites")
+        for key in ("suite", "model", "host", "judge_host", "models", "suites")
         if key in request
     }
     return out or None
@@ -407,7 +410,8 @@ class EvalJobReporter:
             "model": model,
         }
         progress["in_flight"] = entry
-        _append_trail(progress, entry, cap=2 * int(progress.get("total") or 0))
+        # cap=0 keeps every phase; 2×total dropped multiturn conversation judges.
+        _append_trail(progress, entry, cap=0)
         self.job.progress = progress
 
     def fixture_done(self, fr: Any) -> None:

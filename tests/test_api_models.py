@@ -24,6 +24,34 @@ def test_eval_request_defaults():
     assert req.provider == "ollama"
     assert req.fixtures is None
     assert req.host is None
+    assert req.judge_host is None
+    assert req.runs == 1
+
+
+def test_eval_request_accepts_runs_on_toolcall() -> None:
+    req = EvalRequest.model_validate(
+        {"suite": "toolcall", "provider": "ollama", "runs": 3}
+    )
+    assert req.runs == 3
+
+
+def test_eval_request_rejects_runs_on_accuracy() -> None:
+    with pytest.raises(ValidationError, match="runs"):
+        EvalRequest.model_validate(
+            {"suite": "accuracy", "provider": "ollama", "runs": 3}
+        )
+
+
+def test_eval_request_accepts_judge_host() -> None:
+    req = EvalRequest.model_validate(
+        {
+            "suite": "accuracy",
+            "provider": "ollama",
+            "host": "http://192.168.1.239:11434",
+            "judge_host": "http://192.168.1.79:11434",
+        }
+    )
+    assert req.judge_host == "http://192.168.1.79:11434"
 
 
 def test_eval_request_normalizes_effort_aliases():

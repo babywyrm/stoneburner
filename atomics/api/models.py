@@ -25,6 +25,8 @@ MAX_EVAL_BUDGET_USD = 1000.0
 # is the most one API request may start.
 MAX_SWEEP_MODELS = 8
 MAX_SWEEP_RUNS = 3
+# CLI --runs 3 exists on these suites. Accuracy / multiturn / rag / … are one pass.
+EVAL_RUNS_SUITES = frozenset({"adversarial", "redblue", "toolcall"})
 
 # Load tests. The CLI can soak for hours at c=8; a remote caller cannot.
 MAX_STRESS_CONCURRENCY = 8
@@ -91,6 +93,8 @@ class EvalRequest(BaseModel):
     effort: str | None = None
     reasoning_mode: str | None = None
     budget_usd: float = Field(default=DEFAULT_EVAL_BUDGET_USD, gt=0, le=MAX_EVAL_BUDGET_USD)
+    judge_host: str | None = None
+    runs: int = Field(default=1, ge=1, le=MAX_SWEEP_RUNS)
 
     @field_validator("effort")
     @classmethod
@@ -101,6 +105,15 @@ class EvalRequest(BaseModel):
     @classmethod
     def _known_reasoning_mode(cls, value: str | None) -> str | None:
         return _normalize_reasoning_mode_field(value)
+
+    @model_validator(mode="after")
+    def _runs_only_on_repeatable_suites(self) -> EvalRequest:
+        if self.runs > 1 and self.suite not in EVAL_RUNS_SUITES:
+            raise ValueError(
+                f"runs is only valid for {sorted(EVAL_RUNS_SUITES)}; "
+                f"{self.suite} is a single-pass suite"
+            )
+        return self
 
 
 class SweepRequest(BaseModel):

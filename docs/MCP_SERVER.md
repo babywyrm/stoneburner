@@ -148,7 +148,9 @@ optional `effort` (`none` / `minimal` / `low` / `medium` / `high` /
 `xhigh` / `max`; aliases `xl`, `ultra`) and OpenAI-only
 `reasoning_mode` (`standard` / `pro`). `submit_eval` `codegen` and
 `submit_run` forward the dial. `submit_run` and `submit_sweep` take
-optional `host` (same meaning as `submit_eval`).
+optional `host` (same meaning as `submit_eval`). `submit_eval` also
+takes optional `judge_host` and `runs` (1–3 on adversarial / redblue /
+toolcall).
 
 `probe` has no endpoint. Hours-long soaks, contention, and baselines stay
 on the CLI.
@@ -167,8 +169,8 @@ the suite / model / host, `progress` counts fixtures, and `result.fixtures`
 grows as each fixture finishes — every `submit_eval` suite, not only
 accuracy. Every suite sets `progress.in_flight` to the current generate
 or judge call (codegen is generate only) and appends it to
-`progress.trail` (cap `2 × total`; later phases on multiturn /
-redblue / adversarial are dropped). A sweep counts models × suites
+`progress.trail` (uncapped; multiturn turns and `--runs` phases stay).
+A sweep counts models × suites
 instead, grows `result.jobs`, sets `in_flight` to `{model, suite}`,
 and appends that to `progress.trail` (cap `total`). A stress job
 grows `result.phases` and sets `in_flight` to

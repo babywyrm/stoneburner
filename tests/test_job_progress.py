@@ -55,9 +55,30 @@ def test_resolve_eval_request_fills_default_judge_and_host() -> None:
     assert request["model"] == "llama3.2:1b"
     assert request["judge_model"] == settings.ollama_model
     assert request["host"] == settings.ollama_host
+    assert request["runs"] == 1
+    assert "judge_host" not in request
 
 
-def test_short_request_keeps_suite_model_host() -> None:
+def test_resolve_eval_request_keeps_runs_and_judge_host() -> None:
+    settings = AtomicsSettings()
+    payload = EvalRequest(
+        suite="toolcall",
+        provider="ollama",
+        model="m",
+        host="http://192.168.1.239:11434",
+        judge_host="http://192.168.1.79:11434",
+        runs=3,
+    )
+    request = resolve_eval_request(payload, settings)
+    assert request["runs"] == 3
+    assert request["host"] == "http://192.168.1.239:11434"
+    assert request["judge_host"] == "http://192.168.1.79:11434"
+
+
+def test_short_request_keeps_judge_host() -> None:
+    assert short_request(
+        {"suite": "toolcall", "model": "m", "host": "h", "judge_host": "j"}
+    ) == {"suite": "toolcall", "model": "m", "host": "h", "judge_host": "j"}
     assert short_request(
         {"suite": "accuracy", "provider": "ollama", "model": "m", "host": "h", "budget_usd": 1}
     ) == {"suite": "accuracy", "model": "m", "host": "h"}
@@ -350,22 +371,46 @@ def test_sweep_reporter_appends_start_to_trail() -> None:
     ]
 
 
-def test_eval_trail_caps_at_twice_total() -> None:
+def test_sweep_trail_caps_at_total() -> None:
+    job = Job(job_id="s", kind="sweep", status=JobStatus.RUNNING, created_at=0.0)
+    reporter = SweepJobReporter(
+        job,
+        provider="ollama",
+        models=["a", "b"],
+        suites=["eval"],
+        runs=1,
+        budget_usd=2.0,
+        total=2,
+    )
+    reporter.start("a", "eval")
+    reporter.start("b", "eval")
+    reporter.start("c", "eval")
+    assert job.progress["trail"] == [
+        {"model": "a", "suite": "eval"},
+        {"model": "b", "suite": "eval"},
+    ]
+
+
+def test_eval_trail_keeps_phases_past_twice_total() -> None:
+    # Multiturn: generate + per-turn judge + conversation judge on one fixture.
     job = Job(job_id="j", kind="eval", status=JobStatus.RUNNING, created_at=0.0)
     reporter = EvalJobReporter(
         job,
-        suite="accuracy",
+        suite="multiturn",
         provider="ollama",
         model="m",
         judge_model="m",
         host=None,
         total=1,
     )
-    reporter.phase("ev-01", "generate", "m")
-    reporter.phase("ev-01", "judge", "m")
-    reporter.phase("ev-02", "generate", "m")
-    assert len(job.progress["trail"]) == 2
-    assert job.progress["trail"][-1]["fixture_id"] == "ev-01"
+    reporter.phase("mt-01", "generate", "m")
+    reporter.phase("mt-01", "judge", "m")
+    reporter.phase("mt-01", "judge", "m")
+    assert [row["phase"] for row in job.progress["trail"]] == [
+        "generate",
+        "judge",
+        "judge",
+    ]
 
 
 def test_reporter_grows_result_and_clears_in_flight() -> None:

@@ -155,6 +155,23 @@ def test_submit_eval_includes_host_when_given():
     assert payload["host"] == "http://192.168.1.79:11434"
 
 
+def test_submit_eval_includes_runs_and_judge_host_when_given():
+    requests: list[httpx.Request] = []
+    with client_recording(requests) as client:
+        client.submit_eval(
+            suite="toolcall",
+            provider="ollama",
+            judge_host="http://192.168.1.79:11434",
+            runs=3,
+        )
+
+    import json
+
+    payload = json.loads(requests[0].content)
+    assert payload["judge_host"] == "http://192.168.1.79:11434"
+    assert payload["runs"] == 3
+
+
 def test_submit_eval_includes_budget_when_given():
     requests: list[httpx.Request] = []
     with client_recording(requests) as client:
