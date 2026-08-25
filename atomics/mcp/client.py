@@ -236,6 +236,7 @@ class AtomicsApiClient:
         effort: str | None = None,
         reasoning_mode: str | None = None,
         host: str | None = None,
+        judge_host: str | None = None,
     ) -> Any:
         payload: dict[str, Any] = {
             "provider": provider,
@@ -254,6 +255,8 @@ class AtomicsApiClient:
             payload["reasoning_mode"] = reasoning_mode
         if host is not None:
             payload["host"] = host
+        if judge_host is not None:
+            payload["judge_host"] = judge_host
         return self._request("POST", "/sweeps", json=payload)
 
     def submit_stress(

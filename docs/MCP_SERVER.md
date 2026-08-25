@@ -148,9 +148,9 @@ optional `effort` (`none` / `minimal` / `low` / `medium` / `high` /
 `xhigh` / `max`; aliases `xl`, `ultra`) and OpenAI-only
 `reasoning_mode` (`standard` / `pro`). `submit_eval` `codegen` and
 `submit_run` forward the dial. `submit_run` and `submit_sweep` take
-optional `host` (same meaning as `submit_eval`). `submit_eval` also
-takes optional `judge_host` and `runs` (1–3 on adversarial / redblue /
-toolcall).
+optional `host` (same meaning as `submit_eval`). `submit_eval` and
+`submit_sweep` also take optional `judge_host`. `submit_eval` takes
+`runs` (1–3 on adversarial / redblue / toolcall).
 
 `probe` has no endpoint. Hours-long soaks, contention, and baselines stay
 on the CLI.

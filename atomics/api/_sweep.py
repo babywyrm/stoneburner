@@ -40,7 +40,9 @@ async def run_sweep_from_request(
     def provider_factory(model_name: str):
         return meter.wrap(_provider_for(payload.provider, model_name, payload.host))
 
-    judge_host = payload.host if payload.provider == "ollama" else None
+    judge_host = payload.judge_host
+    if judge_host is None and payload.provider == "ollama":
+        judge_host = payload.host
     judge_provider = meter.wrap(_provider_for("ollama", payload.judge_model, judge_host))
     inner = make_suite_runner(
         provider_factory=provider_factory,

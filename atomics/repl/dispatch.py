@@ -135,6 +135,7 @@ _VERBS: dict[str, tuple[str, frozenset[str], str | None]] = {
                 "effort",
                 "reasoning_mode",
                 "host",
+                "judge_host",
             }
         ),
         None,
