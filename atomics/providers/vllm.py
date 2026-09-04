@@ -18,7 +18,7 @@ import httpx
 from atomics.benchmark.model_classes import classify_model, supports_thinking
 from atomics.providers._openai_compat import OpenAICompatibleTools
 from atomics.providers.base import BaseProvider, ProviderResponse, compute_tps
-from atomics.providers.effort import apply_chat_effort, normalize_effort
+from atomics.providers.effort import apply_chat_effort, normalize_effort, qwen_template_effort
 
 _THINKING_MODEL_PREFIXES: tuple[str, ...] = ("qwen3", "deepseek-r1")
 
@@ -27,17 +27,35 @@ def _model_supports_thinking(model: str) -> bool:
     return any(model.startswith(p) for p in _THINKING_MODEL_PREFIXES)
 
 
+def _is_qwen3(model: str) -> bool:
+    return model.lower().startswith("qwen3")
+
+
+def _usage_reasoning_tokens(usage: dict, thinking_text: str, text: str, out: int) -> int:
+    reported = usage.get("reasoning_tokens")
+    if reported is None:
+        details = usage.get("completion_tokens_details") or {}
+        reported = details.get("reasoning_tokens") if isinstance(details, dict) else None
+    if reported is not None:
+        return int(reported)
+    generated_chars = len(thinking_text) + len(text)
+    if generated_chars > 0 and out > 0:
+        return round(out * len(thinking_text) / generated_chars)
+    return 0
+
+
 class VllmProvider(OpenAICompatibleTools, BaseProvider):
     """Provider for vLLM / OpenAI-compatible inference endpoints.
 
     Targets any server that implements POST /v1/chat/completions and
     GET /v1/models (vLLM, LiteLLM, llama.cpp server, etc.).
 
-    Thinking mode for qwen3-family models is controlled via the
-    chat_template_kwargs.enable_thinking field, which the vLLM/LiteLLM
-    gateway passes through to the model. This maps cleanly from the
-    thinking: bool | None parameter — same semantics as OllamaProvider's
-    THINK flag so the rest of the harness doesn't need to know the backend.
+    Thinking mode for qwen3-family models is controlled via
+    ``chat_template_kwargs.enable_thinking``. ``--effort`` is dual-written:
+    top-level ``reasoning_effort`` for OpenAI-compat gateways, and
+    ``chat_template_kwargs.reasoning_effort`` (low/medium/xhigh) for Qwen
+    Jinja templates that ignore unknown keys. ``--thinking-budget`` is sent
+    as SGLang ``custom_params.thinking_budget`` when thinking is on.
     """
 
     def __init__(
@@ -100,10 +118,23 @@ class VllmProvider(OpenAICompatibleTools, BaseProvider):
         }
         if temperature is not None:
             body["temperature"] = temperature
+        native: dict[str, object] = {}
         reasoning_request = apply_chat_effort(body, effort)
+        if reasoning_request:
+            native.update(reasoning_request)
 
         if _model_supports_thinking(model):
-            body["chat_template_kwargs"] = {"enable_thinking": use_thinking}
+            template_kwargs: dict[str, object] = {"enable_thinking": use_thinking}
+            if use_thinking and _is_qwen3(model):
+                template_effort = qwen_template_effort(effort)
+                if template_effort is not None:
+                    template_kwargs["reasoning_effort"] = template_effort
+            body["chat_template_kwargs"] = template_kwargs
+            native["chat_template_kwargs"] = template_kwargs
+            if use_thinking and _is_qwen3(model) and thinking_budget is not None:
+                custom = {"thinking_budget": thinking_budget}
+                body["custom_params"] = custom
+                native["custom_params"] = custom
 
         t0 = time.monotonic()
         try:
@@ -140,12 +171,7 @@ class VllmProvider(OpenAICompatibleTools, BaseProvider):
             thinking_content = choice.get("message", {}).get("reasoning_content", "")
             if thinking_content:
                 thinking_text = thinking_content
-                # vLLM counts reasoning within completion_tokens but reports no
-                # separate figure; estimate by character proportion so it stays
-                # anchored to the real token total instead of a word count.
-                generated_chars = len(thinking_text) + len(text)
-                if generated_chars > 0 and out > 0:
-                    thinking_tokens = round(out * len(thinking_text) / generated_chars)
+            thinking_tokens = _usage_reasoning_tokens(usage, thinking_text, text, out)
 
         return ProviderResponse(
             text=text,
@@ -160,7 +186,7 @@ class VllmProvider(OpenAICompatibleTools, BaseProvider):
             thinking_text=thinking_text,
             raw=data,
             effort=normalize_effort(effort),
-            reasoning_request=reasoning_request,
+            reasoning_request=native or None,
         )
 
     async def list_models(self) -> list[dict[str, str | float | bool]]:

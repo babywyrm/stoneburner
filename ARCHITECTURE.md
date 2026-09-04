@@ -94,7 +94,9 @@ cost, `tps_basis`, and the operator dial (`effort`, `reasoning_mode`) plus the
 native payload (`reasoning_request`). Adapters live in
 `providers/{claude,openai,bedrock,ollama, vllm,brain_gateway}.py`. Pricing is
 centralized in `providers/pricing.py`. The shared mapper is
-`providers/effort.py`.
+`providers/effort.py`. vLLM `generate()` dual-writes Qwen `chat_template_kwargs`
+and optional SGLang `custom_params`; the shared `OpenAICompatibleTools` mixin
+used by `generate_with_tools` does not.
 
 Build providers through the single factory `providers.factory.make_provider()` —
 do not write a new provider-name switch. It raises `ProviderConfigError`, which
