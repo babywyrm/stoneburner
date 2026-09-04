@@ -13,6 +13,7 @@ from atomics.providers.effort import (
     normalize_reasoning_mode,
     openai_chat_effort,
     openai_reasoning,
+    qwen_template_effort,
 )
 
 
@@ -64,6 +65,35 @@ def test_openai_chat_effort_is_scalar() -> None:
     assert openai_chat_effort(None) is None
     assert openai_chat_effort("ultra") == "max"
     assert openai_chat_effort("none") == "none"
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        (None, None),
+        ("", None),
+        ("none", None),
+        ("minimal", "low"),
+        ("low", "low"),
+        ("medium", "medium"),
+        ("high", "medium"),
+        ("xhigh", "xhigh"),
+        ("xl", "xhigh"),
+        ("max", "xhigh"),
+        ("ultra", "xhigh"),
+    ],
+)
+def test_qwen_template_effort_maps_to_template_keys(
+    raw: str | None, expected: str | None
+) -> None:
+    assert qwen_template_effort(raw) == expected
+
+
+@pytest.mark.unit
+def test_qwen_template_effort_rejects_unknown() -> None:
+    with pytest.raises(EffortError, match="unknown effort"):
+        qwen_template_effort("ludicrous")
 
 
 @pytest.mark.unit

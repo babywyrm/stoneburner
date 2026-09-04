@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Added
+- **Qwen3 thinking keys on `--provider vllm`.** `--effort` is written into
+  `chat_template_kwargs.reasoning_effort` (`low` / `medium` / `xhigh`) as
+  well as top-level `reasoning_effort`, so Qwen Jinja cannot silently
+  ignore the dial and fall through to xhigh. `--thinking-budget` is sent
+  as SGLang `custom_params.thinking_budget` when thinking is on. Reported
+  `usage.reasoning_tokens` is preferred over a character-share estimate.
+  A hard token cap still needs SGLang `--enable-strict-thinking`.
+  `generate_with_tools` does not send the Qwen template keys.
+
 ## 0.22.2 (2026-08-24) — Uncapped eval trails and CLI knobs on HTTP
 
 ### Upgrade notes

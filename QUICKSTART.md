@@ -129,6 +129,9 @@ uv run atomics provider-test --provider bedrock --region us-east-1 --effort high
 uv run atomics provider-test --provider groq --effort medium
 uv run atomics provider-test --provider gemini --effort high
 uv run atomics provider-test --provider together --effort medium
+
+# vLLM / SGLang — Qwen template keys. Hard cap needs --enable-strict-thinking on the server.
+uv run atomics provider-test --provider vllm -m qwen3.8:27b --effort low --thinking-budget 512
 ```
 
 > **Ecosystem fit:** run private/local models for sensitive workloads and cost

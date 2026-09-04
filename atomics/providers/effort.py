@@ -101,6 +101,22 @@ def openai_chat_effort(effort: str | None) -> str | None:
     return payload.get("effort")
 
 
+def qwen_template_effort(effort: str | None) -> str | None:
+    """Qwen3.8 Jinja ``reasoning_effort``: low, medium, or xhigh.
+
+    Unknown keys are ignored by the template and fall through to xhigh, so
+    ``high`` / ``max`` are mapped rather than sent verbatim.
+    """
+    resolved = normalize_effort(effort)
+    if resolved is None or resolved == "none":
+        return None
+    if resolved in ("minimal", "low"):
+        return "low"
+    if resolved in ("medium", "high"):
+        return "medium"
+    return "xhigh"
+
+
 def apply_chat_effort(body: dict, effort: str | None) -> dict[str, str] | None:
     """Set ``reasoning_effort`` on an OpenAI-compatible chat body."""
     value = openai_chat_effort(effort)

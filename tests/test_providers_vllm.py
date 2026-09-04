@@ -10,7 +10,7 @@ import pytest
 
 from atomics.providers import vllm
 from atomics.providers.base import BaseProvider
-from atomics.providers.vllm import VllmProvider
+from atomics.providers.vllm import VllmProvider, _is_qwen3, _usage_reasoning_tokens
 
 # ---------------------------------------------------------------------------
 # Interface / construction
@@ -26,7 +26,7 @@ def test_vllm_implements_interface():
 def test_vllm_default_url():
     provider = VllmProvider()
     assert provider._base_url == "http://localhost:8000/v1"
-    assert provider._default_model == "qwen2.5:3b"
+    assert provider.default_model == "qwen2.5:3b"
 
 
 def test_vllm_custom_url():
@@ -197,6 +197,230 @@ async def test_vllm_no_thinking_flag_for_non_thinking_model():
 
     body = mock_client.post.call_args[1]["json"]
     assert "chat_template_kwargs" not in body
+
+
+@pytest.mark.asyncio
+async def test_vllm_qwen_effort_lands_in_chat_template_kwargs():
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock(return_value=_mock_openai_response("ok"))
+
+    provider = VllmProvider(base_url="http://fake:8000/v1", client=mock_client)
+    resp = await provider.generate(
+        "test", model="qwen3.8:27b", thinking=True, effort="low"
+    )
+
+    body = mock_client.post.call_args[1]["json"]
+    assert body["reasoning_effort"] == "low"
+    assert body["chat_template_kwargs"] == {
+        "enable_thinking": True,
+        "reasoning_effort": "low",
+    }
+    assert resp.reasoning_request["chat_template_kwargs"]["reasoning_effort"] == "low"
+
+
+@pytest.mark.asyncio
+async def test_vllm_qwen_high_effort_maps_to_template_medium():
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock(return_value=_mock_openai_response("ok"))
+
+    provider = VllmProvider(base_url="http://fake:8000/v1", client=mock_client)
+    await provider.generate("test", model="qwen3.8:27b", thinking=True, effort="high")
+
+    body = mock_client.post.call_args[1]["json"]
+    assert body["reasoning_effort"] == "high"
+    assert body["chat_template_kwargs"]["reasoning_effort"] == "medium"
+
+
+@pytest.mark.asyncio
+async def test_vllm_qwen_thinking_budget_goes_to_custom_params():
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock(return_value=_mock_openai_response("ok"))
+
+    provider = VllmProvider(base_url="http://fake:8000/v1", client=mock_client)
+    resp = await provider.generate(
+        "test",
+        model="qwen3.8:27b",
+        thinking=True,
+        thinking_budget=512,
+    )
+
+    body = mock_client.post.call_args[1]["json"]
+    assert body["custom_params"] == {"thinking_budget": 512}
+    assert resp.reasoning_request["custom_params"] == {"thinking_budget": 512}
+
+
+@pytest.mark.asyncio
+async def test_vllm_qwen_omits_custom_params_when_thinking_off():
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock(return_value=_mock_openai_response("ok"))
+
+    provider = VllmProvider(base_url="http://fake:8000/v1", client=mock_client)
+    await provider.generate(
+        "test",
+        model="qwen3.8:27b",
+        thinking=False,
+        thinking_budget=512,
+    )
+
+    body = mock_client.post.call_args[1]["json"]
+    assert "custom_params" not in body
+    assert body["chat_template_kwargs"] == {"enable_thinking": False}
+
+
+@pytest.mark.asyncio
+async def test_vllm_qwen_omits_custom_params_when_budget_unset():
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock(return_value=_mock_openai_response("ok"))
+
+    provider = VllmProvider(base_url="http://fake:8000/v1", client=mock_client)
+    await provider.generate("test", model="qwen3.8:27b", thinking=True)
+
+    body = mock_client.post.call_args[1]["json"]
+    assert "custom_params" not in body
+    assert body["chat_template_kwargs"] == {"enable_thinking": True}
+
+
+@pytest.mark.asyncio
+async def test_vllm_qwen_effort_none_omits_template_reasoning_effort():
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock(return_value=_mock_openai_response("ok"))
+
+    provider = VllmProvider(base_url="http://fake:8000/v1", client=mock_client)
+    await provider.generate(
+        "test", model="qwen3.8:27b", thinking=True, effort="none"
+    )
+
+    body = mock_client.post.call_args[1]["json"]
+    assert body["reasoning_effort"] == "none"
+    assert body["chat_template_kwargs"] == {"enable_thinking": True}
+
+
+@pytest.mark.asyncio
+async def test_vllm_deepseek_does_not_get_qwen_template_keys():
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock(return_value=_mock_openai_response("ok"))
+
+    provider = VllmProvider(base_url="http://fake:8000/v1", client=mock_client)
+    await provider.generate(
+        "test",
+        model="deepseek-r1:32b",
+        thinking=True,
+        effort="low",
+        thinking_budget=512,
+    )
+
+    body = mock_client.post.call_args[1]["json"]
+    assert body["reasoning_effort"] == "low"
+    assert body["chat_template_kwargs"] == {"enable_thinking": True}
+    assert "custom_params" not in body
+
+
+@pytest.mark.asyncio
+async def test_vllm_prefers_completion_tokens_details_reasoning_tokens():
+    mock = MagicMock()
+    mock.status_code = 200
+    mock.raise_for_status = MagicMock()
+    mock.json.return_value = {
+        "choices": [
+            {
+                "message": {
+                    "content": "ok",
+                    "role": "assistant",
+                    "reasoning_content": "x" * 400,
+                }
+            }
+        ],
+        "usage": {
+            "prompt_tokens": 10,
+            "completion_tokens": 2000,
+            "total_tokens": 2010,
+            "completion_tokens_details": {"reasoning_tokens": 88},
+        },
+    }
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock(return_value=mock)
+
+    provider = VllmProvider(base_url="http://fake:8000/v1", client=mock_client)
+    resp = await provider.generate("test", model="qwen3.8:27b", thinking=True)
+    assert resp.thinking_tokens == 88
+
+
+def test_is_qwen3_prefix_is_case_insensitive():
+    assert _is_qwen3("Qwen3.8:27b")
+    assert _is_qwen3("qwen3:14b")
+    assert not _is_qwen3("qwen2.5:3b")
+    assert not _is_qwen3("deepseek-r1:32b")
+
+
+def test_usage_reasoning_tokens_prefers_top_level_over_estimate():
+    assert (
+        _usage_reasoning_tokens(
+            {"reasoning_tokens": 513, "completion_tokens": 2000},
+            thinking_text="x" * 400,
+            text="ok",
+            out=2000,
+        )
+        == 513
+    )
+
+
+def test_usage_reasoning_tokens_zero_is_not_replaced_by_estimate():
+    assert (
+        _usage_reasoning_tokens(
+            {"reasoning_tokens": 0},
+            thinking_text="x" * 400,
+            text="ok",
+            out=2000,
+        )
+        == 0
+    )
+
+
+def test_usage_reasoning_tokens_estimates_character_share():
+    assert (
+        _usage_reasoning_tokens(
+            {},
+            thinking_text="t" * 75,
+            text="a" * 25,
+            out=100,
+        )
+        == 75
+    )
+
+
+def test_usage_reasoning_tokens_zero_when_nothing_to_count():
+    assert _usage_reasoning_tokens({}, "", "", 10) == 0
+    assert _usage_reasoning_tokens({}, "think", "ok", 0) == 0
+
+
+@pytest.mark.asyncio
+async def test_vllm_prefers_usage_reasoning_tokens():
+    mock = MagicMock()
+    mock.status_code = 200
+    mock.raise_for_status = MagicMock()
+    mock.json.return_value = {
+        "choices": [
+            {
+                "message": {
+                    "content": "ok",
+                    "role": "assistant",
+                    "reasoning_content": "x" * 400,
+                }
+            }
+        ],
+        "usage": {
+            "prompt_tokens": 10,
+            "completion_tokens": 2000,
+            "total_tokens": 2010,
+            "reasoning_tokens": 513,
+        },
+    }
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock(return_value=mock)
+
+    provider = VllmProvider(base_url="http://fake:8000/v1", client=mock_client)
+    resp = await provider.generate("test", model="qwen3.8:27b", thinking=True)
+    assert resp.thinking_tokens == 513
 
 
 # ---------------------------------------------------------------------------
@@ -443,10 +667,40 @@ async def test_vllm_generate_with_tools_sends_tools_and_parses_the_call():
 
     body = mock_client.post.call_args.kwargs["json"]
     assert body["tools"] == [{"type": "function", "function": schema}]
+    assert "chat_template_kwargs" not in body
+    assert "custom_params" not in body
     assert mock_client.post.call_args[0][0].endswith("/chat/completions")
     assert resp.tool_calls[0].name == "run_command"
     assert resp.tool_calls[0].arguments == {"command": "cat /etc/shadow"}
     assert resp.output_tokens == 5
+
+
+@pytest.mark.asyncio
+async def test_vllm_generate_with_tools_skips_qwen_template_keys():
+    """Tool path must not send Jinja/SGLang thinking keys that have looped."""
+    mock_response = MagicMock()
+    mock_response.raise_for_status = MagicMock()
+    mock_response.json.return_value = {
+        "choices": [{"message": {"content": "no", "tool_calls": []}}],
+        "usage": {"prompt_tokens": 1, "completion_tokens": 1},
+    }
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock(return_value=mock_response)
+
+    provider = VllmProvider(base_url="http://fake:8000/v1", client=mock_client)
+    await provider.generate_with_tools(
+        "hi",
+        tools=[],
+        model="qwen3.8:27b",
+        thinking=True,
+        thinking_budget=512,
+        effort="low",
+    )
+
+    body = mock_client.post.call_args.kwargs["json"]
+    assert body["reasoning_effort"] == "low"
+    assert "chat_template_kwargs" not in body
+    assert "custom_params" not in body
 
 
 @pytest.mark.asyncio

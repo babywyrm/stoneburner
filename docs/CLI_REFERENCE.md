@@ -25,6 +25,7 @@ Recipes: [QUICKSTART.md](../QUICKSTART.md).
 | `atomics provider-test -p groq --effort medium` | `reasoning_effort` on Groq when the model honors it |
 | `atomics provider-test -p gemini --effort high` | `reasoning_effort` on Gemini when the model honors it |
 | `atomics provider-test -p together --effort medium` | `reasoning_effort` on Together when the model honors it |
+| `atomics provider-test -p vllm -m qwen3.8:27b --effort low --thinking-budget 512` | Qwen template `reasoning_effort` plus SGLang `thinking_budget` |
 | `atomics run -b 5.0` | Run with $5 budget cap |
 | `atomics run -i 10` | Override interval to 10 seconds |
 | `atomics compare` | Compare providers side-by-side (cost, latency, tokens) |
