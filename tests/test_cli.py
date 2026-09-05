@@ -870,6 +870,89 @@ def test_cli_provider_test_success(monkeypatch):
     assert "passed" in result.output.lower()
 
 
+def _provider_test_response(**overrides) -> SimpleNamespace:
+    fields = dict(
+        text="4",
+        input_tokens=1,
+        output_tokens=1,
+        total_tokens=2,
+        latency_ms=1.0,
+        estimated_cost_usd=0.0,
+        tokens_per_second=None,
+        tps_basis="wall_clock",
+        thinking_tokens=0,
+        thinking_text="",
+        cache_read_tokens=0,
+        cache_write_tokens=0,
+        reasoning_request=None,
+    )
+    fields.update(overrides)
+    return SimpleNamespace(**fields)
+
+
+def test_cli_provider_test_default_visible_budget_is_256(monkeypatch):
+    captured: dict = {}
+
+    class Dummy:
+        name = "ollama"
+        default_model = "qwen3:4b"
+
+        async def health_check(self):
+            return True
+
+        async def generate(self, *_args, **kwargs):
+            captured.update(kwargs)
+            return _provider_test_response()
+
+    monkeypatch.setattr("atomics.commands.admin._make_provider", lambda *_a, **_k: Dummy())
+    result = CliRunner().invoke(cli, ["provider-test", "-p", "ollama", "-m", "qwen3:4b"])
+    assert result.exit_code == 0
+    assert captured["max_tokens"] == 256
+
+
+def test_cli_provider_test_honours_max_output_tokens(monkeypatch):
+    captured: dict = {}
+
+    class Dummy:
+        name = "ollama"
+        default_model = "qwen3:4b"
+
+        async def health_check(self):
+            return True
+
+        async def generate(self, *_args, **kwargs):
+            captured.update(kwargs)
+            return _provider_test_response()
+
+    monkeypatch.setattr("atomics.commands.admin._make_provider", lambda *_a, **_k: Dummy())
+    result = CliRunner().invoke(
+        cli,
+        ["provider-test", "-p", "ollama", "-m", "qwen3:4b", "--max-output-tokens", "512"],
+    )
+    assert result.exit_code == 0
+    assert captured["max_tokens"] == 512
+
+
+def test_cli_provider_test_empty_visible_with_thinking_is_think(monkeypatch):
+    class Dummy:
+        name = "ollama"
+        default_model = "qwen3.5:2b"
+
+        async def health_check(self):
+            return True
+
+        async def generate(self, *_args, **_kwargs):
+            return _provider_test_response(text="", thinking_tokens=288, thinking_text="...")
+
+    monkeypatch.setattr("atomics.commands.admin._make_provider", lambda *_a, **_k: Dummy())
+    result = CliRunner().invoke(
+        cli, ["provider-test", "-p", "ollama", "-m", "qwen3.5:2b", "--effort", "low"]
+    )
+    assert result.exit_code == 0
+    assert "THINK" in result.output
+    assert "288" in result.output
+
+
 def test_cli_models_command(monkeypatch):
     """atomics models should list Ollama models with class/thinking annotations."""
 

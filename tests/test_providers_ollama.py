@@ -184,6 +184,102 @@ async def test_ollama_generate_forwards_native_think_flag():
 
 
 @pytest.mark.asyncio
+async def test_ollama_effort_low_sends_think_level():
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.raise_for_status = MagicMock()
+    mock_response.json.return_value = {
+        "response": "ok",
+        "eval_count": 5,
+        "prompt_eval_count": 3,
+        "eval_duration": 1,
+    }
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock(return_value=mock_response)
+
+    provider = OllamaProvider(host="http://fake:11434", client=mock_client)
+    resp = await provider.generate(
+        "hi", model="qwen3:4b", thinking=True, effort="low"
+    )
+
+    body = mock_client.post.call_args.kwargs["json"]
+    assert body["think"] == "low"
+    assert resp.effort == "low"
+    assert resp.reasoning_request == {"think": "low"}
+
+
+@pytest.mark.asyncio
+async def test_ollama_effort_none_disables_think():
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.raise_for_status = MagicMock()
+    mock_response.json.return_value = {
+        "response": "ok",
+        "eval_count": 5,
+        "prompt_eval_count": 3,
+        "eval_duration": 1,
+    }
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock(return_value=mock_response)
+
+    provider = OllamaProvider(host="http://fake:11434", client=mock_client)
+    await provider.generate("hi", model="qwen3:4b", thinking=True, effort="none")
+
+    body = mock_client.post.call_args.kwargs["json"]
+    assert body["think"] is False
+    assert not body["prompt"].startswith("/no_think")
+    assert body["prompt"] == "hi"
+
+
+@pytest.mark.asyncio
+async def test_ollama_no_thinking_wins_over_effort():
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.raise_for_status = MagicMock()
+    mock_response.json.return_value = {
+        "response": "ok",
+        "eval_count": 5,
+        "prompt_eval_count": 3,
+        "eval_duration": 1,
+    }
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock(return_value=mock_response)
+
+    provider = OllamaProvider(host="http://fake:11434", client=mock_client)
+    await provider.generate("hi", model="qwen3:4b", thinking=False, effort="max")
+
+    body = mock_client.post.call_args.kwargs["json"]
+    assert body["think"] is False
+    assert body["prompt"] == "hi"
+
+
+@pytest.mark.asyncio
+async def test_ollama_generate_with_tools_sends_think_level():
+    mock_response = MagicMock()
+    mock_response.raise_for_status = MagicMock()
+    mock_response.json.return_value = {
+        "message": {"content": "no", "tool_calls": []},
+        "eval_count": 1,
+        "prompt_eval_count": 1,
+        "eval_duration": 1,
+    }
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock(return_value=mock_response)
+
+    provider = OllamaProvider(host="http://fake:11434", client=mock_client)
+    await provider.generate_with_tools(
+        "hi",
+        tools=[],
+        model="qwen3:4b",
+        thinking=True,
+        effort="high",
+    )
+
+    body = mock_client.post.call_args.kwargs["json"]
+    assert body["think"] == "high"
+
+
+@pytest.mark.asyncio
 async def test_ollama_reads_native_thinking_field():
     """Newer Ollama returns reasoning in `thinking`, not <think> tags in response."""
     mock_response = MagicMock()

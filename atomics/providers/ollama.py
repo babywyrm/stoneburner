@@ -14,14 +14,13 @@ from atomics.providers._tool_dialects import (
     parse_ollama_tool_calls,
 )
 from atomics.providers.base import BaseProvider, ProviderResponse, compute_tps
-from atomics.providers.effort import normalize_effort
+from atomics.providers.effort import normalize_effort, ollama_think_value
 
 _THINK_TAG_RE = re.compile(r"<think>(.*?)</think>", re.DOTALL)
-_THINKING_MODEL_PREFIXES = ("qwen3", "deepseek-r1")
 
 
 def _model_supports_thinking(model: str) -> bool:
-    return any(model.startswith(p) for p in _THINKING_MODEL_PREFIXES)
+    return supports_thinking(model)
 
 
 def _strip_thinking(text: str) -> tuple[str, str]:
@@ -77,7 +76,9 @@ class OllamaProvider(BaseProvider):
     ) -> ProviderResponse:
         model = model or self._default_model
 
-        use_thinking = thinking if thinking is not None else _model_supports_thinking(model)
+        auto = thinking if thinking is not None else _model_supports_thinking(model)
+        think_field = ollama_think_value(thinking=auto, effort=effort)
+        use_thinking = think_field is not False
 
         options: dict = {}
         if temperature is not None:
@@ -88,23 +89,14 @@ class OllamaProvider(BaseProvider):
             options["num_ctx"] = self._context_tokens
         if thinking_budget and use_thinking:
             options["num_predict"] = max_tokens + thinking_budget
-        if not use_thinking and _model_supports_thinking(model):
-            prompt = "/no_think " + prompt
 
         body: dict = {
             "model": model,
             "prompt": prompt,
             "stream": False,
             "system": system or "You are a helpful assistant.",
+            "think": think_field,
         }
-        # Newer Ollama builds expose native thinking via a top-level `think`
-        # field. Explicitly set it so models that Ollama might auto-enable thinking
-        # for (e.g. gemma4) don't silently consume the response budget in <think>.
-        if thinking is not None:
-            body["think"] = thinking
-        else:
-            # Not explicitly requested — set based on our model classification.
-            body["think"] = use_thinking
         if options:
             body["options"] = options
 
@@ -167,6 +159,8 @@ class OllamaProvider(BaseProvider):
             thinking_tokens=thinking_tokens,
             thinking_text=thinking_text,
             raw=data,
+            effort=normalize_effort(effort),
+            reasoning_request={"think": think_field},
         )
 
     async def generate_with_tools(
@@ -193,8 +187,12 @@ class OllamaProvider(BaseProvider):
         accounting for every Ollama figure in the project — including the
         published leaderboard. A test pins generate() to /api/generate.
         """
-        del thinking, thinking_budget, reasoning_mode
+        del reasoning_mode
         model = model or self._default_model
+
+        auto = thinking if thinking is not None else _model_supports_thinking(model)
+        think_field = ollama_think_value(thinking=auto, effort=effort)
+        use_thinking = think_field is not False
 
         messages: list[dict[str, Any]] = []
         if system:
@@ -214,15 +212,20 @@ class OllamaProvider(BaseProvider):
             )
             messages.append({"role": "tool", "content": injected_tool_output})
 
+        options: dict[str, Any] = {"num_predict": max_tokens}
+        if thinking_budget and use_thinking:
+            options["num_predict"] = max_tokens + thinking_budget
+        if self._context_tokens is not None:
+            options["num_ctx"] = self._context_tokens
+
         body: dict[str, Any] = {
             "model": model,
             "messages": messages,
             "stream": False,
             "tools": openai_tool_payload(list(tools)),
-            "options": {"num_predict": max_tokens},
+            "options": options,
+            "think": think_field,
         }
-        if self._context_tokens is not None:
-            body["options"]["num_ctx"] = self._context_tokens
 
         try:
             response = await self._client.post(
@@ -259,6 +262,7 @@ class OllamaProvider(BaseProvider):
             raw=data,
             tool_calls=parse_ollama_tool_calls(message),
             effort=normalize_effort(effort),
+            reasoning_request={"think": think_field},
         )
 
     async def list_models(self) -> list[dict[str, str | float | bool]]:

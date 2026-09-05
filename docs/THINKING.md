@@ -21,6 +21,7 @@ uv run atomics provider-test --provider groq --effort medium
 uv run atomics provider-test --provider gemini --effort high
 uv run atomics provider-test --provider together --effort medium
 uv run atomics provider-test --provider vllm -m qwen3.8:27b --effort low --thinking-budget 512
+uv run atomics provider-test --provider ollama -m qwen3:14b --effort low
 
 # Full prompt, model reply, thinking, and judge rationale (no truncated table)
 uv run atomics eval --provider openai -m gpt-5.6-luna --effort low --verbose \
@@ -42,7 +43,7 @@ uv run atomics provider-test -p ollama -m qwen3.8:27b --no-thinking
 |----------|--------|-----------|
 | **Claude** | Opus 4.x, Sonnet 4.x | Extended thinking API (`budget_tokens`) |
 | **OpenAI** | o3, o3-mini, o3-pro, o4-mini, gpt-5.x (including Sol/Terra/Luna) | Reasoning tokens (`completion_tokens_details`) |
-| **Ollama** | qwen3 family (including qwen3.8), deepseek-r1, phi4-*-reasoning | Native `thinking` field, plus `<think>` tag fallback |
+| **Ollama** | qwen3 family (including qwen3.8), deepseek-r1, gpt-oss, phi4-*-reasoning | Native `think` field: bool, or `low` / `medium` / `high` / `max` from `--effort`. Plus `<think>` tag fallback |
 | **vLLM / SGLang** (`--provider vllm`) | qwen3 family (including qwen3.8) | `chat_template_kwargs.enable_thinking` plus mapped `reasoning_effort`; optional `custom_params.thinking_budget` |
 
 When `--thinking` / `--no-thinking` is omitted, stoneburner checks the model against its capability registry and enables thinking automatically for known models. Use `--no-thinking` to force it off for A/B comparisons.
@@ -59,19 +60,20 @@ The core challenge: thinking/reasoning tokens are **real computation** (they con
 
 | Provider | How thinking is requested | How thinking tokens are counted |
 |----------|--------------------------|-------------------------------|
-| **Ollama** | `body.think = true` (native API field). For older builds: `/no_think` prefix disables it. `num_predict` is inflated by `thinking_budget` so the visible answer isn't starved. | Newer Ollama returns a top-level `thinking` string; older builds embed `<think>...</think>` in `response`. Both are captured. Thinking token count is **estimated** by character proportion of the total `eval_count` (Ollama doesn't report thinking tokens separately). |
+| **Ollama** | `body.think` is a bool, or `low` / `medium` / `high` / `max` from `--effort` (never `none` — that 400s). `--no-thinking` and `--effort none` send `false`. `num_predict` is inflated by `thinking_budget` so the visible answer isn't starved. GPT-OSS ignores bool `think` and wants a level. | Newer Ollama returns a top-level `thinking` string; older builds embed `<think>...</think>` in `response`. Both are captured. Thinking token count is **estimated** by character proportion of the total `eval_count` (Ollama doesn't report thinking tokens separately). |
 | **vLLM / SGLang** (`--provider vllm`) | Qwen3: `chat_template_kwargs.enable_thinking` on/off. `--effort` is dual-written: top-level `reasoning_effort` (OpenAI-compat) and `chat_template_kwargs.reasoning_effort` mapped to `low` / `medium` / `xhigh` (Qwen Jinja ignores unknown keys and falls through to xhigh). `--thinking-budget` is SGLang `custom_params.thinking_budget` when thinking is on; a hard cap also needs the server flag `--enable-strict-thinking`. Hermes `/reasoning` does not reach the model. | Prefer `usage.reasoning_tokens` when the gateway reports it; otherwise estimate from `reasoning_content` character share. |
+| **llama.cpp** (`--provider llamacpp`) | OpenAI-compat `reasoning_effort` on `generate()` | Gateway-reported usage when present |
 | **Claude** | `thinking.budget_tokens` in the API request (extended thinking mode). | API returns `thinking_tokens` directly in the response metadata — no estimation needed. |
 | **OpenAI** | `--effort` → Chat Completions `reasoning_effort`, or Responses `reasoning.effort`. `--reasoning-mode pro` forces the Responses API and sets `reasoning.mode`. | `completion_tokens_details.reasoning_tokens` from the API response. |
 | **Claude (4.6+)** | `--effort` → `thinking: {type: "adaptive"}` plus `output_config.effort`. `--thinking` without `--effort` still uses `budget_tokens`. | Thinking blocks plus usage metadata. |
 | **Bedrock** | Same Claude mapping, sent in `additionalModelRequestFields`. Region-prefixed IDs (`us.anthropic.claude-…`) resolve to the Claude family. | Usage metadata from Converse. |
 
-`--effort` values: `none`, `minimal`, `low`, `medium`, `high`, `xhigh` (alias `xl`), `max` (alias `ultra`). Claude 4.6 maps `xhigh` to `max`. OpenAI-compatible clouds (Groq, Together, Gemini, vLLM) receive `reasoning_effort` when the backend honors it. On `--provider vllm` Qwen3 models, that value is also mapped into `chat_template_kwargs` (`high` → `medium`, `max` → `xhigh`) so the template cannot silently ignore it. The native payload is recorded on the response as `reasoning_request`. HTTP / MCP take the same fields on `POST /runs`, `POST /evals`, `POST /sweeps`, and `POST /provider-test` (and the matching `submit_*` / `provider_test` tools). `probe` stays CLI-only.
+`--effort` values: `none`, `minimal`, `low`, `medium`, `high`, `xhigh` (alias `xl`), `max` (alias `ultra`). Claude 4.6 maps `xhigh` to `max`. OpenAI-compatible clouds (Groq, Together, Gemini, vLLM, llama.cpp) receive `reasoning_effort` when the backend honors it. Ollama maps the same dial onto native `think` (`low` / `medium` / `high` / `max`). On `--provider vllm` Qwen3 models, that value is also mapped into `chat_template_kwargs` (`high` → `medium`, `max` → `xhigh`) so the template cannot silently ignore it. The native payload is recorded on the response as `reasoning_request`. HTTP / MCP take the same fields on `POST /runs`, `POST /evals`, `POST /sweeps`, and `POST /provider-test` (and the matching `submit_*` / `provider_test` tools). `probe` stays CLI-only.
 
 ### Key Behaviors
 
 1. **Auto-detection:** `model_classes.supports_thinking()` checks a registry of known thinking-capable model families. If the model supports it and `--thinking` wasn't explicitly set, thinking is enabled automatically.
-2. **Suppression:** when thinking is *disabled* for a model that supports it, the Ollama provider prepends `/no_think` to the prompt AND sets `body.think = false` to prevent Ollama from auto-enabling it (which some models like gemma4 trigger).
+2. **Suppression:** when thinking is *disabled* for a model that supports it, the Ollama provider sets `body.think = false`. Do not prefix `/no_think` into the user prompt — current Ollama honors the native field, and the prefix leaks into the answer (`qwen3:4b` narrated the token instead of answering).
 3. **Budget management:** `thinking_budget` is added to `num_predict` on Ollama so the visible answer isn't starved. On `--provider vllm` Qwen3, a non-`None` budget is `custom_params.thinking_budget` (SGLang enforces a hard cap only with `--enable-strict-thinking`). Security suites that default `--thinking-budget 8000` will send that field; stock vLLM that forbids extra body keys may `422`. `provider-test` / `eval` default the flag to unset. Claude uses `budget_tokens`.
 4. **Separation in output:** `ProviderResponse.thinking_tokens` and `ProviderResponse.thinking_text` are always populated separately from `output_tokens` and `text`. The `report` command shows them as distinct columns.
 

@@ -24,6 +24,7 @@ def test_classify_known_mid_models():
 
 def test_classify_known_heavy_models():
     assert classify_model("claude-opus-4-6") == ModelClass.HEAVY
+    assert classify_model("claude-fable-5") == ModelClass.HEAVY
     assert classify_model("o3") == ModelClass.HEAVY
     assert classify_model("us.anthropic.claude-opus-4-6-v1") == ModelClass.HEAVY
 
@@ -83,6 +84,8 @@ def test_classify_ollama_local_models():
     assert classify_model("qwen3.5:9b") == ModelClass.MID
     assert classify_model("granite4.1:3b") == ModelClass.MID
     assert classify_model("granite4.1:8b") == ModelClass.MID
+    assert classify_model("granite4.2:3b") == ModelClass.MID
+    assert classify_model("granite4.2:8b") == ModelClass.MID
     assert classify_model("lfm2.5:8b") == ModelClass.MID
     assert classify_model("mistral-nemo:12b") == ModelClass.MID
     assert classify_model("mistral-small:24b") == ModelClass.HEAVY
@@ -116,6 +119,8 @@ def test_classify_local_gateway_lineup_fully_tagged():
         "custom-agent:latest",
         "granite4.1:3b",
         "granite4.1:8b",
+        "granite4.2:3b",
+        "granite4.2:8b",
         "llama3.2:1b",
         "ministral-3:3b",
         "ministral-3:8b",
@@ -161,6 +166,8 @@ def test_thinking_support_qwen3_5_family():
     assert supports_thinking("qwen3.6:27b") is True
     assert supports_thinking("qwen3.8:27b") is True
     assert supports_thinking("phi4-mini-reasoning:3.8b") is True
+    assert supports_thinking("gpt-oss:20b") is True
+    assert supports_thinking("claude-fable-5") is True
 
 
 def test_thinking_support_deepseek_r1_all_sizes():

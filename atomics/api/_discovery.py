@@ -18,7 +18,7 @@ from atomics.validation import sanitize_error
 
 LISTABLE_PROVIDERS = frozenset({"ollama", "vllm"})
 PROVIDER_TEST_PROMPT = "What is 2+2? Reply with just the number."
-PROVIDER_TEST_MAX_TOKENS = 32
+PROVIDER_TEST_MAX_TOKENS = 256
 
 
 def _provider(name: str, model: str | None, host: str | None):
