@@ -65,6 +65,7 @@ def test_readme_landing_is_a_storefront_not_only_a_manual():
     assert "n/a (scored/total scored)" in text
     assert "atomics doctor" in text
     assert "atomics toolcall" in text
+    assert "atomics provider-test --provider ollama --effort low" in text
     lowered = text.lower()
     assert "brainbox" not in lowered
     assert "garak" not in lowered

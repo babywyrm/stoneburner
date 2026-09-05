@@ -327,6 +327,25 @@ def test_provider_test_quiet_ok() -> None:
     assert '"ok"' not in result.stdout
 
 
+def test_provider_test_quiet_empty_visible_with_thinking_is_think() -> None:
+    body = {
+        "ok": True,
+        "model": "qwen3.5:2b",
+        "latency_ms": 400.0,
+        "response": "",
+        "thinking_tokens": 288,
+        "error": None,
+    }
+    result = handle_line(
+        "provider_test --provider ollama",
+        session=Session(),
+        client=_client([], response=httpx.Response(200, json=body)),
+    )
+    assert "THINK" in result.stdout
+    assert "288" in result.stdout
+    assert '"ok"' not in result.stdout
+
+
 def test_provider_test_quiet_fail() -> None:
     body = {
         "ok": False,

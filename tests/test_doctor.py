@@ -232,6 +232,7 @@ def test_suggest_next_step_prefers_reachable_ollama():
     assert step is not None
     assert step.command == "atomics provider-test --provider ollama --no-thinking"
     assert "Ollama" in step.reason
+    assert "--effort" in step.reason
 
 
 def test_suggest_next_step_uses_claude_when_ollama_is_down():
