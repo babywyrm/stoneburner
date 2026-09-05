@@ -50,7 +50,7 @@ When `--thinking` / `--no-thinking` is omitted, stoneburner checks the model aga
 
 The same `--thinking` / `--no-thinking` / `--thinking-budget` grammar is on every suite that calls `generate`: `run`, `eval`, `adversarial`, `redblue`, `refusal`, `toolcall` (prose and tool channels), `codereview`, `multiturn`, `rag`, `codegen`, and `probe`. `--effort` / `--reasoning-mode` are on those same suites. The tool channel keeps Claude extended thinking off and still forwards `output_config.effort`. For local thinking models on short fixtures, `--no-thinking` is the difference between a visible answer and an empty generation that spent the whole token budget on hidden reasoning. When that still happens, the attempt is `thinking_budget` (CLI: `THINK`), not a provider crash.
 
-On `--provider vllm`, those Qwen template keys are written only by `generate()`. `generate_with_tools` still sends top-level `reasoning_effort` when `--effort` is set, and does not send `chat_template_kwargs` or `custom_params`. Do not pair `--effort` with `--channel tools` against SGLang `--tool-call-parser qwen3_coder`; that combination has looped.
+On `--provider vllm`, those Qwen template keys are written by `generate()` and `generate_with_tools`. If SGLang `--tool-call-parser qwen3_coder` still loops with `--effort` on `--channel tools`, use `--no-thinking` on that channel.
 
 ## How the Engine Handles Thinking Tokens
 

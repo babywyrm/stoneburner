@@ -676,8 +676,8 @@ async def test_vllm_generate_with_tools_sends_tools_and_parses_the_call():
 
 
 @pytest.mark.asyncio
-async def test_vllm_generate_with_tools_skips_qwen_template_keys():
-    """Tool path must not send Jinja/SGLang thinking keys that have looped."""
+async def test_vllm_generate_with_tools_sends_qwen_template_keys():
+    """Tool path matches generate() Jinja/SGLang thinking keys."""
     mock_response = MagicMock()
     mock_response.raise_for_status = MagicMock()
     mock_response.json.return_value = {
@@ -688,7 +688,7 @@ async def test_vllm_generate_with_tools_skips_qwen_template_keys():
     mock_client.post = AsyncMock(return_value=mock_response)
 
     provider = VllmProvider(base_url="http://fake:8000/v1", client=mock_client)
-    await provider.generate_with_tools(
+    resp = await provider.generate_with_tools(
         "hi",
         tools=[],
         model="qwen3.8:27b",
@@ -699,8 +699,12 @@ async def test_vllm_generate_with_tools_skips_qwen_template_keys():
 
     body = mock_client.post.call_args.kwargs["json"]
     assert body["reasoning_effort"] == "low"
-    assert "chat_template_kwargs" not in body
-    assert "custom_params" not in body
+    assert body["chat_template_kwargs"] == {
+        "enable_thinking": True,
+        "reasoning_effort": "low",
+    }
+    assert body["custom_params"] == {"thinking_budget": 512}
+    assert resp.reasoning_request["chat_template_kwargs"]["reasoning_effort"] == "low"
 
 
 @pytest.mark.asyncio

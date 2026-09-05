@@ -64,6 +64,19 @@ class OpenAICompatibleTools:
         """Cost for a tool request. Self-hosted providers override to stay at zero."""
         return 0.0
 
+    def _augment_tool_body(
+        self,
+        body: dict[str, Any],
+        *,
+        model: str,
+        thinking: bool | None,
+        thinking_budget: int | None,
+        effort: str | None,
+    ) -> dict[str, Any] | None:
+        """Optional extra chat-body keys. vLLM adds Qwen template fields."""
+        del body, model, thinking, thinking_budget, effort
+        return None
+
     async def generate_with_tools(
         self,
         prompt: str,
@@ -78,7 +91,7 @@ class OpenAICompatibleTools:
         effort: str | None = None,
         reasoning_mode: str | None = None,
     ) -> ProviderResponse:
-        del thinking, thinking_budget, reasoning_mode
+        del reasoning_mode
         this: Any = self
         model = model or this._default_model
 
@@ -120,6 +133,15 @@ class OpenAICompatibleTools:
             "tools": openai_tool_payload(list(tools)),
         }
         reasoning_request = apply_chat_effort(body, effort)
+        extra = self._augment_tool_body(
+            body,
+            model=model,
+            thinking=thinking,
+            thinking_budget=thinking_budget,
+            effort=effort,
+        )
+        if extra:
+            reasoning_request = {**(reasoning_request or {}), **extra}
 
         url = f"{this._base_url}{self._tool_path}"
         t0 = time.monotonic()

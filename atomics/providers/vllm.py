@@ -44,6 +44,32 @@ def _usage_reasoning_tokens(usage: dict, thinking_text: str, text: str, out: int
     return 0
 
 
+def _qwen_thinking_extras(
+    body: dict,
+    *,
+    model: str,
+    use_thinking: bool,
+    effort: str | None,
+    thinking_budget: int | None,
+) -> dict[str, object]:
+    """Write Qwen/SGLang thinking keys onto an OpenAI-compat chat body."""
+    native: dict[str, object] = {}
+    if not _model_supports_thinking(model):
+        return native
+    template_kwargs: dict[str, object] = {"enable_thinking": use_thinking}
+    if use_thinking and _is_qwen3(model):
+        template_effort = qwen_template_effort(effort)
+        if template_effort is not None:
+            template_kwargs["reasoning_effort"] = template_effort
+    body["chat_template_kwargs"] = template_kwargs
+    native["chat_template_kwargs"] = template_kwargs
+    if use_thinking and _is_qwen3(model) and thinking_budget is not None:
+        custom = {"thinking_budget": thinking_budget}
+        body["custom_params"] = custom
+        native["custom_params"] = custom
+    return native
+
+
 class VllmProvider(OpenAICompatibleTools, BaseProvider):
     """Provider for vLLM / OpenAI-compatible inference endpoints.
 
@@ -87,6 +113,25 @@ class VllmProvider(OpenAICompatibleTools, BaseProvider):
             "Content-Type": "application/json",
         }
 
+    def _augment_tool_body(
+        self,
+        body: dict,
+        *,
+        model: str,
+        thinking: bool | None,
+        thinking_budget: int | None,
+        effort: str | None,
+    ) -> dict[str, object] | None:
+        use_thinking = thinking if thinking is not None else _model_supports_thinking(model)
+        extra = _qwen_thinking_extras(
+            body,
+            model=model,
+            use_thinking=use_thinking,
+            effort=effort,
+            thinking_budget=thinking_budget,
+        )
+        return extra or None
+
     async def generate(
         self,
         prompt: str,
@@ -123,18 +168,15 @@ class VllmProvider(OpenAICompatibleTools, BaseProvider):
         if reasoning_request:
             native.update(reasoning_request)
 
-        if _model_supports_thinking(model):
-            template_kwargs: dict[str, object] = {"enable_thinking": use_thinking}
-            if use_thinking and _is_qwen3(model):
-                template_effort = qwen_template_effort(effort)
-                if template_effort is not None:
-                    template_kwargs["reasoning_effort"] = template_effort
-            body["chat_template_kwargs"] = template_kwargs
-            native["chat_template_kwargs"] = template_kwargs
-            if use_thinking and _is_qwen3(model) and thinking_budget is not None:
-                custom = {"thinking_budget": thinking_budget}
-                body["custom_params"] = custom
-                native["custom_params"] = custom
+        native.update(
+            _qwen_thinking_extras(
+                body,
+                model=model,
+                use_thinking=use_thinking,
+                effort=effort,
+                thinking_budget=thinking_budget,
+            )
+        )
 
         t0 = time.monotonic()
         try:
