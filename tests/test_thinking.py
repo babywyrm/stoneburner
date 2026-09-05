@@ -94,6 +94,16 @@ class TestOllamaThinkingParsing:
         assert clean == "just a plain answer"
         assert thinking == ""
 
+    def test_strip_orphan_think_closer(self):
+        from atomics.providers.ollama import _strip_thinking
+
+        raw = "Hmm, 2+2 is 4.\n</think>\n\n4"
+        clean, thinking = _strip_thinking(raw)
+        assert clean == "4"
+        assert "2+2" in thinking
+        assert "</think>" not in clean
+        assert "</think>" not in thinking
+
     def test_model_supports_thinking(self):
         from atomics.providers.ollama import _model_supports_thinking
 
@@ -159,6 +169,36 @@ class TestOllamaProviderThinking:
         body = call_args.kwargs.get("json") or call_args[1].get("json")
         assert body["prompt"] == "What is 2+2?"
         assert body["think"] is False
+
+    @pytest.mark.asyncio
+    async def test_thinking_disabled_strips_leaked_cot(self):
+        from atomics.providers.ollama import OllamaProvider
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.raise_for_status = MagicMock()
+        mock_response.json.return_value = {
+            "response": (
+                "The user wants just the number.\n"
+                "So my response should be 4.\n"
+                "</think>\n\n4"
+            ),
+            "eval_count": 40,
+            "prompt_eval_count": 10,
+            "eval_duration": 500_000_000,
+            "total_duration": 1_000_000_000,
+        }
+
+        mock_client = AsyncMock()
+        mock_client.post = AsyncMock(return_value=mock_response)
+
+        provider = OllamaProvider(default_model="qwen3:4b", client=mock_client)
+        resp = await provider.generate("What is 2+2?", thinking=False)
+
+        assert resp.text == "4"
+        assert "user wants" in resp.thinking_text
+        assert "</think>" not in resp.text
+        assert resp.thinking_tokens > 0
 
 
 class TestClaudeProviderThinking:

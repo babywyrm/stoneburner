@@ -26,6 +26,9 @@
 - **`provider-test` visible budget is 256**, not 32, and `--max-output-tokens`
   overrides it. Empty visible text with thinking tokens prints `THINK`.
   HTTP `POST /provider-test` uses the same 256 default.
+- **Ollama splits leaked CoT out of visible text.** `think: false` is not
+  enough on some Qwen tags; they still emit an orphan `</think>`. The
+  closer (and paired `<think>` blocks) move to `thinking_text`.
 
 ## 0.22.2 (2026-08-24) — Uncapped eval trails and CLI knobs on HTTP
 
