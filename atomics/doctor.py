@@ -41,7 +41,7 @@ def suggest_next_step(
     if ollama_reachable:
         return NextStep(
             command="atomics provider-test --provider ollama --no-thinking",
-            reason="Ollama is reachable.",
+            reason="Ollama is reachable. --effort low is the native think dial.",
         )
     if has_claude_key:
         return NextStep(

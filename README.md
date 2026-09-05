@@ -35,7 +35,7 @@ Ollama endpoint: http://localhost:11434
 Ollama reachable — 3 model(s): qwen2.5:7b, gemma3:4b, llama3.2:3b
 
 Next: atomics provider-test --provider ollama --no-thinking
-      Ollama is reachable.
+      Ollama is reachable. --effort low is the native think dial.
 ```
 
 ```text
@@ -61,11 +61,12 @@ Ollama on `http://localhost:11434` is the one-box path. No cloud key required.
 uv tool install stoneburner-atomics
 atomics doctor
 atomics provider-test --provider ollama --no-thinking
+atomics provider-test --provider ollama --effort low
 atomics toolcall --provider ollama --channel tools --runs 3 --no-thinking
 ```
 
 `--no-thinking` keeps reasoning models from spending the whole token budget
-on hidden chain-of-thought.
+on hidden chain-of-thought. `--effort low` is the native Ollama think dial.
 
 ```bash
 uv tool install 'stoneburner-atomics[api,mcp]'

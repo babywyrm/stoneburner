@@ -18,6 +18,9 @@
 - **Thinking taxonomy:** `claude-fable-5`, `gpt-oss:20b` / `120b`,
   `granite4.2:3b` / `:8b`, and prefixes `gpt-oss`, `claude-fable`,
   `claude-mythos`, `claude-opus-5`.
+- **`--effort` on the first-run surface.** README and `doctor` Next
+  teach `--effort low`. Quiet REPL `provider_test` prints `THINK` when
+  visible text is empty and `thinking_tokens` is set.
 
 ### Fixed
 - **Ollama `--no-thinking` no longer prefixes `/no_think` into the prompt.**
