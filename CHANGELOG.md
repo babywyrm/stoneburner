@@ -31,7 +31,8 @@
   HTTP `POST /provider-test` uses the same 256 default.
 - **Ollama splits leaked CoT out of visible text.** `think: false` is not
   enough on some Qwen tags; they still emit an orphan `</think>`. The
-  closer (and paired `<think>` blocks) move to `thinking_text`.
+  closer (and paired `<think>` blocks) move to `thinking_text`. Same split
+  on `/api/chat` `generate_with_tools`.
 
 ## 0.22.2 (2026-08-24) — Uncapped eval trails and CLI knobs on HTTP
 

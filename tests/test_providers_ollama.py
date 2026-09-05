@@ -280,6 +280,35 @@ async def test_ollama_generate_with_tools_sends_think_level():
 
 
 @pytest.mark.asyncio
+async def test_ollama_generate_with_tools_strips_leaked_cot():
+    mock_response = MagicMock()
+    mock_response.raise_for_status = MagicMock()
+    mock_response.json.return_value = {
+        "message": {
+            "content": "Okay I will call the tool.\n</think>\n\n",
+            "thinking": "should I?",
+            "tool_calls": [],
+        },
+        "eval_count": 20,
+        "prompt_eval_count": 5,
+        "eval_duration": 1,
+    }
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock(return_value=mock_response)
+
+    provider = OllamaProvider(host="http://fake:11434", client=mock_client)
+    resp = await provider.generate_with_tools(
+        "hi", tools=[], model="qwen3:4b", thinking=False
+    )
+
+    assert resp.text == ""
+    assert "Okay I will call the tool." in resp.thinking_text
+    assert "should I?" in resp.thinking_text
+    assert "</think>" not in resp.text
+    assert resp.thinking_tokens > 0
+
+
+@pytest.mark.asyncio
 async def test_ollama_reads_native_thinking_field():
     """Newer Ollama returns reasoning in `thinking`, not <think> tags in response."""
     mock_response = MagicMock()
