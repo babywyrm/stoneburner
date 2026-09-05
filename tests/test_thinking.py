@@ -19,6 +19,8 @@ class TestThinkingRegistry:
         assert supports_thinking("gpt-5")
         assert supports_thinking("gpt-5.6-sol")
         assert supports_thinking("gpt-5.6-luna")
+        assert supports_thinking("claude-fable-5")
+        assert supports_thinking("gpt-oss:20b")
 
     def test_non_thinking_models(self):
         assert not supports_thinking("gpt-4o")
@@ -97,6 +99,8 @@ class TestOllamaThinkingParsing:
 
         assert _model_supports_thinking("qwen3:14b")
         assert _model_supports_thinking("qwen3:1.7b")
+        assert _model_supports_thinking("gpt-oss:20b")
+        assert _model_supports_thinking("phi4-reasoning:14b")
         assert not _model_supports_thinking("qwen2.5:7b")
         assert not _model_supports_thinking("llama3.2:3b")
 
@@ -153,7 +157,8 @@ class TestOllamaProviderThinking:
 
         call_args = mock_client.post.call_args
         body = call_args.kwargs.get("json") or call_args[1].get("json")
-        assert body["prompt"].startswith("/no_think")
+        assert body["prompt"] == "What is 2+2?"
+        assert body["think"] is False
 
 
 class TestClaudeProviderThinking:

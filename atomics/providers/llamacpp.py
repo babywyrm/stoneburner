@@ -15,6 +15,7 @@ import httpx
 
 from atomics.providers._openai_compat import OpenAICompatibleTools
 from atomics.providers.base import BaseProvider, ProviderResponse, compute_tps
+from atomics.providers.effort import apply_chat_effort, normalize_effort
 
 
 class LlamaCppProvider(OpenAICompatibleTools, BaseProvider):
@@ -72,6 +73,8 @@ class LlamaCppProvider(OpenAICompatibleTools, BaseProvider):
         }
         if temperature is not None:
             body["temperature"] = temperature
+        reasoning_request = apply_chat_effort(body, effort)
+        del thinking, thinking_budget, reasoning_mode
 
         t0 = time.monotonic()
         try:
@@ -111,6 +114,8 @@ class LlamaCppProvider(OpenAICompatibleTools, BaseProvider):
             tokens_per_second=tps,
             tps_basis="wall_clock",
             raw=data,
+            effort=normalize_effort(effort),
+            reasoning_request=reasoning_request,
         )
 
     async def health_check(self) -> bool:

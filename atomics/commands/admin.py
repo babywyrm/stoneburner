@@ -449,6 +449,13 @@ def models(provider_name: str, host: str | None, vllm_host: str | None) -> None:
     "--thinking/--no-thinking", "thinking_flag", default=None, help="Enable/disable thinking mode"
 )
 @click.option("--thinking-budget", type=int, default=None, help="Max thinking tokens")
+@click.option(
+    "--max-output-tokens",
+    type=int,
+    default=256,
+    show_default=True,
+    help="Visible answer budget. Separate from --thinking-budget.",
+)
 @effort_options
 def provider_test(
     provider_name: str,
@@ -459,6 +466,7 @@ def provider_test(
     gateway_url: str | None,
     thinking_flag: bool | None,
     thinking_budget: int | None,
+    max_output_tokens: int,
     effort: str | None,
     reasoning_mode: str | None,
 ) -> None:
@@ -527,7 +535,7 @@ def provider_test(
             resp = await prov.generate(
                 "What is 2+2? Reply with just the number.",
                 model=model,
-                max_tokens=32,
+                max_tokens=max_output_tokens,
                 thinking=eff_thinking,
                 thinking_budget=thinking_budget,
                 effort=effort,
@@ -536,7 +544,16 @@ def provider_test(
         except Exception as exc:
             console.print(f"[red]Generate failed:[/red] {exc}")
             sys.exit(1)
-        console.print(f"Response: {_rich_escape(resp.text.strip())}")
+        visible = (resp.text or "").strip()
+        thinking_tokens = getattr(resp, "thinking_tokens", 0) or 0
+        thinking_text = (getattr(resp, "thinking_text", "") or "").strip()
+        if not visible and (thinking_tokens or thinking_text):
+            console.print(
+                f"[yellow]THINK[/yellow] visible answer empty; "
+                f"{thinking_tokens} thinking tokens "
+                "(raise --max-output-tokens / --thinking-budget, or --no-thinking)"
+            )
+        console.print(f"Response: {_rich_escape(visible)}")
         console.print(
             f"Tokens: in={resp.input_tokens} out={resp.output_tokens} total={resp.total_tokens}"
         )

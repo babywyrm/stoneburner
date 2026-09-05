@@ -25,6 +25,7 @@ MODEL_CLASS_MAP: dict[str, ModelClass] = {
     "claude-opus-4-5": ModelClass.HEAVY,
     "claude-opus-4-6": ModelClass.HEAVY,
     "claude-opus-4-7": ModelClass.HEAVY,
+    "claude-fable-5": ModelClass.HEAVY,
     # Claude via Bedrock (inference profiles)
     "us.anthropic.claude-haiku-4-5-20251001-v1:0": ModelClass.LIGHT,
     "us.anthropic.claude-sonnet-4-6": ModelClass.MID,
@@ -87,6 +88,8 @@ MODEL_CLASS_MAP: dict[str, ModelClass] = {
     "ministral-3:8b": ModelClass.MID,
     "granite4.1:3b": ModelClass.MID,
     "granite4.1:8b": ModelClass.MID,
+    "granite4.2:3b": ModelClass.MID,
+    "granite4.2:8b": ModelClass.MID,
     "deepseek-r1:14b": ModelClass.MID,
     "deepseek-r1:32b": ModelClass.HEAVY,
     "deepseek-r1:70b": ModelClass.HEAVY,
@@ -110,6 +113,8 @@ MODEL_CLASS_MAP: dict[str, ModelClass] = {
     "qwen3.6:27b": ModelClass.HEAVY,
     "qwen3.6:35b-a3b": ModelClass.HEAVY,
     "qwen3.8:27b": ModelClass.HEAVY,
+    "gpt-oss:20b": ModelClass.HEAVY,
+    "gpt-oss:120b": ModelClass.HEAVY,
 }
 
 
@@ -118,6 +123,7 @@ THINKING_CAPABLE: frozenset[str] = frozenset(
         # Claude — extended thinking via API
         "claude-opus-4-6",
         "claude-opus-4-7",
+        "claude-fable-5",
         "claude-sonnet-4-6",
         "claude-sonnet-4-20250514",
         "claude-opus-4-5",
@@ -155,6 +161,8 @@ THINKING_CAPABLE: frozenset[str] = frozenset(
         "qwen3.6:27b",
         "qwen3.6:35b-a3b",
         "qwen3.8:27b",
+        "gpt-oss:20b",
+        "gpt-oss:120b",
         "deepseek-r1:7b",
         "deepseek-r1:14b",
         "deepseek-r1:32b",
@@ -184,6 +192,10 @@ def supports_thinking(model_id: str) -> bool:
         "phi4-reasoning",
         "phi4-mini-reasoning",
         "gpt-5",
+        "gpt-oss",
+        "claude-fable",
+        "claude-mythos",
+        "claude-opus-5",
     ):
         if model_id.startswith(prefix):
             return True

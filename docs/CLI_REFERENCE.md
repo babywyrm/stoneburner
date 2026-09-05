@@ -26,6 +26,7 @@ Recipes: [QUICKSTART.md](../QUICKSTART.md).
 | `atomics provider-test -p gemini --effort high` | `reasoning_effort` on Gemini when the model honors it |
 | `atomics provider-test -p together --effort medium` | `reasoning_effort` on Together when the model honors it |
 | `atomics provider-test -p vllm -m qwen3.8:27b --effort low --thinking-budget 512` | Qwen template `reasoning_effort` plus SGLang `thinking_budget` |
+| `atomics provider-test -p ollama -m qwen3:14b --effort low` | Ollama native `think: "low"` (not a no-op bool) |
 | `atomics run -b 5.0` | Run with $5 budget cap |
 | `atomics run -i 10` | Override interval to 10 seconds |
 | `atomics compare` | Compare providers side-by-side (cost, latency, tokens) |
@@ -43,6 +44,7 @@ Recipes: [QUICKSTART.md](../QUICKSTART.md).
 | `atomics provider-test -p openai` | Health check OpenAI |
 | `atomics provider-test -p ollama` | Health check Ollama |
 | `atomics provider-test -p ollama -m qwen3.8:27b --no-thinking` | Smoke-test a thinking model without burning the visible answer |
+| `atomics provider-test -p ollama -m qwen3:4b --effort low --max-output-tokens 512` | Native `think: "low"` with room for a visible answer |
 | `atomics provider-test -p brain-gateway` | Health check brain-gateway |
 | `atomics provider-test -p groq` | Health check Groq |
 | `atomics provider-test -p together` | Health check Together AI |

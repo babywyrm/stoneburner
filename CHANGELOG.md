@@ -11,6 +11,21 @@
   `usage.reasoning_tokens` is preferred over a character-share estimate.
   A hard token cap still needs SGLang `--enable-strict-thinking`.
   `generate_with_tools` does not send the Qwen template keys.
+- **Ollama `--effort` maps to native `think` levels.** `low` / `medium` /
+  `high` / `max` on `/api/generate` and `/api/chat`. `--effort none` and
+  `--no-thinking` send `false` (never the string `none`, which 400s).
+  llama.cpp `generate()` now sends OpenAI-compat `reasoning_effort`.
+- **Thinking taxonomy:** `claude-fable-5`, `gpt-oss:20b` / `120b`,
+  `granite4.2:3b` / `:8b`, and prefixes `gpt-oss`, `claude-fable`,
+  `claude-mythos`, `claude-opus-5`.
+
+### Fixed
+- **Ollama `--no-thinking` no longer prefixes `/no_think` into the prompt.**
+  Native `think: false` is enough; the prefix made `qwen3:4b` narrate the
+  token instead of answering.
+- **`provider-test` visible budget is 256**, not 32, and `--max-output-tokens`
+  overrides it. Empty visible text with thinking tokens prints `THINK`.
+  HTTP `POST /provider-test` uses the same 256 default.
 
 ## 0.22.2 (2026-08-24) — Uncapped eval trails and CLI knobs on HTTP
 

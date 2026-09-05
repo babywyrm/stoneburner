@@ -132,6 +132,9 @@ uv run atomics provider-test --provider together --effort medium
 
 # vLLM / SGLang — Qwen template keys. Hard cap needs --enable-strict-thinking on the server.
 uv run atomics provider-test --provider vllm -m qwen3.8:27b --effort low --thinking-budget 512
+
+# Ollama — native think levels (low/medium/high/max). Do not send "none".
+uv run atomics provider-test --provider ollama -m qwen3:14b --effort low
 ```
 
 > **Ecosystem fit:** run private/local models for sensitive workloads and cost

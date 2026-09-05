@@ -75,6 +75,30 @@ async def test_generate_with_temperature():
 
 
 @pytest.mark.asyncio
+async def test_llamacpp_generate_sends_reasoning_effort():
+    captured: dict = {}
+
+    class _Client(httpx.AsyncClient):
+        async def post(self, url, **kwargs):
+            captured.update(kwargs.get("json") or {})
+            request = httpx.Request("POST", url)
+            return httpx.Response(
+                200,
+                json={
+                    "choices": [{"message": {"content": "ok"}}],
+                    "usage": {"prompt_tokens": 1, "completion_tokens": 1},
+                },
+                request=request,
+            )
+
+    prov = LlamaCppProvider(client=_Client())
+    resp = await prov.generate("test", effort="low")
+    assert captured["reasoning_effort"] == "low"
+    assert resp.effort == "low"
+    assert resp.reasoning_request == {"effort": "low"}
+
+
+@pytest.mark.asyncio
 async def test_health_check_true():
     prov = LlamaCppProvider(client=FakeClient())
     assert await prov.health_check() is True

@@ -117,6 +117,28 @@ def qwen_template_effort(effort: str | None) -> str | None:
     return "xhigh"
 
 
+def ollama_think_value(*, thinking: bool, effort: str | None) -> bool | str:
+    """Native Ollama ``think`` field: bool or low/medium/high/max.
+
+    ``none`` is a 400 on /api/generate and /api/chat. OpenAI-compat /v1
+    uses ``reasoning_effort`` instead (including ``none``).
+    """
+    if not thinking:
+        return False
+    resolved = normalize_effort(effort)
+    if resolved is None:
+        return True
+    if resolved == "none":
+        return False
+    if resolved in ("minimal", "low"):
+        return "low"
+    if resolved == "medium":
+        return "medium"
+    if resolved == "high":
+        return "high"
+    return "max"
+
+
 def apply_chat_effort(body: dict, effort: str | None) -> dict[str, str] | None:
     """Set ``reasoning_effort`` on an OpenAI-compatible chat body."""
     value = openai_chat_effort(effort)

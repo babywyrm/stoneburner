@@ -111,7 +111,7 @@ def test_provider_test_returns_health_and_generate(client):
     assert body["input_tokens"] == 8
     assert body["output_tokens"] == 1
     generate_kwargs = fake.generate.await_args.kwargs
-    assert generate_kwargs["max_tokens"] == 32
+    assert generate_kwargs["max_tokens"] == 256
     assert "2+2" in fake.generate.await_args.args[0]
 
 

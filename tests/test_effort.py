@@ -11,6 +11,7 @@ from atomics.providers.effort import (
     claude_request,
     normalize_effort,
     normalize_reasoning_mode,
+    ollama_think_value,
     openai_chat_effort,
     openai_reasoning,
     qwen_template_effort,
@@ -94,6 +95,30 @@ def test_qwen_template_effort_maps_to_template_keys(
 def test_qwen_template_effort_rejects_unknown() -> None:
     with pytest.raises(EffortError, match="unknown effort"):
         qwen_template_effort("ludicrous")
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    ("thinking", "effort", "expected"),
+    [
+        (False, None, False),
+        (False, "high", False),
+        (True, None, True),
+        (True, "none", False),
+        (True, "minimal", "low"),
+        (True, "low", "low"),
+        (True, "medium", "medium"),
+        (True, "high", "high"),
+        (True, "xhigh", "max"),
+        (True, "xl", "max"),
+        (True, "max", "max"),
+        (True, "ultra", "max"),
+    ],
+)
+def test_ollama_think_value_maps_to_native_field(
+    thinking: bool, effort: str | None, expected: bool | str
+) -> None:
+    assert ollama_think_value(thinking=thinking, effort=effort) == expected
 
 
 @pytest.mark.unit
