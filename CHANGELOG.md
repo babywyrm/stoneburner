@@ -10,7 +10,7 @@
   as SGLang `custom_params.thinking_budget` when thinking is on. Reported
   `usage.reasoning_tokens` is preferred over a character-share estimate.
   A hard token cap still needs SGLang `--enable-strict-thinking`.
-  `generate_with_tools` does not send the Qwen template keys.
+  `generate_with_tools` sends the same Qwen template keys as `generate()`.
 - **Ollama `--effort` maps to native `think` levels.** `low` / `medium` /
   `high` / `max` on `/api/generate` and `/api/chat`. `--effort none` and
   `--no-thinking` send `false` (never the string `none`, which 400s).
