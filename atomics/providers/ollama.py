@@ -24,7 +24,7 @@ def _model_supports_thinking(model: str) -> bool:
 
 
 def _strip_thinking(text: str) -> tuple[str, str]:
-    """Separate <think>...</think> blocks from the visible answer."""
+    """Separate <think> blocks and orphan closers from the visible answer."""
     thinking_parts: list[str] = []
 
     def _collect(m: re.Match) -> str:
@@ -32,7 +32,13 @@ def _strip_thinking(text: str) -> tuple[str, str]:
         return ""
 
     clean = _THINK_TAG_RE.sub(_collect, text).strip()
-    return clean, "\n\n".join(thinking_parts)
+    closer = "</think>"
+    if closer in clean:
+        before, after = clean.rsplit(closer, 1)
+        if before.strip():
+            thinking_parts.append(before.strip())
+        clean = after.strip()
+    return clean, "\n\n".join(p for p in thinking_parts if p)
 
 
 class OllamaProvider(BaseProvider):
@@ -121,12 +127,9 @@ class OllamaProvider(BaseProvider):
         native_thinking = data.get("thinking")
         if isinstance(native_thinking, str):
             thinking_text = native_thinking.strip()
-        if use_thinking and "<think>" in raw_text:
-            text, tagged = _strip_thinking(raw_text)
-            if tagged:
-                thinking_text = f"{thinking_text}\n\n{tagged}".strip() if thinking_text else tagged
-        else:
-            text = raw_text
+        text, tagged = _strip_thinking(raw_text)
+        if tagged:
+            thinking_text = f"{thinking_text}\n\n{tagged}".strip() if thinking_text else tagged
 
         # Ollama exposes pure decode time (eval_duration, nanoseconds), so its
         # throughput is reported on the "generation" basis rather than wall-clock.
