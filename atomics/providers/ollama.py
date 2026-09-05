@@ -41,6 +41,20 @@ def _strip_thinking(text: str) -> tuple[str, str]:
     return clean, "\n\n".join(p for p in thinking_parts if p)
 
 
+def _visible_and_thinking(raw_text: str, native: object, out: int) -> tuple[str, str, int]:
+    """Split leaked CoT from visible text and estimate thinking tokens."""
+    thinking_text = native.strip() if isinstance(native, str) else ""
+    text, tagged = _strip_thinking(raw_text)
+    if tagged:
+        thinking_text = f"{thinking_text}\n\n{tagged}".strip() if thinking_text else tagged
+    thinking_tokens = 0
+    if thinking_text and out > 0:
+        generated_chars = len(thinking_text) + len(text)
+        if generated_chars > 0:
+            thinking_tokens = round(out * len(thinking_text) / generated_chars)
+    return text, thinking_text, thinking_tokens
+
+
 class OllamaProvider(BaseProvider):
     supports_tools = True
 
@@ -122,14 +136,9 @@ class OllamaProvider(BaseProvider):
         raw_text = data.get("response", "")
         out = data.get("eval_count", 0)
         inp = data.get("prompt_eval_count", 0)
-
-        thinking_text = ""
-        native_thinking = data.get("thinking")
-        if isinstance(native_thinking, str):
-            thinking_text = native_thinking.strip()
-        text, tagged = _strip_thinking(raw_text)
-        if tagged:
-            thinking_text = f"{thinking_text}\n\n{tagged}".strip() if thinking_text else tagged
+        text, thinking_text, thinking_tokens = _visible_and_thinking(
+            raw_text, data.get("thinking"), out
+        )
 
         # Ollama exposes pure decode time (eval_duration, nanoseconds), so its
         # throughput is reported on the "generation" basis rather than wall-clock.
@@ -138,16 +147,6 @@ class OllamaProvider(BaseProvider):
 
         total_duration = data.get("total_duration", 0)
         latency = total_duration / 1e6 if total_duration else 0.0
-
-        # Ollama reports total generated tokens (eval_count) but no separate
-        # count for the <think> reasoning span. Estimate the reasoning share by
-        # character proportion of the generated text so the figure stays anchored
-        # to the real token total rather than an unanchored word count.
-        thinking_tokens = 0
-        if thinking_text and out > 0:
-            generated_chars = len(thinking_text) + len(text)
-            if generated_chars > 0:
-                thinking_tokens = round(out * len(thinking_text) / generated_chars)
 
         return ProviderResponse(
             text=text,
@@ -246,6 +245,12 @@ class OllamaProvider(BaseProvider):
         message = data.get("message") or {}
         out = data.get("eval_count", 0)
         inp = data.get("prompt_eval_count", 0)
+        native = message.get("thinking")
+        if not isinstance(native, str):
+            native = data.get("thinking")
+        text, thinking_text, thinking_tokens = _visible_and_thinking(
+            message.get("content") or "", native, out
+        )
 
         # /api/chat reports eval_duration too, so the generation basis carries
         # over and tool-path throughput stays comparable with generate().
@@ -253,7 +258,7 @@ class OllamaProvider(BaseProvider):
         total_duration = data.get("total_duration", 0)
 
         return ProviderResponse(
-            text=message.get("content") or "",
+            text=text,
             input_tokens=inp,
             output_tokens=out,
             total_tokens=inp + out,
@@ -262,6 +267,8 @@ class OllamaProvider(BaseProvider):
             estimated_cost_usd=0.0,
             tokens_per_second=(compute_tps(out, eval_duration / 1e9) if eval_duration else None),
             tps_basis="generation",
+            thinking_tokens=thinking_tokens,
+            thinking_text=thinking_text,
             raw=data,
             tool_calls=parse_ollama_tool_calls(message),
             effort=normalize_effort(effort),
