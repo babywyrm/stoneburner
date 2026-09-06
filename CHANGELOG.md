@@ -20,7 +20,12 @@
   `claude-mythos`, `claude-opus-5`.
 - **`--effort` on the first-run surface.** README and `doctor` Next
   teach `--effort low`. Quiet REPL `provider_test` prints `THINK` when
-  visible text is empty and `thinking_tokens` is set.
+  visible text is empty and `thinking_tokens` is set, or when HTTP
+  `think` is true.
+- **HTTP `POST /provider-test` field `think`.** True when the visible
+  answer is empty and thinking tokens or thinking text are present.
+  False on a normal 2+2 answer. MCP `provider_test` returns the same
+  body.
 
 ### Fixed
 - **Ollama `--no-thinking` no longer prefixes `/no_think` into the prompt.**

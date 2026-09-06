@@ -70,7 +70,7 @@ would expose eval submission to the network unauthenticated.
 | GET | `/api/v1/jobs` | List in-memory API jobs (no result payload) |
 | GET | `/api/v1/jobs/{job_id}` | Poll job status/result |
 | GET | `/api/v1/models` | List Ollama or vLLM tags (`?provider=&host=`) |
-| POST | `/api/v1/provider-test` | Health + fixed 2+2 generate (spends a few tokens) |
+| POST | `/api/v1/provider-test` | Health + fixed 2+2 generate (spends a few tokens). `think` is true when the visible answer is empty and thinking tokens/text are present |
 | GET | `/api/v1/compare` | Compare providers/models |
 | GET | `/api/v1/reports/recent-runs` | Recent run report |
 | GET | `/api/v1/reports/trends` | Hourly token/cost series (`?hours=1..168`) |
