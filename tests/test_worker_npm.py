@@ -152,7 +152,8 @@ def test_worker_npm_cli_requires_api_key():
     assert "api-key" in result.output
 
 
-def test_worker_npm_cli_rejects_malformed_label():
+def test_worker_npm_cli_rejects_malformed_label(monkeypatch):
+    monkeypatch.setattr("atomics.commands.worker_npm.shutil.which", lambda _: "node")
     runner = CliRunner()
     result = runner.invoke(worker_npm, ["--api-key", "k", "--label", "badlabel"])
     assert result.exit_code != 0
@@ -204,7 +205,8 @@ def test_npm_worker_executes_and_submits_assignment(coordinator_server):
     assert result["status"] == "ok"
 
 
-def test_worker_npm_cli_rejects_invalid_pool_size():
+def test_worker_npm_cli_rejects_invalid_pool_size(monkeypatch):
+    monkeypatch.setattr("atomics.commands.worker_npm.shutil.which", lambda _: "node")
     runner = CliRunner()
     result = runner.invoke(worker_npm, ["--api-key", "k", "--pool-size", "0"])
     assert result.exit_code != 0
