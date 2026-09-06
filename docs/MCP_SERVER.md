@@ -93,7 +93,7 @@ ATOMICS_API_URL="https://atomics.internal:8000" uv run atomics mcp
 | `compare` | yes | Compare recorded results by provider or model |
 | `recent_runs` | yes | List recent recorded runs |
 | `trends` | yes | Hourly token and cost series |
-| `provider_test` | **no** | Health + a fixed 2+2 generate — spends a few tokens |
+| `provider_test` | **no** | Health + a fixed 2+2 generate — spends a few tokens. Same `think` flag as HTTP |
 | `submit_run` | **no** | Start a benchmark run — spends tokens |
 | `submit_eval` | **no** | Start an eval suite — spends tokens |
 | `submit_sweep` | **no** | Multi-model, multi-suite campaign — spends tokens. Budget required |

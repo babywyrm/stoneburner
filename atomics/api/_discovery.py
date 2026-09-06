@@ -90,17 +90,22 @@ async def run_provider_test(payload: ProviderTestRequest) -> dict[str, Any]:
             "latency_ms": 0.0,
             "cost_usd": 0.0,
         }
+    visible = (resp.text or "").strip()
+    thinking_tokens = getattr(resp, "thinking_tokens", 0) or 0
+    thinking_text = (getattr(resp, "thinking_text", "") or "").strip()
+    think = not visible and bool(thinking_tokens or thinking_text)
     return {
         "ok": True,
         "health": True,
         "provider": adapter.name,
         "model": payload.model,
-        "response": (resp.text or "").strip(),
+        "response": visible,
         "error": None,
         "input_tokens": resp.input_tokens,
         "output_tokens": resp.output_tokens,
         "total_tokens": resp.total_tokens,
-        "thinking_tokens": resp.thinking_tokens,
+        "thinking_tokens": thinking_tokens,
+        "think": think,
         "latency_ms": resp.latency_ms,
         "cost_usd": resp.estimated_cost_usd,
     }

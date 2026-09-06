@@ -292,7 +292,8 @@ def format_provider_test(body: dict[str, Any]) -> str:
             think_n = int(thinking_tokens)
         except (TypeError, ValueError):
             think_n = 0
-        if not reply.strip() and think_n:
+        think = bool(body.get("think")) or (not reply.strip() and think_n > 0)
+        if think:
             return f"THINK  {model}  {ms}  {think_n} thinking tokens\n"
         return f"ok  {model}  {ms}  {reply}\n"
     error = body.get("error") or "failed"

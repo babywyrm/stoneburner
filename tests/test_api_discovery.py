@@ -113,6 +113,37 @@ def test_provider_test_returns_health_and_generate(client):
     generate_kwargs = fake.generate.await_args.kwargs
     assert generate_kwargs["max_tokens"] == 256
     assert "2+2" in fake.generate.await_args.args[0]
+    assert body["think"] is False
+
+
+def test_provider_test_empty_visible_with_thinking_is_think(client):
+    fake = SimpleNamespace(
+        name="ollama",
+        health_check=AsyncMock(return_value=True),
+        generate=AsyncMock(
+            return_value=SimpleNamespace(
+                text="",
+                input_tokens=34,
+                output_tokens=32,
+                total_tokens=66,
+                thinking_tokens=32,
+                thinking_text="...",
+                latency_ms=80.0,
+                estimated_cost_usd=0.0,
+            )
+        ),
+    )
+    with patch("atomics.api._discovery.make_provider", return_value=fake):
+        resp = client.post(
+            "/api/v1/provider-test",
+            json={"provider": "ollama", "model": "qwen3.5:2b", "effort": "low"},
+        )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["ok"] is True
+    assert body["response"] == ""
+    assert body["thinking_tokens"] == 32
+    assert body["think"] is True
 
 
 def test_provider_test_rejects_caller_prompt(client):

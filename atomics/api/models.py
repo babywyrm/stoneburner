@@ -351,5 +351,6 @@ class ProviderTestResponse(BaseModel):
     output_tokens: int = 0
     total_tokens: int = 0
     thinking_tokens: int = 0
+    think: bool = False
     latency_ms: float = 0.0
     cost_usd: float = 0.0
