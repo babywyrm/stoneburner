@@ -131,6 +131,9 @@ caller should fall back to its normal configuration (`AtomicsSettings`).
 
 `atomics doctor` reports whether a control file was found, and the
 backend / URL / model it resolved. It never prints `INFERENCE_API_KEY`.
+When `INFERENCE_BACKEND` is `vllm`, Next is `provider-test --provider
+vllm --no-thinking` with `--vllm-host` / `-m` from the file, even if
+Ollama is also reachable.
 
 `atomics run --provider ollama` (and the other suites that go through
 `make_provider`) fill `--ollama-host` / `--model` from the file when those

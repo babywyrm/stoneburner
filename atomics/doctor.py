@@ -29,15 +29,30 @@ def suggest_next_step(
     errors: int,
     ollama_reachable: bool,
     has_claude_key: bool,
+    inference_backend: str | None = None,
+    inference_url: str | None = None,
+    inference_model: str | None = None,
 ) -> NextStep | None:
     """Pick a first-run command from what doctor already observed.
 
-    Ollama wins when it answers: that is the no-key path the listing sells.
-    A Claude key is the fallback. Blocking errors suppress the suggestion.
-    The default provider is not changed.
+    inference.env backend wins: a vLLM box should not be told to hit Ollama.
+    Else Ollama if it answers. Claude key is the fallback. Blocking errors
+    suppress the suggestion. The default provider is not changed.
     """
     if errors:
         return None
+    if (inference_backend or "").strip().lower() == "vllm":
+        parts = ["atomics provider-test --provider vllm --no-thinking"]
+        url = (inference_url or "").strip()
+        model = (inference_model or "").strip()
+        if url:
+            parts.append(f"--vllm-host {url}")
+        if model:
+            parts.append(f"-m {model}")
+        return NextStep(
+            command=" ".join(parts),
+            reason="inference.env backend is vllm.",
+        )
     if ollama_reachable:
         return NextStep(
             command="atomics provider-test --provider ollama --no-thinking",
@@ -190,6 +205,9 @@ def run_doctor(settings: AtomicsSettings | None = None) -> int:
         errors=errors,
         ollama_reachable=ollama_reachable,
         has_claude_key=bool(settings.anthropic_api_key),
+        inference_backend=view.backend if view is not None else None,
+        inference_url=view.url if view is not None else None,
+        inference_model=view.model if view is not None else None,
     )
     if step is not None:
         console.print()
