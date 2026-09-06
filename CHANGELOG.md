@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+## 0.22.3 (2026-09-05) — Thinking dials reach Ollama and Qwen
+
+### Upgrade notes
+- Additive. No CLI flag removals.
+- `POST /provider-test` (and MCP `provider_test`) gains `think`
+  (bool, default false). Existing clients ignore unknown fields.
+- `atomics doctor` Next follows `inference.env` when backend is
+  `vllm`, even if Ollama is also reachable.
+- `provider-test` visible budget is 256 (was 32).
+  `--max-output-tokens` still overrides it.
+- `--no-thinking` on Ollama no longer prefixes `/no_think` into
+  the prompt.
+
 ### Added
 - **Qwen3 thinking keys on `--provider vllm`.** `--effort` is written into
   `chat_template_kwargs.reasoning_effort` (`low` / `medium` / `xhigh`) as
