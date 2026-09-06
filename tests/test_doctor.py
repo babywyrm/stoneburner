@@ -201,6 +201,27 @@ def test_doctor_reports_inference_env_without_leaking_key(capsys, tmp_path, monk
     assert "sk-secret-must-not-leak" not in out
 
 
+def test_doctor_next_follows_vllm_inference_env(capsys, tmp_path, monkeypatch):
+    env_path = tmp_path / "inference.env"
+    env_path.write_text(
+        "INFERENCE_BACKEND=vllm\n"
+        "INFERENCE_URL=http://127.0.0.1:8000/v1\n"
+        "INFERENCE_MODEL=qwen3.8:27b\n"
+    )
+    monkeypatch.setenv("INFERENCE_ENV", str(env_path))
+    monkeypatch.delenv("BRAIN_ENV", raising=False)
+    settings = AtomicsSettings(db_path=tmp_path / "doc.db")
+    mock_response = MagicMock()
+    mock_response.json.return_value = {"models": [{"name": "qwen2.5:7b"}]}
+    with patch("httpx.get", return_value=mock_response):
+        assert run_doctor(settings=settings) == 0
+    next_block = " ".join(capsys.readouterr().out.split("Next:", 1)[-1].split())
+    assert "--provider vllm" in next_block
+    assert "--vllm-host http://127.0.0.1:8000/v1" in next_block
+    assert "-m qwen3.8:27b" in next_block
+    assert "--provider ollama --no-thinking" not in next_block
+
+
 def test_doctor_reports_missing_inference_env(capsys, tmp_path, monkeypatch):
     monkeypatch.setenv("INFERENCE_ENV", str(tmp_path / "missing.env"))
     monkeypatch.delenv("BRAIN_ENV", raising=False)
@@ -233,6 +254,23 @@ def test_suggest_next_step_prefers_reachable_ollama():
     assert step.command == "atomics provider-test --provider ollama --no-thinking"
     assert "Ollama" in step.reason
     assert "--effort" in step.reason
+
+
+def test_suggest_next_step_vllm_inference_env_wins_over_ollama():
+    step = suggest_next_step(
+        errors=0,
+        ollama_reachable=True,
+        has_claude_key=True,
+        inference_backend="vllm",
+        inference_url="http://gpu:8000/v1",
+        inference_model="qwen3.8:27b",
+    )
+    assert step is not None
+    assert step.command == (
+        "atomics provider-test --provider vllm --no-thinking "
+        "--vllm-host http://gpu:8000/v1 -m qwen3.8:27b"
+    )
+    assert "vllm" in step.reason
 
 
 def test_suggest_next_step_uses_claude_when_ollama_is_down():

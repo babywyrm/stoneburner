@@ -26,6 +26,9 @@
   answer is empty and thinking tokens or thinking text are present.
   False on a normal 2+2 answer. MCP `provider_test` returns the same
   body.
+- **`doctor` Next follows `inference.env`.** Backend `vllm` wins over a
+  reachable Ollama: `provider-test --provider vllm --no-thinking` plus
+  `--vllm-host` / `-m` from the control file.
 
 ### Fixed
 - **Ollama `--no-thinking` no longer prefixes `/no_think` into the prompt.**

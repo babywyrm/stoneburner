@@ -20,10 +20,12 @@ From PyPI (Ollama on `http://localhost:11434`, no cloud key):
 uv tool install stoneburner-atomics
 atomics doctor
 atomics provider-test --provider ollama --no-thinking
+atomics provider-test --provider ollama --effort low
 ```
 
 Thinking models (qwen3, qwen3.8, deepseek-r1) need `--no-thinking` or the
-visible answer can come back empty.
+visible answer can come back empty. `--effort low` is the native Ollama
+think dial.
 
 From a clone: `uv sync --all-extras`, then prefix commands with `uv run`.
 Bare `uv sync` drops the API, MCP, RAG, and test extras.
@@ -46,8 +48,8 @@ unless you pass flags or `ATOMICS_*`. See
 
 `doctor` exits non-zero if anything is missing, so it's safe in front of a
 long run: `atomics doctor && atomics run --tier ez -n 3`. A healthy check
-prints one `Next:` command — Ollama when it answers, otherwise Claude if
-a key is set.
+prints one `Next:` command — `inference.env` backend `vllm` if set,
+otherwise Ollama when it answers, otherwise Claude if a key is set.
 
 ---
 
