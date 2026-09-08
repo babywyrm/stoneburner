@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Changed
+- Lockfile patches: boto3/botocore 1.43.90, pydantic 2.13.5, uvicorn
+  0.52.4, mypy 2.3.1, ruff 0.16.6. Click 8.5 (already allowed).
+  MCP extra stays 2.0 and is capped `<2.1` — 2.1+ wraps tool errors
+  and drops the API detail. Publish downloads artifacts with
+  `actions/download-artifact@v8` (pairs with existing
+  `upload-artifact@v7`).
+
 ## 0.22.3 (2026-09-05) — Thinking dials reach Ollama and Qwen
 
 ### Upgrade notes

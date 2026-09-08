@@ -250,7 +250,8 @@ Package version is **0.22.3**.
 
 ## Next
 
-Unscheduled. Pick one; do not mix a parked item into it.
+Current package is **0.22.3**. Unscheduled. Pick one; do not mix a
+parked item into it.
 
 - **Suite convergence** (ARCHITECTURE): `results` alias, large
   command modules, CLI integrity exit on the five suites that only
