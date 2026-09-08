@@ -54,7 +54,8 @@ That satisfies the guard without inventing a release that never happened.
    uv run pytest -q --cov-fail-under=85
    uv run mypy atomics/
    uv run ruff check atomics/ tests/ scripts/
-   gitleaks detect --config .gitleaks.toml --no-banner --redact
+   gitleaks git --no-banner --config .gitleaks.toml --redact
+   gitleaks dir --no-banner --config .gitleaks.toml --redact
    uv run python scripts/smoke_fleet.py       # real processes, not TestClient
    ```
 

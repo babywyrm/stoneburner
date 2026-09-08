@@ -30,7 +30,8 @@ a local pass means a green build:
 uv run pytest -q --cov-fail-under=85
 uv run mypy atomics/
 uv run ruff check atomics/ tests/ scripts/
-gitleaks detect --config .gitleaks.toml --no-banner --redact
+gitleaks git --no-banner --config .gitleaks.toml --redact
+gitleaks dir --no-banner --config .gitleaks.toml --redact
 ```
 
 Line length is 100 and is enforced. Fixture payload files are exempt so gold

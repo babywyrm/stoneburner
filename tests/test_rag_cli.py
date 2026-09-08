@@ -175,22 +175,21 @@ def test_rag_cli_with_invalid_fixtures_exits():
     assert "Unknown fixture IDs" in result.output
 
 
-def test_rag_cli_with_json_out():
+def test_rag_cli_with_json_out(tmp_path):
     runner = CliRunner()
     summary = _mock_summary()
-    with runner.isolated_filesystem() as fs:
-        out_path = Path(fs) / "rag.json"
-        with (
-            patch("atomics.commands.rag._make_provider", return_value=_mock_provider()),
-            patch("atomics.eval.rag.runner.run_rag", new=AsyncMock(return_value=summary)),
-            patch("atomics.storage.repository.MetricsRepository", return_value=_mock_repo()),
-        ):
-            result = runner.invoke(cli, ["rag", "--no-save", "--json-out", str(out_path)])
-            assert result.exit_code == 0, result.output
-            assert out_path.exists()
+    out_path = tmp_path / "rag.json"
+    with (
+        patch("atomics.commands.rag._make_provider", return_value=_mock_provider()),
+        patch("atomics.eval.rag.runner.run_rag", new=AsyncMock(return_value=summary)),
+        patch("atomics.storage.repository.MetricsRepository", return_value=_mock_repo()),
+    ):
+        result = runner.invoke(cli, ["rag", "--no-save", "--json-out", str(out_path)])
+        assert result.exit_code == 0, result.output
+        assert out_path.exists()
 
 
-def test_rag_cli_with_index_mocks_extras():
+def test_rag_cli_with_index_mocks_extras(tmp_path):
     """Run `atomics rag --index` with mocked sentence_transformers/sqlite_vec."""
     runner = CliRunner()
     summary = _mock_summary()
@@ -206,38 +205,34 @@ def test_rag_cli_with_index_mocks_extras():
         "sentence_transformers": MagicMock(),
         "sqlite_vec": MagicMock(),
     }
-    with runner.isolated_filesystem() as fs:
-        index_path = Path(fs) / "index.vec"
-        index_path.write_text("")  # click.Path requires exists=True
-        with (
-            patch.dict("sys.modules", fake_modules),
-            patch(
-                "atomics.eval.rag.retrieval.LocalSentenceTransformerEmbedder", fake_embedder_class
-            ),
-            patch("atomics.eval.rag.retrieval.RAGIndex", fake_index_class),
-            patch(
-                "atomics.eval.rag.runner.run_rag", new=AsyncMock(return_value=summary)
-            ) as run_rag,
-            patch("atomics.commands.rag._make_provider", return_value=_mock_provider()),
-        ):
-            result = runner.invoke(
-                cli, ["rag", "--index", str(index_path), "--top-k", "3", "--no-save"]
-            )
-            assert result.exit_code == 0, result.output
-            assert run_rag.call_args.kwargs["index"] is fake_index
-            assert run_rag.call_args.kwargs["top_k"] == 3
+    index_path = tmp_path / "index.vec"
+    index_path.write_text("")  # click.Path requires exists=True
+    with (
+        patch.dict("sys.modules", fake_modules),
+        patch(
+            "atomics.eval.rag.retrieval.LocalSentenceTransformerEmbedder", fake_embedder_class
+        ),
+        patch("atomics.eval.rag.retrieval.RAGIndex", fake_index_class),
+        patch("atomics.eval.rag.runner.run_rag", new=AsyncMock(return_value=summary)) as run_rag,
+        patch("atomics.commands.rag._make_provider", return_value=_mock_provider()),
+    ):
+        result = runner.invoke(
+            cli, ["rag", "--index", str(index_path), "--top-k", "3", "--no-save"]
+        )
+        assert result.exit_code == 0, result.output
+        assert run_rag.call_args.kwargs["index"] is fake_index
+        assert run_rag.call_args.kwargs["top_k"] == 3
 
 
-def test_rag_cli_index_missing_exits_on_missing_extra():
+def test_rag_cli_index_missing_exits_on_missing_extra(tmp_path):
     """When --index is used but extras are missing, CLI exits with a helpful message."""
     runner = CliRunner()
-    with runner.isolated_filesystem() as fs:
-        index_path = Path(fs) / "index.vec"
-        index_path.write_text("")
-        with patch.dict("sys.modules", {"sentence_transformers": None, "sqlite_vec": None}):
-            result = runner.invoke(cli, ["rag", "--index", str(index_path), "--no-save"])
-            assert result.exit_code == 1
-            assert "RAG indexing requires" in result.output
+    index_path = tmp_path / "index.vec"
+    index_path.write_text("")
+    with patch.dict("sys.modules", {"sentence_transformers": None, "sqlite_vec": None}):
+        result = runner.invoke(cli, ["rag", "--index", str(index_path), "--no-save"])
+        assert result.exit_code == 1
+        assert "RAG indexing requires" in result.output
 
 
 @pytest.mark.skipif(_RAG_EXTRAS_MISSING, reason="rag extras not installed")

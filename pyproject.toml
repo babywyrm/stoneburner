@@ -58,8 +58,9 @@ api = [
 ]
 # The MCP server is a proxy over a running API server, so it needs no provider
 # or storage dependency of its own — httpx is already a core dependency.
+# MCP 2.1+ wraps tool errors and drops the API detail the agent needs.
 mcp = [
-    "mcp>=2.0.0",
+    "mcp>=2.0.0,<2.1",
 ]
 dev = [
     "pytest>=8.0.0",
