@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Fixed
+- **Ollama thinking registry includes granite4.2 and gemma4.**
+  0.22.3 named granite4.2 in the changelog but never added it to
+  `supports_thinking`, so `--effort low` printed `Effort: low` and
+  sent `think: false`. gemma4 advertises the same Ollama `thinking`
+  capability and was missing too. `--no-thinking` still wins.
+  Non-thinking tags (mistral, gemma3, phi4-mini, ministral) still
+  get `think: false` — `think: "low"` is a 400 on those.
+
 ### Changed
 - Lockfile patches: boto3/botocore 1.43.90, pydantic 2.13.5, uvicorn
   0.52.4, mypy 2.3.1, ruff 0.16.6. Click 8.5 (already allowed).

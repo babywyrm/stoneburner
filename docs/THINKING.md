@@ -43,7 +43,7 @@ uv run atomics provider-test -p ollama -m qwen3.8:27b --no-thinking
 |----------|--------|-----------|
 | **Claude** | Opus 4.x, Sonnet 4.x | Extended thinking API (`budget_tokens`) |
 | **OpenAI** | o3, o3-mini, o3-pro, o4-mini, gpt-5.x (including Sol/Terra/Luna) | Reasoning tokens (`completion_tokens_details`) |
-| **Ollama** | qwen3 family (including qwen3.8), deepseek-r1, gpt-oss, phi4-*-reasoning | Native `think` field: bool, or `low` / `medium` / `high` / `max` from `--effort`. Plus `<think>` tag fallback |
+| **Ollama** | qwen3 family (including qwen3.8), granite4.2, gemma4, deepseek-r1, gpt-oss, phi4-*-reasoning | Native `think` field: bool, or `low` / `medium` / `high` / `max` from `--effort`. Plus `<think>` tag fallback. Do not send think levels to tags that lack the capability (mistral, gemma3, phi4-mini) — Ollama 400s. |
 | **vLLM / SGLang** (`--provider vllm`) | qwen3 family (including qwen3.8) | `chat_template_kwargs.enable_thinking` plus mapped `reasoning_effort`; optional `custom_params.thinking_budget` |
 
 When `--thinking` / `--no-thinking` is omitted, stoneburner checks the model against its capability registry and enables thinking automatically for known models. Use `--no-thinking` to force it off for A/B comparisons.

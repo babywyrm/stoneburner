@@ -21,6 +21,8 @@ class TestThinkingRegistry:
         assert supports_thinking("gpt-5.6-luna")
         assert supports_thinking("claude-fable-5")
         assert supports_thinking("gpt-oss:20b")
+        assert supports_thinking("granite4.2:3b")
+        assert supports_thinking("gemma4:12b")
 
     def test_non_thinking_models(self):
         assert not supports_thinking("gpt-4o")
