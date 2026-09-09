@@ -10,6 +10,10 @@
   HTTP. One-fixture proofs no longer need `--category` plus hope.
 
 ### Fixed
+- **`--provider vllm` reads Ollama `/v1` `message.reasoning`.** SGLang
+  still uses `reasoning_content`. Empty visible text with CoT in
+  `reasoning` was dropping thinking tokens, so `provider-test` did not
+  print `THINK`.
 - **Ollama thinking registry includes granite4.2 and gemma4.**
   0.22.3 named granite4.2 in the changelog but never added it to
   `supports_thinking`, so `--effort low` printed `Effort: low` and

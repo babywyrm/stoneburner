@@ -457,6 +457,69 @@ async def test_vllm_reasoning_content_captured():
     assert resp.thinking_tokens > 0
 
 
+@pytest.mark.asyncio
+async def test_vllm_ollama_message_reasoning_captured():
+    """Ollama /v1 puts CoT in message.reasoning, not reasoning_content."""
+    mock = MagicMock()
+    mock.status_code = 200
+    mock.raise_for_status = MagicMock()
+    mock.json.return_value = {
+        "choices": [
+            {
+                "message": {
+                    "content": "",
+                    "role": "assistant",
+                    "reasoning": "2+2 is 4",
+                },
+                "finish_reason": "length",
+            }
+        ],
+        "usage": {"prompt_tokens": 23, "completion_tokens": 64, "total_tokens": 87},
+    }
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock(return_value=mock)
+
+    provider = VllmProvider(base_url="http://fake:8000/v1", client=mock_client)
+    resp = await provider.generate("test", model="qwen3.5:4b", thinking=True)
+
+    assert resp.text == ""
+    assert resp.thinking_text == "2+2 is 4"
+    assert resp.thinking_tokens == 64
+
+
+@pytest.mark.asyncio
+async def test_vllm_prefers_reasoning_content_over_reasoning():
+    mock = MagicMock()
+    mock.status_code = 200
+    mock.raise_for_status = MagicMock()
+    mock.json.return_value = {
+        "choices": [
+            {
+                "message": {
+                    "content": "4",
+                    "role": "assistant",
+                    "reasoning_content": "sglang cot",
+                    "reasoning": "ollama cot",
+                }
+            }
+        ],
+        "usage": {
+            "prompt_tokens": 10,
+            "completion_tokens": 20,
+            "total_tokens": 30,
+            "reasoning_tokens": 5,
+        },
+    }
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock(return_value=mock)
+
+    provider = VllmProvider(base_url="http://fake:8000/v1", client=mock_client)
+    resp = await provider.generate("test", model="qwen3.8:27b", thinking=True)
+
+    assert resp.thinking_text == "sglang cot"
+    assert resp.thinking_tokens == 5
+
+
 # ---------------------------------------------------------------------------
 # Connection error
 # ---------------------------------------------------------------------------
