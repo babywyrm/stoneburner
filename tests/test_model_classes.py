@@ -168,6 +168,21 @@ def test_thinking_support_qwen3_5_family():
     assert supports_thinking("phi4-mini-reasoning:3.8b") is True
     assert supports_thinking("gpt-oss:20b") is True
     assert supports_thinking("claude-fable-5") is True
+    assert supports_thinking("granite4.2:3b") is True
+    assert supports_thinking("granite4.2:8b") is True
+    assert supports_thinking("gemma4:12b") is True
+    assert supports_thinking("gemma4:e4b") is True
+
+
+def test_thinking_support_local_non_thinking_tags():
+    """Ollama tags that do not advertise thinking must not get think levels.
+
+    Sending think: "low" to mistral:7b is a 400. gemma3 is not gemma4.
+    """
+    assert supports_thinking("gemma3:4b") is False
+    assert supports_thinking("mistral:7b") is False
+    assert supports_thinking("phi4-mini:3.8b") is False
+    assert supports_thinking("ministral-3:8b") is False
 
 
 def test_thinking_support_deepseek_r1_all_sizes():
@@ -183,10 +198,10 @@ def test_thinking_support_phi4_not_thinking():
     assert supports_thinking("phi4:14b") is False
 
 
-def test_thinking_support_gemma_not_thinking():
-    """gemma models don't use <think> tags."""
+def test_thinking_support_gemma3_not_thinking():
+    """gemma3 does not advertise thinking. gemma4 does."""
     assert supports_thinking("gemma3:4b") is False
-    assert supports_thinking("gemma4:e4b") is False
+    assert supports_thinking("gemma3:12b") is False
 
 
 def test_model_class_enum_values():

@@ -253,6 +253,108 @@ async def test_ollama_no_thinking_wins_over_effort():
     assert body["prompt"] == "hi"
 
 
+def _ok_generate_client() -> AsyncMock:
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.raise_for_status = MagicMock()
+    mock_response.json.return_value = {
+        "response": "ok",
+        "eval_count": 5,
+        "prompt_eval_count": 3,
+        "eval_duration": 1,
+    }
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock(return_value=mock_response)
+    return mock_client
+
+
+def _ok_chat_client() -> AsyncMock:
+    mock_response = MagicMock()
+    mock_response.raise_for_status = MagicMock()
+    mock_response.json.return_value = {
+        "message": {"content": "no", "tool_calls": []},
+        "eval_count": 1,
+        "prompt_eval_count": 1,
+        "eval_duration": 1,
+    }
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock(return_value=mock_response)
+    return mock_client
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "model",
+    ("granite4.2:3b", "granite4.2:8b", "gemma4:12b", "qwen3.5:4b", "qwen3.6:27b"),
+)
+async def test_ollama_effort_low_without_thinking_flag(model: str) -> None:
+    """--effort low must reach think: low even when --thinking was omitted."""
+    mock_client = _ok_generate_client()
+    provider = OllamaProvider(host="http://fake:11434", client=mock_client)
+    resp = await provider.generate("hi", model=model, effort="low")
+
+    body = mock_client.post.call_args.kwargs["json"]
+    assert body["think"] == "low"
+    assert resp.reasoning_request == {"think": "low"}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("effort", "expected"),
+    (
+        ("none", False),
+        ("minimal", "low"),
+        ("low", "low"),
+        ("medium", "medium"),
+        ("high", "high"),
+        ("xhigh", "max"),
+        ("max", "max"),
+    ),
+)
+async def test_ollama_effort_levels_without_thinking_flag(
+    effort: str, expected: bool | str
+) -> None:
+    mock_client = _ok_generate_client()
+    provider = OllamaProvider(host="http://fake:11434", client=mock_client)
+    await provider.generate("hi", model="granite4.2:3b", effort=effort)
+
+    body = mock_client.post.call_args.kwargs["json"]
+    assert body["think"] == expected
+
+
+@pytest.mark.asyncio
+async def test_ollama_effort_does_not_force_think_on_mistral() -> None:
+    """mistral:7b 400s on think levels. Effort must not invent a think dial."""
+    mock_client = _ok_generate_client()
+    provider = OllamaProvider(host="http://fake:11434", client=mock_client)
+    await provider.generate("hi", model="mistral:7b", effort="low")
+
+    body = mock_client.post.call_args.kwargs["json"]
+    assert body["think"] is False
+
+
+@pytest.mark.asyncio
+async def test_ollama_granite_auto_think_when_unset() -> None:
+    mock_client = _ok_generate_client()
+    provider = OllamaProvider(host="http://fake:11434", client=mock_client)
+    await provider.generate("hi", model="granite4.2:3b")
+
+    body = mock_client.post.call_args.kwargs["json"]
+    assert body["think"] is True
+
+
+@pytest.mark.asyncio
+async def test_ollama_tools_effort_low_without_thinking_flag() -> None:
+    mock_client = _ok_chat_client()
+    provider = OllamaProvider(host="http://fake:11434", client=mock_client)
+    await provider.generate_with_tools(
+        "hi", tools=[], model="granite4.2:8b", effort="low"
+    )
+
+    body = mock_client.post.call_args.kwargs["json"]
+    assert body["think"] == "low"
+
+
 @pytest.mark.asyncio
 async def test_ollama_generate_with_tools_sends_think_level():
     mock_response = MagicMock()

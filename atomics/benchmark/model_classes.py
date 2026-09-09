@@ -169,6 +169,11 @@ THINKING_CAPABLE: frozenset[str] = frozenset(
         "deepseek-r1:70b",
         "phi4-reasoning:14b",
         "phi4-mini-reasoning:3.8b",
+        "granite4.2:3b",
+        "granite4.2:8b",
+        "gemma4:e4b",
+        "gemma4:12b",
+        "gemma4:26b",
     }
 )
 
@@ -196,6 +201,8 @@ def supports_thinking(model_id: str) -> bool:
         "claude-fable",
         "claude-mythos",
         "claude-opus-5",
+        "granite4.2",
+        "gemma4",
     ):
         if model_id.startswith(prefix):
             return True
