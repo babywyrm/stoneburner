@@ -31,6 +31,19 @@ def _is_qwen3(model: str) -> bool:
     return model.lower().startswith("qwen3")
 
 
+def _message_thinking_text(message: dict) -> str:
+    """CoT text from an OpenAI-compat chat message.
+
+    SGLang uses ``reasoning_content``. Ollama ``/v1`` uses ``reasoning``.
+    Prefer the SGLang key when both are present.
+    """
+    for key in ("reasoning_content", "reasoning"):
+        value = message.get(key)
+        if isinstance(value, str) and value:
+            return value
+    return ""
+
+
 def _usage_reasoning_tokens(usage: dict, thinking_text: str, text: str, out: int) -> int:
     reported = usage.get("reasoning_tokens")
     if reported is None:
@@ -210,9 +223,7 @@ class VllmProvider(OpenAICompatibleTools, BaseProvider):
         thinking_text = ""
         thinking_tokens = 0
         if use_thinking and _model_supports_thinking(model):
-            thinking_content = choice.get("message", {}).get("reasoning_content", "")
-            if thinking_content:
-                thinking_text = thinking_content
+            thinking_text = _message_thinking_text(choice.get("message") or {})
             thinking_tokens = _usage_reasoning_tokens(usage, thinking_text, text, out)
 
         return ProviderResponse(
