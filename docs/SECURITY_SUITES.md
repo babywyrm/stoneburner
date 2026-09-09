@@ -33,6 +33,9 @@ uv run atomics adversarial --provider ollama -m qwen3:14b --judge-model qwen2.5:
 # Target specific categories
 uv run atomics adversarial --provider claude --category prompt_injection,role_confusion
 
+# One fixture (unknown ids fail before a request)
+uv run atomics adversarial --fixtures adv-01 --no-thinking
+
 # With thinking enabled
 uv run atomics adversarial --provider ollama -m qwen3:14b --thinking
 

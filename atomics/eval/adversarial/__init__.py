@@ -7,7 +7,7 @@ consistent everywhere (header, progress bar, actual run, and docs).
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 
 from .agentic_reasoning import AGENTIC_REASONING_FIXTURES  # noqa: F401
 from .encoding_obfuscation import ENCODING_OBFUSCATION_FIXTURES  # noqa: F401
@@ -58,15 +58,32 @@ def expand_categories(categories: Iterable[str]) -> set[str]:
 
 def select_fixtures(
     categories: Iterable[str] | None = None,
+    *,
+    ids: Sequence[str] | None = None,
 ) -> list[AdversarialFixture]:
     """Return fixtures filtered by category (group aliases expanded).
 
     With no categories, returns the full `ALL_FIXTURES` set in order.
+    Optional ``ids`` further subsets that catalog and keeps request
+    order. Unknown ids raise ``ValueError`` so a typo cannot silently
+    run the whole suite. Combined with categories, ids must fall
+    inside that subset.
     """
     if not categories:
-        return list(ALL_FIXTURES)
-    wanted = expand_categories(categories)
-    return [f for f in ALL_FIXTURES if f.category in wanted]
+        catalog = list(ALL_FIXTURES)
+    else:
+        wanted = expand_categories(categories)
+        catalog = [f for f in ALL_FIXTURES if f.category in wanted]
+    if ids is None:
+        return catalog
+    wanted_ids = [item.strip() for item in ids if item.strip()]
+    if not wanted_ids:
+        raise ValueError("no fixture IDs")
+    by_id = {fixture.id: fixture for fixture in catalog}
+    missing = [item for item in wanted_ids if item not in by_id]
+    if missing:
+        raise ValueError(f"unknown fixture IDs: {', '.join(missing)}")
+    return [by_id[item] for item in wanted_ids]
 
 
 __all__ = [

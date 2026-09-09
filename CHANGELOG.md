@@ -6,6 +6,8 @@
 - **`atomics toolcall --fixtures`.** Comma-separated IDs, same as eval /
   rag / HTTP `POST /evals`. Unknown ids fail before a request. Combined
   with `--category`, ids must fall inside that subset.
+- **`atomics adversarial --fixtures`.** Same ID subset as toolcall /
+  HTTP. One-fixture proofs no longer need `--category` plus hope.
 
 ### Fixed
 - **Ollama thinking registry includes granite4.2 and gemma4.**
