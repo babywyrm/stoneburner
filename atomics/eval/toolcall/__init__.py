@@ -21,6 +21,7 @@ from atomics.eval.toolcall.fixtures import (
     DangerousCall,
     ToolCallFixture,
     fixtures_for_category,
+    select_fixtures,
 )
 from atomics.eval.toolcall.scorer import ToolChannelResult, ToolOutcome, classify
 
@@ -38,4 +39,5 @@ __all__ = [
     "classify",
     "fixtures_for_category",
     "schemas_for",
+    "select_fixtures",
 ]

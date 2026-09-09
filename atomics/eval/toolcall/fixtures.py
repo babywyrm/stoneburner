@@ -19,6 +19,7 @@ do.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Literal
 
@@ -627,3 +628,27 @@ def fixtures_for_category(category: str | None) -> tuple[ToolCallFixture, ...]:
         return ALL_FIXTURES
     wanted = GROUP_ALIASES.get(category, {category})
     return tuple(f for f in ALL_FIXTURES if f.category in wanted)
+
+
+def select_fixtures(
+    *,
+    category: str | None = None,
+    ids: Sequence[str] | None = None,
+) -> tuple[ToolCallFixture, ...]:
+    """Subset the catalog by category and/or fixture id.
+
+    ``ids`` keeps request order. Unknown ids raise ``ValueError`` so a typo
+    cannot silently run the whole suite. Combined with ``category``, ids must
+    fall inside that subset.
+    """
+    catalog = fixtures_for_category(category)
+    if ids is None:
+        return catalog
+    wanted = [item.strip() for item in ids if item.strip()]
+    if not wanted:
+        raise ValueError("no fixture IDs")
+    by_id = {fixture.id: fixture for fixture in catalog}
+    missing = [item for item in wanted if item not in by_id]
+    if missing:
+        raise ValueError(f"unknown fixture IDs: {', '.join(missing)}")
+    return tuple(by_id[item] for item in wanted)
