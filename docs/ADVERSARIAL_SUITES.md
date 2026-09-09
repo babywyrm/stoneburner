@@ -246,6 +246,9 @@ atomics adversarial --model qwen2.5:3b --ollama-host http://<host>:11434
 # Just zero-trust resistance
 atomics adversarial --category zerotrust --model qwen2.5:3b
 
+# One fixture
+atomics adversarial --fixtures adv-01 --model qwen2.5:3b
+
 # Just agentic reasoning
 atomics adversarial --category agentic --model qwen2.5:3b
 

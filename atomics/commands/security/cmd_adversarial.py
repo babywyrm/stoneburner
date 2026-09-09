@@ -92,6 +92,14 @@ def _parse_model_spec(spec: str, default_provider: str) -> tuple[str, str, str |
     "instruction_override, social_engineering, data_exfil_attempt.",
 )
 @click.option(
+    "--fixtures",
+    "fixtures_filter",
+    type=str,
+    default=None,
+    help="Comma-separated fixture IDs (default: all, or the --category subset). "
+    "Unknown ids fail before a request.",
+)
+@click.option(
     "--thinking/--no-thinking",
     "thinking_flag",
     default=None,
@@ -148,6 +156,7 @@ def adversarial(
     extra_judges: str | None,
     runs: int,
     category: str | None,
+    fixtures_filter: str | None,
     thinking_flag: bool | None,
     thinking_budget: int,
     effort: str | None,
@@ -167,6 +176,7 @@ def adversarial(
     \b
     Examples:
       atomics adversarial --provider ollama -m qwen3:14b --runs 3
+      atomics adversarial --fixtures adv-01 --no-thinking
       atomics adversarial --judge-model deepseek-r1:14b --extra-judges "claude:claude-sonnet-4-6"
       atomics adversarial --runs 3 --extra-judges "ollama:deepseek-r1:14b@http://ollama-host:11434"
     """
@@ -174,6 +184,20 @@ def adversarial(
     from atomics.eval.adversarial.runner import run_adversarial
 
     console = Console()
+    categories = [c.strip() for c in category.split(",")] if category else None
+    ids = None
+    if fixtures_filter is not None:
+        ids = [part.strip() for part in fixtures_filter.split(",") if part.strip()]
+        if not ids:
+            raise click.BadParameter("no fixture IDs", param_hint="--fixtures")
+    try:
+        selected = (
+            select_fixtures(categories, ids=ids) if ids is not None else select_fixtures(categories)
+        )
+    except ValueError as exc:
+        raise click.BadParameter(str(exc), param_hint="--fixtures") from exc
+    selected_count = len(selected)
+
     settings = load_settings()
     provider = _make_provider(provider_name, model, ollama_host, settings, vllm_host=vllm_host)
     judge = _make_provider(
@@ -183,8 +207,6 @@ def adversarial(
     effective_model = _attribution_model(provider, model)
     actual_judge_name = judge.name
     effective_judge_model = _attribution_model(judge, judge_model)
-    categories = [c.strip() for c in category.split(",")] if category else None
-    selected_count = len(select_fixtures(categories))
 
     extra_judge_pairs = parse_extra_judges(
         extra_judges,
@@ -248,11 +270,9 @@ def adversarial(
         pass_count=runs,
     )
 
-    # Actual fixture count (may be filtered by --category) via the single source
-    # of truth so header/progress/run all agree.
-    from atomics.eval.adversarial import select_fixtures
-
-    adv_fixture_count = len(select_fixtures(categories))
+    # Actual fixture count (may be filtered by --category / --fixtures)
+    # so header/progress/run all agree.
+    adv_fixture_count = selected_count
 
     show_progress = ctx.obj.get("progress", True) if ctx.obj else True
     progress = (
@@ -323,6 +343,7 @@ def adversarial(
             judge_model=judge_model,
             extra_judges=extra_judge_pairs,
             categories=categories,
+            fixtures=selected,
             runs=runs,
             run_id=run_id,
             thinking=thinking_flag,
@@ -438,6 +459,7 @@ def adversarial(
                 judge_model=judge_model,
                 extra_judges=extra_judge_pairs,
                 categories=categories,
+                fixtures=selected,
                 runs=runs,
                 run_id=cmp_run_id,
                 thinking=thinking_flag,

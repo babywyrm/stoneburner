@@ -896,6 +896,27 @@ def test_select_fixtures_group_and_concrete_category():
     assert esc and all(f.category == "escalation_gradual" for f in esc)
 
 
+def test_select_fixtures_by_id_preserves_request_order():
+    from atomics.eval.adversarial import select_fixtures
+
+    selected = select_fixtures(ids=["adv-02", "adv-01"])
+    assert [f.id for f in selected] == ["adv-02", "adv-01"]
+
+
+def test_select_fixtures_unknown_id_raises():
+    from atomics.eval.adversarial import select_fixtures
+
+    with pytest.raises(ValueError, match="adv-99"):
+        select_fixtures(ids=["adv-01", "adv-99"])
+
+
+def test_select_fixtures_id_must_be_in_category():
+    from atomics.eval.adversarial import select_fixtures
+
+    with pytest.raises(ValueError, match="adv-01"):
+        select_fixtures(["mcp"], ids=["adv-01"])
+
+
 # ── Multi-turn prior_turns rendering ────────────────────────────────────────
 
 

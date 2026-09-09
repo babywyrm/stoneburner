@@ -44,6 +44,65 @@ def _mock_adversarial_cli(monkeypatch, summaries):
     )
 
 
+def test_cli_adversarial_fixtures_option_is_documented():
+    result = CliRunner().invoke(cli, ["adversarial", "--help"])
+    assert result.exit_code == 0
+    assert "--fixtures" in result.output
+
+
+def test_unknown_adversarial_fixture_id_is_rejected_before_any_request():
+    result = CliRunner().invoke(
+        cli,
+        ["adversarial", "-p", "ollama", "-m", "x", "--fixtures", "adv-99", "--no-save"],
+    )
+    assert result.exit_code != 0
+    assert "adv-99" in result.output
+
+
+def test_cli_adversarial_empty_fixtures_is_rejected():
+    result = CliRunner().invoke(
+        cli,
+        ["adversarial", "-p", "ollama", "-m", "x", "--fixtures", ",", "--no-save"],
+    )
+    assert result.exit_code != 0
+    assert "fixture" in result.output.lower()
+
+
+def test_cli_adversarial_passes_fixture_subset_to_runner(monkeypatch):
+    captured: list = []
+
+    class DummyProvider:
+        name = "mock"
+
+    async def fake_run_adversarial(*_args, **kwargs):
+        captured.append(kwargs)
+        return _adversarial_cli_summary(0.9)
+
+    monkeypatch.setattr(
+        "atomics.commands.security.cmd_adversarial._make_provider",
+        lambda *_args, **_kwargs: DummyProvider(),
+    )
+    monkeypatch.setattr(
+        "atomics.eval.adversarial.runner.run_adversarial",
+        fake_run_adversarial,
+    )
+
+    result = CliRunner().invoke(
+        cli,
+        [
+            "adversarial",
+            "--no-save",
+            "--allow-partial",
+            "--fixtures",
+            "adv-02,adv-01",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert captured
+    assert [f.id for f in captured[0]["fixtures"]] == ["adv-02", "adv-01"]
+    assert "Fixtures: 2" in result.output
+
+
 def test_cli_adversarial_renders_indeterminate_resilience_as_na(monkeypatch):
     _mock_adversarial_cli(monkeypatch, [_adversarial_cli_summary(None)])
 

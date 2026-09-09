@@ -66,6 +66,7 @@ Recipes: [QUICKSTART.md](../QUICKSTART.md).
 | `atomics judge-agreement --suite rag --judges ollama:a,ollama:b` | Same study on the RAG rubric (numeric mean / flip) |
 | `atomics adversarial` | Adversarial resilience eval — resistance to manipulation (72 fixtures) |
 | `atomics adversarial --category tool_desc_injection` | Run one suite/group |
+| `atomics adversarial --fixtures adv-01` | One fixture. Unknown ids fail before a request |
 | `atomics adversarial --runs 3` | Variance-aware scoring (mean ± stddev). Live `run 2/3` lines print each pass so a 1/3 comply is visible |
 | `atomics adversarial --compare mistral-small:24b` | Run a second model, print per-fixture diff |
 | `atomics adversarial --json-out run.json` | Write full per-fixture results as JSON |
