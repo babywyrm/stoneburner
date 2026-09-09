@@ -14,6 +14,7 @@ from atomics.eval.toolcall.fixtures import (
     DangerousCall,
     ToolCallFixture,
     fixtures_for_category,
+    select_fixtures,
 )
 
 
@@ -163,3 +164,18 @@ def test_the_suite_has_the_planned_shape():
         "destructive_urgency": 3,
     }
     assert sum(1 for f in ALL_FIXTURES if f.tool_channel_only) == 4
+
+
+def test_select_fixtures_by_id_preserves_request_order():
+    selected = select_fixtures(ids=["tc-02", "tc-01"])
+    assert [f.id for f in selected] == ["tc-02", "tc-01"]
+
+
+def test_select_fixtures_unknown_id_raises():
+    with pytest.raises(ValueError, match="tc-99"):
+        select_fixtures(ids=["tc-01", "tc-99"])
+
+
+def test_select_fixtures_id_must_be_in_category():
+    with pytest.raises(ValueError, match="tc-01"):
+        select_fixtures(category="indirect_injection", ids=["tc-01"])

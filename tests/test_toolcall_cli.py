@@ -21,6 +21,21 @@ def test_cli_toolcall_thinking_options():
     assert "--thinking-budget" in result.output
 
 
+def test_cli_toolcall_fixtures_option_is_documented():
+    result = CliRunner().invoke(cli, ["toolcall", "--help"])
+    assert result.exit_code == 0
+    assert "--fixtures" in result.output
+
+
+def test_unknown_fixture_id_is_rejected_before_any_request():
+    result = CliRunner().invoke(
+        cli,
+        ["toolcall", "-p", "ollama", "-m", "x", "--fixtures", "tc-99", "--no-save"],
+    )
+    assert result.exit_code != 0
+    assert "tc-99" in result.output
+
+
 def test_toolcall_is_registered():
     result = CliRunner().invoke(cli, ["toolcall", "--help"])
     assert result.exit_code == 0
@@ -317,3 +332,52 @@ def test_toolcall_prints_each_run_outcome(monkeypatch) -> None:
     assert "run 3/3" in result.output
     assert "DANGEROUS" in result.output
     assert "read_file" in result.output
+
+
+def test_toolcall_fixtures_flag_runs_only_those_ids(monkeypatch) -> None:
+    from types import SimpleNamespace
+
+    from atomics.eval.toolcall.runner import ToolCallSummary
+    from atomics.eval.toolcall.scorer import ToolOutcome
+
+    provider = SimpleNamespace(name="ollama", default_model="x")
+    seen: dict[str, list[str]] = {}
+    aggregated = {
+        "id": "tc-01",
+        "category": "direct_dangerous",
+        "severity": "CRITICAL",
+        "tool_outcome": ToolOutcome.DANGEROUS_CALL,
+        "prose_label": None,
+        "calls": [],
+        "error": None,
+        "latency_ms": 10.0,
+        "cost_usd": 0.0,
+        "tool_only": False,
+        "runs": [{}],
+    }
+
+    async def fake_run(**kwargs):
+        seen["ids"] = [f.id for f in kwargs["fixtures"]]
+        return ToolCallSummary(
+            run_id="r-subset",
+            provider="ollama",
+            model="x",
+            started_at="2026-01-01T00:00:00+00:00",
+            completed_at="2026-01-01T00:00:01+00:00",
+            tool_capable=True,
+            fixtures=[aggregated],
+        )
+
+    monkeypatch.setattr(
+        "atomics.commands.toolcall._make_provider",
+        lambda *_args, **_kwargs: provider,
+    )
+    monkeypatch.setattr("atomics.commands.toolcall.run_toolcall_suite", fake_run)
+
+    result = CliRunner().invoke(
+        cli,
+        ["toolcall", "-p", "ollama", "-m", "x", "--fixtures", "tc-01", "--no-save"],
+    )
+    assert result.exit_code == 0, result.output
+    assert seen["ids"] == ["tc-01"]
+    assert "1 fixtures" in result.output

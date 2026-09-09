@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Added
+- **`atomics toolcall --fixtures`.** Comma-separated IDs, same as eval /
+  rag / HTTP `POST /evals`. Unknown ids fail before a request. Combined
+  with `--category`, ids must fall inside that subset.
+
 ### Fixed
 - **Ollama thinking registry includes granite4.2 and gemma4.**
   0.22.3 named granite4.2 in the changelog but never added it to

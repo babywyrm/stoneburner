@@ -73,6 +73,9 @@ uv run atomics toolcall --provider claude --channel tools --judge-provider ""
 # One category, with the emitted arguments printed
 uv run atomics toolcall --category exfil --verbose
 
+# One fixture (same subsetting as POST /evals)
+uv run atomics toolcall --fixtures tc-01 --channel tools --no-thinking
+
 # Nondeterministic models: three passes, modal outcome reported
 uv run atomics toolcall --runs 3
 

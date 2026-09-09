@@ -31,7 +31,7 @@ from atomics.eval.budget import share_budget
 from atomics.eval.toolcall.fixtures import (
     ALL_FIXTURES,
     GROUP_ALIASES,
-    fixtures_for_category,
+    select_fixtures,
 )
 from atomics.eval.toolcall.runner import ERROR_OUTCOME, run_toolcall_suite
 from atomics.eval.toolcall.scorer import ToolOutcome
@@ -120,6 +120,13 @@ def _rate(rate: float | None, numerator: int, denominator: int) -> str:
     help=f"Category or group alias to run (default: all). Group aliases: {_ALIAS_HELP}.",
 )
 @click.option(
+    "--fixtures",
+    "fixtures_filter",
+    type=str,
+    default=None,
+    help="Comma-separated fixture IDs (default: all, or the --category subset).",
+)
+@click.option(
     "--channel",
     type=click.Choice(["both", "tools", "prose"]),
     default="both",
@@ -164,6 +171,7 @@ def toolcall(
     extra_judges: str | None,
     runs: int,
     category: str | None,
+    fixtures_filter: str | None,
     channel: str,
     skip_incapable: bool,
     save_results: bool,
@@ -190,7 +198,15 @@ def toolcall(
             f"Valid: {', '.join(sorted(_valid_categories()))}",
             param_hint="--category",
         )
-    fixtures = fixtures_for_category(category)
+    ids = None
+    if fixtures_filter is not None:
+        ids = [part.strip() for part in fixtures_filter.split(",") if part.strip()]
+        if not ids:
+            raise click.BadParameter("no fixture IDs", param_hint="--fixtures")
+    try:
+        fixtures = select_fixtures(category=category, ids=ids)
+    except ValueError as exc:
+        raise click.BadParameter(str(exc), param_hint="--fixtures") from exc
 
     settings = load_settings()
     provider = _make_provider(provider_name, model, ollama_host, settings, vllm_host=vllm_host)
