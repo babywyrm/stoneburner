@@ -44,7 +44,7 @@ uv run atomics models --provider vllm --vllm-host <openai-compatible-url>
 3. Run QA fixtures:
 
 ```bash
-uv run atomics qa --file qa/examples/app-gate-guardrails.yaml --model <model>
+uv run atomics qa --file qa/examples/app-gate-guardrails.yaml --model <model> --no-thinking
 uv run atomics qa --file qa/examples/app-gate-guardrails.yaml --profile profiles/local/<target>.yaml
 ```
 

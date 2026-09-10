@@ -155,8 +155,22 @@ async def _query_ollama(
     model: str,
     prompt: str,
     num_predict: int = 1024,
+    *,
+    thinking: bool | None = None,
+    thinking_budget: int | None = None,
+    effort: str | None = None,
 ) -> tuple[str, float]:
     """Fire a single prompt at Ollama. Returns (response_text, latency_ms)."""
+    from atomics.benchmark.model_classes import supports_thinking
+    from atomics.providers.effort import ollama_think_value
+    from atomics.providers.ollama import _visible_and_thinking
+
+    auto = thinking if thinking is not None else supports_thinking(model)
+    think_field = ollama_think_value(thinking=auto, effort=effort)
+    use_thinking = think_field is not False
+    options: dict[str, int] = {"num_predict": num_predict}
+    if thinking_budget and use_thinking:
+        options["num_predict"] = num_predict + thinking_budget
     t0 = time.monotonic()
     resp = await client.post(
         f"{host}/api/generate",
@@ -164,13 +178,16 @@ async def _query_ollama(
             "model": model,
             "prompt": prompt,
             "stream": False,
-            "options": {"num_predict": num_predict},
+            "think": think_field,
+            "options": options,
         },
     )
     resp.raise_for_status()
     data = resp.json()
     lat = (time.monotonic() - t0) * 1000
-    text = data.get("response", "")
+    text, _, _ = _visible_and_thinking(
+        data.get("response", ""), data.get("thinking"), data.get("eval_count", 0)
+    )
     return text, lat
 
 
@@ -193,6 +210,9 @@ async def run_qa_suite(
     num_predict: int = 1024,
     on_result: object = None,
     profile: TargetProfile | None = None,
+    thinking: bool | None = None,
+    thinking_budget: int | None = None,
+    effort: str | None = None,
 ) -> QASuiteResult:
     """Run all fixtures sequentially and evaluate each response.
 
@@ -211,7 +231,14 @@ async def run_qa_suite(
                     text, lat = await _query_profile(client, profile, fixture.prompt)
                 else:
                     text, lat = await _query_ollama(
-                        client, host, model, fixture.prompt, num_predict
+                        client,
+                        host,
+                        model,
+                        fixture.prompt,
+                        num_predict,
+                        thinking=thinking,
+                        thinking_budget=thinking_budget,
+                        effort=effort,
                     )
                 status, mp, mf = evaluate_fixture(fixture, text)
                 qa_result = QAResult(

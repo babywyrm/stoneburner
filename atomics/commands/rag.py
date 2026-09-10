@@ -1305,6 +1305,20 @@ def archreview(
 @click.option(
     "--fail-fast", is_flag=True, default=False, help="Stop after the first FAIL or ERROR."
 )
+@click.option(
+    "--thinking/--no-thinking",
+    "thinking_flag",
+    default=None,
+    help="Force thinking on or off for raw Ollama QA (default: auto-detect). "
+    "Ignored with --profile.",
+)
+@click.option(
+    "--thinking-budget",
+    type=int,
+    default=None,
+    help="Added to --num-predict when thinking is on. Raw Ollama only.",
+)
+@effort_options
 def qa(
     qa_file: str,
     profile_path: str | None,
@@ -1312,6 +1326,10 @@ def qa(
     ollama_host: str | None,
     num_predict: int,
     fail_fast: bool,
+    thinking_flag: bool | None,
+    thinking_budget: int | None,
+    effort: str | None,
+    reasoning_mode: str | None,
 ) -> None:
     """QA validation — fire fixture prompts and check pass/fail patterns.
 
@@ -1331,6 +1349,7 @@ def qa(
 
     \b
     Other examples:
+      atomics qa --file qa/examples/app-gate-guardrails.yaml --model qwen3.8:27b --no-thinking
       atomics qa --file qa/examples/ai-gate-regression.yaml --fail-fast
       atomics qa --file qa/examples/app-gate-guardrails.yaml \\
                  --profile profiles/local/my-policy.yaml
@@ -1339,6 +1358,8 @@ def qa(
     import logging as _logging
 
     from atomics.benchmark.qa_runner import QAResult, load_qa_suite, run_qa_suite
+
+    _ = reasoning_mode
 
     _logging.getLogger("httpx").setLevel(_logging.WARNING)
     _logging.getLogger("httpcore").setLevel(_logging.WARNING)
@@ -1390,6 +1411,9 @@ def qa(
                 num_predict=num_predict,
                 on_result=_on_result,
                 profile=loaded_profile,
+                thinking=thinking_flag,
+                thinking_budget=thinking_budget,
+                effort=effort,
             )
         )
     except KeyboardInterrupt:

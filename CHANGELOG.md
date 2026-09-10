@@ -6,8 +6,11 @@
 - **`atomics toolcall --fixtures`.** Comma-separated IDs, same as eval /
   rag / HTTP `POST /evals`. Unknown ids fail before a request. Combined
   with `--category`, ids must fall inside that subset.
-- **`atomics adversarial --fixtures`.** Same ID subset as toolcall /
-  HTTP. One-fixture proofs no longer need `--category` plus hope.
+- **`atomics qa --thinking` / `--effort`.** Raw Ollama QA posted
+  `/api/generate` with no `think` field, so qwen3.8 burned hidden CoT
+  on pattern checks. `--no-thinking` sends `think: false`; `--effort`
+  uses the same native levels as `provider-test`. `--profile` is
+  unchanged.
 
 ### Fixed
 - **`--provider vllm` reads Ollama `/v1` `message.reasoning`.** SGLang

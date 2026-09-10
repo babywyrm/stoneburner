@@ -22,6 +22,7 @@ uv run atomics provider-test --provider gemini --effort high
 uv run atomics provider-test --provider together --effort medium
 uv run atomics provider-test --provider vllm -m qwen3.8:27b --effort low --thinking-budget 512
 uv run atomics provider-test --provider ollama -m qwen3:14b --effort low
+uv run atomics qa --file qa/examples/app-gate-guardrails.yaml -m qwen3.8:27b --no-thinking
 
 # Full prompt, model reply, thinking, and judge rationale (no truncated table)
 uv run atomics eval --provider openai -m gpt-5.6-luna --effort low --verbose \
@@ -48,7 +49,7 @@ uv run atomics provider-test -p ollama -m qwen3.8:27b --no-thinking
 
 When `--thinking` / `--no-thinking` is omitted, stoneburner checks the model against its capability registry and enables thinking automatically for known models. Use `--no-thinking` to force it off for A/B comparisons.
 
-The same `--thinking` / `--no-thinking` / `--thinking-budget` grammar is on every suite that calls `generate`: `run`, `eval`, `adversarial`, `redblue`, `refusal`, `toolcall` (prose and tool channels), `codereview`, `multiturn`, `rag`, `codegen`, and `probe`. `--effort` / `--reasoning-mode` are on those same suites. The tool channel keeps Claude extended thinking off and still forwards `output_config.effort`. For local thinking models on short fixtures, `--no-thinking` is the difference between a visible answer and an empty generation that spent the whole token budget on hidden reasoning. When that still happens, the attempt is `thinking_budget` (CLI: `THINK`), not a provider crash.
+The same `--thinking` / `--no-thinking` / `--thinking-budget` grammar is on every suite that calls `generate`: `run`, `eval`, `adversarial`, `redblue`, `refusal`, `toolcall` (prose and tool channels), `codereview`, `multiturn`, `rag`, `codegen`, `probe`, and raw-Ollama `qa`. `--effort` / `--reasoning-mode` are on those same suites (`qa` ignores `--reasoning-mode`; `--profile` QA does not send Ollama `think`). The tool channel keeps Claude extended thinking off and still forwards `output_config.effort`. For local thinking models on short fixtures, `--no-thinking` is the difference between a visible answer and an empty generation that spent the whole token budget on hidden reasoning. When that still happens, the attempt is `thinking_budget` (CLI: `THINK`), not a provider crash.
 
 On `--provider vllm`, those Qwen template keys are written by `generate()` and `generate_with_tools`. If SGLang `--tool-call-parser qwen3_coder` still loops with `--effort` on `--channel tools`, use `--no-thinking` on that channel.
 
