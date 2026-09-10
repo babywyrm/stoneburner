@@ -144,6 +144,9 @@ HTTP (`runs`, `judge_host`, `channel`, `fixtures`).
 template keys on vLLM, native Ollama `think` levels, leaked CoT
 split out of visible text, and doctor Next following
 `inference.env`.
+**v0.22.4** (2026-09-10) is `--fixtures` on the remaining security
+CLIs, `atomics qa --thinking` / token counts, Ollama `/v1`
+`message.reasoning`, and granite4.2 / gemma4 on the thinking registry.
 
 ## v0.19.0 — A stranger can trust a headline
 
@@ -213,7 +216,8 @@ releases; they are not this tag.
 **v0.22.0** (2026-08-23) shipped the items below. **v0.22.1** is the
 storefront README. **v0.22.2** is uncapped eval trails and CLI knobs
 on HTTP. **v0.22.3** is thinking dials on Ollama and Qwen.
-Package version is **0.22.3**.
+**v0.22.4** is fixture subsets, QA thinking, and token counts.
+Package version is **0.22.4**.
 
 - [x] **REPL line editing.** Stdlib `readline` for in-process
       history. No `prompt_toolkit`. Not session persistence to disk.
@@ -250,7 +254,7 @@ Package version is **0.22.3**.
 
 ## Next
 
-Current package is **0.22.3**. Unscheduled. Pick one; do not mix a
+Current package is **0.22.4**. Unscheduled. Pick one; do not mix a
 parked item into it.
 
 - **Suite convergence** (ARCHITECTURE): `results` alias, large

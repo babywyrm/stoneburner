@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## 0.22.4 (2026-09-10) — Fixture subsets, QA thinking, and token counts
+
+### Upgrade notes
+- Additive. No CLI flag removals.
+- Raw `atomics qa` now sends `think`. `--no-thinking` is `think: false`.
+  Omit neither: thinking models used to burn hidden CoT on pattern checks.
+- `--fixtures` on toolcall, adversarial, refusal, redblue, and
+  codereview: unknown ids fail before a request. Combined with
+  `--category` / `--mode`, ids must fall inside that subset.
+
 ### Added
 - **`atomics toolcall --fixtures`.** Comma-separated IDs, same as eval /
   rag / HTTP `POST /evals`. Unknown ids fail before a request. Combined
