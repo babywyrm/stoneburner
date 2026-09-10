@@ -14,6 +14,10 @@
   on pattern checks. `--no-thinking` sends `think: false`; `--effort`
   uses the same native levels as `provider-test`. `--profile` is
   unchanged.
+- **`atomics qa` keeps Ollama token counts.** Each fixture records
+  `prompt_eval_count` / `eval_count` and the same thinking split as
+  `provider-test`. CLI prints `in=` / `out=` / `think=`. `--profile`
+  leaves them unset — the gate HTTP body has no usage.
 - **QUICKSTART: watch a live Ollama request.** macOS `lsof` and Linux
   `ss` for `:11434`, `OLLAMA_DEBUG=1 ollama serve`, GIN path table
   (`/api/generate` vs `/api/chat` vs `/v1/chat/completions`). Bind-in-use

@@ -538,7 +538,7 @@ Thinking tokens: 24
 - `provider-test` prints that every time.
 - Suites: `--json-out run.json` and `--save` (SQLite). `eval --verbose` prints thinking text.
 - `--provider vllm` prefers gateway `usage.reasoning_tokens`. Native Ollama `eval_count` includes hidden reasoning; we estimate `thinking_tokens` by character share.
-- `atomics qa` is pass/fail patterns only — it does not persist token counts.
+- `atomics qa` prints Ollama `in` / `out` / `think` on each fixture. `--profile` has no usage shape, so those stay unset.
 
 Do not commit prompt dumps. Keep traces in the screen/journal, or a gitignored `--json-out` file.
 
