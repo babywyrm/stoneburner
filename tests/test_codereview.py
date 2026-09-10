@@ -5,7 +5,7 @@ from __future__ import annotations
 import httpx
 import pytest
 
-from atomics.eval.codereview import SECURE_CODE_FIXTURES, run_codereview
+from atomics.eval.codereview import SECURE_CODE_FIXTURES, run_codereview, select_fixtures
 from atomics.eval.outcomes import JudgeOutcomeStatus, ProviderOutcomeKind, RunStatus
 from atomics.providers.base import ProviderResponse
 
@@ -27,6 +27,20 @@ def test_fixtures_have_both_modes():
 def test_ids_unique():
     ids = [f.id for f in SECURE_CODE_FIXTURES]
     assert len(ids) == len(set(ids))
+
+
+def test_select_fixtures_default_is_all():
+    assert select_fixtures() == list(SECURE_CODE_FIXTURES)
+
+
+def test_select_fixtures_by_id_preserves_request_order():
+    selected = select_fixtures(ids=["scr-clean-01", "scr-01"])
+    assert [f.id for f in selected] == ["scr-clean-01", "scr-01"]
+
+
+def test_select_fixtures_unknown_id_raises():
+    with pytest.raises(ValueError, match="scr-99"):
+        select_fixtures(ids=["scr-01", "scr-99"])
 
 
 def test_vulnerable_fixtures_have_cwe_and_findings():

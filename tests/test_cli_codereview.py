@@ -156,8 +156,56 @@ def test_codereview_help_preserves_public_options() -> None:
         "--thinking",
         "--no-thinking",
         "--thinking-budget",
+        "--fixtures",
     ):
         assert option in result.output
+
+
+def test_unknown_codereview_fixture_id_is_rejected_before_any_request() -> None:
+    result = CliRunner().invoke(
+        cli,
+        ["codereview", "-p", "ollama", "-m", "x", "--fixtures", "scr-99", "--no-save"],
+    )
+    assert result.exit_code != 0
+    assert "scr-99" in result.output
+
+
+def test_cli_codereview_empty_fixtures_is_rejected() -> None:
+    result = CliRunner().invoke(
+        cli,
+        ["codereview", "-p", "ollama", "-m", "x", "--fixtures", ",", "--no-save"],
+    )
+    assert result.exit_code != 0
+    assert "fixture" in result.output.lower()
+
+
+def test_cli_codereview_passes_fixture_subset_to_runner(monkeypatch) -> None:
+    captured: list = []
+    provider = SimpleNamespace(name="mock", default_model="mock-model")
+
+    async def fake_run_codereview(*_args, **kwargs):
+        captured.append(kwargs)
+        return _Summary(run_id=kwargs.get("run_id") or "codereview-run")
+
+    monkeypatch.setattr(
+        "atomics.commands.security.cmd_codereview._make_provider",
+        lambda *_args, **_kwargs: provider,
+    )
+    monkeypatch.setattr("atomics.eval.codereview.run_codereview", fake_run_codereview)
+
+    result = CliRunner().invoke(
+        cli,
+        [
+            "codereview",
+            "--no-save",
+            "--allow-partial",
+            "--fixtures",
+            "scr-clean-01,scr-01",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert captured
+    assert [f.id for f in captured[0]["fixtures"]] == ["scr-clean-01", "scr-01"]
 
 
 def test_codereview_command_is_registered_and_reexported() -> None:

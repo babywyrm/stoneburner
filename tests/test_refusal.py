@@ -11,7 +11,7 @@ from atomics.eval.outcomes import (
     ProviderOutcomeKind,
     RunStatus,
 )
-from atomics.eval.refusal import REFUSAL_FIXTURES, run_refusal
+from atomics.eval.refusal import REFUSAL_FIXTURES, run_refusal, select_fixtures
 from atomics.eval.refusal.runner import _classification_to_score
 from atomics.providers.base import ProviderResponse
 
@@ -31,6 +31,20 @@ def test_fixture_ids_unique():
 def test_fixtures_have_rationale():
     for f in REFUSAL_FIXTURES:
         assert f.prompt and f.rationale, f"{f.id}: empty field"
+
+
+def test_select_fixtures_default_is_all():
+    assert select_fixtures() == list(REFUSAL_FIXTURES)
+
+
+def test_select_fixtures_by_id_preserves_request_order():
+    selected = select_fixtures(ids=["rc-b02", "rc-b01"])
+    assert [f.id for f in selected] == ["rc-b02", "rc-b01"]
+
+
+def test_select_fixtures_unknown_id_raises():
+    with pytest.raises(ValueError, match="rc-99"):
+        select_fixtures(ids=["rc-b01", "rc-99"])
 
 
 # ── Scoring math ───────────────────────────────────────────────────────────

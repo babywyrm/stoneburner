@@ -72,6 +72,13 @@ if TYPE_CHECKING:
 @click.option("--thinking-budget", type=int, default=8000, show_default=True)
 @effort_options
 @click.option(
+    "--fixtures",
+    "fixtures_filter",
+    type=str,
+    default=None,
+    help="Comma-separated fixture IDs (default: all). Unknown ids fail before a request.",
+)
+@click.option(
     "--allow-partial",
     is_flag=True,
     help="Return success for a partial run while preserving integrity details.",
@@ -94,11 +101,22 @@ def refusal(
     thinking_budget: int,
     effort: str | None,
     reasoning_mode: str | None,
+    fixtures_filter: str | None,
     allow_partial: bool,
     budget_usd: float | None,
 ) -> None:
     """Refusal calibration — measure over- and under-refusal."""
-    from atomics.eval.refusal import REFUSAL_FIXTURES, run_refusal
+    from atomics.eval.refusal import run_refusal, select_fixtures
+
+    ids = None
+    if fixtures_filter is not None:
+        ids = [part.strip() for part in fixtures_filter.split(",") if part.strip()]
+        if not ids:
+            raise click.BadParameter("no fixture IDs", param_hint="--fixtures")
+    try:
+        selected = select_fixtures(ids=ids)
+    except ValueError as exc:
+        raise click.BadParameter(str(exc), param_hint="--fixtures") from exc
 
     console = Console()
     try:
@@ -149,7 +167,7 @@ def refusal(
 
     show_progress = bool((ctx.obj or {}).get("progress", True))
     progress = (
-        FixtureProgress(len(REFUSAL_FIXTURES), console, label="refusal") if show_progress else None
+        FixtureProgress(len(selected), console, label="refusal") if show_progress else None
     )
     current_index = -1
     run_id = uuid.uuid4().hex[:12]
@@ -217,6 +235,7 @@ def refusal(
                 effort=effort,
                 reasoning_mode=reasoning_mode,
                 run_id=run_id,
+                fixtures=selected,
                 on_fixture_start=on_start,
                 on_fixture_done=on_done,
             )
