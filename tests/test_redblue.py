@@ -65,6 +65,8 @@ import asyncio
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
+import pytest
+
 
 def _provider(text="The Metasploit module search command is: search type:exploit"):
     p = AsyncMock()
@@ -148,6 +150,115 @@ def test_cli_redblue_help():
     result = runner.invoke(cli, ["redblue", "--help"])
     assert result.exit_code == 0
     assert "red" in result.output.lower()
+    assert "--fixtures" in result.output
+
+
+def test_select_fixtures_default_is_all():
+    from atomics.eval.redblue.fixtures import ALL_FIXTURES, select_fixtures
+
+    assert select_fixtures() == list(ALL_FIXTURES)
+
+
+def test_select_fixtures_by_id_preserves_request_order():
+    from atomics.eval.redblue.fixtures import select_fixtures
+
+    selected = select_fixtures(ids=["rb-b01", "rb-r01"])
+    assert [f.id for f in selected] == ["rb-b01", "rb-r01"]
+
+
+def test_select_fixtures_unknown_id_raises():
+    from atomics.eval.redblue.fixtures import select_fixtures
+
+    with pytest.raises(ValueError, match="rb-99"):
+        select_fixtures(ids=["rb-r01", "rb-99"])
+
+
+def test_select_fixtures_id_must_be_in_mode():
+    from atomics.eval.redblue.fixtures import select_fixtures
+
+    with pytest.raises(ValueError, match="rb-b01"):
+        select_fixtures("red", ids=["rb-b01"])
+
+
+def test_unknown_redblue_fixture_id_is_rejected_before_any_request():
+    from click.testing import CliRunner
+
+    from atomics.cli import cli
+
+    result = CliRunner().invoke(
+        cli,
+        ["redblue", "-p", "ollama", "-m", "x", "--fixtures", "rb-99", "--no-save"],
+    )
+    assert result.exit_code != 0
+    assert "rb-99" in result.output
+
+
+def test_cli_redblue_empty_fixtures_is_rejected():
+    from click.testing import CliRunner
+
+    from atomics.cli import cli
+
+    result = CliRunner().invoke(
+        cli,
+        ["redblue", "-p", "ollama", "-m", "x", "--fixtures", ",", "--no-save"],
+    )
+    assert result.exit_code != 0
+    assert "fixture" in result.output.lower()
+
+
+def test_cli_redblue_mode_rejects_id_outside_subset():
+    from click.testing import CliRunner
+
+    from atomics.cli import cli
+
+    result = CliRunner().invoke(
+        cli,
+        [
+            "redblue",
+            "-p",
+            "ollama",
+            "-m",
+            "x",
+            "--mode",
+            "red",
+            "--fixtures",
+            "rb-b01",
+            "--no-save",
+        ],
+    )
+    assert result.exit_code != 0
+    assert "rb-b01" in result.output
+
+
+def test_cli_redblue_passes_fixture_subset_to_runner(monkeypatch):
+    from click.testing import CliRunner
+
+    from atomics.cli import cli
+
+    captured: list = []
+    provider = SimpleNamespace(name="ollama", default_model="x")
+
+    async def fake_run(_provider, **kwargs):
+        captured.append(kwargs)
+        return _empty_redblue_summary(runs=1)
+
+    monkeypatch.setattr(
+        "atomics.commands.security.cmd_redblue._make_provider",
+        lambda *_args, **_kwargs: provider,
+    )
+    monkeypatch.setattr(
+        "atomics.eval.redblue.runner.run_redblue",
+        fake_run,
+    )
+
+    result = CliRunner().invoke(
+        cli,
+        ["redblue", "--no-save", "--fixtures", "rb-b01,rb-r01"],
+    )
+    assert result.exit_code == 0, result.output
+    assert captured
+    assert [f.id for f in captured[0]["fixtures"]] == ["rb-b01", "rb-r01"]
+    assert "Fixtures: 2" in result.output
 
 
 # ── Multi-run (--runs N) support ─────────────────────────────────────────────

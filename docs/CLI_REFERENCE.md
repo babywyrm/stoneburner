@@ -83,12 +83,15 @@ Recipes: [QUICKSTART.md](../QUICKSTART.md).
 | `atomics toolcall --no-skip-incapable` | Non-zero exit if the model cannot emit tool calls (for sweeps) |
 | `atomics toolcall --no-thinking` | Force thinking off on the prose channel (same grammar as red/blue) |
 | `atomics refusal` | Refusal-calibration eval — over- vs under-refusal |
+| `atomics refusal --fixtures rc-b01` | One fixture. Unknown ids fail before a request |
 | `atomics refusal --extra-judges ollama:mistral:7b` | Majority-vote classification; ties are unresolved |
 | `atomics refusal --no-thinking` | Force thinking off so reasoning models do not burn the fixture budget |
 | `atomics codereview` | Secure-code-review eval — planted-vuln detection + false positives |
+| `atomics codereview --fixtures scr-01` | One fixture. Unknown ids fail before a request |
 | `atomics codereview --extra-judges ollama:mistral:7b` | Majority-vote verdict; ties are unresolved |
 | `atomics codereview --no-thinking` | Force thinking off so the review is visible text, not hidden reasoning |
 | `atomics redblue --mode all` | Red/blue security capability eval (offensive + defensive) |
+| `atomics redblue --fixtures rb-r01` | One fixture. Combined with `--mode`, ids must fall inside that subset |
 | `atomics redblue --extra-judges ollama:mistral:7b` | Multi-judge mean ± stdev on the quality score |
 | `atomics redblue --runs 3 --json-out rb.json` | Variance-aware capability scoring + JSON export. Live `run 2/3` lines print each pass |
 | `atomics redblue --no-thinking --runs 3` | Multi-run capability score with thinking forced off |

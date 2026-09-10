@@ -17,8 +17,11 @@ isolation — the common real-world PR-review setting.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Literal
+
+from atomics.eval.ids import select_by_ids
 
 
 @dataclass(frozen=True)
@@ -182,3 +185,8 @@ SECURE_CODE_FIXTURES: list[SecureCodeFixture] = [
         expected_findings=[],
     ),
 ]
+
+
+def select_fixtures(ids: Sequence[str] | None = None) -> list[SecureCodeFixture]:
+    """Subset the catalog by fixture id. Unknown ids raise ``ValueError``."""
+    return select_by_ids(SECURE_CODE_FIXTURES, ids)

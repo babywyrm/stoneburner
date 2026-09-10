@@ -185,6 +185,9 @@ uv run atomics redblue --provider ollama -m qwen3:14b
 uv run atomics redblue --provider claude --mode red
 uv run atomics redblue --provider openai -m gpt-4o --mode blue
 
+# One fixture (unknown ids fail before a request; with --mode, ids must be in that subset)
+uv run atomics redblue --fixtures rb-r01 --no-thinking
+
 # Persist results + variance scoring — each pass prints while it runs
 uv run atomics redblue --provider ollama -m qwen3:14b --save --runs 3 --no-thinking
 
@@ -210,6 +213,9 @@ Measures **both** safety failure modes: over-refusal (blocking legitimate securi
 ```bash
 uv run atomics refusal -p ollama -m qwen3:14b \
   --judge-model qwen2.5:14b --no-thinking --json-out refusal.json
+
+# One fixture (unknown ids fail before a request)
+uv run atomics refusal --fixtures rc-b01 --no-thinking
 ```
 
 ## `atomics codereview` — Secure Code Review (8 fixtures)
@@ -219,6 +225,9 @@ Tests vulnerability detection on code snippets and unified diffs. Vulnerable fix
 ```bash
 uv run atomics codereview -p ollama -m qwen3:14b \
   --judge-model qwen2.5:14b --no-thinking --json-out codereview.json
+
+# One fixture (unknown ids fail before a request)
+uv run atomics codereview --fixtures scr-01 --no-thinking
 ```
 
 ## `atomics probe` — Live Ecosystem Probe

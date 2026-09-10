@@ -56,6 +56,14 @@ from atomics.eval.suite_integrity import format_headline_rate
     help="Which fixture set to run.",
 )
 @click.option(
+    "--fixtures",
+    "fixtures_filter",
+    type=str,
+    default=None,
+    help="Comma-separated fixture IDs (default: all, or the --mode subset). "
+    "Unknown ids fail before a request.",
+)
+@click.option(
     "--runs",
     type=int,
     default=1,
@@ -93,6 +101,7 @@ def redblue(
     judge_host: str | None,
     extra_judges: str | None,
     mode: str,
+    fixtures_filter: str | None,
     runs: int,
     thinking_flag: bool | None,
     thinking_budget: int,
@@ -107,15 +116,21 @@ def redblue(
 
     Use --runs 3 for variance-aware scoring (mean ± stddev across passes).
     """
-    from atomics.eval.redblue.fixtures import ALL_FIXTURES, BLUE_FIXTURES, RED_FIXTURES
+    from atomics.eval.redblue.fixtures import select_fixtures
     from atomics.eval.redblue.runner import run_redblue
 
+    ids = None
+    if fixtures_filter is not None:
+        ids = [part.strip() for part in fixtures_filter.split(",") if part.strip()]
+        if not ids:
+            raise click.BadParameter("no fixture IDs", param_hint="--fixtures")
+    try:
+        selected = select_fixtures(mode, ids=ids)
+    except ValueError as exc:
+        raise click.BadParameter(str(exc), param_hint="--fixtures") from exc
+
     console = Console()
-    fixture_count = {
-        "red": len(RED_FIXTURES),
-        "blue": len(BLUE_FIXTURES),
-        "all": len(ALL_FIXTURES),
-    }[mode]
+    fixture_count = len(selected)
     settings = load_settings()
     provider = _make_provider(provider_name, model, ollama_host, settings, vllm_host=vllm_host)
     judge = _make_provider(
@@ -216,6 +231,7 @@ def redblue(
                 model=model,
                 judge_model=judge_model,
                 extra_judges=extra_judge_pairs,
+                fixtures=selected,
                 runs=runs,
                 run_id=run_id,
                 thinking=thinking_flag,

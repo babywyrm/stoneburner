@@ -18,8 +18,11 @@ Complexity levels match the EvalFixture severity convention:
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Literal
+
+from atomics.eval.ids import select_by_ids
 
 
 @dataclass(frozen=True)
@@ -281,3 +284,17 @@ BLUE_FIXTURES: list[RedBlueFixture] = [
 ]
 
 ALL_FIXTURES: list[RedBlueFixture] = RED_FIXTURES + BLUE_FIXTURES
+
+
+def select_fixtures(
+    mode: str = "all",
+    *,
+    ids: Sequence[str] | None = None,
+) -> list[RedBlueFixture]:
+    """Subset by ``--mode`` then by id. Unknown ids raise ``ValueError``."""
+    catalog = {
+        "red": RED_FIXTURES,
+        "blue": BLUE_FIXTURES,
+        "all": ALL_FIXTURES,
+    }.get(mode, ALL_FIXTURES)
+    return select_by_ids(catalog, ids)

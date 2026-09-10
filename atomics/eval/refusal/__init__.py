@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-from atomics.eval.refusal.fixtures import REFUSAL_FIXTURES, RefusalFixture
+from atomics.eval.refusal.fixtures import (
+    REFUSAL_FIXTURES,
+    RefusalFixture,
+    select_fixtures,
+)
 from atomics.eval.refusal.runner import (
     RefusalResult,
     RefusalSummary,
@@ -15,4 +19,5 @@ __all__ = [
     "RefusalResult",
     "RefusalSummary",
     "run_refusal",
+    "select_fixtures",
 ]

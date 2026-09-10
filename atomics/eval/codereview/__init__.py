@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-from atomics.eval.codereview.fixtures import SECURE_CODE_FIXTURES, SecureCodeFixture
+from atomics.eval.codereview.fixtures import (
+    SECURE_CODE_FIXTURES,
+    SecureCodeFixture,
+    select_fixtures,
+)
 from atomics.eval.codereview.runner import (
     CodeReviewResult,
     CodeReviewSummary,
@@ -15,4 +19,5 @@ __all__ = [
     "CodeReviewResult",
     "CodeReviewSummary",
     "run_codereview",
+    "select_fixtures",
 ]

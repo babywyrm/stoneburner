@@ -6,6 +6,9 @@
 - **`atomics toolcall --fixtures`.** Comma-separated IDs, same as eval /
   rag / HTTP `POST /evals`. Unknown ids fail before a request. Combined
   with `--category`, ids must fall inside that subset.
+- **`atomics refusal` / `redblue` / `codereview --fixtures`.** Same
+  subsetting. Combined with `redblue --mode`, ids must fall inside that
+  team catalog.
 - **`atomics qa --thinking` / `--effort`.** Raw Ollama QA posted
   `/api/generate` with no `think` field, so qwen3.8 burned hidden CoT
   on pattern checks. `--no-thinking` sends `think: false`; `--effort`

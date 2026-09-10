@@ -72,6 +72,13 @@ if TYPE_CHECKING:
 @click.option("--thinking-budget", type=int, default=8000, show_default=True)
 @effort_options
 @click.option(
+    "--fixtures",
+    "fixtures_filter",
+    type=str,
+    default=None,
+    help="Comma-separated fixture IDs (default: all). Unknown ids fail before a request.",
+)
+@click.option(
     "--allow-partial",
     is_flag=True,
     help="Return success for a partial run while preserving integrity details.",
@@ -94,11 +101,22 @@ def codereview(
     thinking_budget: int,
     effort: str | None,
     reasoning_mode: str | None,
+    fixtures_filter: str | None,
     allow_partial: bool,
     budget_usd: float | None,
 ) -> None:
     """Secure code review — measure planted-vulnerability detection."""
-    from atomics.eval.codereview import SECURE_CODE_FIXTURES, run_codereview
+    from atomics.eval.codereview import run_codereview, select_fixtures
+
+    ids = None
+    if fixtures_filter is not None:
+        ids = [part.strip() for part in fixtures_filter.split(",") if part.strip()]
+        if not ids:
+            raise click.BadParameter("no fixture IDs", param_hint="--fixtures")
+    try:
+        selected = select_fixtures(ids=ids)
+    except ValueError as exc:
+        raise click.BadParameter(str(exc), param_hint="--fixtures") from exc
 
     console = Console()
     try:
@@ -149,7 +167,7 @@ def codereview(
 
     show_progress = bool((ctx.obj or {}).get("progress", True))
     progress = (
-        FixtureProgress(len(SECURE_CODE_FIXTURES), console, label="codereview")
+        FixtureProgress(len(selected), console, label="codereview")
         if show_progress
         else None
     )
@@ -216,6 +234,7 @@ def codereview(
                 effort=effort,
                 reasoning_mode=reasoning_mode,
                 run_id=run_id,
+                fixtures=selected,
                 on_fixture_start=on_start,
                 on_fixture_done=on_done,
             )
