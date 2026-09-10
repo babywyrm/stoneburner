@@ -14,7 +14,8 @@
 - **QUICKSTART: watch a live Ollama request.** macOS `lsof` and Linux
   `ss` for `:11434`, `OLLAMA_DEBUG=1 ollama serve`, GIN path table
   (`/api/generate` vs `/api/chat` vs `/v1/chat/completions`). Bind-in-use
-  means attach or stop — do not start a second `serve`.
+  means attach or stop — do not start a second `serve`. Token split is
+  `provider-test` / `--json-out`; GIN is wall clock.
 
 ### Fixed
 - **`--provider vllm` reads Ollama `/v1` `message.reasoning`.** SGLang

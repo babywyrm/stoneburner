@@ -526,6 +526,22 @@ A finished call looks like:
 
 `::1` / `127.0.0.1` is this machine. A LAN IP is another client. The `slot` / `prompt cache` lines under `OLLAMA_DEBUG=1` are llama.cpp internals; the GIN row is the request.
 
+GIN duration is wall clock for that HTTP call. Prompt-eval vs decode tok/s is on the `slot print_timing` lines. **What was sent and how tokens split** is `atomics`, not GIN:
+
+```text
+Tokens: in=60 out=24 total=84
+Effort: low
+Reasoning request: {'think': 'low'}
+Thinking tokens: 24
+```
+
+- `provider-test` prints that every time.
+- Suites: `--json-out run.json` and `--save` (SQLite). `eval --verbose` prints thinking text.
+- `--provider vllm` prefers gateway `usage.reasoning_tokens`. Native Ollama `eval_count` includes hidden reasoning; we estimate `thinking_tokens` by character share.
+- `atomics qa` is pass/fail patterns only — it does not persist token counts.
+
+Do not commit prompt dumps. Keep traces in the screen/journal, or a gitignored `--json-out` file.
+
 Smoke it:
 
 ```bash
