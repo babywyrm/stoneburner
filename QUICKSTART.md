@@ -476,7 +476,63 @@ ATOMICS_OLLAMA_TIMEOUT=600   # big reasoning models on hard prompts
 | Compact table truncates the answer and rationale | `atomics eval --verbose` prints the full transcript. |
 | `Unknown provider` | Install the extra: `uv sync --extra openai` / `--extra bedrock`. |
 | Ollama host unreachable | `uv run atomics doctor` and check `ATOMICS_OLLAMA_HOST`. |
+| `bind: address already in use` on `ollama serve` | Something already owns `:11434`. Do not start a second server. Find it (below) and attach, or stop it first. |
+| Overlapping suite runs look slow / judges `ReadTimeout` | One Ollama process, one model. Do not pile three `toolcall --runs 3` packs on the same host. |
 | Want a quick eval, not all 25 | `atomics eval --fixtures ev-01,ev-02`. |
+
+### Watch a live Ollama request (macOS and Linux)
+
+`atomics` does not print the HTTP log. The server does. Confirm the listener, then read GIN lines while you run a one-fixture command.
+
+What's loaded:
+
+```bash
+ollama ps
+curl -sS http://127.0.0.1:11434/api/ps
+uv run atomics doctor
+```
+
+Who owns the port (do not bind a second `serve` if this prints a pid):
+
+```bash
+# macOS
+lsof -nP -iTCP:11434 -sTCP:LISTEN
+# Linux
+ss -lptn 'sport = :11434'
+```
+
+Foreground debug (stop the existing serve first, or you get `address already in use`):
+
+```bash
+OLLAMA_DEBUG=1 OLLAMA_HOST=127.0.0.1:11434 ollama serve
+```
+
+If `serve` was started in `screen` or `tmux`, attach that session instead of launching another. Detach with `Ctrl-A D` (`screen`) or `Ctrl-B D` (`tmux`). `Ctrl-C` in that session stops inference.
+
+Linux packages that ship a unit: `journalctl -u ollama -f`. There is no `ollama logs` command on current Ollama.
+
+A finished call looks like:
+
+```text
+[GIN] ... | 200 | 2.895s | ::1 | POST "/api/generate"
+```
+
+| GIN path | Typical `atomics` caller |
+|----------|--------------------------|
+| `GET /api/tags` | `doctor`, `provider-test` health |
+| `POST /api/generate` | native `--provider ollama` (`qa`, `eval`, `adversarial`, …) |
+| `POST /api/chat` | `toolcall --channel tools` |
+| `POST /v1/chat/completions` | `--provider vllm --vllm-host http://127.0.0.1:11434/v1` |
+
+`::1` / `127.0.0.1` is this machine. A LAN IP is another client. The `slot` / `prompt cache` lines under `OLLAMA_DEBUG=1` are llama.cpp internals; the GIN row is the request.
+
+Smoke it:
+
+```bash
+uv run atomics provider-test -p ollama -m qwen3.8:27b --no-thinking
+uv run atomics qa --file qa/examples/ai-gate-regression.yaml -m qwen3.8:27b --no-thinking
+uv run atomics toolcall --fixtures tc-01 --channel tools --no-thinking --no-save
+```
 
 ---
 

@@ -11,6 +11,10 @@
   on pattern checks. `--no-thinking` sends `think: false`; `--effort`
   uses the same native levels as `provider-test`. `--profile` is
   unchanged.
+- **QUICKSTART: watch a live Ollama request.** macOS `lsof` and Linux
+  `ss` for `:11434`, `OLLAMA_DEBUG=1 ollama serve`, GIN path table
+  (`/api/generate` vs `/api/chat` vs `/v1/chat/completions`). Bind-in-use
+  means attach or stop — do not start a second `serve`.
 
 ### Fixed
 - **`--provider vllm` reads Ollama `/v1` `message.reasoning`.** SGLang
