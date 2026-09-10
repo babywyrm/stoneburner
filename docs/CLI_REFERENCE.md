@@ -44,6 +44,7 @@ Recipes: [QUICKSTART.md](../QUICKSTART.md).
 | `atomics provider-test -p openai` | Health check OpenAI |
 | `atomics provider-test -p ollama` | Health check Ollama |
 | `atomics provider-test -p ollama -m qwen3.8:27b --no-thinking` | Smoke-test a thinking model without burning the visible answer |
+| `ollama ps` / `curl -sS http://127.0.0.1:11434/api/ps` | What Ollama has loaded. See QUICKSTART.md, "Watch a live Ollama request" |
 | `atomics provider-test -p ollama -m qwen3:4b --effort low --max-output-tokens 512` | Native `think: "low"` with room for a visible answer |
 | `atomics provider-test -p brain-gateway` | Health check brain-gateway |
 | `atomics provider-test -p groq` | Health check Groq |

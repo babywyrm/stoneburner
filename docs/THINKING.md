@@ -53,6 +53,8 @@ The same `--thinking` / `--no-thinking` / `--thinking-budget` grammar is on ever
 
 On `--provider vllm`, those Qwen template keys are written by `generate()` and `generate_with_tools`. If SGLang `--tool-call-parser qwen3_coder` still loops with `--effort` on `--channel tools`, use `--no-thinking` on that channel.
 
+To confirm Ollama received the POST (`/api/generate`, `/api/chat`, or `/v1/chat/completions`), see **Watch a live Ollama request** in [`QUICKSTART.md`](../QUICKSTART.md). `OLLAMA_DEBUG=1 ollama serve` on macOS and Linux; do not bind a second server on `:11434`.
+
 ## How the Engine Handles Thinking Tokens
 
 The core challenge: thinking/reasoning tokens are **real computation** (they consume budget and affect latency) but are **invisible to the user** (stripped from the final answer). Stoneburner tracks them separately so benchmarks reflect what users actually see while still accounting for the full inference cost.
