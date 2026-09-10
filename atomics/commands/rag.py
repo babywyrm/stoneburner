@@ -1357,7 +1357,7 @@ def qa(
     import asyncio as _asyncio
     import logging as _logging
 
-    from atomics.benchmark.qa_runner import QAResult, load_qa_suite, run_qa_suite
+    from atomics.benchmark.qa_runner import QAResult, format_qa_tokens, load_qa_suite, run_qa_suite
 
     _ = reasoning_mode
 
@@ -1397,7 +1397,11 @@ def qa(
             "FAIL": "[red]✗[/red]",
             "ERROR": "[yellow]![/yellow]",
         }.get(r.status, "?")
-        console.print(f"  {icon} [{r.status}] {r.fixture.id}  ({r.latency_ms / 1000:.1f}s)")
+        tokens = format_qa_tokens(r)
+        suffix = f"  {tokens}" if tokens else ""
+        console.print(
+            f"  {icon} [{r.status}] {r.fixture.id}  ({r.latency_ms / 1000:.1f}s){suffix}"
+        )
         results.append(r)
         if fail_fast and r.status in ("FAIL", "ERROR"):
             raise KeyboardInterrupt("fail-fast triggered")
@@ -1429,6 +1433,7 @@ def qa(
     rtable.add_column("Matched pass patterns")
     rtable.add_column("Matched fail patterns")
     rtable.add_column("Latency", justify="right")
+    rtable.add_column("Tokens", justify="right")
 
     status_style_map = {
         "PASS": "[green]PASS[/green]",
@@ -1442,6 +1447,7 @@ def qa(
             ", ".join(r.matched_pass) or "-",
             ", ".join(r.matched_fail) or "-",
             f"{r.latency_ms / 1000:.1f}s" if r.latency_ms else "-",
+            format_qa_tokens(r) or "-",
         )
 
     console.print(rtable)

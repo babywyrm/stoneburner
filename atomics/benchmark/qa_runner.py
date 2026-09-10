@@ -58,6 +58,9 @@ class QAResult:
     matched_pass: list[str] = field(default_factory=list)
     matched_fail: list[str] = field(default_factory=list)
     error: str = ""
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    thinking_tokens: int | None = None
 
 
 @dataclass
@@ -90,8 +93,30 @@ class QASuiteResult:
         return self.passed / self.total
 
 
+def format_qa_tokens(result: QAResult) -> str:
+    """Compact in/out/think label. Empty when no counts were observed."""
+    parts: list[str] = []
+    if result.input_tokens is not None:
+        parts.append(f"in={result.input_tokens}")
+    if result.output_tokens is not None:
+        parts.append(f"out={result.output_tokens}")
+    if result.thinking_tokens is not None:
+        parts.append(f"think={result.thinking_tokens}")
+    return " ".join(parts)
+
+
 class QAError(Exception):
     pass
+
+
+def _optional_int(data: dict[str, Any], key: str) -> int | None:
+    raw = data.get(key)
+    if raw is None:
+        return None
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return None
 
 
 def load_qa_suite(path: str) -> tuple[str, str, list[QAFixture]]:
@@ -159,8 +184,8 @@ async def _query_ollama(
     thinking: bool | None = None,
     thinking_budget: int | None = None,
     effort: str | None = None,
-) -> tuple[str, float]:
-    """Fire a single prompt at Ollama. Returns (response_text, latency_ms)."""
+) -> tuple[str, float, int | None, int | None, int | None]:
+    """Fire a single prompt at Ollama. Returns text, latency, token counts."""
     from atomics.benchmark.model_classes import supports_thinking
     from atomics.providers.effort import ollama_think_value
     from atomics.providers.ollama import _visible_and_thinking
@@ -185,10 +210,17 @@ async def _query_ollama(
     resp.raise_for_status()
     data = resp.json()
     lat = (time.monotonic() - t0) * 1000
-    text, _, _ = _visible_and_thinking(
-        data.get("response", ""), data.get("thinking"), data.get("eval_count", 0)
+    output_tokens = _optional_int(data, "eval_count")
+    text, _, thinking_tokens = _visible_and_thinking(
+        data.get("response", ""), data.get("thinking"), output_tokens or 0
     )
-    return text, lat
+    return (
+        text,
+        lat,
+        _optional_int(data, "prompt_eval_count"),
+        output_tokens,
+        thinking_tokens if output_tokens is not None else None,
+    )
 
 
 async def _query_profile(
@@ -229,8 +261,9 @@ async def run_qa_suite(
             try:
                 if profile is not None:
                     text, lat = await _query_profile(client, profile, fixture.prompt)
+                    inp = out = think = None
                 else:
-                    text, lat = await _query_ollama(
+                    text, lat, inp, out, think = await _query_ollama(
                         client,
                         host,
                         model,
@@ -248,6 +281,9 @@ async def run_qa_suite(
                     status=status,
                     matched_pass=mp,
                     matched_fail=mf,
+                    input_tokens=inp,
+                    output_tokens=out,
+                    thinking_tokens=think,
                 )
             except Exception as exc:
                 qa_result = QAResult(

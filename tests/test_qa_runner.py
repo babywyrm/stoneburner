@@ -336,6 +336,48 @@ class TestRunQASuite:
         assert suite.total == 3
         assert suite.passed == 3
 
+    @pytest.mark.asyncio
+    async def test_raw_ollama_records_token_counts(self):
+        fixture = QAFixture(id="t", prompt="q", must_match="any")
+
+        async def _mock_post(*args, **kwargs):
+            m = MagicMock()
+            m.raise_for_status = MagicMock()
+            m.json.return_value = {
+                "response": "ok",
+                "thinking": "ok",
+                "prompt_eval_count": 12,
+                "eval_count": 40,
+            }
+            return m
+
+        with patch("httpx.AsyncClient.post", side_effect=_mock_post):
+            suite = await run_qa_suite("qwen3.8:27b", "http://h", [fixture], thinking=True)
+
+        result = suite.results[0]
+        assert result.input_tokens == 12
+        assert result.output_tokens == 40
+        assert result.thinking_tokens == 20
+        assert result.response == "ok"
+
+    @pytest.mark.asyncio
+    async def test_raw_ollama_missing_counts_leave_tokens_unset(self):
+        fixture = QAFixture(id="t", prompt="q", must_match="any")
+
+        async def _mock_post(*args, **kwargs):
+            m = MagicMock()
+            m.raise_for_status = MagicMock()
+            m.json.return_value = {"response": "ok"}
+            return m
+
+        with patch("httpx.AsyncClient.post", side_effect=_mock_post):
+            suite = await run_qa_suite("model", "http://h", [fixture])
+
+        result = suite.results[0]
+        assert result.input_tokens is None
+        assert result.output_tokens is None
+        assert result.thinking_tokens is None
+
 
     @pytest.mark.asyncio
     async def test_raw_ollama_sends_think_false_when_thinking_off(self):
@@ -448,6 +490,9 @@ class TestQARunnerProfileMode:
         assert suite.total == 1
         assert suite.results[0].response == "gate response"
         assert suite.results[0].latency_ms == pytest.approx(250.0)
+        assert suite.results[0].input_tokens is None
+        assert suite.results[0].output_tokens is None
+        assert suite.results[0].thinking_tokens is None
 
     @pytest.mark.asyncio
     async def test_profile_none_falls_back_to_ollama(self):
@@ -630,3 +675,37 @@ class TestQACLI:
             result = CliRunner().invoke(cli, ["qa", "--file", path])
 
         assert result.exit_code == 0
+
+    def test_qa_prints_token_counts_when_present(self):
+        from click.testing import CliRunner
+
+        from atomics.cli import cli
+        from atomics.qa_runner import QAFixture, QAResult, QASuiteResult
+
+        yaml_content = (
+            "model: test\nhost: http://fake:11434\n"
+            "fixtures:\n  - id: x\n    prompt: p\n    must_match: any\n"
+        )
+        path = _yaml_file(yaml_content)
+
+        fake_suite = QASuiteResult(model="test", host="http://fake:11434")
+        f = QAFixture(id="x", prompt="p", must_match="any")
+        fake_suite.results.append(
+            QAResult(
+                fixture=f,
+                response="ok",
+                latency_ms=100.0,
+                status="PASS",
+                input_tokens=12,
+                output_tokens=40,
+                thinking_tokens=20,
+            )
+        )
+
+        with patch("atomics.qa_runner.run_qa_suite", new=AsyncMock(return_value=fake_suite)):
+            result = CliRunner().invoke(cli, ["qa", "--file", path])
+
+        assert result.exit_code == 0, result.output
+        assert "in=12" in result.output
+        assert "out=40" in result.output
+        assert "think=20" in result.output
