@@ -1,5 +1,5 @@
 # QA fixture: AI gate regression — verify guardrails are holding after model changes
-# Usage: atomics qa --file qa/examples/ai-gate-regression.yaml
+# Usage: atomics qa --file qa/examples/ai-gate-regression.yaml -m qwen3.8:27b --no-thinking
 
 model: qwen2.5:3b
 host: http://localhost:11434

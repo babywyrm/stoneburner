@@ -337,6 +337,96 @@ class TestRunQASuite:
         assert suite.passed == 3
 
 
+    @pytest.mark.asyncio
+    async def test_raw_ollama_sends_think_false_when_thinking_off(self):
+        fixture = QAFixture(id="t", prompt="q", must_match="any")
+        captured: list[dict] = []
+
+        async def _mock_post(url, *, json=None, **kwargs):
+            captured.append(json)
+            m = MagicMock()
+            m.raise_for_status = MagicMock()
+            m.json.return_value = {"response": "ok", "eval_count": 2}
+            return m
+
+        with patch("httpx.AsyncClient.post", side_effect=_mock_post):
+            await run_qa_suite(
+                "qwen3.8:27b", "http://h", [fixture], thinking=False
+            )
+
+        assert captured[0]["think"] is False
+
+
+    @pytest.mark.asyncio
+    async def test_raw_ollama_effort_low_sends_think_level(self):
+        fixture = QAFixture(id="t", prompt="q", must_match="any")
+        captured: list[dict] = []
+
+        async def _mock_post(url, *, json=None, **kwargs):
+            captured.append(json)
+            m = MagicMock()
+            m.raise_for_status = MagicMock()
+            m.json.return_value = {"response": "ok", "eval_count": 2}
+            return m
+
+        with patch("httpx.AsyncClient.post", side_effect=_mock_post):
+            await run_qa_suite(
+                "qwen3.8:27b",
+                "http://h",
+                [fixture],
+                thinking=True,
+                effort="low",
+            )
+
+        assert captured[0]["think"] == "low"
+
+
+    @pytest.mark.asyncio
+    async def test_raw_ollama_auto_think_on_for_qwen38(self):
+        fixture = QAFixture(id="t", prompt="q", must_match="any")
+        captured: list[dict] = []
+
+        async def _mock_post(url, *, json=None, **kwargs):
+            captured.append(json)
+            m = MagicMock()
+            m.raise_for_status = MagicMock()
+            m.json.return_value = {"response": "ok", "eval_count": 2}
+            return m
+
+        with patch("httpx.AsyncClient.post", side_effect=_mock_post):
+            await run_qa_suite("qwen3.8:27b", "http://h", [fixture])
+
+        assert captured[0]["think"] is True
+
+
+    @pytest.mark.asyncio
+    async def test_raw_ollama_strips_think_tags_before_scoring(self):
+        fixture = QAFixture(
+            id="t",
+            prompt="q",
+            must_match="fail",
+            fail_patterns=["I cannot"],
+        )
+
+        async def _mock_post(url, *, json=None, **kwargs):
+            m = MagicMock()
+            m.raise_for_status = MagicMock()
+            m.json.return_value = {
+                "response": "<think>plan to leak</think>I cannot help with that.",
+                "eval_count": 20,
+            }
+            return m
+
+        with patch("httpx.AsyncClient.post", side_effect=_mock_post):
+            suite = await run_qa_suite(
+                "qwen3.8:27b", "http://h", [fixture], thinking=True
+            )
+
+        assert suite.results[0].status == "PASS"
+        assert "plan to leak" not in suite.results[0].response
+        assert "I cannot" in suite.results[0].response
+
+
 # ── Profile-mode qa_runner ────────────────────────────────────────────────────
 
 
@@ -438,6 +528,47 @@ class TestQACLI:
 
         result = CliRunner().invoke(cli, ["qa", "--help"])
         assert "--profile" in result.output or "-p" in result.output
+
+    def test_qa_thinking_and_effort_flags_in_help(self):
+        from click.testing import CliRunner
+
+        from atomics.cli import cli
+
+        result = CliRunner().invoke(cli, ["qa", "--help"])
+        assert result.exit_code == 0
+        assert "--thinking" in result.output
+        assert "--no-thinking" in result.output
+        assert "--effort" in result.output
+        assert "--thinking-budget" in result.output
+
+    def test_qa_no_thinking_is_forwarded_to_runner(self):
+        from click.testing import CliRunner
+
+        from atomics.cli import cli
+        from atomics.qa_runner import QAFixture, QAResult, QASuiteResult
+
+        yaml_content = (
+            "model: qwen3.8:27b\nhost: http://fake:11434\n"
+            "fixtures:\n  - id: x\n    prompt: p\n    must_match: any\n"
+        )
+        path = _yaml_file(yaml_content)
+        fake_suite = QASuiteResult(model="qwen3.8:27b", host="http://fake:11434")
+        f = QAFixture(id="x", prompt="p", must_match="any")
+        fake_suite.results.append(
+            QAResult(fixture=f, response="ok", latency_ms=50.0, status="PASS")
+        )
+
+        with patch(
+            "atomics.qa_runner.run_qa_suite", new=AsyncMock(return_value=fake_suite)
+        ) as mock_run:
+            result = CliRunner().invoke(
+                cli, ["qa", "--file", path, "--no-thinking", "--effort", "low"]
+            )
+
+        assert result.exit_code == 0, result.output
+        kwargs = mock_run.call_args.kwargs
+        assert kwargs.get("thinking") is False
+        assert kwargs.get("effort") == "low"
 
     def test_qa_profile_flag_routes_to_profile_mode(self):
 

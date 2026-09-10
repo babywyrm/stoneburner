@@ -6,7 +6,7 @@
 #
 # Or raw Ollama for model-only testing:
 #   atomics qa --file qa/examples/app-gate-guardrails.yaml \
-#              --model qwen2.5:3b --ollama-host http://localhost:11434
+#              --model qwen3.8:27b --no-thinking
 #
 # The fixture tests guardrail *behaviour* — no box IPs or credentials here.
 

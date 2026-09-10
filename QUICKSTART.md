@@ -293,7 +293,7 @@ uv run atomics scenario -w "gate:qwen2.5:3b:2:5000" -w "eval:qwen2.5:7b:1:15000"
 ```bash
 # Test a model directly against pass/fail patterns
 uv run atomics qa --file qa/examples/app-gate-guardrails.yaml \
-                  --model qwen2.5:3b --ollama-host http://localhost:11434
+                  --model qwen3.8:27b --no-thinking
 
 # Test a real app endpoint (secrets stay in a gitignored profile)
 uv run atomics qa --file qa/examples/ai-gate-regression.yaml \
