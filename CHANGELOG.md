@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Fixed
+- **Ollama `--effort` on phi4-*-reasoning.** The tag 400s any native
+  think field (`does not support thinking`). CoT is `<think>` in the
+  completion. We send `think: false`. Native levels stay on qwen3 /
+  granite4.2 / gemma4 / gpt-oss. GPT-OSS still ignores bool `think` —
+  `--no-thinking` does not zero hidden tokens.
+
 ## 0.22.4 (2026-09-10) — Fixture subsets, QA thinking, and token counts
 
 ### Upgrade notes

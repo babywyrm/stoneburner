@@ -285,7 +285,14 @@ def _ok_chat_client() -> AsyncMock:
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "model",
-    ("granite4.2:3b", "granite4.2:8b", "gemma4:12b", "qwen3.5:4b", "qwen3.6:27b"),
+    (
+        "granite4.2:3b",
+        "granite4.2:8b",
+        "gemma4:12b",
+        "qwen3.5:4b",
+        "qwen3.6:27b",
+        "gpt-oss:20b",
+    ),
 )
 async def test_ollama_effort_low_without_thinking_flag(model: str) -> None:
     """--effort low must reach think: low even when --thinking was omitted."""
@@ -328,6 +335,29 @@ async def test_ollama_effort_does_not_force_think_on_mistral() -> None:
     mock_client = _ok_generate_client()
     provider = OllamaProvider(host="http://fake:11434", client=mock_client)
     await provider.generate("hi", model="mistral:7b", effort="low")
+
+    body = mock_client.post.call_args.kwargs["json"]
+    assert body["think"] is False
+
+
+@pytest.mark.asyncio
+async def test_ollama_effort_low_on_phi4_mini_reasoning_sends_false() -> None:
+    """Ollama: this tag 'does not support thinking'. Any think field 400s."""
+    mock_client = _ok_generate_client()
+    provider = OllamaProvider(host="http://fake:11434", client=mock_client)
+    await provider.generate("hi", model="phi4-mini-reasoning:3.8b", effort="low")
+
+    body = mock_client.post.call_args.kwargs["json"]
+    assert body["think"] is False
+
+
+@pytest.mark.asyncio
+async def test_ollama_tools_effort_low_on_phi4_mini_reasoning_sends_false() -> None:
+    mock_client = _ok_chat_client()
+    provider = OllamaProvider(host="http://fake:11434", client=mock_client)
+    await provider.generate_with_tools(
+        "hi", tools=[], model="phi4-mini-reasoning:3.8b", effort="low"
+    )
 
     body = mock_client.post.call_args.kwargs["json"]
     assert body["think"] is False

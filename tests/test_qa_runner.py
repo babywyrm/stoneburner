@@ -422,6 +422,29 @@ class TestRunQASuite:
 
         assert captured[0]["think"] == "low"
 
+    @pytest.mark.asyncio
+    async def test_raw_ollama_effort_low_on_phi4_mini_reasoning_sends_false(self):
+        fixture = QAFixture(id="t", prompt="q", must_match="any")
+        captured: list[dict] = []
+
+        async def _mock_post(url, *, json=None, **kwargs):
+            captured.append(json)
+            m = MagicMock()
+            m.raise_for_status = MagicMock()
+            m.json.return_value = {"response": "ok", "eval_count": 2}
+            return m
+
+        with patch("httpx.AsyncClient.post", side_effect=_mock_post):
+            await run_qa_suite(
+                "phi4-mini-reasoning:3.8b",
+                "http://h",
+                [fixture],
+                thinking=True,
+                effort="low",
+            )
+
+        assert captured[0]["think"] is False
+
 
     @pytest.mark.asyncio
     async def test_raw_ollama_auto_think_on_for_qwen38(self):

@@ -97,7 +97,7 @@ class OllamaProvider(BaseProvider):
         model = model or self._default_model
 
         auto = thinking if thinking is not None else _model_supports_thinking(model)
-        think_field = ollama_think_value(thinking=auto, effort=effort)
+        think_field = ollama_think_value(thinking=auto, effort=effort, model=model)
         use_thinking = think_field is not False
 
         options: dict = {}
@@ -193,7 +193,7 @@ class OllamaProvider(BaseProvider):
         model = model or self._default_model
 
         auto = thinking if thinking is not None else _model_supports_thinking(model)
-        think_field = ollama_think_value(thinking=auto, effort=effort)
+        think_field = ollama_think_value(thinking=auto, effort=effort, model=model)
         use_thinking = think_field is not False
 
         messages: list[dict[str, Any]] = []

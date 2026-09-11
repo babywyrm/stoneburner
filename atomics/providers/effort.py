@@ -117,26 +117,46 @@ def qwen_template_effort(effort: str | None) -> str | None:
     return "xhigh"
 
 
-def ollama_think_value(*, thinking: bool, effort: str | None) -> bool | str:
+def ollama_think_value(
+    *, thinking: bool, effort: str | None, model: str | None = None
+) -> bool | str:
     """Native Ollama ``think`` field: bool or low/medium/high/max.
 
     ``none`` is a 400 on /api/generate and /api/chat. OpenAI-compat /v1
-    uses ``reasoning_effort`` instead (including ``none``).
+    uses ``reasoning_effort`` instead (including ``none``). Tags that
+    reject the think field entirely (phi4-*-reasoning: "does not support
+    thinking") always get ``False``. Other CoT tags without native levels
+    (deepseek-r1) get ``True`` instead of a string level.
     """
+    from atomics.benchmark.model_classes import (
+        supports_ollama_think_field,
+        supports_ollama_think_levels,
+    )
+
     if not thinking:
+        return False
+    if model is not None and not supports_ollama_think_field(model):
         return False
     resolved = normalize_effort(effort)
     if resolved is None:
+        value: bool | str = True
+    elif resolved == "none":
+        value = False
+    elif resolved in ("minimal", "low"):
+        value = "low"
+    elif resolved == "medium":
+        value = "medium"
+    elif resolved == "high":
+        value = "high"
+    else:
+        value = "max"
+    if (
+        isinstance(value, str)
+        and model is not None
+        and not supports_ollama_think_levels(model)
+    ):
         return True
-    if resolved == "none":
-        return False
-    if resolved in ("minimal", "low"):
-        return "low"
-    if resolved == "medium":
-        return "medium"
-    if resolved == "high":
-        return "high"
-    return "max"
+    return value
 
 
 def apply_chat_effort(body: dict, effort: str | None) -> dict[str, str] | None:
