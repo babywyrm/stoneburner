@@ -191,7 +191,7 @@ async def _query_ollama(
     from atomics.providers.ollama import _visible_and_thinking
 
     auto = thinking if thinking is not None else supports_thinking(model)
-    think_field = ollama_think_value(thinking=auto, effort=effort)
+    think_field = ollama_think_value(thinking=auto, effort=effort, model=model)
     use_thinking = think_field is not False
     options: dict[str, int] = {"num_predict": num_predict}
     if thinking_budget and use_thinking:

@@ -185,6 +185,30 @@ def test_thinking_support_local_non_thinking_tags():
     assert supports_thinking("ministral-3:8b") is False
 
 
+def test_ollama_think_levels_are_not_the_same_as_supports_thinking():
+    """Native think: low/medium/high/max is a smaller set than CoT models.
+
+    phi4-mini-reasoning 400s on any think field: "does not support thinking".
+    CoT still arrives as <think> in the completion.
+    """
+    from atomics.benchmark.model_classes import (
+        supports_ollama_think_field,
+        supports_ollama_think_levels,
+    )
+
+    assert supports_ollama_think_levels("granite4.2:3b") is True
+    assert supports_ollama_think_levels("gemma4:12b") is True
+    assert supports_ollama_think_levels("gpt-oss:20b") is True
+    assert supports_ollama_think_levels("qwen3.8:27b") is True
+    assert supports_ollama_think_levels("phi4-mini-reasoning:3.8b") is False
+    assert supports_ollama_think_levels("phi4-reasoning:14b") is False
+    assert supports_ollama_think_levels("deepseek-r1:14b") is False
+    assert supports_ollama_think_levels("mistral:7b") is False
+    assert supports_ollama_think_field("qwen3.8:27b") is True
+    assert supports_ollama_think_field("phi4-mini-reasoning:3.8b") is False
+    assert supports_ollama_think_field("phi4-reasoning:14b") is False
+
+
 def test_thinking_support_deepseek_r1_all_sizes():
     """All deepseek-r1 sizes should be thinking-capable."""
     assert supports_thinking("deepseek-r1:14b") is True

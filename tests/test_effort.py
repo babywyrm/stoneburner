@@ -122,6 +122,23 @@ def test_ollama_think_value_maps_to_native_field(
 
 
 @pytest.mark.unit
+def test_ollama_think_value_collapses_levels_without_native_dial() -> None:
+    """phi4-mini-reasoning 400s on the think field. Never send true or a level."""
+    assert (
+        ollama_think_value(
+            thinking=True, effort="low", model="phi4-mini-reasoning:3.8b"
+        )
+        is False
+    )
+    assert (
+        ollama_think_value(thinking=True, effort=None, model="phi4-mini-reasoning:3.8b")
+        is False
+    )
+    assert ollama_think_value(thinking=True, effort="low", model="deepseek-r1:14b") is True
+    assert ollama_think_value(thinking=True, effort="low", model="gpt-oss:20b") == "low"
+
+
+@pytest.mark.unit
 def test_claude_adaptive_plus_effort_on_opus_4_6() -> None:
     thinking, extra = claude_request(
         model="claude-opus-4-6",

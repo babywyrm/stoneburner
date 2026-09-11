@@ -209,6 +209,33 @@ def supports_thinking(model_id: str) -> bool:
     return False
 
 
+# Native Ollama think: low/medium/high/max. Other CoT tags 400 on a string level.
+_OLLAMA_THINK_LEVEL_PREFIXES: tuple[str, ...] = (
+    "qwen3",
+    "granite4.2",
+    "gemma4",
+    "gpt-oss",
+)
+
+# Ollama returns 400: "<tag> does not support thinking" (phi4-mini-reasoning).
+_OLLAMA_THINK_FIELD_UNSUPPORTED_PREFIXES: tuple[str, ...] = (
+    "phi4-mini-reasoning",
+    "phi4-reasoning",
+)
+
+
+def supports_ollama_think_levels(model_id: str) -> bool:
+    """True when Ollama accepts think: "low" / "medium" / "high" / "max"."""
+    return any(model_id.startswith(prefix) for prefix in _OLLAMA_THINK_LEVEL_PREFIXES)
+
+
+def supports_ollama_think_field(model_id: str) -> bool:
+    """False when any native think field (bool or level) is a 400."""
+    return not any(
+        model_id.startswith(prefix) for prefix in _OLLAMA_THINK_FIELD_UNSUPPORTED_PREFIXES
+    )
+
+
 _PARAMETER_TAG = re.compile(
     r":e?(?P<n>\d+(?:\.\d+)?)b(?:-|:|$)",
     re.IGNORECASE,
