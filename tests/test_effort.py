@@ -140,6 +140,16 @@ def test_ollama_think_value_collapses_levels_without_native_dial() -> None:
     assert (
         ollama_think_value(thinking=True, effort="low", model="muse-glimmer:30b") == "low"
     )
+    assert (
+        ollama_think_value(
+            thinking=True, effort="low", model="nemotron-3.5-lightning:30b"
+        )
+        == "low"
+    )
+    assert (
+        ollama_think_value(thinking=True, effort="low", model="north-mini-code-1.0:latest")
+        == "low"
+    )
 
 
 @pytest.mark.unit
