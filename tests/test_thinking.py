@@ -25,6 +25,9 @@ class TestThinkingRegistry:
         assert supports_thinking("gemma4:12b")
         assert supports_thinking("lfm2.5:8b")
         assert supports_thinking("muse-glimmer:30b")
+        assert supports_thinking("nemotron-3.5-lightning:30b")
+        assert supports_thinking("north-mini-code-1.0:latest")
+        assert not supports_thinking("nemotron-3-nano:4b")
 
     def test_non_thinking_models(self):
         assert not supports_thinking("gpt-4o")

@@ -294,6 +294,8 @@ def _ok_chat_client() -> AsyncMock:
         "gpt-oss:20b",
         "lfm2.5:8b",
         "muse-glimmer:30b",
+        "nemotron-3.5-lightning:30b",
+        "north-mini-code-1.0:latest",
     ),
 )
 async def test_ollama_effort_low_without_thinking_flag(model: str) -> None:
