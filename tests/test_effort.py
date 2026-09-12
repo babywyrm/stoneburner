@@ -136,6 +136,10 @@ def test_ollama_think_value_collapses_levels_without_native_dial() -> None:
     )
     assert ollama_think_value(thinking=True, effort="low", model="deepseek-r1:14b") is True
     assert ollama_think_value(thinking=True, effort="low", model="gpt-oss:20b") == "low"
+    assert ollama_think_value(thinking=True, effort="low", model="lfm2.5:8b") == "low"
+    assert (
+        ollama_think_value(thinking=True, effort="low", model="muse-glimmer:30b") == "low"
+    )
 
 
 @pytest.mark.unit

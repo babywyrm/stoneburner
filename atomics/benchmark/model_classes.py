@@ -115,6 +115,7 @@ MODEL_CLASS_MAP: dict[str, ModelClass] = {
     "qwen3.8:27b": ModelClass.HEAVY,
     "gpt-oss:20b": ModelClass.HEAVY,
     "gpt-oss:120b": ModelClass.HEAVY,
+    "muse-glimmer:30b": ModelClass.HEAVY,
 }
 
 
@@ -174,6 +175,8 @@ THINKING_CAPABLE: frozenset[str] = frozenset(
         "gemma4:e4b",
         "gemma4:12b",
         "gemma4:26b",
+        "lfm2.5:8b",
+        "muse-glimmer:30b",
     }
 )
 
@@ -203,6 +206,8 @@ def supports_thinking(model_id: str) -> bool:
         "claude-opus-5",
         "granite4.2",
         "gemma4",
+        "lfm2",
+        "muse-glimmer",
     ):
         if model_id.startswith(prefix):
             return True
@@ -215,6 +220,8 @@ _OLLAMA_THINK_LEVEL_PREFIXES: tuple[str, ...] = (
     "granite4.2",
     "gemma4",
     "gpt-oss",
+    "lfm2",
+    "muse-glimmer",
 )
 
 # Ollama returns 400: "<tag> does not support thinking" (phi4-mini-reasoning).
