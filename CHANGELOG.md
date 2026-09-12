@@ -2,12 +2,19 @@
 
 ## Unreleased
 
+### Changed
+- **Ollama think levels for `lfm2.5` and `muse-glimmer`.** Both accept
+  bool and `low` / `medium` / `high` / `max`. Without the prefix,
+  `--effort low` sent `false` (unknown family) or collapsed to `true`.
+  `think: false` on lfm2.5 still leaks `<think>` in the body; muse-glimmer
+  actually turns CoT off.
+
 ### Fixed
 - **Ollama `--effort` on phi4-*-reasoning.** The tag 400s any native
   think field (`does not support thinking`). CoT is `<think>` in the
   completion. We send `think: false`. Native levels stay on qwen3 /
-  granite4.2 / gemma4 / gpt-oss. GPT-OSS still ignores bool `think` —
-  `--no-thinking` does not zero hidden tokens.
+  granite4.2 / gemma4 / gpt-oss / lfm2.5 / muse-glimmer. GPT-OSS still
+  ignores bool `think` — `--no-thinking` does not zero hidden tokens.
 
 ## 0.22.4 (2026-09-10) — Fixture subsets, QA thinking, and token counts
 

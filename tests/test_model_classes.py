@@ -87,6 +87,7 @@ def test_classify_ollama_local_models():
     assert classify_model("granite4.2:3b") == ModelClass.MID
     assert classify_model("granite4.2:8b") == ModelClass.MID
     assert classify_model("lfm2.5:8b") == ModelClass.MID
+    assert classify_model("muse-glimmer:30b") == ModelClass.HEAVY
     assert classify_model("mistral-nemo:12b") == ModelClass.MID
     assert classify_model("mistral-small:24b") == ModelClass.HEAVY
     assert classify_model("nemotron-3-nano:4b") == ModelClass.MID
@@ -172,6 +173,8 @@ def test_thinking_support_qwen3_5_family():
     assert supports_thinking("granite4.2:8b") is True
     assert supports_thinking("gemma4:12b") is True
     assert supports_thinking("gemma4:e4b") is True
+    assert supports_thinking("lfm2.5:8b") is True
+    assert supports_thinking("muse-glimmer:30b") is True
 
 
 def test_thinking_support_local_non_thinking_tags():
@@ -200,6 +203,8 @@ def test_ollama_think_levels_are_not_the_same_as_supports_thinking():
     assert supports_ollama_think_levels("gemma4:12b") is True
     assert supports_ollama_think_levels("gpt-oss:20b") is True
     assert supports_ollama_think_levels("qwen3.8:27b") is True
+    assert supports_ollama_think_levels("lfm2.5:8b") is True
+    assert supports_ollama_think_levels("muse-glimmer:30b") is True
     assert supports_ollama_think_levels("phi4-mini-reasoning:3.8b") is False
     assert supports_ollama_think_levels("phi4-reasoning:14b") is False
     assert supports_ollama_think_levels("deepseek-r1:14b") is False
