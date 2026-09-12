@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+## 0.22.5 (2026-09-12) — Ollama think-field honesty for new tags
+
+### Upgrade notes
+- Additive. No CLI flag removals.
+- `--effort low` now sends native `think` levels on `lfm2.5`,
+  `muse-glimmer`, `nemotron-3.5-lightning`, and `north-mini-code`.
+  Those tags used to get `false` (unknown family) or `true` (collapsed
+  string).
+- `phi4-*-reasoning` always gets `think: false`. Any other value is a
+  400 (`does not support thinking`). CoT still arrives as `<think>` in
+  the completion.
+- Nemotron tool-channel probes need thinking on. North Mini Code
+  advertises tools but the capability probe stays silent — that is not
+  scored as refusal.
+
 ### Changed
 - **Ollama think levels for `lfm2.5`, `muse-glimmer`, `nemotron-3.5-lightning`,
   and `north-mini-code`.** Live 0.33.3: bool and `low` / `medium` / `high` /
