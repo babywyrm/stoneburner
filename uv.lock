@@ -2486,7 +2486,7 @@ wheels = [
 
 [[package]]
 name = "stoneburner-atomics"
-version = "0.22.5"
+version = "0.22.6"
 source = { editable = "." }
 dependencies = [
     { name = "anthropic" },

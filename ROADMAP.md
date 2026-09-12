@@ -221,7 +221,8 @@ storefront README. **v0.22.2** is uncapped eval trails and CLI knobs
 on HTTP. **v0.22.3** is thinking dials on Ollama and Qwen.
 **v0.22.4** is fixture subsets, QA thinking, and token counts.
 **v0.22.5** is Ollama think-field honesty for new tags.
-Package version is **0.22.5**.
+**v0.22.6** is trip evidence in the docs for those think-field
+tags and the tool-channel probe. Package version is **0.22.6**.
 
 - [x] **REPL line editing.** Stdlib `readline` for in-process
       history. No `prompt_toolkit`. Not session persistence to disk.
@@ -258,14 +259,19 @@ Package version is **0.22.5**.
 
 ## Next
 
-Current package is **0.22.5**. Unscheduled. Pick one; do not mix a
+Current package is **0.22.6**. Unscheduled. Pick one; do not mix a
 parked item into it.
 
+- **Named security batteries** (`list` / `show`): compose existing
+  suites into desk-pass, blue/red capability, agent-gate, and
+  threat-model. Same `-p` as every other suite. No new prompts in the
+  first slice. `run` and extra STRIDE fixtures wait. Do not start
+  this to warm up a different milestone.
 - **Suite convergence** (ARCHITECTURE): `results` alias, large
   command modules, CLI integrity exit on the five suites that only
   report. Not user-visible. Do not start this to “warm up.”
-- Do not retag `v0.21.0` or `v0.20.0`. Do not mix a feature into a
-  tag commit. `RELEASING.md`.
+- Do not retag `v0.22.5`, `v0.21.0`, or `v0.20.0`. Do not mix a
+  feature into a tag commit. `RELEASING.md`.
 
 ## Beyond
 

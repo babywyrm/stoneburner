@@ -23,9 +23,13 @@ atomics provider-test --provider ollama --no-thinking
 atomics provider-test --provider ollama --effort low
 ```
 
-Thinking models (qwen3, qwen3.8, deepseek-r1) need `--no-thinking` or the
-visible answer can come back empty. `--effort low` is the native Ollama
-think dial.
+Thinking models (qwen3, qwen3.8, granite4.2, gemma4, gpt-oss, lfm2.5,
+muse-glimmer, nemotron-3.5-lightning, north-mini-code, deepseek-r1,
+phi4-*-reasoning) need `--no-thinking` or a larger `--max-output-tokens`
+or the visible answer can come back empty (`THINK`). `--effort low` is
+the native Ollama think dial on tags that advertise levels. `phi4-*-reasoning`
+always gets `think: false` (any other value 400s) and still leaks CoT in
+the body. `lfm2.5` leaks CoT with `think: false` too.
 
 From a clone: `uv sync --all-extras`, then prefix commands with `uv run`.
 Bare `uv sync` drops the API, MCP, RAG, and test extras.

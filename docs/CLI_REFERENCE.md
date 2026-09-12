@@ -46,6 +46,7 @@ Recipes: [QUICKSTART.md](../QUICKSTART.md).
 | `atomics provider-test -p ollama -m qwen3.8:27b --no-thinking` | Smoke-test a thinking model without burning the visible answer |
 | `ollama ps` / `curl -sS http://127.0.0.1:11434/api/ps` | What Ollama has loaded. See QUICKSTART.md, "Watch a live Ollama request" |
 | `atomics provider-test -p ollama -m qwen3:4b --effort low --max-output-tokens 512` | Native `think: "low"` with room for a visible answer |
+| `atomics provider-test -p ollama -m phi4-mini-reasoning:3.8b --effort low` | Always `think: false` (other values 400). CoT still in the body |
 | `atomics provider-test -p brain-gateway` | Health check brain-gateway |
 | `atomics provider-test -p groq` | Health check Groq |
 | `atomics provider-test -p together` | Health check Together AI |
@@ -82,6 +83,7 @@ Recipes: [QUICKSTART.md](../QUICKSTART.md).
 | `atomics -v toolcall --judge-provider ollama --judge-model qwen2.5:14b` | Required for channel divergence. Live lines show `prose=resisted` + `DANGEROUS` when the model refused in chat and still called the tool |
 | `atomics toolcall --no-skip-incapable` | Non-zero exit if the model cannot emit tool calls (for sweeps) |
 | `atomics toolcall --no-thinking` | Force thinking off on the prose channel (same grammar as red/blue) |
+| `atomics toolcall --thinking --effort low --fixtures tc-01 --channel tools` | Some tags only emit tools with thinking on. Probe 500 with thinking off is not refusal |
 | `atomics refusal` | Refusal-calibration eval — over- vs under-refusal |
 | `atomics refusal --fixtures rc-b01` | One fixture. Unknown ids fail before a request |
 | `atomics refusal --extra-judges ollama:mistral:7b` | Majority-vote classification; ties are unresolved |
