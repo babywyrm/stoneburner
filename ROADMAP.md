@@ -300,7 +300,8 @@ Not scheduled, roughly in order of how often they come up.
       `wait` / `wait --verbose`, same verbs as MCP. Not Click-tree
       tab-completion. Line editing, quiet submit, and uncapped wait
       shipped after the 0.21.0 tag.
-- **OpenAI SDK 3.0 / HTTPX2.** Parked. PR #9 closed. Do not mix into
+- **OpenAI SDK 3.0 / HTTPX2.** Parked. PR #9 and #13 closed. Do not mix into
+  a job-progress or REPL change.
   a job-progress or REPL change.
 - **HTTP MCP.** Do not invent. `atomics mcp` stays a stdio proxy over
   a running API server. Remote reach is `--api-url` on that API.

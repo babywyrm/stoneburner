@@ -31,6 +31,13 @@ updates:
           - "patch"
     commit-message:
       prefix: "chore(deps)"
+    ignore:
+      # 2.1+ wraps tool errors and drops the API detail the agent needs.
+      - dependency-name: "mcp"
+        versions: [">=2.1.0"]
+      # SDK 3 / HTTPX2 is parked. Same decision as #9 / #13.
+      - dependency-name: "openai"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "github-actions"
     directory: "/"
