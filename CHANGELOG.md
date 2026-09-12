@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Changed
+- **Dependabot ignores `mcp>=2.1` and OpenAI majors.** `mcp` stays
+  `<2.1` (tool-error wrapping). OpenAI SDK 3 stays parked (#9, #13).
+
 ## 0.22.6 (2026-09-12) — Trip evidence for Ollama think-field and tool probes
 
 ### Upgrade notes
