@@ -92,7 +92,7 @@ Links are absolute so they work on PyPI as well as GitHub.
 | Copy-paste recipes | [QUICKSTART](https://github.com/babywyrm/stoneburner/blob/main/QUICKSTART.md) |
 | Every flag | [CLI_REFERENCE](https://github.com/babywyrm/stoneburner/blob/main/docs/CLI_REFERENCE.md) |
 | Quality / compare | [COMPARING](https://github.com/babywyrm/stoneburner/blob/main/docs/COMPARING.md) |
-| Security suites | [SECURITY_SUITES](https://github.com/babywyrm/stoneburner/blob/main/docs/SECURITY_SUITES.md) · [leaderboard](https://github.com/babywyrm/stoneburner/blob/main/docs/LEADERBOARD.md) · [red/blue](https://github.com/babywyrm/stoneburner/blob/main/docs/LEADERBOARD-REDBLUE.md) |
+| Security suites | [SECURITY_SUITES](https://github.com/babywyrm/stoneburner/blob/main/docs/SECURITY_SUITES.md) · [batteries](https://github.com/babywyrm/stoneburner/blob/main/docs/BATTERIES.md) · [leaderboard](https://github.com/babywyrm/stoneburner/blob/main/docs/LEADERBOARD.md) · [red/blue](https://github.com/babywyrm/stoneburner/blob/main/docs/LEADERBOARD-REDBLUE.md) |
 | Load / capacity | [LOAD_TESTING](https://github.com/babywyrm/stoneburner/blob/main/docs/LOAD_TESTING.md) |
 | Thinking / `--effort` | [THINKING](https://github.com/babywyrm/stoneburner/blob/main/docs/THINKING.md) |
 | `inference.env` | [INFERENCE_ENV](https://github.com/babywyrm/stoneburner/blob/main/docs/INFERENCE_ENV.md) |

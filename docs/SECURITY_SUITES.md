@@ -8,6 +8,11 @@ Stoneburner includes purpose-built security testing suites that complement infra
 > *says*; `toolcall` scores what it *does* when handed function schemas. A refusal
 > in one is not a refusal in the other, and agentic deployments run on the second.
 
+> **Start with a battery.** `atomics battery list` / `show` / `run` pick fixture
+> subsets for a job (desk pass, blue/red capability, agent gate, threat
+> model). The commands below are the suites those batteries compose.
+> See [BATTERIES.md](BATTERIES.md).
+
 The same suite names work over HTTP and MCP: `POST /api/v1/evals` with
 `"suite": "adversarial" | "redblue" | "refusal" | "toolcall" | "codereview"`
 (plus the quality suites). `atomics mcp` `submit_eval` is that request.

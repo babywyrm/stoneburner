@@ -66,6 +66,9 @@ Recipes: [QUICKSTART.md](../QUICKSTART.md).
 | `atomics eval --extra-judges ollama:mistral:7b` | Multi-judge consensus scoring |
 | `atomics judge-agreement --suite refusal --judges ollama:a,ollama:b` | Generate once, judge N times; report pairwise agreement and majority-flip rate |
 | `atomics judge-agreement --suite rag --judges ollama:a,ollama:b` | Same study on the RAG rubric (numeric mean / flip) |
+| `atomics battery list` | Named security jobs (desk-pass, blue/red, agent-gate, threat-model) |
+| `atomics battery show desk-pass -m qwen3.5:4b` | Purpose, labels, copy-pasteable commands. `-p ollama\|vllm\|openai\|claude\|…` |
+| `atomics battery run desk-pass -m qwen3.5:4b` | Execute those steps in order. Stops on first failure unless `--keep-going` |
 | `atomics adversarial` | Adversarial resilience eval — resistance to manipulation (72 fixtures) |
 | `atomics adversarial --category tool_desc_injection` | Run one suite/group |
 | `atomics adversarial --fixtures adv-01` | One fixture. Unknown ids fail before a request |
