@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Added
+- **Named security batteries.** `atomics battery list` / `show` / `run`
+  compose existing suites into desk-pass, blue-capability, red-capability,
+  agent-gate, and threat-model. Copy-pasteable commands; `run` stops on the
+  first nonzero step unless `--keep-going`. Deeper STRIDE fixtures wait.
+
 ### Changed
 - **Dependabot ignores `mcp>=2.1` and OpenAI majors.** `mcp` stays
   `<2.1` (tool-error wrapping). OpenAI SDK 3 stays parked (#9, #13).

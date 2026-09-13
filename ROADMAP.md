@@ -262,11 +262,9 @@ tags and the tool-channel probe. Package version is **0.22.6**.
 Current package is **0.22.6**. Unscheduled. Pick one; do not mix a
 parked item into it.
 
-- **Named security batteries** (`list` / `show`): compose existing
-  suites into desk-pass, blue/red capability, agent-gate, and
-  threat-model. Same `-p` as every other suite. No new prompts in the
-  first slice. `run` and extra STRIDE fixtures wait. Do not start
-  this to warm up a different milestone.
+- **Named security batteries.** Increment 1 is `list` / `show` / `run`
+  plus docs. Extra red/blue STRIDE fixtures are the next slice. Do not
+  mix suite convergence into it.
 - **Suite convergence** (ARCHITECTURE): `results` alias, large
   command modules, CLI integrity exit on the five suites that only
   report. Not user-visible. Do not start this to “warm up.”
