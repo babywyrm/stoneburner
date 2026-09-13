@@ -165,6 +165,15 @@ _RUNS_SUITES = frozenset(
 )
 
 
+def _positive_budget(budget: str | None) -> bool:
+    if not budget:
+        return False
+    try:
+        return float(budget) > 0
+    except ValueError:
+        return False
+
+
 @battery.command("run")
 @click.argument("name")
 @click.option(
@@ -221,7 +230,7 @@ def battery_run(
     """Execute the named battery. Stops on the first nonzero step unless --keep-going.
 
     Paid providers (`openai`, `claude`, `bedrock`, `groq`, `together`,
-    `gemini`) as `-p` or `--judge-provider` require `--budget`.
+    `gemini`) as `-p` or `--judge-provider` require a positive `--budget`.
     """
     console = Console()
     try:
@@ -235,8 +244,11 @@ def battery_run(
             err=True,
         )
         raise SystemExit(2)
+    if budget is not None and not _positive_budget(budget):
+        click.echo("Pass a positive --budget.", err=True)
+        raise SystemExit(2)
     paid = provider in _PAID or (judge_provider in _PAID)
-    if paid and not budget:
+    if paid and not _positive_budget(budget):
         click.echo(
             "Paid provider or judge. Pass --budget.",
             err=True,
