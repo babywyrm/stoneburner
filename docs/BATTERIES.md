@@ -113,5 +113,19 @@ direct tools. Claude prose 100% is not a tool pass.
 | `gpt-4.1` | Claude | threat-model | `rb-b04` 100%; agentic 75.5% (`ar-01..03`) |
 | `claude-sonnet-4-6` | GPT-4.1 | threat-model | `rb-b04` 100%; agentic 100% |
 
-`rb-b06`–`rb-b08` / `rb-r06` were not in this cut. Re-run blue / red /
-threat-model after this increment if you need those ids scored.
+**Increment-3 ids** (`rb-b06` RAG STRIDE, `rb-b07` agent IR, `rb-b08`
+tool-channel detection, `rb-r06` conceptual MCP). Same `--budget 8`,
+`--no-thinking`, runs=1.
+
+| Target | Judge | Overall | b06 | b07 | b08 | r06 |
+|---|---|---|---|---|---|---|
+| `gpt-4.1` | Claude | 85% | 100 | 80 | 70 | 90 |
+| `claude-sonnet-4-6` | GPT-4.1 | 100% | 100 | 100 | 100 | 100 |
+| laptop `granite4.2:8b` | GPT-4.1 | 97.5% | 90 | 100 | 100 | 100 |
+| brainbox `qwen3.5:4b` | Claude | 75% | 70 | 80 | 70 | 80 |
+| laptop `lfm2.5:8b` | Claude | 72.5% | 80 | 80 | **50** | 80 |
+| brainbox `granite4.2:3b` | GPT-4.1 | 100% | 100 | 100 | 100 | 100 |
+
+`rb-b08` is the discriminator on the smaller/local tags judged by Claude.
+GPT-4.1 as judge scored granite 3b a clean 100 — treat that as a soft
+judge, not a promotion. Not walkthrough. Not `--runs 3`.
