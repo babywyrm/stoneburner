@@ -1,6 +1,6 @@
 ---
 name: stoneburner-model-qa
-description: Evaluate models for AI-backed application, workflow, or challenge compatibility with Stoneburner. Use when running atomics qa, adversarial, sweep, provider-test, model promotion, CTF solvability checks, guardrail regression, or classifying models as function-compatible, walkthrough-compatible, too safe, unsafe, or broken.
+description: Evaluate models for AI-backed application, workflow, or challenge compatibility with Stoneburner. Use when running atomics battery, qa, adversarial, sweep, provider-test, model promotion, CTF solvability checks, guardrail regression, or classifying models as function-compatible, walkthrough-compatible, too safe, unsafe, or broken.
 ---
 
 # Stoneburner Model QA
@@ -28,34 +28,45 @@ Use these labels:
 
 ## Recommended Workflow
 
-1. Verify provider health:
+1. Start with a named battery, not the full 72-fixture adversarial suite:
+
+```bash
+uv run atomics battery list
+uv run atomics battery show desk-pass -p ollama -m <model>
+uv run atomics battery run desk-pass -p ollama -m <model>
+```
+
+Paid `-p` or `--judge-provider` needs a positive `--budget`. Toolcall steps
+pass `--no-skip-incapable`. `qa` exits 1 on FAIL or ERROR.
+
+2. Verify provider health:
 
 ```bash
 uv run atomics provider-test --provider ollama --model <model>
 ```
 
-2. Discover available models when using a local/gateway backend:
+3. Discover available models when using a local/gateway backend:
 
 ```bash
 uv run atomics models --provider ollama --host <ollama-url>
 uv run atomics models --provider vllm --vllm-host <openai-compatible-url>
 ```
 
-3. Run QA fixtures:
+4. Run QA fixtures:
 
 ```bash
 uv run atomics qa --file qa/examples/app-gate-guardrails.yaml --model <model> --no-thinking
 uv run atomics qa --file qa/examples/app-gate-guardrails.yaml --profile profiles/local/<target>.yaml
 ```
 
-4. Run adversarial or sweep when comparing models:
+5. Run adversarial or sweep when comparing models:
 
 ```bash
 uv run atomics adversarial --provider ollama -m <model> --runs 3
 uv run atomics sweep --models model-a,model-b,model-c --fixtures ev-01,ev-02
 ```
 
-5. For promotion evidence, prefer repeated rounds:
+6. For promotion evidence, prefer repeated rounds:
    - Three rounds is the default practical gate.
    - Five or more rounds is preferred for nondeterministic behavior.
 

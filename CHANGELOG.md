@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+## 0.22.7 (2026-09-13) — Named security batteries
+
+### Upgrade notes
+- Additive. New commands: `atomics battery list` / `show` / `run`. No
+  flag removals.
+- **`atomics qa` exits 1 on FAIL or ERROR.** A printed FAIL table used to
+  return 0. CI that treated that as success will start failing.
+  `--fail-fast` also exits 1.
+- Paid `battery run` (`-p` or `--judge-provider` in openai/claude/bedrock/
+  groq/together/gemini) needs a positive `--budget`. `show` does not spend
+  and does not require `--budget`.
+- Battery `toolcall` steps pass `--no-skip-incapable`.
+- Do not retag `v0.22.4`–`v0.22.6`.
+
 ### Added
 - **Named security batteries.** `atomics battery list` / `show` / `run`
   compose existing suites into desk-pass, blue-capability, red-capability,
