@@ -236,6 +236,8 @@ uv run atomics battery list
 uv run atomics battery show desk-pass -p ollama -m granite4.2:8b
 uv run atomics battery run desk-pass -p ollama -m granite4.2:8b
 uv run atomics battery run desk-pass -p openai -m gpt-4.1 --budget 5
+uv run atomics battery run blue-capability -p ollama -m granite4.2:8b \
+  --judge-provider claude --judge-model claude-sonnet-4-6 --budget 5
 ```
 
 See [`docs/BATTERIES.md`](docs/BATTERIES.md). Then, if you mean to:

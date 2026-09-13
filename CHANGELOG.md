@@ -31,7 +31,10 @@
   sweep, labcompare, `run`, and provider-mode stress/soak.
 - **Paid `battery run` requires `--budget`.** A missing ceiling used to
   warn and spend. Same rule as `show`: openai/claude/bedrock/groq/
-  together/gemini exit 2 until `--budget` is set. Local/lab `-p` unchanged.
+  together/gemini as `-p` **or** `--judge-provider` exit 2 until
+  `--budget` is set. Local/lab `-p` with a local judge is unchanged.
+  In-process `run` maps Click usage errors to an exit code instead of a
+  traceback.
 
 ## 0.22.6 (2026-09-12) — Trip evidence for Ollama think-field and tool probes
 

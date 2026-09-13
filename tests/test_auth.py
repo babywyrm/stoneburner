@@ -378,6 +378,7 @@ def test_cli_whoami_no_auth(monkeypatch, tmp_path):
     from atomics.cli import cli
 
     monkeypatch.setenv("OPENAI_API_KEY", "")
+    monkeypatch.setattr("atomics.secrets.get_secret", lambda _key: None)
     monkeypatch.setattr(
         "atomics.auth.codex._default_codex_auth_path",
         lambda: tmp_path / "nonexistent.json",

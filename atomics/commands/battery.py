@@ -132,7 +132,12 @@ def battery_show(
 
 
 def invoke_atomics(args: list[str]) -> int:
-    """Run one suite command in-process. Tests monkeypatch this."""
+    """Run one suite command in-process. Tests monkeypatch this.
+
+    `standalone_mode=False` so Click does not `sys.exit`. Usage errors
+    (`BadParameter`, `ctx.exit`) must still become an integer code or
+    `battery run` tracebacks on the first bad step.
+    """
     from atomics.cli import cli
 
     try:
@@ -144,6 +149,13 @@ def invoke_atomics(args: list[str]) -> int:
         if isinstance(code, int):
             return code
         return 1
+    except click.exceptions.Exit as exc:
+        return int(exc.exit_code)
+    except click.Abort:
+        return 1
+    except click.ClickException as exc:
+        exc.show()
+        return int(exc.exit_code)
     return 0
 
 
@@ -209,7 +221,7 @@ def battery_run(
     """Execute the named battery. Stops on the first nonzero step unless --keep-going.
 
     Paid providers (`openai`, `claude`, `bedrock`, `groq`, `together`,
-    `gemini`) require `--budget`.
+    `gemini`) as `-p` or `--judge-provider` require `--budget`.
     """
     console = Console()
     try:
@@ -223,9 +235,10 @@ def battery_run(
             err=True,
         )
         raise SystemExit(2)
-    if provider in _PAID and not budget:
+    paid = provider in _PAID or (judge_provider in _PAID)
+    if paid and not budget:
         click.echo(
-            f"{provider} is a paid provider. Pass --budget.",
+            "Paid provider or judge. Pass --budget.",
             err=True,
         )
         raise SystemExit(2)
