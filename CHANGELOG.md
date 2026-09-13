@@ -11,6 +11,7 @@
   `rb-b07` (agent tool-channel IR), `rb-b08` (tool-channel detection),
   `rb-r06` (conceptual MCP confused deputy). `threat-model` now runs
   `rb-b04,rb-b06`. Blue/red `--mode` picks the new ids up automatically.
+  Live cut in `docs/BATTERIES.md` (runs=1).
 
 ### Changed
 - **Dependabot ignores `mcp>=2.1` and OpenAI majors.** `mcp` stays
