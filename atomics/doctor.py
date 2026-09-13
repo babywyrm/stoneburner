@@ -75,7 +75,13 @@ def _warn_env_shadows_keychain(console: Console) -> None:
 
     from atomics.secrets import get_secret
 
-    for name in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY"):
+    for name in (
+        "ANTHROPIC_API_KEY",
+        "OPENAI_API_KEY",
+        "GROQ_API_KEY",
+        "TOGETHER_API_KEY",
+        "GEMINI_API_KEY",
+    ):
         env_val = os.environ.get(name) or ""
         stored = get_secret(name) or ""
         if env_val and stored and env_val != stored:

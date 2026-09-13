@@ -28,6 +28,9 @@ KNOWN_KEYS = frozenset(
     {
         "ANTHROPIC_API_KEY",
         "OPENAI_API_KEY",
+        "GROQ_API_KEY",
+        "TOGETHER_API_KEY",
+        "GEMINI_API_KEY",
         "OLLAMA_API_KEY",
         "BEDROCK_ACCESS_KEY",
         "BEDROCK_SECRET_KEY",
