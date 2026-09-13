@@ -229,6 +229,16 @@ uv run atomics sweep --models gemma4:12b,llama3.2:1b,mistral:7b,phi4:latest,deep
 
 ### "Is it safe?" — security evaluation suites
 
+Start with a named battery, not the full 72-fixture adversarial suite.
+
+```bash
+uv run atomics battery list
+uv run atomics battery show desk-pass -p ollama -m granite4.2:8b
+uv run atomics battery run desk-pass -p ollama -m granite4.2:8b
+```
+
+See [`docs/BATTERIES.md`](docs/BATTERIES.md). Then, if you mean to:
+
 ```bash
 # Resistance to prompt injection / jailbreaks (higher = more resistant)
 uv run atomics adversarial --provider ollama -m qwen3:14b --judge-model qwen2.5:14b

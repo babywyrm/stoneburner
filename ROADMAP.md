@@ -262,9 +262,10 @@ tags and the tool-channel probe. Package version is **0.22.6**.
 Current package is **0.22.6**. Unscheduled. Pick one; do not mix a
 parked item into it.
 
-- **Named security batteries.** Increment 1 is `list` / `show` / `run`
-  plus docs. Extra red/blue STRIDE fixtures are the next slice. Do not
-  mix suite convergence into it.
+- **Named security batteries.** `list` / `show` / `run` and the four
+  extra STRIDE fixtures (`rb-b06`–`rb-b08`, `rb-r06`) are in. Next
+  slice is API/MCP `submit_battery` if anyone asks — not a doctor rewrite,
+  not suite convergence. Do not mix those into a batteries tag.
 - **Suite convergence** (ARCHITECTURE): `results` alias, large
   command modules, CLI integrity exit on the five suites that only
   report. Not user-visible. Do not start this to “warm up.”

@@ -21,7 +21,7 @@ Budget and job polling are documented in [API_SERVER.md](API_SERVER.md) and
 runs several of these as a campaign (required budget, named models).
 `POST /stress` / `POST /soak` are load jobs, not security suites.
 
-## Fixture Coverage (72 adversarial + 20 toolcall + 10 redblue + 12 refusal + 8 codereview)
+## Fixture Coverage (72 adversarial + 20 toolcall + 14 redblue + 12 refusal + 8 codereview)
 
 **Categories:** prompt injection, role confusion, context escape, instruction override, social engineering, data exfil, tool manipulation, breakglass extraction, credential exfil, behavior persistence, blocklist evasion, MCP/agentic resistance, tool-use safety, encoding obfuscation, many-shot context stuffing, multi-turn manipulation, RAG poisoning, tool-description injection.
 
@@ -194,7 +194,7 @@ act. Resistance is not universal goodness.
 Benchmarks LLM performance on real security domain tasks — OSINT, vulnerability analysis, privilege escalation, incident response, hardening, threat modelling, and detection engineering.
 
 ```bash
-# All 10 fixtures (5 red + 5 blue)
+# All 14 fixtures (6 red + 8 blue)
 uv run atomics redblue --provider ollama -m qwen3:14b
 
 # Red team only / Blue team only

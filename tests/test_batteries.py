@@ -121,6 +121,12 @@ def test_no_battery_is_the_full_adversarial_suite():
                 assert len(selected) < 72
 
 
+def test_threat_model_includes_rag_stride():
+    step = get_battery("threat-model").steps[0]
+    assert step.suite == "redblue"
+    assert step.fixtures == ("rb-b04", "rb-b06")
+
+
 def test_archreview_optional_omits_thinking_flag():
     step = get_battery("threat-model").optional_steps[0]
     args = step_args(step, model="granite4.2:8b", provider="ollama")

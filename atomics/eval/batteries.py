@@ -1,7 +1,7 @@
 """Named security batteries — jobs, not new suites.
 
 Each battery is a documented subset of runners that already exist.
-`atomics battery show` prints the commands. `run` is a later increment.
+`atomics battery show` prints the commands. `run` executes them.
 """
 
 from __future__ import annotations
@@ -82,7 +82,7 @@ BATTERIES: tuple[Battery, ...] = (
         steps=(
             BatteryStep(
                 suite="redblue",
-                purpose="Five blue fixtures",
+                purpose="Blue fixtures including STRIDE, IR, and tool-channel detection",
                 mode="blue",
                 extra=("--no-save",),
             ),
@@ -114,7 +114,7 @@ BATTERIES: tuple[Battery, ...] = (
         steps=(
             BatteryStep(
                 suite="redblue",
-                purpose="Five red fixtures",
+                purpose="Red fixtures including conceptual MCP confused-deputy",
                 mode="red",
                 extra=("--no-save",),
             ),
@@ -159,8 +159,8 @@ BATTERIES: tuple[Battery, ...] = (
         purpose="STRIDE for an agentic system plus agentic architecture reasoning.",
         when="The question is 'does this model reason about agent security architecture'.",
         not_a_pass=(
-            "One STRIDE prompt is not a threat-model practice. "
-            "archreview is optional and needs a repo pack."
+            "Two STRIDE prompts plus agentic reasoning are not a threat-model "
+            "practice. archreview is optional and needs a repo pack."
         ),
         label_hint="capability axis — architectural reasoning, not gate behavior",
         cost_band="medium",
@@ -168,8 +168,8 @@ BATTERIES: tuple[Battery, ...] = (
         steps=(
             BatteryStep(
                 suite="redblue",
-                purpose="Existing STRIDE agent threat model",
-                fixtures=("rb-b04",),
+                purpose="Agent STRIDE plus RAG-corpus STRIDE",
+                fixtures=("rb-b04", "rb-b06"),
                 extra=("--no-save",),
             ),
             BatteryStep(
