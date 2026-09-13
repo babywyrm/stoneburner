@@ -44,6 +44,9 @@
 - **`qa` exits 1 on FAIL or ERROR.** A failed fixture used to print
   and return 0, so `battery run desk-pass` continued after a dead
   app-gate. `--fail-fast` still stops early and now also exits 1.
+- **Battery `toolcall` steps pass `--no-skip-incapable`.** The
+  interactive default exits 0 when a model cannot emit tools. That
+  made desk-pass and agent-gate look green on a silent skip.
 
 ## 0.22.6 (2026-09-12) — Trip evidence for Ollama think-field and tool probes
 
