@@ -41,6 +41,9 @@
   (and Together / Gemini) is a known name; empty env still picks up the
   stored key. Doctor's env-shadows-keychain warning covers those names
   too.
+- **`qa` exits 1 on FAIL or ERROR.** A failed fixture used to print
+  and return 0, so `battery run desk-pass` continued after a dead
+  app-gate. `--fail-fast` still stops early and now also exits 1.
 
 ## 0.22.6 (2026-09-12) — Trip evidence for Ollama think-field and tool probes
 

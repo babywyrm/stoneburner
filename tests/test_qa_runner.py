@@ -732,3 +732,26 @@ class TestQACLI:
         assert "in=12" in result.output
         assert "out=40" in result.output
         assert "think=20" in result.output
+
+    def test_qa_exits_nonzero_on_fail(self):
+        from click.testing import CliRunner
+
+        from atomics.cli import cli
+        from atomics.qa_runner import QAFixture, QAResult, QASuiteResult
+
+        yaml_content = (
+            "model: test\nhost: http://fake:11434\n"
+            "fixtures:\n  - id: x\n    prompt: p\n    must_match: any\n"
+        )
+        path = _yaml_file(yaml_content)
+        fake_suite = QASuiteResult(model="test", host="http://fake:11434")
+        f = QAFixture(id="x", prompt="p", must_match="any")
+        fake_suite.results.append(
+            QAResult(fixture=f, response="nope", latency_ms=10.0, status="FAIL")
+        )
+
+        with patch("atomics.qa_runner.run_qa_suite", new=AsyncMock(return_value=fake_suite)):
+            result = CliRunner().invoke(cli, ["qa", "--file", path])
+
+        assert result.exit_code == 1
+        assert "FAIL" in result.output
