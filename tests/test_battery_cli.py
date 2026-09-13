@@ -121,6 +121,23 @@ def test_battery_run_judged_requires_judge_model():
     assert "judge" in result.output.lower()
 
 
+def test_battery_run_paid_without_budget_exits(monkeypatch):
+    seen: list[list[str]] = []
+
+    def fake_invoke(args: list[str]) -> int:
+        seen.append(args)
+        return 0
+
+    monkeypatch.setattr("atomics.commands.battery.invoke_atomics", fake_invoke)
+    result = CliRunner().invoke(
+        cli, ["battery", "run", "desk-pass", "-p", "openai", "-m", "gpt-4.1"]
+    )
+    assert result.exit_code == 2
+    assert "budget" in result.output.lower()
+    assert "Traceback" not in result.output
+    assert seen == []
+
+
 def test_battery_run_desk_pass_invokes_steps(monkeypatch):
     seen: list[list[str]] = []
 
@@ -165,3 +182,30 @@ def test_battery_run_keep_going(monkeypatch):
     )
     assert result.exit_code != 0
     assert seen == ["provider-test", "qa", "toolcall"]
+
+
+def test_battery_run_paid_with_budget_invokes(monkeypatch):
+    seen: list[str] = []
+
+    def fake_invoke(args: list[str]) -> int:
+        seen.append(args[0])
+        return 0
+
+    monkeypatch.setattr("atomics.commands.battery.invoke_atomics", fake_invoke)
+    result = CliRunner().invoke(
+        cli,
+        [
+            "battery",
+            "run",
+            "desk-pass",
+            "-p",
+            "openai",
+            "-m",
+            "gpt-4.1",
+            "--budget",
+            "5",
+        ],
+    )
+    assert result.exit_code == 0
+    assert seen[0] == "provider-test"
+    assert "qa" not in seen
