@@ -5,6 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass, field
+from inspect import isawaitable
 
 from atomics.providers.outcomes import ProviderOutcome
 from atomics.providers.toolcalls import ToolCall
@@ -143,3 +144,32 @@ class BaseProvider(ABC):
             f"{type(self).__name__} does not support tool calling. "
             "Check provider.supports_tools before calling this."
         )
+
+    async def aclose(self) -> None:
+        """Close the async HTTP client on this loop. No-op if there is none.
+
+        httpx/Anthropic/OpenAI clients bind to the loop that first used them.
+        Closing here, before asyncio.run() tears that loop down, avoids
+        ``RuntimeError: Event loop is closed`` during GC.
+        """
+        client = getattr(self, "_client", None)
+        if client is None:
+            return
+        closer = getattr(type(client), "aclose", None) or getattr(type(client), "close", None)
+        if closer is None:
+            return
+        result = closer(client)
+        if isawaitable(result):
+            await result
+
+
+async def aclose_providers(*providers: BaseProvider | None) -> None:
+    for provider in providers:
+        if provider is None:
+            continue
+        closer = getattr(provider, "aclose", None)
+        if closer is None:
+            continue
+        result = closer()
+        if isawaitable(result):
+            await result

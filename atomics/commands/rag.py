@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import sys
 import uuid
 from pathlib import Path
@@ -20,6 +19,7 @@ from atomics.commands.common import (
     eval_budget_from,
     extra_judges_option,
     parse_extra_judges,
+    run_async,
     setup_logging,
     write_summary_json,
 )
@@ -31,6 +31,7 @@ from atomics.commands.suite_run import (
 )
 from atomics.config import load_settings
 from atomics.eval.budget import BudgetMeter, share_budget
+from atomics.providers.base import aclose_providers
 
 
 @click.command("rag")
@@ -275,7 +276,7 @@ def rag(
             embedder = LocalSentenceTransformerEmbedder(embedding_model)
             index = RAGIndex(index_path, embedder=embedder)
 
-        summary = asyncio.run(
+        summary = run_async(
             run_rag(
                 test_provider,
                 judge_provider=judge_provider,
@@ -291,7 +292,10 @@ def rag(
                 fixtures=selected_fixtures,
                 index=index,
                 top_k=top_k,
-            )
+            ),
+            test_provider,
+            judge_provider,
+            *(p for p, _ in extra_judge_pairs),
         )
 
         console.print(result_table)
@@ -692,7 +696,7 @@ def codegen(
             if supports_thinking(model):
                 eff_thinking = True
 
-        summary = asyncio.run(
+        summary = run_async(
             run_codegen(
                 test_provider,
                 model=model,
@@ -703,7 +707,8 @@ def codegen(
                 effort=effort,
                 reasoning_mode=reasoning_mode,
                 fixtures=selected_fixtures,
-            )
+            ),
+            test_provider,
         )
 
         console.print(result_table)
@@ -899,7 +904,7 @@ def probe(
             if repo:
                 repo.save_probe_result(run_id, r)
 
-        summary = asyncio.run(
+        summary = run_async(
             run_probe(
                 provider,
                 judge_provider=judge,
@@ -913,7 +918,10 @@ def probe(
                 reasoning_mode=reasoning_mode,
                 regression_threshold=0.10,
                 on_result=on_result,
-            )
+            ),
+            provider,
+            judge,
+            *(p for p, _ in extra_judge_pairs),
         )
 
         table = Table(title="Probe Summary")
@@ -1038,7 +1046,6 @@ def archreview(
     budget_usd,
 ):
     """Benchmark models on a security-architecture review of a repo."""
-    import asyncio
     import os
     from pathlib import Path
 
@@ -1170,87 +1177,99 @@ def archreview(
         repo = run.repository
 
         async def _run_all() -> None:
-            for mdl in models:
-                test_provider = _build_provider(
-                    provider_name,
-                    mdl,
-                    ollama_host if provider_name == "ollama" else vllm_host,
-                    context_tokens=archreview_context_tokens if provider_name == "ollama" else None,
-                )
-                collisions = detect_self_judge(
-                    test_provider, mdl, [(judge_provider, judge_model), *extra_judge_pairs]
-                )
-                if collisions:
-                    console.print(
-                        f"[yellow]warning:[/yellow] judge collides with "
-                        f"model under test: {collisions}"
+            created: list = []
+            try:
+                for mdl in models:
+                    test_provider = _build_provider(
+                        provider_name,
+                        mdl,
+                        ollama_host if provider_name == "ollama" else vllm_host,
+                        context_tokens=archreview_context_tokens
+                        if provider_name == "ollama"
+                        else None,
                     )
-
-                if verbose:
-                    console.print(
-                        f"\n[bold]→ analyzing with [cyan]{mdl}[/cyan][/bold] "
-                        f"({provider_name}, {rounds} round{'s' if rounds != 1 else ''})…"
+                    created.append(test_provider)
+                    collisions = detect_self_judge(
+                        test_provider, mdl, [(judge_provider, judge_model), *extra_judge_pairs]
                     )
-
-                results = await run_archreview(
-                    spec=spec,
-                    tier=tier,
-                    pack=pack,
-                    under_test=test_provider,
-                    under_test_model=mdl,
-                    judge=judge_provider,
-                    judge_model=judge_model,
-                    extra_judges=extra_judge_pairs,
-                    rounds=rounds,
-                    objective=not judge_only,
-                    max_output_tokens=max_output_tokens,
-                    run_id=archreview_run_id,
-                )
-                all_results.extend(results)
-                if repo:
-                    for r in results:
-                        repo.save_archreview_result(r)
-
-                if verbose:
-                    for r in results:
-                        if r.error_message:
-                            console.print(
-                                f"  [red]round {r.round}: "
-                                f"{_rich_escape(r.error_class or '')}: "
-                                f"{_rich_escape(r.error_message or '')}[/red]"
-                            )
-                            continue
-                        judge_str = f"{r.judge_score:.2f}" if r.judge_score is not None else "—"
-                        flag = " [yellow](parse failed)[/yellow]" if r.parse_failed else ""
+                    if collisions:
                         console.print(
-                            f"  [dim]round {r.round}:[/dim] "
-                            f"recall=[green]{r.objective_recall:.2f}[/green] "
-                            f"prec={r.objective_precision:.2f} obj-f={r.objective_f:.2f} "
-                            f"judge=[magenta]{judge_str}[/magenta] findings={len(r.findings)}"
-                            f" matched={r.matched_categories or '—'}{flag}"
+                            f"[yellow]warning:[/yellow] judge collides with "
+                            f"model under test: {collisions}"
                         )
-                        for f in r.findings:
+
+                    if verbose:
+                        console.print(
+                            f"\n[bold]→ analyzing with [cyan]{mdl}[/cyan][/bold] "
+                            f"({provider_name}, {rounds} round{'s' if rounds != 1 else ''})…"
+                        )
+
+                    results = await run_archreview(
+                        spec=spec,
+                        tier=tier,
+                        pack=pack,
+                        under_test=test_provider,
+                        under_test_model=mdl,
+                        judge=judge_provider,
+                        judge_model=judge_model,
+                        extra_judges=extra_judge_pairs,
+                        rounds=rounds,
+                        objective=not judge_only,
+                        max_output_tokens=max_output_tokens,
+                        run_id=archreview_run_id,
+                    )
+                    all_results.extend(results)
+                    if repo:
+                        for r in results:
+                            repo.save_archreview_result(r)
+
+                    if verbose:
+                        for r in results:
+                            if r.error_message:
+                                console.print(
+                                    f"  [red]round {r.round}: "
+                                    f"{_rich_escape(r.error_class or '')}: "
+                                    f"{_rich_escape(r.error_message or '')}[/red]"
+                                )
+                                continue
+                            judge_str = f"{r.judge_score:.2f}" if r.judge_score is not None else "—"
+                            flag = " [yellow](parse failed)[/yellow]" if r.parse_failed else ""
                             console.print(
-                                f"      [dim]•[/dim] {f.category} · {f.location} · {f.severity}"
+                                f"  [dim]round {r.round}:[/dim] "
+                                f"recall=[green]{r.objective_recall:.2f}[/green] "
+                                f"prec={r.objective_precision:.2f} obj-f={r.objective_f:.2f} "
+                                f"judge=[magenta]{judge_str}[/magenta] findings={len(r.findings)}"
+                                f" matched={r.matched_categories or '—'}{flag}"
                             )
+                            for f in r.findings:
+                                console.print(
+                                    f"      [dim]•[/dim] {f.category} · {f.location} · {f.severity}"
+                                )
 
-                cat_sets = [{f.category for f in r.findings} for r in results]
-                recalls = [r.objective_recall for r in results]
-                stability, _sd = compute_robustness(cat_sets, recalls)
-                avg = lambda xs: round(sum(xs) / len(xs), 3) if xs else 0.0  # noqa: E731
-                judge_vals = [r.judge_score for r in results if r.judge_score is not None]
-                table.add_row(
-                    mdl,
-                    str(avg(recalls)),
-                    str(avg([r.objective_precision for r in results])),
-                    str(avg([r.objective_f for r in results])),
-                    str(avg(judge_vals) if judge_vals else "—"),
-                    judge_label,
-                    str(stability),
-                    str(round(sum(len(r.findings) for r in results) / len(results), 1)),
-                )
+                    cat_sets = [{f.category for f in r.findings} for r in results]
+                    recalls = [r.objective_recall for r in results]
+                    stability, _sd = compute_robustness(cat_sets, recalls)
+                    avg = lambda xs: round(sum(xs) / len(xs), 3) if xs else 0.0  # noqa: E731
+                    judge_vals = [r.judge_score for r in results if r.judge_score is not None]
+                    table.add_row(
+                        mdl,
+                        str(avg(recalls)),
+                        str(avg([r.objective_precision for r in results])),
+                        str(avg([r.objective_f for r in results])),
+                        str(avg(judge_vals) if judge_vals else "—"),
+                        judge_label,
+                        str(stability),
+                        str(round(sum(len(r.findings) for r in results) / len(results), 1)),
+                    )
 
-        asyncio.run(_run_all())
+            finally:
+                await aclose_providers(*created)
+
+        run_async(
+            _run_all(),
+            judge_provider,
+            *(p for p, _ in extra_judge_pairs),
+        )
 
         console.print(table)
 

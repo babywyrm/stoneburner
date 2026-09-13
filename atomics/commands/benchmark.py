@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import sys
 from typing import TYPE_CHECKING
 
@@ -22,13 +21,14 @@ from atomics.commands.common import (
     budget_option,
     effort_options,
     eval_budget_from,
+    run_async,
     setup_logging,
 )
 from atomics.commands.common import effective_model as resolve_effective_model
 from atomics.config import load_settings
 from atomics.eval.budget import BudgetMeter
 from atomics.models import BurnTier
-from atomics.providers.base import BaseProvider
+from atomics.providers.base import BaseProvider, aclose_providers
 
 if TYPE_CHECKING:
     from atomics.benchmark.labcompare import CellResult
@@ -202,7 +202,7 @@ def run(
 
     summary = None
     try:
-        summary = asyncio.run(engine.run(max_iterations=max_iterations))
+        summary = run_async(engine.run(max_iterations=max_iterations), provider)
     except KeyboardInterrupt:
         console.print("\n[yellow]Interrupted — finalizing run...[/yellow]")
     finally:
@@ -683,7 +683,7 @@ def sweep(
 
         disc = OllamaProvider(host=effective_host)
         try:
-            available = asyncio.run(disc.list_models())
+            available = run_async(disc.list_models(), disc)
         except ConnectionError as exc:
             click.echo(str(exc), err=True)
             raise SystemExit(1)
@@ -705,10 +705,20 @@ def sweep(
     # N-model sweep cost N times what --budget asked for.
     meter = BudgetMeter(eval_budget_from(budget_usd))
 
+    created: list[BaseProvider] = []
+
     def provider_factory(model_name: str):
-        return meter.wrap(
+        wrapped = meter.wrap(
             _make_provider(provider_name, model_name, ollama_host, settings, vllm_host=vllm_host)
         )
+        created.append(wrapped)
+        return wrapped
+
+    async def _with_created(coro):
+        try:
+            return await coro
+        finally:
+            await aclose_providers(*created)
 
     judge_provider = meter.wrap(
         _make_provider(
@@ -722,25 +732,28 @@ def sweep(
 
     if suite_list != ["eval"] or status_path or log_path:
         ignore_broken_pipe()
-        suite_results = asyncio.run(
-            run_gauntlet(
-                models=model_list,
-                suites=suite_list,
-                run_suite=make_suite_runner(
-                    provider_factory=provider_factory,
-                    judge_provider=judge_provider,
-                    judge_model=judge_model,
-                    runs=runs,
-                    thinking=thinking_flag,
-                    thinking_budget=thinking_budget,
-                    fixture_ids=fixture_ids,
-                    effort=effort,
-                    reasoning_mode=reasoning_mode,
-                ),
-                status_path=Path(status_path) if status_path else None,
-                log_path=Path(log_path) if log_path else None,
-                skip_incapable=False,
-            )
+        suite_results = run_async(
+            _with_created(
+                run_gauntlet(
+                    models=model_list,
+                    suites=suite_list,
+                    run_suite=make_suite_runner(
+                        provider_factory=provider_factory,
+                        judge_provider=judge_provider,
+                        judge_model=judge_model,
+                        runs=runs,
+                        thinking=thinking_flag,
+                        thinking_budget=thinking_budget,
+                        fixture_ids=fixture_ids,
+                        effort=effort,
+                        reasoning_mode=reasoning_mode,
+                    ),
+                    status_path=Path(status_path) if status_path else None,
+                    log_path=Path(log_path) if log_path else None,
+                    skip_incapable=False,
+                )
+            ),
+            judge_provider,
         )
         table = Table(title="Suite Sweep Results", show_lines=True)
         table.add_column("Model", style="cyan bold")
@@ -802,20 +815,23 @@ def sweep(
         f"{'all' if fixture_ids is None else len(fixture_ids)} fixtures[/bold]\n"
     )
 
-    results = asyncio.run(
-        run_model_sweep(
-            provider_factory=provider_factory,
-            judge_provider=judge_provider,
-            models=model_list,
-            fixture_ids=fixture_ids,
-            judge_model=judge_model,
-            thinking=thinking_flag,
-            thinking_budget=thinking_budget,
-            effort=effort,
-            reasoning_mode=reasoning_mode,
-            on_model_done=on_model_done,
-            on_fixture_done=on_fixture_done_verbose,
-        )
+    results = run_async(
+        _with_created(
+            run_model_sweep(
+                provider_factory=provider_factory,
+                judge_provider=judge_provider,
+                models=model_list,
+                fixture_ids=fixture_ids,
+                judge_model=judge_model,
+                thinking=thinking_flag,
+                thinking_budget=thinking_budget,
+                effort=effort,
+                reasoning_mode=reasoning_mode,
+                on_model_done=on_model_done,
+                on_fixture_done=on_fixture_done_verbose,
+            )
+        ),
+        judge_provider,
     )
 
     console.print(result_table)
@@ -853,7 +869,7 @@ def sweep(
 
 def _run_labcompare_sync(**kwargs) -> list[CellResult]:
     """Sync wrapper around the async orchestrator (patch target in tests)."""
-    return asyncio.run(run_labcompare(**kwargs))
+    return run_async(run_labcompare(**kwargs))
 
 
 def _render_labcompare(console, cells, hosts, dims) -> None:

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import sys
 import uuid
 from pathlib import Path
@@ -21,6 +20,7 @@ from atomics.commands.common import (
     eval_budget_from,
     extra_judges_option,
     parse_extra_judges,
+    run_async,
     setup_logging,
     write_summary_json,
 )
@@ -291,7 +291,7 @@ def eval(
             if supports_thinking(model):
                 eff_thinking = True
 
-        summary = asyncio.run(
+        summary = run_async(
             run_eval(
                 test_provider,
                 judge_provider=judge_provider,
@@ -306,7 +306,10 @@ def eval(
                 extra_judges=extra_judge_pairs,
                 fixtures=selected_fixtures,
                 quiet=show_verbose,
-            )
+            ),
+            test_provider,
+            judge_provider,
+            *(p for p, _ in extra_judge_pairs),
         )
 
         if not show_verbose:

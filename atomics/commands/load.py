@@ -9,7 +9,7 @@ import click
 from rich.console import Console
 from rich.table import Table
 
-from atomics.commands.common import PROVIDER_CHOICES, _make_provider, setup_logging
+from atomics.commands.common import PROVIDER_CHOICES, _make_provider, run_async, setup_logging
 from atomics.config import load_settings
 
 
@@ -191,7 +191,7 @@ def stress(
         provider = _make_provider(provider_name, effective_model, ollama_host, settings)
         from atomics.load.stress import run_stress_provider
 
-        result = asyncio.run(
+        result = run_async(
             run_stress_provider(
                 provider=provider,
                 model=effective_model,
@@ -199,7 +199,8 @@ def stress(
                 phase_seconds=phase_seconds,
                 num_predict=num_predict,
                 on_phase=_on_phase,
-            )
+            ),
+            provider,
         )
     else:
         from atomics.load.stress import run_stress
@@ -651,7 +652,7 @@ def soak(
         )
     elif provider_name != "ollama":
         provider = _make_provider(provider_name, model, ollama_host, settings)
-        result = asyncio.run(
+        result = run_async(
             run_soak_provider(
                 provider=provider,
                 model=model or "",
@@ -661,7 +662,8 @@ def soak(
                 num_predict=num_predict,
                 think_time_seconds=think_time,
                 on_sample=_on_sample,
-            )
+            ),
+            provider,
         )
     else:
         host = ollama_host or settings.ollama_host

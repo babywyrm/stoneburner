@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import uuid
 from pathlib import Path
 
@@ -16,6 +15,7 @@ from atomics.commands.common import (
     budget_option,
     eval_budget_from,
     parse_extra_judges,
+    run_async,
     write_summary_json,
 )
 from atomics.commands.suite_run import SuiteRun, suite_run
@@ -138,7 +138,7 @@ def judge_agreement(
         finalize=_no_parent_finalize,
         failure_prefix="Judge-agreement study failed",
     ) as run:
-        summary = asyncio.run(
+        summary = run_async(
             run_agreement_study(
                 suite=suite.lower(),
                 provider=provider,
@@ -146,7 +146,9 @@ def judge_agreement(
                 model=model,
                 fixture_ids=fixture_ids,
                 run_id=run_id,
-            )
+            ),
+            provider,
+            *(p for p, _ in judge_pairs),
         )
         if run.repository is not None:
             _save_rows(run, summary)

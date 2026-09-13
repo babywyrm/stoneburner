@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import sys
 
 import click
@@ -15,6 +14,7 @@ from atomics.commands.common import (
     _make_provider,
     effective_model,
     effort_options,
+    run_async,
     setup_logging,
 )
 from atomics.config import load_settings
@@ -395,7 +395,7 @@ def models(provider_name: str, host: str | None, vllm_host: str | None) -> None:
         title = f"Ollama Models — {effective_host}"
 
     try:
-        result = asyncio.run(provider.list_models())
+        result = run_async(provider.list_models(), provider)
     except ConnectionError as exc:
         click.echo(str(exc), err=True)
         raise SystemExit(1)
@@ -575,7 +575,7 @@ def provider_test(
         if resp.tokens_per_second is not None:
             console.print(f"Throughput: {resp.tokens_per_second:.1f} tok/s ({resp.tps_basis})")
 
-    asyncio.run(_test())
+    run_async(_test(), prov)
 
 
 @click.command()

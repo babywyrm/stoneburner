@@ -21,10 +21,12 @@ from atomics.commands.common import (
     eval_budget_from,
     extra_judges_option,
     parse_extra_judges,
+    run_async,
 )
 from atomics.commands.suite_run import SuiteRun, finalize_adversarial_run
 from atomics.config import load_settings
 from atomics.eval.budget import share_budget
+from atomics.providers.base import BaseProvider, aclose_providers
 
 _KNOWN_PROVIDERS = {"claude", "bedrock", "openai", "ollama", "vllm", "brain-gateway"}
 
@@ -335,27 +337,48 @@ def adversarial(
                 model=effective_model,
             )
 
-    summary = asyncio.run(
-        run_adversarial(
-            provider,
-            judge_provider=judge,
-            model=model,
-            judge_model=judge_model,
-            extra_judges=extra_judge_pairs,
-            categories=categories,
-            fixtures=selected,
-            runs=runs,
-            run_id=run_id,
-            thinking=thinking_flag,
-            thinking_budget=thinking_budget,
-            effort=effort,
-            reasoning_mode=reasoning_mode,
-            on_fixture_start=on_start,
-            on_fixture_done=on_done,
-            on_run_done=on_run,
-            verbose=verbose,
-        )
+    close_after: list[BaseProvider | None] = [
+        provider,
+        judge,
+        *(p for p, _ in extra_judge_pairs),
+    ]
+    # --compare reuses the same judge on a second await. One Runner so the
+    # HTTP client is not bound to a loop that asyncio.run already closed.
+    runner: asyncio.Runner | None = asyncio.Runner() if compare_model else None
+
+    def close_clients() -> None:
+        if runner is None:
+            return
+        try:
+            runner.run(aclose_providers(*close_after))
+        except Exception:
+            logging.getLogger("atomics.cli").exception("provider aclose failed")
+        finally:
+            runner.close()
+
+    if runner is not None:
+        ctx.call_on_close(close_clients)
+
+    _adv_coro = run_adversarial(
+        provider,
+        judge_provider=judge,
+        model=model,
+        judge_model=judge_model,
+        extra_judges=extra_judge_pairs,
+        categories=categories,
+        fixtures=selected,
+        runs=runs,
+        run_id=run_id,
+        thinking=thinking_flag,
+        thinking_budget=thinking_budget,
+        effort=effort,
+        reasoning_mode=reasoning_mode,
+        on_fixture_start=on_start,
+        on_fixture_done=on_done,
+        on_run_done=on_run,
+        verbose=verbose,
     )
+    summary = runner.run(_adv_coro) if runner is not None else run_async(_adv_coro, *close_after)
 
     title = f"Adversarial Resilience Summary (runs={summary.runs}, judges={len(summary.judges)})"
     table = Table(title=title)
@@ -451,7 +474,9 @@ def adversarial(
                     model=effective_cmp_model,
                 )
 
-        compare_summary = asyncio.run(
+        close_after.append(cmp_provider)
+        assert runner is not None
+        compare_summary = runner.run(
             run_adversarial(
                 cmp_provider,
                 judge_provider=judge,

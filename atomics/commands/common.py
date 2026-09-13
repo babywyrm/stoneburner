@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import time
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Protocol, TypeVar, cast
 
@@ -17,7 +18,7 @@ from rich.status import Status
 from atomics.config import AtomicsSettings
 from atomics.eval.budget import EvalBudget
 from atomics.eval.outcomes import RunIntegrity
-from atomics.providers.base import BaseProvider
+from atomics.providers.base import BaseProvider, aclose_providers
 from atomics.providers.factory import (
     PROVIDER_NAMES,
     ProviderConfigError,
@@ -29,6 +30,23 @@ from atomics.validation import sanitize_error
 PROVIDER_CHOICES = click.Choice(list(PROVIDER_NAMES), case_sensitive=False)
 
 _P = TypeVar("_P")
+
+
+def run_async(coro: Awaitable[_P], *providers: BaseProvider | None) -> _P:
+    """Run ``coro`` then aclose providers on the same loop.
+
+    Battery ``run`` invokes several suites in one process. Each suite's
+    ``asyncio.run`` would otherwise GC httpx/Anthropic clients after the
+    loop is gone.
+    """
+
+    async def _run() -> _P:
+        try:
+            return await coro
+        finally:
+            await aclose_providers(*providers)
+
+    return asyncio.run(_run())
 
 
 def _effort_callback(_ctx: click.Context, _param: click.Parameter, value: str | None) -> str | None:
