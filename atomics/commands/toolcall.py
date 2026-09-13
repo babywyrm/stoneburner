@@ -6,7 +6,6 @@ command file in the project.
 
 from __future__ import annotations
 
-import asyncio
 from pathlib import Path
 
 import click
@@ -23,6 +22,7 @@ from atomics.commands.common import (
     eval_budget_from,
     extra_judges_option,
     parse_extra_judges,
+    run_async,
     write_summary_json,
 )
 from atomics.commands.suite_run import finalize_evaluation_run, suite_run
@@ -285,7 +285,7 @@ def toolcall(
             f"— [{style}]{label}[/{style}]  prose={prose}  called={_called(aggregated)}"
         )
 
-    summary = asyncio.run(
+    summary = run_async(
         run_toolcall_suite(
             provider=provider,
             model=model,
@@ -302,7 +302,10 @@ def toolcall(
             on_fixture_start=on_start,
             on_fixture_done=on_done,
             on_run_done=on_run,
-        )
+        ),
+        provider,
+        judge,
+        *(p for p, _ in extra_judge_pairs),
     )
 
     if not summary.tool_capable:

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import uuid
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -24,6 +23,7 @@ from atomics.commands.common import (
     extra_judges_option,
     integrity_exit_code,
     parse_extra_judges,
+    run_async,
     write_summary_json,
 )
 from atomics.commands.suite_run import finalize_evaluation_run, suite_run
@@ -223,7 +223,7 @@ def refusal(
     ) as run:
         run.begin(run_id, provider=provider_name, model=attributed_model)
         repository = run.repository
-        summary = asyncio.run(
+        summary = run_async(
             run_refusal(
                 provider,
                 judge_provider=judge,
@@ -238,7 +238,10 @@ def refusal(
                 fixtures=selected,
                 on_fixture_start=on_start,
                 on_fixture_done=on_done,
-            )
+            ),
+            provider,
+            judge,
+            *(p for p, _ in extra_judge_pairs),
         )
         _render_refusal_summary(
             console,

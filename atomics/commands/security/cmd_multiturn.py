@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import sys
 import uuid
 from pathlib import Path
@@ -19,6 +18,7 @@ from atomics.commands.common import (
     eval_budget_from,
     extra_judges_option,
     parse_extra_judges,
+    run_async,
     setup_logging,
     write_summary_json,
 )
@@ -211,7 +211,7 @@ def multiturn(
             if supports_thinking(model):
                 eff_thinking = True
 
-        summary = asyncio.run(
+        summary = run_async(
             run_multiturn(
                 test_provider,
                 judge_provider=judge_provider,
@@ -225,7 +225,10 @@ def multiturn(
                 effort=effort,
                 reasoning_mode=reasoning_mode,
                 fixtures=selected_fixtures,
-            )
+            ),
+            test_provider,
+            judge_provider,
+            *(p for p, _ in extra_judge_pairs),
         )
 
         console.print(result_table)

@@ -133,6 +133,9 @@ class GuardedProvider(BaseProvider):
             raise AttributeError(name)
         return getattr(self._inner, name)
 
+    async def aclose(self) -> None:
+        await self._inner.aclose()
+
     async def health_check(self) -> bool:
         # Not metered: a health check is not model traffic and costs nothing.
         return await self._inner.health_check()

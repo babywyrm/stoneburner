@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import uuid
 from pathlib import Path
 
@@ -20,6 +19,7 @@ from atomics.commands.common import (
     eval_budget_from,
     extra_judges_option,
     parse_extra_judges,
+    run_async,
     write_summary_json,
 )
 from atomics.commands.suite_run import finalize_task_run, suite_run
@@ -223,7 +223,7 @@ def redblue(
             if repo:
                 repo.save_task_result(fr.task_result, suite=f"redblue-{fr.fixture.team}")
 
-        summary = asyncio.run(
+        summary = run_async(
             run_redblue(
                 provider,
                 judge_provider=judge,
@@ -242,7 +242,10 @@ def redblue(
                 on_fixture_start=on_start,
                 on_fixture_done=on_done,
                 on_run_done=on_run,
-            )
+            ),
+            provider,
+            judge,
+            *(p for p, _ in extra_judge_pairs),
         )
 
         table = Table(title=f"Red/Blue Eval Summary ({mode})")

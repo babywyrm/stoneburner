@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
+from atomics.providers.base import aclose_providers
 from atomics.validation import sanitize_error
 
 logger = logging.getLogger("atomics.labcompare")
@@ -192,24 +193,31 @@ async def run_labcompare(
     for host in hosts:
         provider = provider_factory(host.url)
         ps_fetcher = ps_fetcher_factory(host.url)
-        for model in models:
-            if on_cell:
-                on_cell(host.name, model)
-            cell = CellResult(host_name=host.name, host_url=host.url, model=model)
-            try:
-                if "throughput" in dimensions:
-                    tp = await probe_throughput(
-                        provider, model, ps_fetcher=ps_fetcher, prompts=fixed_prompts
+        try:
+            for model in models:
+                if on_cell:
+                    on_cell(host.name, model)
+                cell = CellResult(host_name=host.name, host_url=host.url, model=model)
+                try:
+                    if "throughput" in dimensions:
+                        tp = await probe_throughput(
+                            provider, model, ps_fetcher=ps_fetcher, prompts=fixed_prompts
+                        )
+                        cell.tokens_per_second = tp.tokens_per_second
+                        cell.latency_ms = tp.latency_ms
+                        cell.prompt_eval_rate = tp.prompt_eval_rate
+                        cell.vram_fit_pct = tp.vram_fit_pct
+                        cell.gpu_name = tp.gpu_name
+                    if "quality" in dimensions:
+                        cell.quality_score = await quality_fn(
+                            provider, judge_host, judge_model, model
+                        )
+                except Exception as exc:
+                    cell.error = sanitize_error(exc)[:200]
+                    logger.warning(
+                        "labcompare: cell %s/%s failed: %s", host.name, model, cell.error
                     )
-                    cell.tokens_per_second = tp.tokens_per_second
-                    cell.latency_ms = tp.latency_ms
-                    cell.prompt_eval_rate = tp.prompt_eval_rate
-                    cell.vram_fit_pct = tp.vram_fit_pct
-                    cell.gpu_name = tp.gpu_name
-                if "quality" in dimensions:
-                    cell.quality_score = await quality_fn(provider, judge_host, judge_model, model)
-            except Exception as exc:
-                cell.error = sanitize_error(exc)[:200]
-                logger.warning("labcompare: cell %s/%s failed: %s", host.name, model, cell.error)
-            cells.append(cell)
+                cells.append(cell)
+        finally:
+            await aclose_providers(provider)
     return cells

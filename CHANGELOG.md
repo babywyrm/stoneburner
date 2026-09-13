@@ -22,6 +22,13 @@
   `AtomicsSettings()` and missed OS keychain keys. Env still wins; if
   env and keychain disagree, doctor says so without printing values.
   Valid AWS creds no longer print the account id.
+- **Provider HTTP clients close on the live loop.** Battery `run`
+  invoked several suites in one process; each `asyncio.run` left
+  httpx/Anthropic/OpenAI clients to GC after the loop was gone
+  (`RuntimeError: Event loop is closed`). Suites now aclose before
+  teardown. `--compare` on adversarial keeps one loop across both models.
+  Same close on eval, rag, codegen, probe, multiturn, judge-agreement,
+  sweep, labcompare, `run`, and provider-mode stress/soak.
 
 ## 0.22.6 (2026-09-12) — Trip evidence for Ollama think-field and tool probes
 
