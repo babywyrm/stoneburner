@@ -47,6 +47,8 @@
 - **Battery `toolcall` steps pass `--no-skip-incapable`.** The
   interactive default exits 0 when a model cannot emit tools. That
   made desk-pass and agent-gate look green on a silent skip.
+- **Distributed timestamps are timezone-aware.** `Worker.registered_at`
+  and `DistributedJob.created_at` used `datetime.utcnow()`.
 
 ## 0.22.6 (2026-09-12) — Trip evidence for Ollama think-field and tool probes
 
