@@ -209,3 +209,40 @@ def test_battery_run_paid_with_budget_invokes(monkeypatch):
     assert result.exit_code == 0
     assert seen[0] == "provider-test"
     assert "qa" not in seen
+
+
+def test_battery_run_paid_judge_without_budget_exits(monkeypatch):
+    seen: list[list[str]] = []
+
+    def fake_invoke(args: list[str]) -> int:
+        seen.append(args)
+        return 0
+
+    monkeypatch.setattr("atomics.commands.battery.invoke_atomics", fake_invoke)
+    result = CliRunner().invoke(
+        cli,
+        [
+            "battery",
+            "run",
+            "blue-capability",
+            "-p",
+            "ollama",
+            "-m",
+            "granite4.2:8b",
+            "--judge-provider",
+            "claude",
+            "--judge-model",
+            "claude-sonnet-4-6",
+        ],
+    )
+    assert result.exit_code == 2
+    assert "budget" in result.output.lower()
+    assert seen == []
+
+
+def test_invoke_atomics_maps_click_usage_error_to_exit_code():
+    from atomics.commands.battery import invoke_atomics
+
+    code = invoke_atomics(["eval", "--budget", "0"])
+    assert code != 0
+    assert invoke_atomics(["eval", "--help"]) == 0
