@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 # ── Module tests ──────────────────────────────────────────────────────────────
 
 
@@ -112,6 +114,34 @@ def test_keychain_fills_empty_key(monkeypatch):
 
         settings = load_settings()
         assert settings.anthropic_api_key == "from-keychain"
+
+
+@pytest.mark.parametrize(
+    ("env_name", "attr"),
+    [
+        ("GROQ_API_KEY", "groq_api_key"),
+        ("TOGETHER_API_KEY", "together_api_key"),
+        ("GEMINI_API_KEY", "gemini_api_key"),
+    ],
+)
+def test_keychain_fills_groq_together_gemini(monkeypatch, env_name, attr):
+    monkeypatch.delenv(env_name, raising=False)
+    with patch(
+        "keyring.get_password",
+        side_effect=lambda _service, key: "kc-cloud-placeholder" if key == env_name else None,
+    ):
+        from atomics.config import load_settings
+
+        settings = load_settings()
+        assert getattr(settings, attr) == "kc-cloud-placeholder"
+
+
+def test_known_keys_include_paid_cloud_providers():
+    from atomics.secrets import KNOWN_KEYS
+
+    assert "GROQ_API_KEY" in KNOWN_KEYS
+    assert "TOGETHER_API_KEY" in KNOWN_KEYS
+    assert "GEMINI_API_KEY" in KNOWN_KEYS
 
 
 def test_empty_when_neither_env_nor_keychain(monkeypatch):

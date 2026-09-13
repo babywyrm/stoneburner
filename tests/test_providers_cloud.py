@@ -278,33 +278,36 @@ class TestGeminiProvider:
 # ── CLI integration tests ────────────────────────────────────────────────────
 
 
-def test_cli_provider_test_groq_missing_key():
+def test_cli_provider_test_groq_missing_key(monkeypatch):
     from click.testing import CliRunner
 
     from atomics.cli import cli
 
+    monkeypatch.setattr("atomics.secrets.get_secret", lambda _key: None)
     runner = CliRunner(env={"GROQ_API_KEY": ""})
     result = runner.invoke(cli, ["provider-test", "--provider", "groq"])
     assert result.exit_code != 0
     assert "GROQ_API_KEY" in result.output
 
 
-def test_cli_provider_test_together_missing_key():
+def test_cli_provider_test_together_missing_key(monkeypatch):
     from click.testing import CliRunner
 
     from atomics.cli import cli
 
+    monkeypatch.setattr("atomics.secrets.get_secret", lambda _key: None)
     runner = CliRunner(env={"TOGETHER_API_KEY": ""})
     result = runner.invoke(cli, ["provider-test", "--provider", "together"])
     assert result.exit_code != 0
     assert "TOGETHER_API_KEY" in result.output
 
 
-def test_cli_provider_test_gemini_missing_key():
+def test_cli_provider_test_gemini_missing_key(monkeypatch):
     from click.testing import CliRunner
 
     from atomics.cli import cli
 
+    monkeypatch.setattr("atomics.secrets.get_secret", lambda _key: None)
     runner = CliRunner(env={"GEMINI_API_KEY": ""})
     result = runner.invoke(cli, ["provider-test", "--provider", "gemini"])
     assert result.exit_code != 0

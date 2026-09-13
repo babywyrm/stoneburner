@@ -35,6 +35,11 @@
   `--budget` is set. Local/lab `-p` with a local judge is unchanged.
   In-process `run` maps Click usage errors to an exit code instead of a
   traceback.
+- **Keychain backfill for Groq, Together, and Gemini.** `load_settings()`
+  only filled Anthropic and OpenAI. `atomics secrets set GROQ_API_KEY`
+  (and Together / Gemini) is a known name; empty env still picks up the
+  stored key. Doctor's env-shadows-keychain warning covers those names
+  too.
 
 ## 0.22.6 (2026-09-12) — Trip evidence for Ollama think-field and tool probes
 
