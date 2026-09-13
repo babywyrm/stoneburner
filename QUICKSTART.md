@@ -235,6 +235,7 @@ Start with a named battery, not the full 72-fixture adversarial suite.
 uv run atomics battery list
 uv run atomics battery show desk-pass -p ollama -m granite4.2:8b
 uv run atomics battery run desk-pass -p ollama -m granite4.2:8b
+uv run atomics battery run desk-pass -p openai -m gpt-4.1 --budget 5
 ```
 
 See [`docs/BATTERIES.md`](docs/BATTERIES.md). Then, if you mean to:

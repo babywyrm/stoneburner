@@ -29,6 +29,9 @@
   teardown. `--compare` on adversarial keeps one loop across both models.
   Same close on eval, rag, codegen, probe, multiturn, judge-agreement,
   sweep, labcompare, `run`, and provider-mode stress/soak.
+- **Paid `battery run` requires `--budget`.** A missing ceiling used to
+  warn and spend. Same rule as `show`: openai/claude/bedrock/groq/
+  together/gemini exit 2 until `--budget` is set. Local/lab `-p` unchanged.
 
 ## 0.22.6 (2026-09-12) — Trip evidence for Ollama think-field and tool probes
 

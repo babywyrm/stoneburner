@@ -206,7 +206,11 @@ def battery_run(
     runs: int | None,
     keep_going: bool,
 ) -> None:
-    """Execute the named battery. Stops on the first nonzero step unless --keep-going."""
+    """Execute the named battery. Stops on the first nonzero step unless --keep-going.
+
+    Paid providers (`openai`, `claude`, `bedrock`, `groq`, `together`,
+    `gemini`) require `--budget`.
+    """
     console = Console()
     try:
         item = get_battery(name)
@@ -220,7 +224,11 @@ def battery_run(
         )
         raise SystemExit(2)
     if provider in _PAID and not budget:
-        console.print("[yellow]No --budget set for a paid provider.[/yellow]")
+        click.echo(
+            f"{provider} is a paid provider. Pass --budget.",
+            err=True,
+        )
+        raise SystemExit(2)
     console.print(f"[bold]{item.id}[/bold] — {item.title}")
     console.print(f"Not a pass: {item.not_a_pass}")
     failed = 0

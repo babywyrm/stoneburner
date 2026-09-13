@@ -13,6 +13,8 @@ channel. Score them separately.
 
 `show` prints copy-pasteable commands. `run` executes those steps in
 order and stops on the first nonzero exit unless `--keep-going`.
+Paid `-p` (`openai`, `claude`, `bedrock`, `groq`, `together`, `gemini`)
+require `--budget` on `run` as well as `show`.
 
 Same `-p` as every other suite: `ollama`, `vllm`, `brain-gateway`, `openai`,
 `claude`, `bedrock`, `groq`, `together`, `gemini`, `llamacpp`.
