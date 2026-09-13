@@ -97,6 +97,16 @@ def test_battery_show_lab_vllm():
     assert "--vllm-host" in result.output
 
 
+def test_battery_show_threat_model_lists_both_stride_ids():
+    result = CliRunner().invoke(
+        cli,
+        ["battery", "show", "threat-model", "-m", "lfm2.5:8b", "--judge-model", "x"],
+    )
+    assert result.exit_code == 0
+    assert "rb-b04,rb-b06" in result.output
+    assert "agentic" in result.output
+
+
 def test_battery_run_unknown_exits_nonzero():
     result = CliRunner().invoke(cli, ["battery", "run", "nope"])
     assert result.exit_code != 0

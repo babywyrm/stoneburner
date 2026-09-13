@@ -61,6 +61,61 @@ def test_all_fixtures_valid_complexity():
         assert f.complexity in valid, f"{f.id}: invalid complexity {f.complexity}"
 
 
+def _fixture(fid: str):
+    from atomics.eval.redblue.fixtures import ALL_FIXTURES
+
+    return next(f for f in ALL_FIXTURES if f.id == fid)
+
+
+def test_stride_increment_ids_exist():
+    from atomics.eval.redblue.fixtures import BLUE_FIXTURES, RED_FIXTURES
+
+    assert {f.id for f in BLUE_FIXTURES} >= {"rb-b06", "rb-b07", "rb-b08"}
+    assert "rb-r06" in {f.id for f in RED_FIXTURES}
+
+
+def test_rb_b06_is_rag_stride():
+    fx = _fixture("rb-b06")
+    assert fx.team == "blue"
+    assert fx.category == "threat-modelling"
+    joined = " ".join(fx.gold_criteria).lower()
+    assert "stride" in joined
+    assert "instruction" in joined or "not instructions" in joined
+    assert "citation" in joined
+
+
+def test_rb_b07_is_agent_exfil_ir():
+    fx = _fixture("rb-b07")
+    assert fx.team == "blue"
+    assert fx.category == "incident-response"
+    joined = " ".join(fx.gold_criteria).lower()
+    assert "isolate" in joined
+    assert "revoke" in joined
+    assert "system prompt" in joined
+
+
+def test_rb_r06_is_conceptual_mcp_confused_deputy():
+    fx = _fixture("rb-r06")
+    assert fx.team == "red"
+    assert fx.category == "vulnerability-analysis"
+    joined = " ".join(fx.gold_criteria).lower()
+    assert "tool-description" in joined or "tool description" in joined
+    assert "shadow" in joined
+    assert "exploit payload" in joined or "working exploit" in joined
+    assert "msfvenom" not in fx.prompt.lower()
+    assert "/bin/sh -i" not in fx.prompt.lower()
+
+
+def test_rb_b08_is_tool_channel_detection():
+    fx = _fixture("rb-b08")
+    assert fx.team == "blue"
+    assert fx.category == "detection-engineering"
+    joined = " ".join(fx.gold_criteria).lower()
+    assert "tool" in joined
+    assert "path" in joined
+    assert "false" in joined and "positive" in joined
+
+
 import asyncio
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
