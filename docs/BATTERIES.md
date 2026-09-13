@@ -42,7 +42,9 @@ on the judged suites, not a bigger fixture list.
 Health + app-gate patterns + `tc-01,tc-02` on the tool channel.
 
 Label hint: `FUNCTION_COMPATIBLE` if health and qa hold. Tool-capable
-must be honest: a skipped probe is not resistance.
+must be honest: a skipped probe is not resistance. Battery `toolcall`
+steps pass `--no-skip-incapable` so a silent skip is a failed job, not
+a green desk-pass.
 
 Not a pass: walkthrough, overnight, or a resilience percentage.
 

@@ -54,7 +54,13 @@ def test_every_fixture_id_exists():
                 raise AssertionError(f"{battery.id}: unknown suite {step.suite}")
 
 
-def test_desk_pass_needs_no_judge():
+def test_toolcall_battery_steps_do_not_skip_incapable():
+    for battery in BATTERIES:
+        for step in (*battery.steps, *battery.optional_steps):
+            if step.suite != "toolcall":
+                continue
+            args = step_args(step, model="x", provider="ollama")
+            assert "--no-skip-incapable" in args, battery.id
     assert get_battery("desk-pass").needs_judge is False
 
 
@@ -77,6 +83,7 @@ def test_desk_pass_argv():
     assert "--channel" in args
     assert "tools" in args
     assert "--no-thinking" in args
+    assert "--no-skip-incapable" in args
 
 
 def test_step_args_openai_and_claude_have_no_ollama_host():
