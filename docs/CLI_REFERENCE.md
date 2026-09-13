@@ -186,10 +186,10 @@ runs such as a local model judged by a paid one.
 
 | Command | Description |
 |---------|-------------|
-| `atomics qa --file suite.yaml` | Fire fixture prompts, check pass/fail patterns. Raw Ollama prints `in=` / `out=` / `think=` |
+| `atomics qa --file suite.yaml` | Fire fixture prompts, check pass/fail patterns. Raw Ollama prints `in=` / `out=` / `think=`. Exit 1 on FAIL or ERROR |
 | `atomics qa --file suite.yaml -m qwen3.8:27b --no-thinking` | Raw Ollama; force `think: false` so short fixtures stay visible |
 | `atomics qa --file suite.yaml --profile profiles/local/gate.yaml` | Test app-level AI gate |
-| `atomics qa --fail-fast` | Stop at first FAIL or ERROR |
+| `atomics qa --fail-fast` | Stop at first FAIL or ERROR, then exit 1 |
 
 ## Scheduling
 

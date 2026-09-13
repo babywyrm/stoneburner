@@ -1478,3 +1478,5 @@ def qa(
         f"\n[bold]Pass rate:[/bold] [{pass_color}]{suite.passed}/{suite.total}[/{pass_color}]"
         + (" [dim](stopped early)[/dim]" if stopped_early else "")
     )
+    if suite.failed or suite.errors or stopped_early:
+        raise SystemExit(1)
