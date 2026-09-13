@@ -10,6 +10,7 @@ from atomics.doctor import run_doctor, suggest_next_step
 
 def test_doctor_exits_zero(monkeypatch, tmp_path):
     monkeypatch.setenv("ATOMICS_DB_PATH", str(tmp_path / "doc.db"))
+    monkeypatch.chdir(tmp_path)
     assert run_doctor() == 0
 
 
@@ -125,6 +126,9 @@ def test_doctor_boto3_aws_creds_valid(capsys, tmp_path):
 
     captured = capsys.readouterr()
     assert "boto3" in captured.out
+    assert "AWS credentials" in captured.out
+    assert "valid" in captured.out
+    assert "123456789" not in captured.out
 
 
 def test_doctor_boto3_aws_creds_invalid(capsys, tmp_path):
@@ -289,6 +293,38 @@ def test_suggest_next_step_points_at_localhost_ollama_when_nothing_is_ready():
 
 def test_suggest_next_step_is_silent_when_doctor_has_errors():
     assert suggest_next_step(errors=1, ollama_reachable=True, has_claude_key=True) is None
+
+
+def test_doctor_sees_anthropic_key_from_keychain(capsys, tmp_path, monkeypatch):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("ATOMICS_DB_PATH", str(tmp_path / "doc.db"))
+    monkeypatch.setattr(
+        "atomics.secrets.get_secret",
+        lambda key: "kc-anthropic-placeholder" if key == "ANTHROPIC_API_KEY" else None,
+    )
+    assert run_doctor() == 0
+    out = capsys.readouterr().out
+    line = next(ln for ln in out.splitlines() if "ANTHROPIC_API_KEY" in ln)
+    assert "not set" not in line
+    assert "kc-anthropic-placeholder" not in out
+
+
+def test_doctor_warns_when_env_shadows_keychain(capsys, tmp_path, monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "env-stale-placeholder")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("ATOMICS_DB_PATH", str(tmp_path / "doc.db"))
+    monkeypatch.setattr(
+        "atomics.secrets.get_secret",
+        lambda key: "kc-openai-placeholder" if key == "OPENAI_API_KEY" else None,
+    )
+    assert run_doctor() == 0
+    out = capsys.readouterr().out
+    assert "shadow" in out.lower()
+    assert "keychain" in out.lower()
+    assert "env-stale-placeholder" not in out
+    assert "kc-openai-placeholder" not in out
 
 
 def test_doctor_prints_next_step_when_ollama_answers(capsys, tmp_path):

@@ -11,7 +11,7 @@ from dataclasses import dataclass
 
 from rich.console import Console
 
-from atomics.config import AtomicsSettings
+from atomics.config import AtomicsSettings, load_settings
 from atomics.paths import default_data_dir, default_db_path
 from atomics.scheduler.cron import detect_best_scheduler
 
@@ -69,10 +69,26 @@ def suggest_next_step(
     )
 
 
+def _warn_env_shadows_keychain(console: Console) -> None:
+    """Env wins over keychain. Say so when both exist and disagree. Never print values."""
+    import os
+
+    from atomics.secrets import get_secret
+
+    for name in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY"):
+        env_val = os.environ.get(name) or ""
+        stored = get_secret(name) or ""
+        if env_val and stored and env_val != stored:
+            console.print(
+                f"[yellow]{name}[/yellow] in the environment shadows the keychain "
+                "(env wins)"
+            )
+
+
 def run_doctor(settings: AtomicsSettings | None = None) -> int:
     """Print diagnostics. Returns 0 if healthy, 1 if blocking issues."""
     console = Console()
-    settings = settings or AtomicsSettings()
+    settings = load_settings() if settings is None else settings
     errors = 0
 
     v = sys.version_info
@@ -120,10 +136,8 @@ def run_doctor(settings: AtomicsSettings | None = None) -> int:
             import boto3
 
             sts = boto3.client("sts")
-            identity = sts.get_caller_identity()
-            console.print(
-                f"[green]AWS credentials[/green] valid (account {identity.get('Account', '?')})"
-            )
+            sts.get_caller_identity()
+            console.print("[green]AWS credentials[/green] valid")
         except Exception:
             console.print(
                 "[yellow]AWS credentials[/yellow] not configured or invalid "
@@ -200,6 +214,8 @@ def run_doctor(settings: AtomicsSettings | None = None) -> int:
             )
     else:
         console.print("[yellow]OS keychain: not available (secrets fallback disabled)[/yellow]")
+
+    _warn_env_shadows_keychain(console)
 
     step = suggest_next_step(
         errors=errors,
