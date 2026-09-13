@@ -222,7 +222,10 @@ on HTTP. **v0.22.3** is thinking dials on Ollama and Qwen.
 **v0.22.4** is fixture subsets, QA thinking, and token counts.
 **v0.22.5** is Ollama think-field honesty for new tags.
 **v0.22.6** is trip evidence in the docs for those think-field
-tags and the tool-channel probe. Package version is **0.22.6**.
+tags and the tool-channel probe.
+**v0.22.7** is named security batteries (`atomics battery list` /
+`show` / `run`) plus the fail-closed `qa` / `--budget` / aclose fixes.
+Package version is **0.22.7**.
 
 - [x] **REPL line editing.** Stdlib `readline` for in-process
       history. No `prompt_toolkit`. Not session persistence to disk.
@@ -259,14 +262,12 @@ tags and the tool-channel probe. Package version is **0.22.6**.
 
 ## Next
 
-Current package is **0.22.6**. Unscheduled. Pick one; do not mix a
+Current package is **0.22.7**. Unscheduled. Pick one; do not mix a
 parked item into it.
 
-- **Named security batteries.** CLI `list` / `show` / `run` is in
-  (Unreleased): fail-closed paid `-p` / paid judge, positive `--budget`,
-  `qa` exit 1, `--no-skip-incapable` on toolcall steps. Next slice is
-  API/MCP `submit_battery` if anyone asks — not a doctor rewrite,
-  not suite convergence. Do not mix those into a batteries tag.
+- **API/MCP `submit_battery`.** CLI batteries shipped in 0.22.7. Next
+  slice is a metered HTTP/MCP job if anyone asks — not a doctor rewrite,
+  not suite convergence. Do not mix those into a batteries retag.
 - **Suite convergence** (ARCHITECTURE): `results` alias, large
   command modules, CLI integrity exit on the five suites that only
   report. Not user-visible. Do not start this to “warm up.”

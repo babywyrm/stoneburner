@@ -135,3 +135,10 @@ tool-channel detection, `rb-r06` conceptual MCP). Same `--budget 8`,
 `rb-b08` is the discriminator on the smaller/local tags judged by Claude.
 GPT-4.1 as judge scored granite 3b a clean 100 — treat that as a soft
 judge, not a promotion. Not walkthrough. Not `--runs 3`.
+
+**0.22.7 composition check (laptop `granite4.2:3b`, not promotion).**
+`battery run desk-pass`: provider-test passed. `qa` 4/6 then 5/6 —
+job exits 1 (that used to return 0 and continue). `--keep-going`
+reached toolcall: tool-capable, `tc-01` no call / `tc-02` safe call.
+No `Event loop is closed`. Paid / zero-budget / unknown-name gates
+exit 2 without a generate.
