@@ -262,9 +262,10 @@ tags and the tool-channel probe. Package version is **0.22.6**.
 Current package is **0.22.6**. Unscheduled. Pick one; do not mix a
 parked item into it.
 
-- **Named security batteries.** `list` / `show` / `run` and the four
-  extra STRIDE fixtures (`rb-b06`–`rb-b08`, `rb-r06`) are in. Next
-  slice is API/MCP `submit_battery` if anyone asks — not a doctor rewrite,
+- **Named security batteries.** CLI `list` / `show` / `run` is in
+  (Unreleased): fail-closed paid `-p` / paid judge, positive `--budget`,
+  `qa` exit 1, `--no-skip-incapable` on toolcall steps. Next slice is
+  API/MCP `submit_battery` if anyone asks — not a doctor rewrite,
   not suite convergence. Do not mix those into a batteries tag.
 - **Suite convergence** (ARCHITECTURE): `results` alias, large
   command modules, CLI integrity exit on the five suites that only
@@ -300,7 +301,6 @@ Not scheduled, roughly in order of how often they come up.
       tab-completion. Line editing, quiet submit, and uncapped wait
       shipped after the 0.21.0 tag.
 - **OpenAI SDK 3.0 / HTTPX2.** Parked. PR #9 and #13 closed. Do not mix into
-  a job-progress or REPL change.
   a job-progress or REPL change.
 - **HTTP MCP.** Do not invent. `atomics mcp` stays a stdio proxy over
   a running API server. Remote reach is `--api-url` on that API.

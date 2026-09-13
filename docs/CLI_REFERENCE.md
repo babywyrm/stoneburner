@@ -209,7 +209,7 @@ runs such as a local model judged by a paid one.
 | `atomics export --suite sweep -o out.jsonl` | Export sweep results to file |
 | `atomics export --suite adversarial` | Export adversarial results |
 | `atomics export --suite all --format csv -o all.csv` | Export all suites as CSV |
-| `atomics secrets set ANTHROPIC_API_KEY` | Store an API key in the OS keychain |
+| `atomics secrets set ANTHROPIC_API_KEY` | Store a known key (also OPENAI, GROQ, TOGETHER, GEMINI). `--force` for others |
 | `atomics login` | OAuth/OIDC login (browser or device code) |
 | `atomics logout` | Clear cached OAuth tokens |
 | `atomics whoami` | Show current auth mode and identity |

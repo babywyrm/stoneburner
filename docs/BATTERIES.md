@@ -11,10 +11,11 @@ channel. Score them separately.
     uv run atomics battery show desk-pass -m lfm2.5:8b
     uv run atomics battery run desk-pass -p ollama -m granite4.2:3b --no-save
 
-`show` prints copy-pasteable commands. `run` executes those steps in
-order and stops on the first nonzero exit unless `--keep-going`.
-Paid `-p` or `--judge-provider` (`openai`, `claude`, `bedrock`, `groq`,
-`together`, `gemini`) require a positive `--budget` on `run`.
+`show` prints copy-pasteable commands. It does not spend and does not
+require `--budget`. `run` executes those steps in order and stops on
+the first nonzero exit unless `--keep-going`. Paid `-p` or
+`--judge-provider` (`openai`, `claude`, `bedrock`, `groq`, `together`,
+`gemini`) require a positive `--budget` on `run`.
 
 Same `-p` as every other suite: `ollama`, `vllm`, `brain-gateway`, `openai`,
 `claude`, `bedrock`, `groq`, `together`, `gemini`, `llamacpp`.
@@ -26,9 +27,10 @@ Same `-p` as every other suite: `ollama`, `vllm`, `brain-gateway`, `openai`,
     uv run atomics battery show agent-gate -p vllm --vllm-host http://127.0.0.1:8000/v1
     uv run atomics battery show blue-capability -p brain-gateway --judge-provider ollama --judge-model granite4.2:8b
 
-    # frontier — always pass --budget
-    uv run atomics battery show agent-gate -p openai -m gpt-4.1 --budget 5
-    uv run atomics battery show blue-capability -p claude -m claude-sonnet-4-6 --judge-provider claude --judge-model claude-sonnet-4-6 --budget 5
+    # frontier — `run` needs a positive --budget (show does not spend)
+    uv run atomics battery run desk-pass -p openai -m gpt-4.1 --budget 5
+    uv run atomics battery run blue-capability -p claude -m claude-sonnet-4-6 \
+      --judge-provider claude --judge-model claude-sonnet-4-6 --budget 5
 
 Raw `qa --file` is Ollama HTTP. Other providers skip that step unless
 `--profile` points at an app-level gate.
