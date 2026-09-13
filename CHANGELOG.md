@@ -30,12 +30,13 @@
   Same close on eval, rag, codegen, probe, multiturn, judge-agreement,
   sweep, labcompare, `run`, and provider-mode stress/soak.
 - **Paid `battery run` requires `--budget`.** A missing ceiling used to
-  warn and spend. Same rule as `show`: openai/claude/bedrock/groq/
-  together/gemini as `-p` **or** `--judge-provider` exit 2 until
-  `--budget` is set. `--budget 0` used to pass the gate, run
-  unmetered `provider-test`, then fail on the first judged step.
-  Local/lab `-p` with a local judge is unchanged. In-process `run`
-  maps Click usage errors to an exit code instead of a traceback.
+  warn and spend. openai/claude/bedrock/groq/together/gemini as `-p`
+  **or** `--judge-provider` exit 2 until a positive `--budget` is set.
+  `--budget 0` used to pass the gate, run unmetered `provider-test`,
+  then fail on the first judged step. Local/lab `-p` with a local
+  judge is unchanged. `show` does not spend and does not require
+  `--budget`. In-process `run` maps Click usage errors to an exit code
+  instead of a traceback.
 - **Keychain backfill for Groq, Together, and Gemini.** `load_settings()`
   only filled Anthropic and OpenAI. `atomics secrets set GROQ_API_KEY`
   (and Together / Gemini) is a known name; empty env still picks up the

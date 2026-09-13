@@ -38,8 +38,10 @@ Cloud keys are optional. Store them in the OS keychain if you use them:
 
 ```bash
 atomics secrets set ANTHROPIC_API_KEY
-# or: export ANTHROPIC_API_KEY=sk-ant-...
-# or: export OPENAI_API_KEY=sk-...
+atomics secrets set OPENAI_API_KEY
+# also GROQ_API_KEY, TOGETHER_API_KEY, GEMINI_API_KEY
+# or: export ANTHROPIC_API_KEY=...
+# or: export OPENAI_API_KEY=...
 ```
 
 Point at a non-local Ollama with `ATOMICS_OLLAMA_HOST` (default
@@ -306,6 +308,8 @@ uv run atomics scenario -w "gate:qwen2.5:3b:2:5000" -w "eval:qwen2.5:7b:1:15000"
 ```
 
 ### "Does my AI gate still work?" — QA regression
+
+Exit 1 if any fixture is FAIL or ERROR (`--fail-fast` stops early, still 1).
 
 ```bash
 # Test a model directly against pass/fail patterns

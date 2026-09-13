@@ -121,8 +121,11 @@ private identity providers.
 Secrets stored via `atomics secrets set` use the OS keychain (macOS Keychain,
 Linux secret-service, Windows Credential Locker). Values are never written to
 disk as plaintext, never logged, and never included in exported results.
-
-`atomics secrets get` masks values by default; use `--show` to reveal.
+Known names: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GROQ_API_KEY`,
+`TOGETHER_API_KEY`, `GEMINI_API_KEY`, plus `OLLAMA_API_KEY` and Bedrock
+store-only names. `load_settings()` backfills the five paid API keys when
+env / `.env` are empty. `atomics secrets get` masks values by default;
+use `--show` to reveal.
 
 ## URL validation
 

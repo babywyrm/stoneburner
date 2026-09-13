@@ -257,6 +257,8 @@ handles API keys and can send data to LLM providers. Rules for contributors:
   only. Any command that surfaces a secret value must require an explicit,
   visible opt-in (e.g. a `--show` flag), never print by default.
 - **Resolution order is env → `.env` → OS keychain** (`config.load_settings`).
+  Empty `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GROQ_API_KEY`,
+  `TOGETHER_API_KEY`, and `GEMINI_API_KEY` backfill from the keychain.
   Do not add new secret sources without documenting the order.
 - **Prompts/responses are persisted** to SQLite and included in `export`. Do not
   put credentials in fixtures. Treat `task_results.prompt/response` as sensitive.
