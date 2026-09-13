@@ -211,6 +211,49 @@ def test_battery_run_paid_with_budget_invokes(monkeypatch):
     assert "qa" not in seen
 
 
+def test_battery_run_zero_budget_does_not_invoke(monkeypatch):
+    seen: list[list[str]] = []
+
+    def fake_invoke(args: list[str]) -> int:
+        seen.append(args)
+        return 0
+
+    monkeypatch.setattr("atomics.commands.battery.invoke_atomics", fake_invoke)
+    result = CliRunner().invoke(
+        cli,
+        [
+            "battery",
+            "run",
+            "desk-pass",
+            "-p",
+            "openai",
+            "-m",
+            "gpt-4.1",
+            "--budget",
+            "0",
+        ],
+    )
+    assert result.exit_code == 2
+    assert "budget" in result.output.lower()
+    assert seen == []
+
+
+def test_battery_run_nonnumeric_budget_does_not_invoke(monkeypatch):
+    seen: list[list[str]] = []
+
+    def fake_invoke(args: list[str]) -> int:
+        seen.append(args)
+        return 0
+
+    monkeypatch.setattr("atomics.commands.battery.invoke_atomics", fake_invoke)
+    result = CliRunner().invoke(
+        cli, ["battery", "run", "desk-pass", "-m", "x", "--budget", "nope"]
+    )
+    assert result.exit_code == 2
+    assert "budget" in result.output.lower()
+    assert seen == []
+
+
 def test_battery_run_paid_judge_without_budget_exits(monkeypatch):
     seen: list[list[str]] = []
 
