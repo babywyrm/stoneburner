@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 
@@ -42,7 +42,7 @@ class Worker(BaseModel):
     api_key_hint: str | None = None
     status: WorkerStatus = WorkerStatus.ONLINE
     last_seen_at: datetime | None = None
-    registered_at: datetime = Field(default_factory=datetime.utcnow)
+    registered_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class WorkerRegisterRequest(BaseModel):
@@ -73,7 +73,7 @@ class DistributedJob(BaseModel):
     status: JobStatus = JobStatus.PENDING
     request_json: str
     summary_json: str | None = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     completed_at: datetime | None = None
 
 

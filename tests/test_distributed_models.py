@@ -14,6 +14,7 @@ def test_worker_defaults():
     assert w.status == WorkerStatus.ONLINE
     assert w.worker_id == "w-1"
     assert w.labels["provider"] == "ollama"
+    assert w.registered_at.tzinfo is not None
 
 
 def test_distributed_job_defaults():
