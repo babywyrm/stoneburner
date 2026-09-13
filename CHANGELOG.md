@@ -17,6 +17,12 @@
 - **Dependabot ignores `mcp>=2.1` and OpenAI majors.** `mcp` stays
   `<2.1` (tool-error wrapping). OpenAI SDK 3 stays parked (#9, #13).
 
+### Fixed
+- **`doctor` reads keychain.** `run_doctor()` used a bare
+  `AtomicsSettings()` and missed OS keychain keys. Env still wins; if
+  env and keychain disagree, doctor says so without printing values.
+  Valid AWS creds no longer print the account id.
+
 ## 0.22.6 (2026-09-12) — Trip evidence for Ollama think-field and tool probes
 
 ### Upgrade notes

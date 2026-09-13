@@ -10,6 +10,10 @@ from atomics.cli import cli
 from atomics.eval.outcomes import RunIntegrity
 
 
+def _stub_keychain(monkeypatch) -> None:
+    monkeypatch.setattr("atomics.secrets.get_secret", lambda _key: None)
+
+
 def _adversarial_cli_summary(score):
     return SimpleNamespace(
         runs=1,
@@ -296,7 +300,8 @@ def test_cli_schedule_launchd():
     assert "RunAtLoad" in result.output
 
 
-def test_cli_run_no_api_key():
+def test_cli_run_no_api_key(monkeypatch):
+    _stub_keychain(monkeypatch)
     runner = CliRunner(env={"ANTHROPIC_API_KEY": ""})
     result = runner.invoke(cli, ["run", "-n", "1"])
     assert result.exit_code != 0
@@ -304,6 +309,7 @@ def test_cli_run_no_api_key():
 
 
 def test_cli_run_openai_no_api_key(monkeypatch, tmp_path):
+    _stub_keychain(monkeypatch)
     monkeypatch.setattr(
         "atomics.auth.codex._default_codex_auth_path",
         lambda: tmp_path / "nonexistent.json",
@@ -429,7 +435,8 @@ def test_cli_run_with_mocked_bedrock(monkeypatch, tmp_path):
 
 
 @pytest.mark.unit
-def test_cli_provider_test_missing_api_key():
+def test_cli_provider_test_missing_api_key(monkeypatch):
+    _stub_keychain(monkeypatch)
     runner = CliRunner(env={"ANTHROPIC_API_KEY": ""})
     result = runner.invoke(cli, ["provider-test"])
     assert result.exit_code != 0
@@ -564,6 +571,7 @@ def test_cli_run_with_mocked_openai(monkeypatch, tmp_path):
 
 
 def test_cli_provider_test_openai_missing_key(monkeypatch, tmp_path):
+    _stub_keychain(monkeypatch)
     monkeypatch.setattr(
         "atomics.auth.codex._default_codex_auth_path",
         lambda: tmp_path / "nonexistent.json",
