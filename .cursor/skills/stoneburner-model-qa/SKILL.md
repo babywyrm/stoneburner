@@ -37,7 +37,9 @@ uv run atomics battery run desk-pass -p ollama -m <model>
 ```
 
 Paid `-p` or `--judge-provider` needs a positive `--budget`. Toolcall steps
-pass `--no-skip-incapable`. `qa` exits 1 on FAIL or ERROR.
+pass `--no-skip-incapable`. `qa` exits 1 on FAIL or ERROR. Battery defaults
+to `--no-thinking`; pass `--thinking` for tags that skip the tool probe
+with think off.
 
 2. Verify provider health:
 
