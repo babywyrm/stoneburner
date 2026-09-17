@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Changed
+- **boto3 1.43.97, ruff 0.16.8.** Patch bumps. Lands Dependabot #23 /
+  #22 past the httpx2 audit. Skip anthropic 1.x (#24) and
+  sentence-transformers 6 (#21).
+
 ### Fixed
 - **`battery show` / `run` accept `--thinking`.** Steps still default to
   `--no-thinking` so short fixtures stay visible. Pass `--thinking` for
