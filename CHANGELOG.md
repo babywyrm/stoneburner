@@ -8,6 +8,8 @@
   tags that 500 or skip the tool probe with think off (north-mini,
   phi4-*-reasoning). `--effort` / `--reasoning-mode` forward onto
   generate steps; `archreview` has no effort dial and is skipped.
+- **`httpx2` 2.13 in the mcp extra.** pip-audit failed on 2.10. `mcp`
+  stays `<2.1`.
 
 ## 0.22.7 (2026-09-13) — Named security batteries
 
