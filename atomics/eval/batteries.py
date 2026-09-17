@@ -250,6 +250,15 @@ def _route_flags(
     return args
 
 
+def _effort_flags(effort: str | None, reasoning_mode: str | None) -> list[str]:
+    args: list[str] = []
+    if effort:
+        args.extend(["--effort", effort])
+    if reasoning_mode:
+        args.extend(["--reasoning-mode", reasoning_mode])
+    return args
+
+
 def step_args(
     step: BatteryStep,
     *,
@@ -263,6 +272,8 @@ def step_args(
     judge_host: str | None = None,
     budget: str | None = None,
     profile: str | None = None,
+    effort: str | None = None,
+    reasoning_mode: str | None = None,
 ) -> list[str]:
     """Argv for one step, starting with the subcommand. No `atomics` prefix.
 
@@ -279,6 +290,7 @@ def step_args(
             args.extend(["--ollama-host", ollama_host])
         if vllm_host:
             args.extend(["--vllm-host", vllm_host])
+        args.extend(_effort_flags(effort, reasoning_mode))
         return args
     if step.suite == "qa":
         if profile:
@@ -287,6 +299,7 @@ def step_args(
                 args.append(thinking_flag)
             if model:
                 args.extend(["-m", model])
+            args.extend(_effort_flags(effort, reasoning_mode))
             return args
         if not step.qa_file:
             raise ValueError("qa step needs qa_file")
@@ -297,6 +310,7 @@ def step_args(
             args.extend(["-m", model])
         if ollama_host:
             args.extend(["--ollama-host", ollama_host])
+        args.extend(_effort_flags(effort, reasoning_mode))
         return args
     if step.suite == "archreview":
         if not step.repo:
@@ -341,5 +355,7 @@ def step_args(
             args.extend(["--judge-host", judge_host])
     if budget and step.suite in _BUDGET_SUITES:
         args.extend(["--budget", budget])
+    if step.suite in _NO_THINKING_SUITES:
+        args.extend(_effort_flags(effort, reasoning_mode))
     args.extend(step.extra)
     return args

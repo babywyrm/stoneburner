@@ -48,6 +48,25 @@ def test_battery_show_thinking_forwards():
     assert "--no-thinking" not in result.output
 
 
+def test_battery_show_effort_forwards():
+    result = CliRunner().invoke(
+        cli,
+        [
+            "battery",
+            "show",
+            "desk-pass",
+            "-m",
+            "lfm2.5:8b",
+            "--thinking",
+            "--effort",
+            "low",
+        ],
+    )
+    assert result.exit_code == 0
+    assert "--effort" in result.output
+    assert "low" in result.output
+
+
 def test_battery_show_unknown_exits_nonzero():
     result = CliRunner().invoke(cli, ["battery", "show", "nope"])
     assert result.exit_code != 0
@@ -211,6 +230,35 @@ def test_battery_run_thinking_forwards(monkeypatch):
     for args in seen:
         assert "--thinking" in args
         assert "--no-thinking" not in args
+        assert "--effort" not in args
+
+
+def test_battery_run_effort_forwards(monkeypatch):
+    seen: list[list[str]] = []
+
+    def fake_invoke(args: list[str]) -> int:
+        seen.append(args)
+        return 0
+
+    monkeypatch.setattr("atomics.commands.battery.invoke_atomics", fake_invoke)
+    result = CliRunner().invoke(
+        cli,
+        [
+            "battery",
+            "run",
+            "desk-pass",
+            "-m",
+            "lfm2.5:8b",
+            "--thinking",
+            "--effort",
+            "low",
+        ],
+    )
+    assert result.exit_code == 0
+    assert seen
+    for args in seen:
+        assert "--effort" in args
+        assert args[args.index("--effort") + 1] == "low"
 
 
 def test_battery_run_paid_with_budget_invokes(monkeypatch):

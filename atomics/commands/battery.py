@@ -6,7 +6,7 @@ import click
 from rich.console import Console
 from rich.table import Table
 
-from atomics.commands.common import PROVIDER_CHOICES
+from atomics.commands.common import PROVIDER_CHOICES, effort_options
 from atomics.eval.batteries import BATTERIES, get_battery, step_args, visible_steps
 
 
@@ -80,6 +80,7 @@ def battery_list() -> None:
     help="Default --no-thinking so short fixtures stay visible. "
     "Pass --thinking for tags that 500 or skip the tool probe with think off.",
 )
+@effort_options
 def battery_show(
     name: str,
     model: str | None,
@@ -92,6 +93,8 @@ def battery_show(
     budget: str | None,
     profile: str | None,
     thinking: bool,
+    effort: str | None,
+    reasoning_mode: str | None,
 ) -> None:
     """Print purpose, what a pass is not, and commands for NAME."""
     console = Console()
@@ -121,6 +124,8 @@ def battery_show(
             judge_host=judge_host,
             budget=budget,
             profile=profile,
+            effort=effort,
+            reasoning_mode=reasoning_mode,
         )
         console.print(f"# {step.purpose}")
         console.print(_format_command(args))
@@ -139,6 +144,8 @@ def battery_show(
                 judge_host=judge_host,
                 budget=budget,
                 profile=profile,
+                effort=effort,
+                reasoning_mode=reasoning_mode,
             )
             console.print(f"# {step.purpose}")
             console.print("# " + _format_command(args))
@@ -232,6 +239,7 @@ def _positive_budget(budget: str | None) -> bool:
     help="Default --no-thinking so short fixtures stay visible. "
     "Pass --thinking for tags that 500 or skip the tool probe with think off.",
 )
+@effort_options
 def battery_run(
     name: str,
     model: str | None,
@@ -246,6 +254,8 @@ def battery_run(
     runs: int | None,
     keep_going: bool,
     thinking: bool,
+    effort: str | None,
+    reasoning_mode: str | None,
 ) -> None:
     """Execute the named battery. Stops on the first nonzero step unless --keep-going.
 
@@ -290,6 +300,8 @@ def battery_run(
             judge_host=judge_host,
             budget=budget,
             profile=profile,
+            effort=effort,
+            reasoning_mode=reasoning_mode,
         )
         if runs is not None and step.suite in _RUNS_SUITES:
             args.extend(["--runs", str(runs)])
