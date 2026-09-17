@@ -84,6 +84,25 @@ def test_desk_pass_argv():
     assert "tools" in args
     assert "--no-thinking" in args
     assert "--no-skip-incapable" in args
+    assert "--effort" not in args
+
+
+def test_step_args_forwards_effort():
+    args = step_args(
+        get_battery("desk-pass").steps[2],
+        model="lfm2.5:8b",
+        provider="ollama",
+        effort="low",
+    )
+    assert "--effort" in args
+    assert args[args.index("--effort") + 1] == "low"
+
+
+def test_step_args_effort_skips_archreview():
+    step = get_battery("threat-model").optional_steps[0]
+    assert step.suite == "archreview"
+    args = step_args(step, model="x", provider="ollama", effort="low")
+    assert "--effort" not in args
 
 
 def test_step_args_openai_and_claude_have_no_ollama_host():
