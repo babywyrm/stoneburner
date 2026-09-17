@@ -35,6 +35,17 @@ def test_battery_show_desk_pass_prints_commands():
     assert "tc-01,tc-02" in result.output
     assert "FUNCTION_COMPATIBLE" in result.output
     assert "Not walkthrough" in result.output or "Not walkthrough-compatible" in result.output
+    assert "--no-thinking" in result.output
+    assert "--thinking" not in result.output.replace("--no-thinking", "")
+
+
+def test_battery_show_thinking_forwards():
+    result = CliRunner().invoke(
+        cli, ["battery", "show", "desk-pass", "-m", "lfm2.5:8b", "--thinking"]
+    )
+    assert result.exit_code == 0
+    assert "--thinking" in result.output
+    assert "--no-thinking" not in result.output
 
 
 def test_battery_show_unknown_exits_nonzero():
@@ -182,6 +193,24 @@ def test_battery_run_keep_going(monkeypatch):
     )
     assert result.exit_code != 0
     assert seen == ["provider-test", "qa", "toolcall"]
+
+
+def test_battery_run_thinking_forwards(monkeypatch):
+    seen: list[list[str]] = []
+
+    def fake_invoke(args: list[str]) -> int:
+        seen.append(args)
+        return 0
+
+    monkeypatch.setattr("atomics.commands.battery.invoke_atomics", fake_invoke)
+    result = CliRunner().invoke(
+        cli, ["battery", "run", "desk-pass", "-m", "lfm2.5:8b", "--thinking"]
+    )
+    assert result.exit_code == 0
+    assert seen
+    for args in seen:
+        assert "--thinking" in args
+        assert "--no-thinking" not in args
 
 
 def test_battery_run_paid_with_budget_invokes(monkeypatch):

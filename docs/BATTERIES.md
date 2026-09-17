@@ -9,7 +9,8 @@ channel. Score them separately.
 
     uv run atomics battery list
     uv run atomics battery show desk-pass -m lfm2.5:8b
-    uv run atomics battery run desk-pass -p ollama -m granite4.2:3b --no-save
+    uv run atomics battery run desk-pass -p ollama -m granite4.2:3b
+    uv run atomics battery run desk-pass -p ollama -m phi4-mini-reasoning --thinking
 
 `show` prints copy-pasteable commands. It does not spend and does not
 require `--budget`. `run` executes those steps in order and stops on
@@ -35,8 +36,9 @@ Same `-p` as every other suite: `ollama`, `vllm`, `brain-gateway`, `openai`,
 Raw `qa --file` is Ollama HTTP. Other providers skip that step unless
 `--profile` points at an app-level gate.
 
-Start with `provider-test`. Use `--no-thinking` on short fixtures so
-the visible answer is not eaten by CoT. Promotion evidence is `--runs 3`
+Start with `provider-test`. `battery` defaults to `--no-thinking` so
+short fixtures stay visible. Pass `--thinking` when a tag 500s or
+skips the tool probe with think off. Promotion evidence is `--runs 3`
 on the judged suites, not a bigger fixture list.
 
 ## desk-pass (cheap, no judge)

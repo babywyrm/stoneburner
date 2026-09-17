@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Fixed
+- **`battery show` / `run` accept `--thinking`.** Steps still default to
+  `--no-thinking` so short fixtures stay visible. Pass `--thinking` for
+  tags that 500 or skip the tool probe with think off (north-mini,
+  phi4-*-reasoning).
+
 ## 0.22.7 (2026-09-13) — Named security batteries
 
 ### Upgrade notes

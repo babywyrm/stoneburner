@@ -14,6 +14,10 @@ def _format_command(args: list[str]) -> str:
     return "atomics " + " ".join(args)
 
 
+def _thinking_argv(thinking: bool) -> str:
+    return "--thinking" if thinking else "--no-thinking"
+
+
 @click.group("battery")
 def battery() -> None:
     """Named security jobs that compose existing suites.
@@ -70,6 +74,12 @@ def battery_list() -> None:
     default=None,
     help="App-gate profile; enables qa on non-Ollama providers.",
 )
+@click.option(
+    "--thinking/--no-thinking",
+    default=False,
+    help="Default --no-thinking so short fixtures stay visible. "
+    "Pass --thinking for tags that 500 or skip the tool probe with think off.",
+)
 def battery_show(
     name: str,
     model: str | None,
@@ -81,6 +91,7 @@ def battery_show(
     judge_host: str | None,
     budget: str | None,
     profile: str | None,
+    thinking: bool,
 ) -> None:
     """Print purpose, what a pass is not, and commands for NAME."""
     console = Console()
@@ -102,6 +113,7 @@ def battery_show(
             step,
             model=model,
             provider=provider,
+            thinking_flag=_thinking_argv(thinking),
             ollama_host=ollama_host,
             vllm_host=vllm_host,
             judge_provider=judge_provider,
@@ -119,6 +131,7 @@ def battery_show(
                 step,
                 model=model,
                 provider=provider,
+                thinking_flag=_thinking_argv(thinking),
                 ollama_host=ollama_host,
                 vllm_host=vllm_host,
                 judge_provider=judge_provider,
@@ -213,6 +226,12 @@ def _positive_budget(budget: str | None) -> bool:
     default=False,
     help="Do not stop on the first failure.",
 )
+@click.option(
+    "--thinking/--no-thinking",
+    default=False,
+    help="Default --no-thinking so short fixtures stay visible. "
+    "Pass --thinking for tags that 500 or skip the tool probe with think off.",
+)
 def battery_run(
     name: str,
     model: str | None,
@@ -226,6 +245,7 @@ def battery_run(
     profile: str | None,
     runs: int | None,
     keep_going: bool,
+    thinking: bool,
 ) -> None:
     """Execute the named battery. Stops on the first nonzero step unless --keep-going.
 
@@ -262,6 +282,7 @@ def battery_run(
             step,
             model=model,
             provider=provider,
+            thinking_flag=_thinking_argv(thinking),
             ollama_host=ollama_host,
             vllm_host=vllm_host,
             judge_provider=judge_provider,
