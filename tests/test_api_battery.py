@@ -64,3 +64,65 @@ async def test_battery_skips_provider_test_and_qa(monkeypatch):
     skipped = {s["suite"] for s in result["steps"] if s.get("skipped")}
     assert "provider-test" in skipped
     assert "qa" in skipped
+
+
+def test_post_batteries_returns_202_and_kind():
+    from unittest.mock import AsyncMock, patch
+
+    from fastapi.testclient import TestClient
+
+    from atomics.api.config import ServerSettings
+    from atomics.api.server import create_app
+
+    app = create_app(settings=ServerSettings(no_auth=True))
+    with (
+        patch(
+            "atomics.api.routes.run_battery_from_request",
+            new_callable=AsyncMock,
+            return_value={"battery": "desk-pass", "steps": []},
+        ),
+        TestClient(app) as client,
+    ):
+        resp = client.post(
+            "/api/v1/batteries",
+            json={
+                "name": "desk-pass",
+                "provider": "ollama",
+                "model": "x",
+                "budget_usd": 5,
+            },
+        )
+    assert resp.status_code == 202
+    body = resp.json()
+    assert body["kind"] == "battery"
+    assert body["progress"]["total"] >= 1
+
+
+def test_post_batteries_unknown_name_is_422():
+    from fastapi.testclient import TestClient
+
+    from atomics.api.config import ServerSettings
+    from atomics.api.server import create_app
+
+    app = create_app(settings=ServerSettings(no_auth=True))
+    with TestClient(app) as client:
+        resp = client.post(
+            "/api/v1/batteries",
+            json={"name": "nope", "provider": "ollama", "model": "x", "budget_usd": 5},
+        )
+    assert resp.status_code == 422
+
+
+def test_post_batteries_without_budget_is_422():
+    from fastapi.testclient import TestClient
+
+    from atomics.api.config import ServerSettings
+    from atomics.api.server import create_app
+
+    app = create_app(settings=ServerSettings(no_auth=True))
+    with TestClient(app) as client:
+        resp = client.post(
+            "/api/v1/batteries",
+            json={"name": "desk-pass", "provider": "ollama", "model": "x"},
+        )
+    assert resp.status_code == 422

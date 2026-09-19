@@ -10,7 +10,14 @@ from collections.abc import Sequence
 from typing import Any, Literal, TypedDict, cast
 
 from atomics.api.jobs import Job
-from atomics.api.models import EvalRequest, RunRequest, SoakRequest, StressRequest, SweepRequest
+from atomics.api.models import (
+    BatteryRequest,
+    EvalRequest,
+    RunRequest,
+    SoakRequest,
+    StressRequest,
+    SweepRequest,
+)
 from atomics.config import AtomicsSettings
 from atomics.eval.adversarial import ALL_FIXTURES as ADVERSARIAL_FIXTURES
 from atomics.eval.codegen.fixtures import ALL_CODEGEN_FIXTURES
@@ -327,6 +334,17 @@ def sweep_job_total(payload: SweepRequest) -> int:
 
 def initial_sweep_progress(payload: SweepRequest) -> dict[str, Any]:
     return {"current": 0, "total": sweep_job_total(payload), "in_flight": None, "trail": []}
+
+
+def battery_job_total(payload: BatteryRequest) -> int:
+    from atomics.eval.batteries import get_battery, visible_steps
+
+    battery = get_battery(payload.name)
+    return len(visible_steps(battery, provider=payload.provider, profile=payload.profile))
+
+
+def initial_battery_progress(payload: BatteryRequest) -> dict[str, Any]:
+    return {"current": 0, "total": battery_job_total(payload), "in_flight": None, "trail": []}
 
 
 def stress_job_total(payload: StressRequest) -> int:
