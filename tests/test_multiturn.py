@@ -343,6 +343,82 @@ def test_cli_multiturn_extra_judges_option():
     assert "--extra-judges" in result.output
 
 
+def _partial_multiturn_summary():
+    """One conversation, conversation judge parse-failed → integrity not complete."""
+    from datetime import UTC, datetime
+
+    fixture = ConversationFixture(
+        id="mt-eval-01",
+        complexity=TaskComplexity.LIGHT,
+        system_prompt="x",
+        turns=[ConversationTurn("hi", "greet", ["hello"])],
+    )
+    task = TaskResult(
+        run_id="mt-live",
+        category=TaskCategory.GENERAL_QA,
+        task_name="mt-eval-01",
+        provider="mock",
+        model="x",
+        status=TaskStatus.SUCCESS,
+    )
+    conv_judge = ConversationJudgeResult(0, 0, 0, 0.0, "", parse_failed=True)
+    cr = ConversationResult(
+        fixture=fixture,
+        turn_results=[],
+        conversation_judge=conv_judge,
+        task_result=task,
+        overall_score=None,
+    )
+    now = datetime.now(UTC)
+    return MultiturnRunSummary(
+        run_id="mt-live",
+        provider="mock",
+        model="x",
+        judge_provider="mock",
+        judge_model="j",
+        started_at=now,
+        completed_at=now,
+        conversation_results=[cr],
+    )
+
+
+def _patch_multiturn_partial(monkeypatch):
+    from types import SimpleNamespace
+
+    provider = SimpleNamespace(name="ollama", default_model="x")
+
+    async def fake_run(*_args, **kwargs):
+        return _partial_multiturn_summary()
+
+    monkeypatch.setattr(
+        "atomics.commands.security.cmd_multiturn._make_provider",
+        lambda *_args, **_kwargs: provider,
+    )
+    monkeypatch.setattr("atomics.eval.multiturn.runner.run_multiturn", fake_run)
+
+
+def test_cli_multiturn_partial_integrity_exits_nonzero(monkeypatch) -> None:
+    from click.testing import CliRunner
+
+    from atomics.cli import cli
+
+    _patch_multiturn_partial(monkeypatch)
+    result = CliRunner().invoke(cli, ["--no-progress", "multiturn", "--no-save"])
+    assert result.exit_code == 1
+
+
+def test_cli_multiturn_allow_partial_exits_zero(monkeypatch) -> None:
+    from click.testing import CliRunner
+
+    from atomics.cli import cli
+
+    _patch_multiturn_partial(monkeypatch)
+    result = CliRunner().invoke(
+        cli, ["--no-progress", "multiturn", "--no-save", "--allow-partial"]
+    )
+    assert result.exit_code == 0
+
+
 @pytest.mark.asyncio
 async def test_multiturn_extra_judges_panels_conversation_only(monkeypatch):
     from types import SimpleNamespace

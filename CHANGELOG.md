@@ -16,6 +16,10 @@
   sentence-transformers 6 (#21).
 
 ### Fixed
+- **`redblue` and `multiturn` exit nonzero on a partial run.** Both
+  printed integrity but returned 0. They now take `--allow-partial` and
+  share `integrity_exit_code` with `codereview` / `refusal` /
+  `adversarial`.
 - **`battery show` / `run` accept `--thinking`.** Steps still default to
   `--no-thinking` so short fixtures stay visible. Pass `--thinking` for
   tags that 500 or skip the tool probe with think off (north-mini,

@@ -18,6 +18,7 @@ from atomics.commands.common import (
     effort_options,
     eval_budget_from,
     extra_judges_option,
+    integrity_exit_code,
     parse_extra_judges,
     run_async,
     write_summary_json,
@@ -90,6 +91,11 @@ from atomics.eval.suite_integrity import format_headline_rate
     default=None,
     help="Write the full run (per-fixture scores, rationales, latency, cost) as JSON to this file.",
 )
+@click.option(
+    "--allow-partial",
+    is_flag=True,
+    help="Return success for a partial run while preserving integrity details.",
+)
 @budget_option
 def redblue(
     provider_name: str,
@@ -110,6 +116,7 @@ def redblue(
     max_output_tokens: int | None,
     save_results: bool,
     json_out: str | None,
+    allow_partial: bool,
     budget_usd: float | None,
 ) -> None:
     """Run red/blue team LLM capability eval — offensive and defensive security tasks.
@@ -270,6 +277,9 @@ def redblue(
         if json_out:
             write_summary_json(summary, Path(json_out))
             console.print(f"\n[dim]Wrote JSON results to {json_out}[/dim]")
+
+        if integrity_exit_code(summary.integrity, allow_partial=allow_partial):
+            raise click.exceptions.Exit(1)
 
 
 # ── atomics probe ─────────────────────────────────────────────────────────────

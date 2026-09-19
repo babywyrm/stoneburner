@@ -17,6 +17,7 @@ from atomics.commands.common import (
     effort_options,
     eval_budget_from,
     extra_judges_option,
+    integrity_exit_code,
     parse_extra_judges,
     run_async,
     setup_logging,
@@ -59,6 +60,11 @@ from atomics.eval.budget import share_budget
 @click.option("--thinking/--no-thinking", "thinking_flag", default=None)
 @click.option("--thinking-budget", type=int, default=None)
 @effort_options
+@click.option(
+    "--allow-partial",
+    is_flag=True,
+    help="Return success for a partial run while preserving integrity details.",
+)
 @budget_option
 def multiturn(
     provider_name: str,
@@ -77,6 +83,7 @@ def multiturn(
     thinking_budget: int | None,
     effort: str | None,
     reasoning_mode: str | None,
+    allow_partial: bool,
     budget_usd: float | None,
 ) -> None:
     """Multi-turn conversation evaluation — context retention, coherence, instruction following."""
@@ -256,6 +263,9 @@ def multiturn(
         if json_out:
             write_summary_json(summary, Path(json_out))
             console.print(f"[dim]Wrote JSON results to {json_out}[/dim]")
+
+        if integrity_exit_code(summary.integrity, allow_partial=allow_partial):
+            raise click.exceptions.Exit(1)
 
 
 # ── atomics rag ───────────────────────────────────────────────────────────────
