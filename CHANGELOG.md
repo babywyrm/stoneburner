@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Added
+- **API/MCP `submit_battery`.** `POST /api/v1/batteries` and the MCP
+  tool run a named battery as one metered job. Budget required.
+  `thinking` / `effort` / `reasoning_mode` forward onto every step.
+  provider-test and qa steps are recorded skipped in v1; archreview
+  stays on the CLI.
+
 ### Changed
 - **boto3 1.43.97, ruff 0.16.8.** Patch bumps. Lands Dependabot #23 /
   #22 past the httpx2 audit. Skip anthropic 1.x (#24) and
