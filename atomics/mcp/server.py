@@ -239,8 +239,9 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
 
         Spends tokens. `budget_usd` is required. `name` is one of the five
         batteries (`desk-pass`, `blue-capability`, `red-capability`,
-        `agent-gate`, `threat-model`). provider-test and qa steps are recorded
-        as skipped in v1; archreview stays on the CLI. `thinking` / `effort`
+        `agent-gate`, `threat-model`). provider-test runs the fixed 2+2
+        probe; qa runs the fixture file or profile and a FAIL marks the
+        step not-ok. archreview stays on the CLI. `thinking` / `effort`
         forward onto every step (battery default is `--no-thinking` when
         `thinking` is unset). `host` is the inference endpoint; `judge_host`
         is the judge endpoint when it differs. Poll `get_job` until `status`

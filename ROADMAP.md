@@ -268,8 +268,9 @@ parked item into it.
 - **API/MCP `submit_battery`.** CLI batteries shipped in 0.22.7. Next
   slice is a metered HTTP/MCP job if anyone asks — not a doctor rewrite,
   not suite convergence. Do not mix those into a batteries retag.
-  Shipped: `POST /batteries` + MCP `submit_battery`. provider-test and
-  qa steps are recorded skipped in v1; archreview stays on the CLI.
+  Shipped: `POST /batteries` + MCP `submit_battery`. provider-test runs
+  the fixed probe; qa runs the fixture file or profile. archreview
+  stays on the CLI.
 - **Suite convergence** (ARCHITECTURE): `results` alias, large
   command modules, CLI integrity exit on the five suites that only
   report. Not user-visible. Do not start this to “warm up.”
