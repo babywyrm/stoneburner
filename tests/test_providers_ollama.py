@@ -367,6 +367,76 @@ async def test_ollama_tools_effort_low_on_phi4_mini_reasoning_sends_false() -> N
     assert body["think"] is False
 
 
+def _think_400_then_ok_client(*, chat: bool) -> AsyncMock:
+    """First call 400s on the think field; the retry with think:false succeeds."""
+    import httpx
+
+    bad = MagicMock()
+    bad.status_code = 400
+    bad.text = '{"error":"phi4-mini:3.8b does not support thinking"}'
+    bad.json.return_value = {"error": "phi4-mini:3.8b does not support thinking"}
+
+    def _raise():
+        raise httpx.HTTPStatusError("400", request=MagicMock(), response=bad)
+
+    bad.raise_for_status = _raise
+
+    ok = MagicMock()
+    ok.raise_for_status = MagicMock()
+    if chat:
+        ok.json.return_value = {
+            "message": {"content": "no", "tool_calls": []},
+            "eval_count": 1,
+            "prompt_eval_count": 1,
+            "eval_duration": 1,
+        }
+    else:
+        ok.json.return_value = {
+            "response": "ok",
+            "eval_count": 5,
+            "prompt_eval_count": 3,
+            "eval_duration": 1,
+        }
+    mock_client = AsyncMock()
+    bodies: list[dict] = []
+    responses = [bad, ok]
+
+    async def _post(*args, **kwargs):
+        bodies.append(dict(kwargs.get("json", {})))
+        return responses[len(bodies) - 1]
+
+    mock_client.post = _post
+    mock_client._bodies = bodies
+    return mock_client
+
+
+@pytest.mark.asyncio
+async def test_ollama_generate_retries_think_false_on_think_400() -> None:
+    mock_client = _think_400_then_ok_client(chat=False)
+    provider = OllamaProvider(host="http://fake:11434", client=mock_client)
+    resp = await provider.generate("hi", model="granite4.2:3b", thinking=True)
+
+    bodies = mock_client._bodies
+    assert len(bodies) == 2
+    assert bodies[0]["think"] is True
+    assert bodies[1]["think"] is False
+    assert resp.reasoning_request == {"think": False, "think_fallback": "400"}
+
+
+@pytest.mark.asyncio
+async def test_ollama_tools_retries_think_false_on_think_400() -> None:
+    mock_client = _think_400_then_ok_client(chat=True)
+    provider = OllamaProvider(host="http://fake:11434", client=mock_client)
+    resp = await provider.generate_with_tools(
+        "hi", tools=[], model="granite4.2:3b", thinking=True
+    )
+
+    bodies = mock_client._bodies
+    assert len(bodies) == 2
+    assert bodies[1]["think"] is False
+    assert resp.reasoning_request == {"think": False, "think_fallback": "400"}
+
+
 @pytest.mark.asyncio
 async def test_ollama_granite_auto_think_when_unset() -> None:
     mock_client = _ok_generate_client()
