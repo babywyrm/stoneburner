@@ -13,6 +13,9 @@
   tags that 500 or skip the tool probe with think off (north-mini,
   phi4-*-reasoning). `--effort` / `--reasoning-mode` forward onto
   generate steps; `archreview` has no effort dial and is skipped.
+- **`provider-test` prints health-pass only after generate.** A tag that
+  400s on the think field used to print "health check passed" before the
+  generate failed. The green line now follows a successful generate.
 - **`httpx2` 2.13 in the mcp extra.** pip-audit failed on 2.10. `mcp`
   stays `<2.1`.
 

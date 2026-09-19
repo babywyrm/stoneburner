@@ -525,9 +525,7 @@ def provider_test(
             f"[cyan]{model_label}[/cyan]{thinking_label}..."
         )
         ok = await prov.health_check()
-        if ok:
-            console.print("[green]Provider health check passed.[/green]")
-        else:
+        if not ok:
             console.print("[red]Provider health check failed.[/red]")
             sys.exit(1)
 
@@ -544,6 +542,7 @@ def provider_test(
         except Exception as exc:
             console.print(f"[red]Generate failed:[/red] {exc}")
             sys.exit(1)
+        console.print("[green]Provider health check passed.[/green]")
         visible = (resp.text or "").strip()
         thinking_tokens = getattr(resp, "thinking_tokens", 0) or 0
         thinking_text = (getattr(resp, "thinking_text", "") or "").strip()
