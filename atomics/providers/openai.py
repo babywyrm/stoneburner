@@ -117,15 +117,14 @@ class OpenAIProvider(BaseProvider):
             self._client = client
         else:
             try:
-                from openai import AsyncOpenAI
+                from openai import AsyncOpenAI, Timeout
             except ImportError as exc:
                 raise ImportError(
                     "openai is required for the OpenAI provider. "
                     "Install with: uv sync --extra openai"
                 ) from exc
-            import httpx
 
-            timeout = httpx.Timeout(60.0, connect=10.0)
+            timeout = Timeout(60.0, connect=10.0)
             if auth is not None:
                 self._client = AsyncOpenAI(api_key="oauth-managed", timeout=timeout, max_retries=2)
             else:

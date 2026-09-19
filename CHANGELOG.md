@@ -11,9 +11,12 @@
   on the CLI.
 
 ### Changed
+- **OpenAI extra 3.16 (HTTPX2).** `AsyncOpenAI` takes the SDK `Timeout`
+  (60s read / 10s connect), not `httpx.Timeout`. Core `httpx` is
+  unchanged. Anthropic 1.x (#24) and sentence-transformers 6 (#21)
+  stay skipped.
 - **boto3 1.43.97, ruff 0.16.8.** Patch bumps. Lands Dependabot #23 /
-  #22 past the httpx2 audit. Skip anthropic 1.x (#24) and
-  sentence-transformers 6 (#21).
+  #22 past the httpx2 audit.
 
 ### Fixed
 - **Ollama retries `think: false` on a think-field 400.** A tag that
