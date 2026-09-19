@@ -65,6 +65,7 @@ would expose eval submission to the network unauthenticated.
 | POST | `/api/v1/runs` | Start a benchmark run |
 | POST | `/api/v1/evals` | Start an eval suite |
 | POST | `/api/v1/sweeps` | Start a bounded multi-model, multi-suite campaign (budget required) |
+| POST | `/api/v1/batteries` | Run a named battery as one job (budget required) |
 | POST | `/api/v1/stress` | Ramp concurrency to find saturation (budget required, c≤8, phase ≤15s) |
 | POST | `/api/v1/soak` | Hold concurrency and classify drift (budget required, 30–300s, c≤4) |
 | GET | `/api/v1/jobs` | List in-memory API jobs (no result payload) |
