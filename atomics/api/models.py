@@ -179,6 +179,46 @@ class SweepRequest(BaseModel):
         return parse_suites(",".join(value))
 
 
+class BatteryRequest(BaseModel):
+    """Run a named battery as one job. Budget is required (paid judge possible)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    provider: str
+    model: str | None = None
+    budget_usd: float = Field(gt=0, le=MAX_EVAL_BUDGET_USD)
+    judge_model: str | None = None
+    judge_host: str | None = None
+    host: str | None = None
+    thinking: bool | None = None
+    effort: str | None = None
+    reasoning_mode: str | None = None
+    runs: int = Field(default=1, ge=1, le=MAX_SWEEP_RUNS)
+    profile: str | None = None
+
+    @field_validator("effort")
+    @classmethod
+    def _known_effort(cls, value: str | None) -> str | None:
+        return _normalize_effort_field(value)
+
+    @field_validator("reasoning_mode")
+    @classmethod
+    def _known_reasoning_mode(cls, value: str | None) -> str | None:
+        return _normalize_reasoning_mode_field(value)
+
+    @field_validator("name")
+    @classmethod
+    def _known_battery(cls, value: str) -> str:
+        from atomics.eval.batteries import get_battery
+
+        try:
+            get_battery(value)
+        except KeyError as exc:
+            raise ValueError(str(exc)) from exc
+        return value
+
+
 class StressRequest(BaseModel):
     """Ramp concurrency to find saturation. One named model, required budget."""
 
