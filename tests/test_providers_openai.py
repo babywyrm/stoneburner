@@ -1074,12 +1074,13 @@ async def test_openai_responses_accepts_official_sdk_response_model():
 
 @pytest.mark.unit
 def test_openai_timeout_configured():
-    """OpenAI provider should set a 60s request timeout and 10s connect timeout."""
+    """60s read / 10s connect, via the SDK Timeout — not legacy httpx.Timeout."""
     pytest.importorskip("openai", reason="optional 'openai' extra not installed")
     provider = OpenAIProvider(api_key="sk-test-key")
     timeout = provider._client.timeout
     assert timeout.read == 60.0
     assert timeout.connect == 10.0
+    assert not type(timeout).__module__.startswith("httpx.")
 
 
 @pytest.mark.unit

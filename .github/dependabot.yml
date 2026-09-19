@@ -35,8 +35,14 @@ updates:
       # 2.1+ wraps tool errors and drops the API detail the agent needs.
       - dependency-name: "mcp"
         versions: [">=2.1.0"]
-      # SDK 3 / HTTPX2 is parked. Same decision as #9 / #13.
+      # 3.x taken in-tree. Ignore 4+ until a dedicated pass.
       - dependency-name: "openai"
+        update-types: ["version-update:semver-major"]
+      # HTTPX2 core-dep jump. Same class as the old openai 3 park.
+      - dependency-name: "anthropic"
+        update-types: ["version-update:semver-major"]
+      # rag extra. Stay on 5.7 until someone asks for the 6.x encode path.
+      - dependency-name: "sentence-transformers"
         update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "github-actions"
