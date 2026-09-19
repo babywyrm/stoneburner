@@ -138,3 +138,26 @@ def test_job_response_result_defaults_to_none():
         created_at="0",
     )
     assert resp.result is None
+
+
+def test_battery_request_unknown_name_rejected():
+    from atomics.api.models import BatteryRequest
+
+    with pytest.raises(ValidationError, match="unknown battery"):
+        BatteryRequest(name="nope", provider="ollama", model="x", budget_usd=5)
+
+
+def test_battery_request_requires_budget():
+    from atomics.api.models import BatteryRequest
+
+    with pytest.raises(ValidationError):
+        BatteryRequest(name="desk-pass", provider="ollama", model="x")
+
+
+def test_battery_request_defaults():
+    from atomics.api.models import BatteryRequest
+
+    req = BatteryRequest(name="desk-pass", provider="ollama", model="x", budget_usd=5)
+    assert req.runs == 1
+    assert req.thinking is None
+    assert req.profile is None
