@@ -257,7 +257,7 @@ latency and the truncated reply. `get_job` still returns the full JSON.
 `list_jobs` / `list_models` / `provider_test` / `get_run` /
 `recent_runs` / `compare` / `trends` are quiet one-liners;
 `--verbose` keeps JSON. Session `host` fills `submit_eval` /
-`submit_sweep` / `submit_run` / `submit_stress` / `submit_soak` /
+`submit_sweep` / `submit_battery` / `submit_run` / `submit_stress` / `submit_soak` /
 `list_models` / `provider_test`. An explicit flag wins.
 
 Serves on stdio only: the process holds a spend-authorized API key and no
@@ -266,7 +266,7 @@ point `--api-url` at its authenticated API server and run this locally.
 
 Tools: `health`, `list_models`, `list_jobs`, `get_job`, `get_run`, `compare`,
 `recent_runs`, `trends` (read-only), `provider_test` (fixed 2+2 probe), plus
-`submit_run`, `submit_eval`, `submit_sweep`, `submit_stress`, and
+`submit_run`, `submit_eval`, `submit_sweep`, `submit_battery`, `submit_stress`, and
 `submit_soak`, which spend tokens and return a job id to poll until
 `status` is `completed`. `submit_eval` suites: `accuracy`, `rag`,
 `multiturn`, `adversarial`, `codegen`, `refusal`, `redblue`, `toolcall`,
