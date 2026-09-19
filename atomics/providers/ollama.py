@@ -19,6 +19,18 @@ from atomics.providers.effort import normalize_effort, ollama_think_value
 _THINK_TAG_RE = re.compile(r"<think>(.*?)</think>", re.DOTALL)
 
 
+def _is_think_field_400(exc: httpx.HTTPStatusError) -> bool:
+    """True when Ollama rejected the request because of the think field."""
+    resp = exc.response
+    if resp is None or resp.status_code != 400:
+        return False
+    try:
+        text = resp.text or ""
+    except Exception:
+        text = ""
+    return "think" in text.lower()
+
+
 def _model_supports_thinking(model: str) -> bool:
     return supports_thinking(model)
 
@@ -120,6 +132,7 @@ class OllamaProvider(BaseProvider):
         if options:
             body["options"] = options
 
+        think_fallback: str | None = None
         try:
             response = await self._client.post(
                 f"{self._host}/api/generate",
@@ -131,6 +144,19 @@ class OllamaProvider(BaseProvider):
             raise ConnectionError(
                 f"Cannot connect to Ollama at {self._host} — is it running?"
             ) from exc
+        except httpx.HTTPStatusError as exc:
+            if think_field is not False and _is_think_field_400(exc):
+                body["think"] = False
+                response = await self._client.post(
+                    f"{self._host}/api/generate",
+                    json=body,
+                    timeout=self._timeout,
+                )
+                response.raise_for_status()
+                think_field = False
+                think_fallback = "400"
+            else:
+                raise
 
         data = response.json()
         raw_text = data.get("response", "")
@@ -162,7 +188,11 @@ class OllamaProvider(BaseProvider):
             thinking_text=thinking_text,
             raw=data,
             effort=normalize_effort(effort),
-            reasoning_request={"think": think_field},
+            reasoning_request=(
+                {"think": think_field, "think_fallback": think_fallback}
+                if think_fallback
+                else {"think": think_field}
+            ),
         )
 
     async def generate_with_tools(
@@ -229,6 +259,7 @@ class OllamaProvider(BaseProvider):
             "think": think_field,
         }
 
+        think_fallback: str | None = None
         try:
             response = await self._client.post(
                 f"{self._host}/api/chat",
@@ -240,6 +271,19 @@ class OllamaProvider(BaseProvider):
             raise ConnectionError(
                 f"Cannot connect to Ollama at {self._host} — is it running?"
             ) from exc
+        except httpx.HTTPStatusError as exc:
+            if think_field is not False and _is_think_field_400(exc):
+                body["think"] = False
+                response = await self._client.post(
+                    f"{self._host}/api/chat",
+                    json=body,
+                    timeout=self._timeout,
+                )
+                response.raise_for_status()
+                think_field = False
+                think_fallback = "400"
+            else:
+                raise
 
         data = response.json()
         message = data.get("message") or {}
@@ -272,7 +316,11 @@ class OllamaProvider(BaseProvider):
             raw=data,
             tool_calls=parse_ollama_tool_calls(message),
             effort=normalize_effort(effort),
-            reasoning_request={"think": think_field},
+            reasoning_request=(
+                {"think": think_field, "think_fallback": think_fallback}
+                if think_fallback
+                else {"think": think_field}
+            ),
         )
 
     async def list_models(self) -> list[dict[str, str | float | bool]]:

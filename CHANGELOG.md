@@ -16,6 +16,10 @@
   sentence-transformers 6 (#21).
 
 ### Fixed
+- **Ollama retries `think: false` on a think-field 400.** A tag that
+  rejects the field (phi4-mini, functiongemma) used to fail the run.
+  `generate` and `generate_with_tools` retry once and record
+  `reasoning_request.think_fallback = "400"`.
 - **`redblue` and `multiturn` exit nonzero on a partial run.** Both
   printed integrity but returned 0. They now take `--allow-partial` and
   share `integrity_exit_code` with `codereview` / `refusal` /
