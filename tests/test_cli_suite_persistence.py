@@ -95,7 +95,7 @@ def test_redblue_save_finalizes_parent_and_closes(monkeypatch, tmp_path) -> None
     db_path = tmp_path / "redblue.db"
     opened = _patch_redblue(monkeypatch, db_path)
 
-    result = CliRunner().invoke(cli, ["--no-progress", "redblue", "--save"])
+    result = CliRunner().invoke(cli, ["--no-progress", "redblue", "--save", "--allow-partial"])
 
     assert result.exit_code == 0
     rows = _parent_rows(db_path)
@@ -150,7 +150,7 @@ def test_redblue_no_save_writes_nothing(monkeypatch, tmp_path) -> None:
     db_path = tmp_path / "redblue-nosave.db"
     opened = _patch_redblue(monkeypatch, db_path)
 
-    result = CliRunner().invoke(cli, ["--no-progress", "redblue", "--no-save"])
+    result = CliRunner().invoke(cli, ["--no-progress", "redblue", "--no-save", "--allow-partial"])
 
     assert result.exit_code == 0
     assert opened == []
@@ -199,7 +199,7 @@ def test_multiturn_save_finalizes_parent_and_closes(monkeypatch, tmp_path) -> No
     db_path = tmp_path / "multiturn.db"
     opened = _patch_multiturn(monkeypatch, db_path)
 
-    result = CliRunner().invoke(cli, ["--no-progress", "multiturn", "--save"])
+    result = CliRunner().invoke(cli, ["--no-progress", "multiturn", "--save", "--allow-partial"])
 
     assert result.exit_code == 0
     rows = _parent_rows(db_path)
@@ -625,7 +625,7 @@ def test_redblue_json_out_writes_the_summary(monkeypatch, tmp_path) -> None:
 
     result = CliRunner().invoke(
         cli,
-        ["--no-progress", "redblue", "--no-save", "--json-out", str(out)],
+        ["--no-progress", "redblue", "--no-save", "--json-out", str(out), "--allow-partial"],
     )
 
     assert result.exit_code == 0, result.output
@@ -639,7 +639,7 @@ def test_multiturn_json_out_writes_the_summary(monkeypatch, tmp_path) -> None:
 
     result = CliRunner().invoke(
         cli,
-        ["--no-progress", "multiturn", "--no-save", "--json-out", str(out)],
+        ["--no-progress", "multiturn", "--no-save", "--json-out", str(out), "--allow-partial"],
     )
 
     assert result.exit_code == 0, result.output
