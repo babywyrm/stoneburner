@@ -274,6 +274,8 @@ parked item into it.
 - **Suite convergence** (ARCHITECTURE): `results` alias, large
   command modules, CLI integrity exit on the five suites that only
   report. Not user-visible. Do not start this to “warm up.”
+  Shipped the integrity exit: `redblue` and `multiturn` now take
+  `--allow-partial` and share `integrity_exit_code`.
 - Do not retag `v0.22.5`, `v0.21.0`, or `v0.20.0`. Do not mix a
   feature into a tag commit. `RELEASING.md`.
 

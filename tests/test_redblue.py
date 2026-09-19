@@ -308,7 +308,7 @@ def test_cli_redblue_passes_fixture_subset_to_runner(monkeypatch):
 
     result = CliRunner().invoke(
         cli,
-        ["redblue", "--no-save", "--fixtures", "rb-b01,rb-r01"],
+        ["redblue", "--no-save", "--fixtures", "rb-b01,rb-r01", "--allow-partial"],
     )
     assert result.exit_code == 0, result.output
     assert captured
@@ -507,7 +507,11 @@ def test_cli_redblue_prints_each_run_when_runs_gt_one(monkeypatch) -> None:
 
     _patch_redblue_cli(monkeypatch, scores=[0.4, 0.9, 0.9])
     result = CliRunner().invoke(
-        cli, ["--no-progress", "redblue", "--no-save", "--mode", "red", "--runs", "3"]
+        cli,
+        [
+            "--no-progress", "redblue", "--no-save", "--mode", "red",
+            "--runs", "3", "--allow-partial",
+        ],
     )
     assert result.exit_code == 0, result.output
     assert "run 1/3" in result.output
@@ -522,9 +526,91 @@ def test_cli_redblue_hides_per_pass_when_runs_is_one(monkeypatch) -> None:
     from atomics.cli import cli
 
     _patch_redblue_cli(monkeypatch, scores=[0.8])
-    result = CliRunner().invoke(cli, ["--no-progress", "redblue", "--no-save", "--mode", "red"])
+    result = CliRunner().invoke(
+        cli, ["--no-progress", "redblue", "--no-save", "--mode", "red", "--allow-partial"]
+    )
     assert result.exit_code == 0, result.output
     assert "run 1/1" not in result.output
+
+
+def _partial_redblue_summary():
+    """One fixture, judge parse-failed → integrity not complete."""
+    from datetime import UTC, datetime
+
+    from atomics.eval.judge import JudgeResult
+    from atomics.eval.redblue.fixtures import RedBlueFixture
+    from atomics.eval.redblue.runner import RedBlueFixtureResult, RedBlueSummary
+    from atomics.models import TaskCategory, TaskResult, TaskStatus
+
+    fixture = RedBlueFixture(
+        id="rb-01", team="red", category="recon", complexity="MEDIUM", prompt="x"
+    )
+    task = TaskResult(
+        run_id="rb-live",
+        category=TaskCategory.GENERAL_QA,
+        task_name="rb-01",
+        provider="mock",
+        model="x",
+        status=TaskStatus.SUCCESS,
+    )
+    judge = JudgeResult(
+        score=0.0,
+        accuracy=0,
+        completeness=0,
+        format_score=0,
+        rationale="",
+        judge_model="j",
+        parse_failed=True,
+    )
+    now = datetime.now(UTC)
+    summary = RedBlueSummary(
+        run_id="rb-live",
+        provider="mock",
+        model="x",
+        mode="red",
+        started_at=now,
+        completed_at=now,
+        runs=1,
+        results=[RedBlueFixtureResult(fixture=fixture, task_result=task, judge=judge)],
+    )
+    return summary
+
+
+def _patch_redblue_partial(monkeypatch):
+    from types import SimpleNamespace
+
+    provider = SimpleNamespace(name="ollama", default_model="x")
+
+    async def fake_run(_provider, **kwargs):
+        return _partial_redblue_summary()
+
+    monkeypatch.setattr(
+        "atomics.commands.security.cmd_redblue._make_provider",
+        lambda *_args, **_kwargs: provider,
+    )
+    monkeypatch.setattr("atomics.eval.redblue.runner.run_redblue", fake_run)
+
+
+def test_cli_redblue_partial_integrity_exits_nonzero(monkeypatch) -> None:
+    from click.testing import CliRunner
+
+    from atomics.cli import cli
+
+    _patch_redblue_partial(monkeypatch)
+    result = CliRunner().invoke(cli, ["--no-progress", "redblue", "--no-save", "--mode", "red"])
+    assert result.exit_code == 1
+
+
+def test_cli_redblue_allow_partial_exits_zero(monkeypatch) -> None:
+    from click.testing import CliRunner
+
+    from atomics.cli import cli
+
+    _patch_redblue_partial(monkeypatch)
+    result = CliRunner().invoke(
+        cli, ["--no-progress", "redblue", "--no-save", "--mode", "red", "--allow-partial"]
+    )
+    assert result.exit_code == 0
 
 
 # ── --json-out ───────────────────────────────────────────────────────────────
