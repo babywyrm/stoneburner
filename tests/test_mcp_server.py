@@ -32,6 +32,7 @@ SPENDING_TOOLS = {
     "submit_run",
     "submit_eval",
     "submit_sweep",
+    "submit_battery",
     "submit_stress",
     "submit_soak",
     "provider_test",
@@ -87,6 +88,12 @@ class FakeApi:
 
     def submit_sweep(self, **kwargs):
         return self._record("submit_sweep", **kwargs)
+
+    def submit_battery(self, **kwargs):
+        self.calls.append(("submit_battery", kwargs))
+        if self.error is not None:
+            raise self.error
+        return self.result
 
     def submit_stress(self, **kwargs):
         return self._record("submit_stress", **kwargs)
@@ -230,6 +237,40 @@ async def test_submit_sweep_forwards_judge_host():
     )
     _, kwargs = api.calls[0]
     assert kwargs["judge_host"] == "http://127.0.0.1:11434"
+
+
+async def test_submit_battery_forwards_required_budget():
+    api = FakeApi()
+    await build_server(api).call_tool(
+        "submit_battery",
+        {
+            "name": "desk-pass",
+            "provider": "ollama",
+            "model": "x",
+            "budget_usd": 5.0,
+        },
+    )
+    name, kwargs = api.calls[0]
+    assert name == "submit_battery"
+    assert kwargs["name"] == "desk-pass"
+    assert kwargs["budget_usd"] == 5.0
+
+
+async def test_submit_battery_forwards_thinking_effort():
+    api = FakeApi()
+    await build_server(api).call_tool(
+        "submit_battery",
+        {
+            "name": "desk-pass",
+            "provider": "ollama",
+            "budget_usd": 5.0,
+            "thinking": True,
+            "effort": "low",
+        },
+    )
+    _, kwargs = api.calls[0]
+    assert kwargs["thinking"] is True
+    assert kwargs["effort"] == "low"
 
 
 async def test_submit_stress_forwards_required_budget():

@@ -221,6 +221,47 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
         )
 
     @server.tool(annotations=SPENDS)
+    def submit_battery(
+        name: str,
+        provider: str,
+        budget_usd: float,
+        model: str | None = None,
+        judge_model: str | None = None,
+        judge_host: str | None = None,
+        host: str | None = None,
+        thinking: bool | None = None,
+        effort: str | None = None,
+        reasoning_mode: str | None = None,
+        runs: int = 1,
+        profile: str | None = None,
+    ) -> Any:
+        """Run a named battery as one job and return its job id.
+
+        Spends tokens. `budget_usd` is required. `name` is one of the five
+        batteries (`desk-pass`, `blue-capability`, `red-capability`,
+        `agent-gate`, `threat-model`). provider-test and qa steps are recorded
+        as skipped in v1; archreview stays on the CLI. `thinking` / `effort`
+        forward onto every step (battery default is `--no-thinking` when
+        `thinking` is unset). `host` is the inference endpoint; `judge_host`
+        is the judge endpoint when it differs. Poll `get_job` until `status`
+        is `completed`.
+        """
+        return api.submit_battery(
+            name=name,
+            provider=provider,
+            budget_usd=budget_usd,
+            model=model,
+            judge_model=judge_model,
+            judge_host=judge_host,
+            host=host,
+            thinking=thinking,
+            effort=effort,
+            reasoning_mode=reasoning_mode,
+            runs=runs,
+            profile=profile,
+        )
+
+    @server.tool(annotations=SPENDS)
     def submit_stress(
         provider: str,
         model: str,

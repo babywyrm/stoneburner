@@ -250,6 +250,44 @@ def test_submit_sweep_includes_judge_host_when_given():
     assert json.loads(requests[0].content)["judge_host"] == "http://192.168.1.79:11434"
 
 
+def test_submit_battery_posts_required_budget():
+    requests: list[httpx.Request] = []
+    with client_recording(requests) as client:
+        client.submit_battery(
+            name="desk-pass",
+            provider="ollama",
+            model="x",
+            budget_usd=5.0,
+        )
+
+    import json
+
+    assert requests[0].method == "POST"
+    assert requests[0].url.path == "/api/v1/batteries"
+    payload = json.loads(requests[0].content)
+    assert payload["name"] == "desk-pass"
+    assert payload["budget_usd"] == 5.0
+    assert payload["runs"] == 1
+
+
+def test_submit_battery_forwards_thinking_effort():
+    requests: list[httpx.Request] = []
+    with client_recording(requests) as client:
+        client.submit_battery(
+            name="desk-pass",
+            provider="ollama",
+            budget_usd=5.0,
+            thinking=True,
+            effort="low",
+        )
+
+    import json
+
+    payload = json.loads(requests[0].content)
+    assert payload["thinking"] is True
+    assert payload["effort"] == "low"
+
+
 def test_submit_stress_posts_required_budget():
     requests: list[httpx.Request] = []
     with client_recording(requests) as client:
