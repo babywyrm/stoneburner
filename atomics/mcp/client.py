@@ -262,6 +262,46 @@ class AtomicsApiClient:
             payload["judge_host"] = judge_host
         return self._request("POST", "/sweeps", json=payload)
 
+    def submit_battery(
+        self,
+        *,
+        name: str,
+        provider: str,
+        budget_usd: float,
+        model: str | None = None,
+        judge_model: str | None = None,
+        judge_host: str | None = None,
+        host: str | None = None,
+        thinking: bool | None = None,
+        effort: str | None = None,
+        reasoning_mode: str | None = None,
+        runs: int = 1,
+        profile: str | None = None,
+    ) -> Any:
+        payload: dict[str, Any] = {
+            "name": name,
+            "provider": provider,
+            "budget_usd": budget_usd,
+            "runs": runs,
+        }
+        if model is not None:
+            payload["model"] = model
+        if judge_model is not None:
+            payload["judge_model"] = judge_model
+        if judge_host is not None:
+            payload["judge_host"] = judge_host
+        if host is not None:
+            payload["host"] = host
+        if thinking is not None:
+            payload["thinking"] = thinking
+        if effort is not None:
+            payload["effort"] = effort
+        if reasoning_mode is not None:
+            payload["reasoning_mode"] = reasoning_mode
+        if profile is not None:
+            payload["profile"] = profile
+        return self._request("POST", "/batteries", json=payload)
+
     def submit_stress(
         self,
         *,
