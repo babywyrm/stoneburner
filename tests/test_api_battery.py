@@ -16,12 +16,30 @@ async def test_battery_expands_steps_in_order(monkeypatch):
         seen.append(payload.suite)
         return {"suite": payload.suite, "fixtures": []}
 
+    async def fake_provider_test(payload):
+        return {"ok": True, "health": True}
+
+    def fake_load_qa_suite(path):
+        return "", "http://x", []
+
+    async def fake_run_qa_suite(**kwargs):
+        from atomics.benchmark.qa_runner import QASuiteResult
+
+        return QASuiteResult(model="x", host="http://x")
+
     monkeypatch.setattr("atomics.api._battery.run_eval_suite", fake_run_eval_suite)
+    monkeypatch.setattr("atomics.api._battery.run_provider_test", fake_provider_test)
+    monkeypatch.setattr("atomics.api._battery.load_qa_suite", fake_load_qa_suite)
+    monkeypatch.setattr("atomics.api._battery.run_qa_suite", fake_run_qa_suite)
     req = BatteryRequest(name="desk-pass", provider="ollama", model="x", budget_usd=5)
     result = await run_battery_from_request(req)
-    assert [s["suite"] for s in result["steps"] if not s.get("skipped")] == seen
+    eval_steps = [s["suite"] for s in result["steps"] if s["suite"] in seen]
+    assert eval_steps == seen
     assert seen  # desk-pass has eval-suite steps
     assert result["battery"] == "desk-pass"
+    # provider-test and qa run before the eval steps
+    assert result["steps"][0]["suite"] == "provider-test"
+    assert result["steps"][1]["suite"] == "qa"
 
 
 @pytest.mark.asyncio
@@ -49,21 +67,89 @@ async def test_battery_forwards_thinking_and_effort(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_battery_skips_provider_test_and_qa(monkeypatch):
+async def test_battery_skips_only_archreview(monkeypatch):
     seen: list[str] = []
 
     async def fake_run_eval_suite(payload, job=None):
         seen.append(payload.suite)
         return {"suite": payload.suite, "fixtures": []}
 
+    async def fake_provider_test(payload):
+        return {"ok": True, "health": True}
+
+    def fake_load_qa_suite(path):
+        return "", "http://x", []
+
+    async def fake_run_qa_suite(**kwargs):
+        from atomics.benchmark.qa_runner import QASuiteResult
+
+        return QASuiteResult(model="x", host="http://x")
+
+    monkeypatch.setattr("atomics.api._battery.run_eval_suite", fake_run_eval_suite)
+    monkeypatch.setattr("atomics.api._battery.run_provider_test", fake_provider_test)
+    monkeypatch.setattr("atomics.api._battery.load_qa_suite", fake_load_qa_suite)
+    monkeypatch.setattr("atomics.api._battery.run_qa_suite", fake_run_qa_suite)
+    req = BatteryRequest(name="threat-model", provider="ollama", model="x", budget_usd=5)
+    result = await run_battery_from_request(req)
+    skipped = {s["suite"] for s in result["steps"] if s.get("skipped")}
+    assert skipped == {"archreview"}
+    assert "provider-test" not in skipped
+    assert "qa" not in skipped
+
+
+@pytest.mark.asyncio
+async def test_battery_runs_provider_test_step(monkeypatch):
+    async def fake_provider_test(payload):
+        return {"ok": True, "health": True, "provider": "ollama", "model": payload.model}
+
+    async def fake_run_eval_suite(payload, job=None):
+        return {"suite": payload.suite, "fixtures": []}
+
+    monkeypatch.setattr("atomics.api._battery.run_provider_test", fake_provider_test)
     monkeypatch.setattr("atomics.api._battery.run_eval_suite", fake_run_eval_suite)
     req = BatteryRequest(name="desk-pass", provider="ollama", model="x", budget_usd=5)
     result = await run_battery_from_request(req)
-    assert "provider-test" not in seen
-    assert "qa" not in seen
-    skipped = {s["suite"] for s in result["steps"] if s.get("skipped")}
-    assert "provider-test" in skipped
-    assert "qa" in skipped
+    pt = next(s for s in result["steps"] if s["suite"] == "provider-test")
+    assert pt["ok"] is True
+    assert pt.get("skipped") is not True
+
+
+@pytest.mark.asyncio
+async def test_battery_runs_qa_step_and_marks_fail(monkeypatch):
+    from atomics.benchmark.qa_runner import QAFixture, QAResult, QASuiteResult
+
+    async def fake_provider_test(payload):
+        return {"ok": True, "health": True, "provider": "ollama", "model": payload.model}
+
+    async def fake_run_eval_suite(payload, job=None):
+        return {"suite": payload.suite, "fixtures": []}
+
+    def fake_load_qa_suite(path):
+        return "", "http://x", [QAFixture(id="f1", prompt="p")]
+
+    async def fake_run_qa_suite(**kwargs):
+        suite = QASuiteResult(model="x", host="http://x")
+        suite.results.append(
+            QAResult(
+                fixture=QAFixture(id="f1", prompt="p"),
+                response="r",
+                latency_ms=1.0,
+                status="FAIL",
+            )
+        )
+        return suite
+
+    monkeypatch.setattr("atomics.api._battery.run_provider_test", fake_provider_test)
+    monkeypatch.setattr("atomics.api._battery.run_eval_suite", fake_run_eval_suite)
+    monkeypatch.setattr("atomics.api._battery.load_qa_suite", fake_load_qa_suite)
+    monkeypatch.setattr("atomics.api._battery.run_qa_suite", fake_run_qa_suite)
+    req = BatteryRequest(name="desk-pass", provider="ollama", model="x", budget_usd=5)
+    result = await run_battery_from_request(req)
+    qa = next(s for s in result["steps"] if s["suite"] == "qa")
+    assert qa["ok"] is False
+    assert qa.get("skipped") is not True
+    assert qa["passed"] == 0
+    assert qa["total"] == 1
 
 
 def test_post_batteries_returns_202_and_kind():
