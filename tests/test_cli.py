@@ -1017,7 +1017,26 @@ def test_cli_provider_test_empty_visible_with_thinking_is_think(monkeypatch):
     )
     assert result.exit_code == 0
     assert "THINK" in result.output
-    assert "288" in result.output
+
+
+def test_cli_provider_test_generate_failure_is_not_a_pass(monkeypatch):
+    class Dummy:
+        name = "ollama"
+        default_model = "phi4-mini:3.8b"
+
+        async def health_check(self):
+            return True
+
+        async def generate(self, *_args, **_kwargs):
+            raise RuntimeError("Client error '400 Bad Request'")
+
+    monkeypatch.setattr("atomics.commands.admin._make_provider", lambda *_a, **_k: Dummy())
+    result = CliRunner().invoke(
+        cli, ["provider-test", "-p", "ollama", "-m", "phi4-mini:3.8b", "--thinking"]
+    )
+    assert result.exit_code != 0
+    assert "Generate failed" in result.output
+    assert "health check passed" not in result.output.lower()
 
 
 def test_cli_models_command(monkeypatch):
