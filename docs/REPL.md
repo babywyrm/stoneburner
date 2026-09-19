@@ -21,7 +21,7 @@ In-memory only. `set provider ollama`, `set model llama3.2:1b`,
 `set host http://127.0.0.1:11434`, `set effort high`, `show`.
 `set model` with no value clears it. Submit verbs fill omitted fields
 from the session (`host` goes to `submit_eval`, `submit_sweep`,
-`submit_run`, `submit_stress`, `submit_soak`, `list_models`, and
+`submit_battery`, `submit_run`, `submit_stress`, `submit_soak`, `list_models`, and
 `provider_test`). An explicit flag wins.
 
 ## Verbs

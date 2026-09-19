@@ -97,6 +97,7 @@ ATOMICS_API_URL="https://atomics.internal:8000" uv run atomics mcp
 | `submit_run` | **no** | Start a benchmark run — spends tokens |
 | `submit_eval` | **no** | Start an eval suite — spends tokens |
 | `submit_sweep` | **no** | Multi-model, multi-suite campaign — spends tokens. Budget required |
+| `submit_battery` | **no** | Run a named battery as one job — spends tokens. Budget required |
 | `submit_stress` | **no** | Ramp concurrency to find saturation — spends tokens. Budget required, c≤8 |
 | `submit_soak` | **no** | Hold concurrency and classify drift — spends tokens. Budget required, 30–300s |
 
