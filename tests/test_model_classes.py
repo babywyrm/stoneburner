@@ -212,6 +212,10 @@ def test_ollama_think_levels_are_not_the_same_as_supports_thinking():
     assert supports_ollama_think_levels("muse-glimmer:30b") is True
     assert supports_ollama_think_levels("nemotron-3.5-lightning:30b") is True
     assert supports_ollama_think_levels("north-mini-code-1.0:latest") is True
+    # Probed against Ollama: think "low" and think true both 200 with a
+    # populated thinking field; think false returns the visible answer alone.
+    assert supports_ollama_think_levels("laguna-xs-2.1:latest") is True
+    assert supports_ollama_think_levels("laguna-s-2.1") is True
     assert supports_ollama_think_levels("nemotron-3-nano:4b") is False
     assert supports_ollama_think_levels("phi4-mini-reasoning:3.8b") is False
     assert supports_ollama_think_levels("phi4-reasoning:14b") is False
