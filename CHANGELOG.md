@@ -23,6 +23,9 @@
   rejects the field (phi4-mini, functiongemma) used to fail the run.
   `generate` and `generate_with_tools` retry once and record
   `reasoning_request.think_fallback = "400"`.
+- **`submit_battery` marks a partial eval step not-ok.** The CLI already
+  exits 1. The API job stamped every eval step `ok: true` after it returned.
+  The result now carries `integrity`, and a failed tool probe is not ok.
 - **`rag`, `codegen`, and `toolcall` exit nonzero on a partial run.**
   They printed integrity and returned 0. They now take `--allow-partial`
   and share `integrity_exit_code` with the other judged suites.

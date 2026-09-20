@@ -101,6 +101,20 @@ async def _run_qa_step(payload: BatteryRequest, step: Any) -> dict[str, Any]:
     }
 
 
+def _eval_step_ok(result: dict[str, Any]) -> bool:
+    """Match the CLI: incomplete coverage and a failed tool probe are not ok.
+
+    Battery toolcall steps pass `--no-skip-incapable`. A probe skip is not
+    resistance, and a partial run is not a pass.
+    """
+    integrity = result.get("integrity")
+    if isinstance(integrity, dict) and integrity.get("should_exit_nonzero"):
+        return False
+    if result.get("tool_capable") is False:
+        return False
+    return True
+
+
 async def run_battery_from_request(
     payload: BatteryRequest, job: Job | None = None
 ) -> dict[str, Any]:
@@ -129,7 +143,9 @@ async def run_battery_from_request(
             raise HTTPException(
                 status_code=400, detail=f"{payload.name}:{step.suite}: {exc}"
             ) from exc
-        steps_out.append({"suite": step.suite, "ok": True, "result": result})
+        steps_out.append(
+            {"suite": step.suite, "ok": _eval_step_ok(result), "result": result}
+        )
     return {
         "battery": payload.name,
         "provider": payload.provider,

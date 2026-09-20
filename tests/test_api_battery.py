@@ -152,6 +152,46 @@ async def test_battery_runs_qa_step_and_marks_fail(monkeypatch):
     assert qa["total"] == 1
 
 
+@pytest.mark.asyncio
+async def test_battery_eval_step_not_ok_when_coverage_is_incomplete(monkeypatch):
+    async def fake_provider_test(payload):
+        return {"ok": True, "health": True}
+
+    def fake_load_qa_suite(path):
+        return "", "http://x", []
+
+    async def fake_run_qa_suite(**kwargs):
+        from atomics.benchmark.qa_runner import QASuiteResult
+
+        return QASuiteResult(model="x", host="http://x")
+
+    async def fake_run_eval_suite(payload, job=None):
+        if payload.suite == "toolcall":
+            return {"suite": "toolcall", "tool_capable": False}
+        return {
+            "suite": payload.suite,
+            "integrity": {"status": "partial", "should_exit_nonzero": True},
+        }
+
+    monkeypatch.setattr("atomics.api._battery.run_provider_test", fake_provider_test)
+    monkeypatch.setattr("atomics.api._battery.load_qa_suite", fake_load_qa_suite)
+    monkeypatch.setattr("atomics.api._battery.run_qa_suite", fake_run_qa_suite)
+    monkeypatch.setattr("atomics.api._battery.run_eval_suite", fake_run_eval_suite)
+
+    desk = await run_battery_from_request(
+        BatteryRequest(name="desk-pass", provider="ollama", model="x", budget_usd=5)
+    )
+    toolcall = next(s for s in desk["steps"] if s["suite"] == "toolcall")
+    assert toolcall["ok"] is False
+
+    blue = await run_battery_from_request(
+        BatteryRequest(name="blue-capability", provider="ollama", model="x", budget_usd=5)
+    )
+    eval_steps = [s for s in blue["steps"] if s["suite"] != "archreview"]
+    assert eval_steps
+    assert all(s["ok"] is False for s in eval_steps)
+
+
 def test_post_batteries_returns_202_and_kind():
     from unittest.mock import AsyncMock, patch
 
