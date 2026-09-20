@@ -271,11 +271,11 @@ parked item into it.
   Shipped: `POST /batteries` + MCP `submit_battery`. provider-test runs
   the fixed probe; qa runs the fixture file or profile. archreview
   stays on the CLI.
-- **Suite convergence** (ARCHITECTURE): `results` alias, large
-  command modules, CLI integrity exit on the five suites that only
-  report. Not user-visible. Do not start this to “warm up.”
-  Shipped the integrity exit: `redblue` and `multiturn` now take
-  `--allow-partial` and share `integrity_exit_code`.
+- **Suite convergence** (ARCHITECTURE): `results` alias and the large
+  command modules. Not user-visible. Do not start this to “warm up.”
+  Integrity exit is done: `redblue`, `multiturn`, `rag`, `codegen`, and
+  `toolcall` take `--allow-partial` and share `integrity_exit_code`.
+  `toolcall --skip-incapable` stays a separate gate.
 - Do not retag `v0.22.5`, `v0.21.0`, or `v0.20.0`. Do not mix a
   feature into a tag commit. `RELEASING.md`.
 

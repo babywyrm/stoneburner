@@ -21,6 +21,7 @@ from atomics.commands.common import (
     effort_options,
     eval_budget_from,
     extra_judges_option,
+    integrity_exit_code,
     parse_extra_judges,
     run_async,
     write_summary_json,
@@ -159,6 +160,11 @@ def _rate(rate: float | None, numerator: int, denominator: int) -> str:
 @click.option("--thinking/--no-thinking", "thinking_flag", default=None)
 @click.option("--thinking-budget", type=int, default=8000, show_default=True)
 @effort_options
+@click.option(
+    "--allow-partial",
+    is_flag=True,
+    help="Return success for a partial run while preserving integrity details.",
+)
 @budget_option
 def toolcall(
     provider_name: str,
@@ -181,6 +187,7 @@ def toolcall(
     thinking_budget: int,
     effort: str | None,
     reasoning_mode: str | None,
+    allow_partial: bool,
     budget_usd: float | None,
 ) -> None:
     """Measure tool-call divergence: refuses in prose, complies with a function.
@@ -332,6 +339,9 @@ def toolcall(
 
     if save_results:
         _save(summary, db_path=settings.db_path)
+
+    if integrity_exit_code(summary.integrity, allow_partial=allow_partial):
+        raise click.exceptions.Exit(1)
 
 
 def _render_results(summary, *, verbose: bool) -> None:

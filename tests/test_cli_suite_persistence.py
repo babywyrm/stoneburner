@@ -375,7 +375,9 @@ def test_rag_save_finalizes_parent_and_closes(monkeypatch, tmp_path) -> None:
     db_path = tmp_path / "rag.db"
     opened = _patch_rag(monkeypatch, db_path)
 
-    result = CliRunner().invoke(cli, ["--no-progress", "rag", "--save"])
+    result = CliRunner().invoke(
+        cli, ["--no-progress", "rag", "--save", "--allow-partial"]
+    )
 
     assert result.exit_code == 0, result.output
     rows = _parent_rows(db_path)
@@ -439,7 +441,9 @@ def test_codegen_save_finalizes_parent_and_closes(monkeypatch, tmp_path) -> None
     db_path = tmp_path / "codegen.db"
     opened = _patch_codegen(monkeypatch, db_path)
 
-    result = CliRunner().invoke(cli, ["--no-progress", "codegen", "--save"])
+    result = CliRunner().invoke(
+        cli, ["--no-progress", "codegen", "--save", "--allow-partial"]
+    )
 
     assert result.exit_code == 0, result.output
     rows = _parent_rows(db_path)

@@ -204,10 +204,10 @@ nine of ten judge calls failed reported the tenth score as its headline number
 and looked healthy. Their scores are unchanged — the `integrity` block is what
 tells you how much of the run is behind them.
 
-The five report integrity but do **not** exit nonzero on partial coverage. Only
-the three attempt-based suites gate on it, and adding a gate to the others would
-change the exit code of runs that pass today. Read `integrity.status` or
-`should_exit_nonzero` from `--json-out` if you want to enforce it in CI.
+The five report integrity and exit nonzero when coverage is incomplete.
+`--allow-partial` overrides that exit; it does not alter stored integrity.
+`toolcall --skip-incapable` is a separate gate: a probe skip exits before
+fixtures run, and is not a partial run.
 
 ### How to add a new adversarial fixture suite
 
