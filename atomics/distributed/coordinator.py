@@ -111,6 +111,8 @@ class Coordinator:
         self._conn.commit()
         return self.get_worker(worker_id)
 
+    # Interpolated into SELECTs below. A literal column list, never caller input,
+    # which is why those reads are annotated as audited.
     WORKER_COLUMNS = (
         "worker_id, labels, capabilities, endpoint, api_key_hint, status, "
         "last_seen_at, registered_at"
@@ -118,7 +120,7 @@ class Coordinator:
 
     def get_worker(self, worker_id: str) -> Worker | None:
         row = self._conn.execute(
-            f"SELECT {self.WORKER_COLUMNS} FROM workers WHERE worker_id = ?",
+            f"SELECT {self.WORKER_COLUMNS} FROM workers WHERE worker_id = ?",  # nosec B608
             (worker_id,),
         ).fetchone()
         if not row:
@@ -128,7 +130,7 @@ class Coordinator:
     def list_workers(self) -> list[Worker]:
         """Return all registered workers, newest first."""
         rows = self._conn.execute(
-            f"SELECT {self.WORKER_COLUMNS} FROM workers ORDER BY registered_at DESC"
+            f"SELECT {self.WORKER_COLUMNS} FROM workers ORDER BY registered_at DESC"  # nosec B608
         ).fetchall()
         return [self._row_to_worker(row) for row in rows]
 
@@ -145,7 +147,7 @@ class Coordinator:
         """
         self._mark_absent_workers()
         rows = self._conn.execute(
-            f"SELECT {self.WORKER_COLUMNS} FROM workers WHERE status = ? "
+            f"SELECT {self.WORKER_COLUMNS} FROM workers WHERE status = ? "  # nosec B608
             "ORDER BY registered_at, worker_id",
             (WorkerStatus.ONLINE.value,),
         ).fetchall()
@@ -367,6 +369,7 @@ class Coordinator:
         self._conn.commit()
         return self._row_to_assignment(row)
 
+    # Literal column list, same contract as WORKER_COLUMNS.
     ASSIGNMENT_COLUMNS = (
         "assignment_id, job_id, worker_id, target_worker_id, status, task_spec, "
         "result_json, retry_count, started_at, completed_at"
@@ -432,7 +435,7 @@ class Coordinator:
 
     def get_assignment(self, assignment_id: str) -> TaskAssignment | None:
         row = self._conn.execute(
-            f"SELECT {self.ASSIGNMENT_COLUMNS} "
+            f"SELECT {self.ASSIGNMENT_COLUMNS} "  # nosec B608
             "FROM distributed_assignments WHERE assignment_id = ?",
             (assignment_id,),
         ).fetchone()

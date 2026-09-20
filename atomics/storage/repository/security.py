@@ -233,7 +233,8 @@ class SecurityMixin(RepositoryBase):
             clauses.append("run_id = ?")
             params.append(run_id)
         where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
-        sql = f"SELECT * FROM adversarial_results {where} ORDER BY timestamp DESC"
+        # clauses are literals; every caller value is bound in params.
+        sql = f"SELECT * FROM adversarial_results {where} ORDER BY timestamp DESC"  # nosec B608
         if limit is not None:
             sql += " LIMIT ?"
             params.append(limit)

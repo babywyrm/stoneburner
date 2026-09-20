@@ -81,6 +81,24 @@ Both should report no findings. Configuration notes:
   them. Keep it that way: a literal `sk-`-prefixed placeholder trips
   credential detectors and trains readers to paste keys into shell history.
 
+## Static analysis
+
+```bash
+uv run --with bandit bandit -q -r atomics/ scripts/ -ll
+```
+
+Medium and high are at zero and CI keeps them there, so anything this prints is
+new. `-ll` drops the low band on purpose: it is 60 findings that are structural
+here rather than defects — asserts inside fixtures, `random` for task
+shuffling, argv-list `subprocess` calls — and a gate that needs 60 suppressions
+stops being read.
+
+Audited exceptions carry an inline `# nosec <id>` with the reason on the line
+above, because bandit parses every word after `# nosec` as another test id. The
+suppressed set is the SQL builders that interpolate a literal column list or a
+quoted identifier while binding every caller value with `?`, the `/tmp` paths
+that are fixture data or smoke scratch, and the post-run hook below.
+
 ## Post-run hooks (`--hook` / `ATOMICS_POST_RUN_HOOK`)
 
 The `atomics run --hook "command"` flag (or `ATOMICS_POST_RUN_HOOK` env var)

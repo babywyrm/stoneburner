@@ -9,6 +9,19 @@
   provider-test runs the fixed 2+2 probe; qa runs the battery's fixture
   file or profile and a FAIL marks the step not-ok. archreview stays
   on the CLI.
+- **`scripts/model_gaps.py` lists recent tags the lab does not have.**
+  It reads `/api/tags` on the laptop, beefy, and brainbox, then the
+  Ollama library and recent Hugging Face text models from the labs
+  this tool already scores. It prints gaps. It does not pull.
+
+### Security
+- **Bandit gates the security workflow at medium and above.** Both high
+  findings are gone: the recency digest passes `usedforsecurity=False`, so a
+  FIPS build no longer refuses a non-credential bucket key, and the post-run
+  hook states its trust boundary — operator config only, never an API caller,
+  summary values passed as environment rather than interpolated. The audited
+  exceptions are annotated inline. The low band stays out of the gate;
+  `SECURITY.md` says why and how to run it locally.
 
 ### Changed
 - **OpenAI extra 3.16 (HTTPX2).** `AsyncOpenAI` takes the SDK `Timeout`
@@ -23,10 +36,6 @@
   rejects the field (phi4-mini, functiongemma) used to fail the run.
   `generate` and `generate_with_tools` retry once and record
   `reasoning_request.think_fallback = "400"`.
-- **`scripts/model_gaps.py` lists recent tags the lab does not have.**
-  It reads `/api/tags` on the laptop, beefy, and brainbox, then the
-  Ollama library and recent Hugging Face text models from the labs
-  this tool already scores. It prints gaps. It does not pull.
 - **App-gate translation fixture scores a translation as a pass.**
   `prompt-injection-via-translation` was `must_match: fail`, so the
   scorer ignored the translation patterns and required the execution

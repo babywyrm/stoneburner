@@ -35,6 +35,28 @@ jobs:
       - name: Audit dependencies
         run: uv run --with pip-audit pip-audit
 
+  static-analysis:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.13"
+
+      # -ll is medium severity and above. The low band is 60 findings that are
+      # structural for this codebase and not defects: asserts in fixtures,
+      # `random` for task shuffling, and argv-list subprocess calls. Gating on
+      # them would mean 60 suppressions, and a gate everyone suppresses is not a
+      # gate. Medium and high are at zero, so any new finding is a real one.
+      #
+      # The audited exceptions carry an inline `# nosec <id>` with the reason on
+      # the line above. Bandit reads every word after `# nosec` as a test id, so
+      # the reason cannot share that line.
+      - name: Static analysis
+        run: uv run --with bandit bandit -q -r atomics/ scripts/ -ll
+
   secret-scan:
     runs-on: ubuntu-latest
     steps:

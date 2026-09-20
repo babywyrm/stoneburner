@@ -106,6 +106,7 @@ class RunsMixin(RepositoryBase):
             clauses.append("started_at >= datetime('now', ?)")
             params.append(f"-{since_hours} hours")
         where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        # clauses are literals; every caller value is bound in params.
         sql = f"""
             SELECT
                 provider,
@@ -118,6 +119,6 @@ class RunsMixin(RepositoryBase):
             FROM runs {where}
             GROUP BY provider
             ORDER BY total_cost DESC
-        """
+        """  # nosec B608
         rows = self._conn.execute(sql, params).fetchall()
         return [dict(r) for r in rows]

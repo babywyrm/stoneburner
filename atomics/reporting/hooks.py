@@ -30,9 +30,17 @@ def hook_env(
 
 
 def run_post_hook(cmd: str, extra_env: Mapping[str, str]) -> int:
-    """Run a shell command with extra env vars merged into the current environment."""
+    """Run a shell command with extra env vars merged into the current environment.
+
+    `cmd` is the operator's own `--post-run-hook` or `post_run_hook` setting, so
+    a shell is the feature rather than a bug — the same trust model as a git
+    hook. Nothing from a model, a fixture, or an API request reaches it. Run
+    summary values are passed as environment, never interpolated into `cmd`, so
+    a run id cannot close a quote. Do not widen the source of `cmd` to anything
+    a caller can set remotely without dropping the shell.
+    """
     env = {**os.environ, **extra_env}
-    return subprocess.run(cmd, shell=True, env=env, check=False).returncode
+    return subprocess.run(cmd, shell=True, env=env, check=False).returncode  # nosec B602
 
 
 def _escape_applescript_string(s: str) -> str:

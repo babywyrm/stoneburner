@@ -262,22 +262,27 @@ Package version is **0.22.7**.
 
 ## Next
 
-Current package is **0.22.7**. Unscheduled. Pick one; do not mix a
-parked item into it.
+Current package is **0.22.7**. Unreleased work is not a retag.
+Do not retag `v0.22.5`, `v0.21.0`, or `v0.20.0`. Do not mix a
+feature into a tag commit. `RELEASING.md`.
 
-- **API/MCP `submit_battery`.** CLI batteries shipped in 0.22.7. Next
-  slice is a metered HTTP/MCP job if anyone asks — not a doctor rewrite,
-  not suite convergence. Do not mix those into a batteries retag.
-  Shipped: `POST /batteries` + MCP `submit_battery`. provider-test runs
-  the fixed probe; qa runs the fixture file or profile. archreview
-  stays on the CLI.
-- **Suite convergence** (ARCHITECTURE): `results` alias and the large
-  command modules. Not user-visible. Do not start this to “warm up.”
-  Integrity exit is done: `redblue`, `multiturn`, `rag`, `codegen`, and
-  `toolcall` take `--allow-partial` and share `integrity_exit_code`.
-  `toolcall --skip-incapable` stays a separate gate.
-- Do not retag `v0.22.5`, `v0.21.0`, or `v0.20.0`. Do not mix a
-  feature into a tag commit. `RELEASING.md`.
+Shipped since 0.22.7, still unreleased:
+
+- API/MCP `submit_battery`. archreview stays on the CLI.
+- Integrity exit on `rag`, `codegen`, `toolcall`, `redblue`, and
+  `multiturn`. `toolcall --skip-incapable` stays a separate gate.
+- App-gate translation fixture scores a translation as a pass.
+- `scripts/model_gaps.py` reports recent Ollama and Hugging Face tags
+  the three hosts do not have. It does not pull.
+
+Nothing user-visible is scheduled. Do not start suite convergence
+(`results` alias, large command modules) to warm up. Do not invent
+HTTP MCP.
+
+`laguna-xs-2.1` is on the laptop and not in the think registry.
+Same for any later glm, ornith, or deepseek-v4 pull. Add a prefix
+only after a live generate shows whether Ollama accepts a think
+level, a bool, or neither.
 
 ## Beyond
 

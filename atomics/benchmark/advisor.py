@@ -85,6 +85,7 @@ def analyze_cost_optimization(
 
     where = f"WHERE {' AND '.join(clauses)}"
 
+    # clauses are literals; every caller value is bound in params.
     sql = f"""
         SELECT
             category,
@@ -98,7 +99,7 @@ def analyze_cost_optimization(
         GROUP BY category, model
         HAVING task_count >= 2
         ORDER BY category, avg_cost_per_task ASC
-    """
+    """  # nosec B608
     rows = conn.execute(sql, params).fetchall()
 
     groups: dict[str, list[dict]] = {}

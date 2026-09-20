@@ -534,7 +534,9 @@ def _rebuild_table(
     conn.execute("PRAGMA foreign_keys=OFF")
     conn.execute(_rename_create_table(create_sql, table, tmp))
     cols = ", ".join(_ident(name) for name in common)
-    conn.execute(f"INSERT INTO {_ident(tmp)} ({cols}) SELECT {cols} FROM {_ident(table)}")
+    # Table and column names come from the schema, and _ident quotes them.
+    copy = f"INSERT INTO {_ident(tmp)} ({cols}) SELECT {cols} FROM {_ident(table)}"  # nosec B608
+    conn.execute(copy)
     conn.execute(f"DROP TABLE {_ident(table)}")
     conn.execute(f"ALTER TABLE {_ident(tmp)} RENAME TO {_ident(table)}")
     conn.execute("PRAGMA foreign_keys=ON")

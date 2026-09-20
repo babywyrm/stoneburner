@@ -107,7 +107,8 @@ class AnalyticsMixin(RepositoryBase):
             clauses.append("suite LIKE ?")
             params.append(f"{suite_prefix}%")
         where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
-        sql = f"SELECT * FROM task_results {where} ORDER BY started_at DESC"
+        # clauses are literals; every caller value is bound in params.
+        sql = f"SELECT * FROM task_results {where} ORDER BY started_at DESC"  # nosec B608
         if limit is not None:
             sql += " LIMIT ?"
             params.append(limit)
@@ -150,6 +151,7 @@ class AnalyticsMixin(RepositoryBase):
         where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
         col = "provider" if group_by == "provider" else "model"
         other = "model" if group_by == "provider" else "provider"
+        # col/other are a two-way literal choice, not group_by itself.
         sql = f"""
             SELECT
                 {col} as group_key,
@@ -173,14 +175,15 @@ class AnalyticsMixin(RepositoryBase):
             FROM task_results {where}
             GROUP BY {col}
             ORDER BY avg_cost_per_task ASC
-        """
+        """  # nosec B608
         agg_rows = self._conn.execute(sql, params).fetchall()
 
+        # col is a two-way literal choice, not group_by itself.
         detail_sql = f"""
             SELECT {col} as group_key, latency_ms, estimated_cost_usd, total_tokens
             FROM task_results {where}
             ORDER BY {col}
-        """
+        """  # nosec B608
         detail_rows = self._conn.execute(detail_sql, params).fetchall()
 
         from collections import defaultdict
