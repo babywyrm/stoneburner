@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- **`ornith` takes an Ollama think level but is never auto-enabled.** It
+  honours the level (`low` spent 42 eval tokens, `max` 195), yet Ollama
+  leaves `thinking` empty and the reasoning carries no `<think>` tags, so
+  `_strip_thinking` cannot lift it out of the answer. Sending it by default
+  would put raw reasoning in every short fixture, so it joins the level
+  prefixes and stays out of `supports_thinking`. Fourth CoT shape on the
+  Ollama side; `docs/THINKING.md` now lists it.
+- **Desk-pass rows for the five newest local tags.** `gemma4:26b` (6/6),
+  `gemma4:31b`, `granite4.2:30b`, `laguna-xs-2.1` (5/6 each), and
+  `ornith-1.5:9b` (4/6). All five are tool-capable; only `ornith` made no
+  dangerous call. `docs/BATTERIES.md`.
+
 ## 0.23.0 (2026-09-20) — Honest exit codes
 
 ### Upgrade notes

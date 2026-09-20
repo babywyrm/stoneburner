@@ -222,6 +222,11 @@ def supports_thinking(model_id: str) -> bool:
 
 
 # Native Ollama think: low/medium/high/max. Other CoT tags 400 on a string level.
+#
+# ornith is here but deliberately absent from supports_thinking: it honours a
+# level, yet Ollama leaves the thinking field empty and the reasoning carries no
+# <think> tags, so _strip_thinking cannot lift it out of the answer. Send a
+# level when asked, never by default.
 _OLLAMA_THINK_LEVEL_PREFIXES: tuple[str, ...] = (
     "qwen3",
     "granite4.2",
@@ -232,6 +237,7 @@ _OLLAMA_THINK_LEVEL_PREFIXES: tuple[str, ...] = (
     "muse-glimmer",
     "nemotron-3.5-lightning",
     "north-mini-code",
+    "ornith",
 )
 
 # Ollama returns 400: "<tag> does not support thinking" (phi4-mini-reasoning).
