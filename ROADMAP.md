@@ -225,7 +225,10 @@ on HTTP. **v0.22.3** is thinking dials on Ollama and Qwen.
 tags and the tool-channel probe.
 **v0.22.7** is named security batteries (`atomics battery list` /
 `show` / `run`) plus the fail-closed `qa` / `--budget` / aclose fixes.
-Package version is **0.22.7**.
+**v0.23.0** is honest exit codes: the last five report-only suites
+exit nonzero on a partial run, `submit_battery` marks a partial step
+not-ok, and bandit gates the security workflow.
+Package version is **0.23.0**.
 
 - [x] **REPL line editing.** Stdlib `readline` for in-process
       history. No `prompt_toolkit`. Not session persistence to disk.
@@ -262,22 +265,16 @@ Package version is **0.22.7**.
 
 ## Next
 
-Current package is **0.22.7**. Unreleased work is not a retag.
-Do not retag `v0.22.5`, `v0.21.0`, or `v0.20.0`. Do not mix a
-feature into a tag commit. `RELEASING.md`.
+Current package is **0.23.0** — honest exit codes. Do not retag
+`v0.22.5`, `v0.21.0`, or `v0.20.0`. Do not mix a feature into a tag
+commit. `RELEASING.md`.
 
-Shipped since 0.22.7, still unreleased:
+Nothing user-visible is scheduled. Do not invent HTTP MCP.
 
-- API/MCP `submit_battery`. archreview stays on the CLI.
-- Integrity exit on `rag`, `codegen`, `toolcall`, `redblue`, and
-  `multiturn`. `toolcall --skip-incapable` stays a separate gate.
-- App-gate translation fixture scores a translation as a pass.
-- `scripts/model_gaps.py` reports recent Ollama and Hugging Face tags
-  the three hosts do not have. It does not pull.
-
-Nothing user-visible is scheduled. Do not start suite convergence
-(`results` alias, large command modules) to warm up. Do not invent
-HTTP MCP.
+Suite convergence is partly done: `rag.py` is now one module per
+command, and the `results` alias is largely in place. What remains is
+`load.py` (1,114 lines) and `benchmark.py` (1,061). Neither is
+user-visible; do not start them to warm up.
 
 `laguna-xs-2.1` is on the laptop and not in the think registry.
 Same for any later glm, ornith, or deepseek-v4 pull. Add a prefix
