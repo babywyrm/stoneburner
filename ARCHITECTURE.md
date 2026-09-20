@@ -33,7 +33,7 @@ Support / infra      config, paths, secrets, doctor, reporting/,
 
 ```mermaid
 flowchart TB
-    CLI["CLI / entry\ncli.py, commands/"] --> Commands["commands/\nauth, admin, benchmark, eval, security, load, api, mcp, rag"]
+    CLI["CLI / entry\ncli.py, commands/"] --> Commands["commands/\nauth, admin, benchmark, eval, security, load, api, mcp, rag, codegen, probe, archreview, qa"]
     API["API / server\natomics/api/"] --> Commands
     MCP["MCP / agent\natomics/mcp/"] --> API
     Commands --> Orchestration["Orchestration\nbenchmark/sweep, load/scenario"]
@@ -243,7 +243,7 @@ New code should follow the target column, not copy whichever suite you opened fi
 | Parent run row | `commands/suite_run.py` | done — every recording command owns its repository through the shared lifetime, so the row is finalized and the connection closed even when the run raises |
 | Stats helpers | one shared `stats` module | done — `atomics/stats.py` |
 | Provider build | `providers.factory.make_provider()` | done — single factory, CLI wraps it |
-| CLI modules | one module per command under `commands/` | partial — everything is out of `cli.py`, but the larger `commands/<group>.py` modules still hold several commands each |
+| CLI modules | one module per command under `commands/` | partial — `rag.py` split into `rag` / `codegen` / `probe` / `archreview` / `qa`; `load.py` and `benchmark.py` still hold several commands each |
 | Repository modules | persistence grouped by domain | generic records extracted; `storage/repository.py` remains a split candidate |
 
 ---

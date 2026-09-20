@@ -29,6 +29,12 @@
   `SECURITY.md` says why and how to run it locally.
 
 ### Changed
+- **`commands/rag.py` split into one module per command.** It had grown to
+  1,501 lines holding seven unrelated commands, so `codegen`, `probe`,
+  `archreview`, and `qa` now have their own modules and `rag.py` keeps the RAG
+  family. Command bodies moved verbatim; no flag, output, or registration
+  order changed. Tests that patch `_make_provider` now target the owning
+  module, since `patch` binds where the name is looked up.
 - **OpenAI extra 3.16 (HTTPX2).** `AsyncOpenAI` takes the SDK `Timeout`
   (60s read / 10s connect), not `httpx.Timeout`. Core `httpx` is
   unchanged. Anthropic 1.x (#24) and sentence-transformers 6 (#21)
