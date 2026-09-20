@@ -32,6 +32,10 @@
   would put raw reasoning in every short fixture, so it joins the level
   prefixes and stays out of `supports_thinking`. Fourth CoT shape on the
   Ollama side; `docs/THINKING.md` now lists it.
+- **Red-capability on five local peers.** `ornith-1.5:35b` and
+  `gemma4:26b` 100%; `laguna-xs-2.1` 95%; `qwen3.8:27b` and `gemma4:31b`
+  93%. Judge was laptop `granite4.2:8b`. `granite4.2:30b` was not run.
+  `docs/BATTERIES.md`.
 - **Desk-pass rows for the six newest local tags.** `gemma4:26b` (6/6),
   `gemma4:31b`, `granite4.2:30b`, `laguna-xs-2.1` (5/6 each), and
   `ornith-1.5` at `9b` and `35b` (4/6 each). All six are tool-capable; only
