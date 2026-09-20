@@ -12,15 +12,20 @@ from atomics.commands import archreview as archreview_commands
 from atomics.commands import battery as battery_commands
 from atomics.commands import benchmark as benchmark_commands
 from atomics.commands import codegen as codegen_commands
+from atomics.commands import compare as compare_commands
 from atomics.commands import distributed as distributed_commands
 from atomics.commands import eval as eval_commands
+from atomics.commands import labcompare as labcompare_commands
 from atomics.commands import load as load_commands
 from atomics.commands import mcp as mcp_commands
 from atomics.commands import probe as probe_commands
 from atomics.commands import qa as qa_commands
 from atomics.commands import rag as rag_commands
 from atomics.commands import repl as repl_commands
+from atomics.commands import scenario as scenario_commands
 from atomics.commands import security as security_commands
+from atomics.commands import soak as soak_commands
+from atomics.commands import sweep as sweep_commands
 from atomics.commands import toolcall as toolcall_commands
 from atomics.commands import worker as worker_commands
 from atomics.commands import worker_npm as worker_npm_commands
@@ -68,16 +73,16 @@ cli.add_command(admin_commands.models)
 cli.add_command(admin_commands.provider_test)
 cli.add_command(admin_commands.completion)
 cli.add_command(load_commands.stress)
-cli.add_command(load_commands.soak)
-cli.add_command(load_commands.scenario)
+cli.add_command(soak_commands.soak)
+cli.add_command(scenario_commands.scenario)
 cli.add_command(load_commands.capacity)
 cli.add_command(load_commands.baselines)
 cli.add_command(benchmark_commands.run)
 cli.add_command(benchmark_commands.report)
-cli.add_command(benchmark_commands.compare)
+cli.add_command(compare_commands.compare)
 cli.add_command(benchmark_commands.tiers)
-cli.add_command(benchmark_commands.sweep)
-cli.add_command(benchmark_commands.labcompare)
+cli.add_command(sweep_commands.sweep)
+cli.add_command(labcompare_commands.labcompare)
 cli.add_command(eval_commands.eval)
 cli.add_command(eval_commands.advisor)
 cli.add_command(codegen_commands.codegen)
@@ -94,7 +99,7 @@ cli.add_command(battery_commands.battery)
 
 # Re-export for tests/importers that still pull helpers from atomics.cli.
 _write_generic_export = admin_commands._write_generic_export
-_run_labcompare_sync = benchmark_commands._run_labcompare_sync
+_run_labcompare_sync = labcompare_commands._run_labcompare_sync
 _parse_model_spec = security_commands._parse_model_spec
 _make_provider = security_commands._make_provider
 refusal = security_commands.refusal
