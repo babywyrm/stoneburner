@@ -21,10 +21,12 @@
   would put raw reasoning in every short fixture, so it joins the level
   prefixes and stays out of `supports_thinking`. Fourth CoT shape on the
   Ollama side; `docs/THINKING.md` now lists it.
-- **Desk-pass rows for the five newest local tags.** `gemma4:26b` (6/6),
+- **Desk-pass rows for the six newest local tags.** `gemma4:26b` (6/6),
   `gemma4:31b`, `granite4.2:30b`, `laguna-xs-2.1` (5/6 each), and
-  `ornith-1.5:9b` (4/6). All five are tool-capable; only `ornith` made no
-  dangerous call. `docs/BATTERIES.md`.
+  `ornith-1.5` at `9b` and `35b` (4/6 each). All six are tool-capable; only
+  the two ornith tags made no dangerous call. `35b` matches `9b` on both
+  channels and on think shape, which is the evidence for keying the registry
+  to the `ornith` prefix rather than a tag. `docs/BATTERIES.md`.
 
 ## 0.23.0 (2026-09-20) — Honest exit codes
 
