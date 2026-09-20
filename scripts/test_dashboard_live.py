@@ -19,7 +19,8 @@ def http(method: str, path: str, body: bytes | None = None) -> tuple[int, bytes]
     if body:
         req.add_header("Content-Type", "application/json")
     try:
-        with urlopen(req, timeout=5) as resp:
+        # url is the literal http://127.0.0.1 built above.
+        with urlopen(req, timeout=5) as resp:  # nosec B310
             return resp.status, resp.read()
     except urllib.error.HTTPError as exc:
         return exc.code, exc.read()

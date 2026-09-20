@@ -101,12 +101,16 @@ class RecencyTracker:
         self._seen: deque[str] = deque(maxlen=window)
 
     def is_recent(self, key: str) -> bool:
-        h = hashlib.md5(key.encode()).hexdigest()[:10]
-        return h in self._seen
+        return self._digest(key) in self._seen
 
     def record(self, key: str) -> None:
-        h = hashlib.md5(key.encode()).hexdigest()[:10]
-        self._seen.append(h)
+        self._seen.append(self._digest(key))
+
+    @staticmethod
+    def _digest(key: str) -> str:
+        # A short bucket key for "have I shown this prompt lately", never a
+        # credential. usedforsecurity=False so a FIPS build does not refuse it.
+        return hashlib.md5(key.encode(), usedforsecurity=False).hexdigest()[:10]
 
     @property
     def seen_count(self) -> int:
