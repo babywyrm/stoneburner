@@ -31,7 +31,7 @@ def test_labcompare_cli_renders_table():
             quality_score=0.94,
         ),
     ]
-    with patch("atomics.commands.benchmark._run_labcompare_sync", return_value=fake_cells):
+    with patch("atomics.commands.labcompare._run_labcompare_sync", return_value=fake_cells):
         runner = CliRunner()
         result = runner.invoke(
             cli,

@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### Changed
+- **`load.py` and `benchmark.py` split on their oversized commands.** `soak`,
+  `scenario`, `compare`, `sweep`, and `labcompare` are their own modules;
+  `load.py` keeps stress / capacity / baselines and `benchmark.py` keeps
+  run / report / tiers, since those are each one family. No command module is
+  over 500 lines now. Bodies moved verbatim and `--help` is byte-identical.
+  One test exemption came with it: `test_no_eval_running_command_is_missing_a_budget`
+  scans per module, and `labcompare` had been covered only by sharing a file
+  with `sweep`. It pins both the model and the judge to ollama and has no
+  provider flag, so there is no spend to cap.
+
 ### Added
 - **`ornith` takes an Ollama think level but is never auto-enabled.** It
   honours the level (`low` spent 42 eval tokens, `max` 195), yet Ollama

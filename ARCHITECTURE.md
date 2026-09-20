@@ -243,7 +243,7 @@ New code should follow the target column, not copy whichever suite you opened fi
 | Parent run row | `commands/suite_run.py` | done — every recording command owns its repository through the shared lifetime, so the row is finalized and the connection closed even when the run raises |
 | Stats helpers | one shared `stats` module | done — `atomics/stats.py` |
 | Provider build | `providers.factory.make_provider()` | done — single factory, CLI wraps it |
-| CLI modules | one module per command under `commands/` | partial — `rag.py` split into `rag` / `codegen` / `probe` / `archreview` / `qa`; `load.py` and `benchmark.py` still hold several commands each |
+| CLI modules | one module per command under `commands/` | done for the oversized ones — `rag.py` split into `rag` / `codegen` / `probe` / `archreview` / `qa`; `soak`, `scenario`, `compare`, `sweep`, and `labcompare` are their own modules. `load.py` (stress / capacity / baselines) and `benchmark.py` (run / report / tiers) keep a cohesive family each, every module under 500 lines |
 | Repository modules | persistence grouped by domain | generic records extracted; `storage/repository.py` remains a split candidate |
 
 ---

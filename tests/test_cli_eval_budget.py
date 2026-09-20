@@ -58,6 +58,10 @@ def test_no_eval_running_command_is_missing_a_budget():
     covered = {
         path.stem for path in commands_dir.glob("*.py") if "budget_option" in path.read_text()
     }
+    # labcompare pins the model and judge provider to ollama, so there is no
+    # spend to cap. It only became visible to this scan when it moved out of
+    # benchmark.py, where sweep's budget_option covered the whole module.
+    covered |= {"labcompare"}
     assert spending_modules <= covered, (
         f"modules that run eval suites without a --budget: {spending_modules - covered}"
     )

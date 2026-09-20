@@ -271,10 +271,9 @@ commit. `RELEASING.md`.
 
 Nothing user-visible is scheduled. Do not invent HTTP MCP.
 
-Suite convergence is partly done: `rag.py` is now one module per
-command, and the `results` alias is largely in place. What remains is
-`load.py` (1,114 lines) and `benchmark.py` (1,061). Neither is
-user-visible; do not start them to warm up.
+Suite convergence is done. `rag.py`, `load.py`, and `benchmark.py` are
+split, no command module is over 500 lines, and the `results` alias is
+in place. Do not reopen it to warm up.
 
 `laguna-xs-2.1` is on the laptop and not in the think registry.
 Same for any later glm, ornith, or deepseek-v4 pull. Add a prefix
