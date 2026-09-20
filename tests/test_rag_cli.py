@@ -78,6 +78,7 @@ def _mock_summary():
     summary.total_cost_usd = 0.02
     summary.fixture_results = []
     summary.parse_failure_rate = 0.0
+    summary.integrity = SimpleNamespace(should_exit_nonzero=False)
     summary.to_dict.return_value = {"overall_rag_score": 0.85}
     return summary
 
@@ -375,3 +376,67 @@ def test_rag_retrieval_cli_missing_extras_exits(tmp_path: Path):
         )
         assert result.exit_code == 1
         assert "RAG retrieval requires" in result.output
+
+
+def _partial_rag_summary():
+    from datetime import UTC, datetime
+
+    from atomics.eval.rag.fixtures import ALL_RAG_FIXTURES
+    from atomics.eval.rag.judge import RAGJudgeResult
+    from atomics.eval.rag.runner import RAGFixtureResult, RAGRunSummary
+    from atomics.models import TaskCategory, TaskResult, TaskStatus
+
+    now = datetime.now(UTC)
+    fixture = ALL_RAG_FIXTURES[0]
+    task = TaskResult(
+        run_id="rag-partial",
+        category=TaskCategory.GENERAL_QA,
+        task_name=fixture.id,
+        provider="mock",
+        model="x",
+        status=TaskStatus.SUCCESS,
+    )
+    judge = RAGJudgeResult(
+        grounding=0,
+        faithfulness=0,
+        abstention=0,
+        score=0.0,
+        rationale="",
+        parse_failed=True,
+    )
+    return RAGRunSummary(
+        run_id="rag-partial",
+        provider="mock",
+        model="x",
+        judge_provider="mock",
+        judge_model="j",
+        started_at=now,
+        completed_at=now,
+        fixture_results=[RAGFixtureResult(fixture=fixture, task_result=task, judge=judge)],
+    )
+
+
+def test_rag_cli_partial_integrity_exits_nonzero():
+    runner = CliRunner()
+    with (
+        patch("atomics.commands.rag._make_provider", return_value=_mock_provider()),
+        patch(
+            "atomics.eval.rag.runner.run_rag",
+            new=AsyncMock(return_value=_partial_rag_summary()),
+        ),
+    ):
+        result = runner.invoke(cli, ["rag", "--no-save"])
+    assert result.exit_code == 1, result.output
+
+
+def test_rag_cli_allow_partial_exits_zero():
+    runner = CliRunner()
+    with (
+        patch("atomics.commands.rag._make_provider", return_value=_mock_provider()),
+        patch(
+            "atomics.eval.rag.runner.run_rag",
+            new=AsyncMock(return_value=_partial_rag_summary()),
+        ),
+    ):
+        result = runner.invoke(cli, ["rag", "--no-save", "--allow-partial"])
+    assert result.exit_code == 0, result.output

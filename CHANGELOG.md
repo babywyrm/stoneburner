@@ -23,6 +23,11 @@
   rejects the field (phi4-mini, functiongemma) used to fail the run.
   `generate` and `generate_with_tools` retry once and record
   `reasoning_request.think_fallback = "400"`.
+- **`rag`, `codegen`, and `toolcall` exit nonzero on a partial run.**
+  They printed integrity and returned 0. They now take `--allow-partial`
+  and share `integrity_exit_code` with the other judged suites.
+  `toolcall --skip-incapable` is unchanged: a probe skip is not a
+  partial run.
 - **`redblue` and `multiturn` exit nonzero on a partial run.** Both
   printed integrity but returned 0. They now take `--allow-partial` and
   share `integrity_exit_code` with `codereview` / `refusal` /

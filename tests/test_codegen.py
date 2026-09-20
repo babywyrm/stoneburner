@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 from atomics.eval.codegen import CodegenFixture, CodeTestCase
 from atomics.eval.codegen.fixtures import ALL_CODEGEN_FIXTURES
 from atomics.eval.codegen.runner import (
@@ -293,3 +295,80 @@ def test_cli_codegen_help():
     result = runner.invoke(cli, ["codegen", "--help"])
     assert result.exit_code == 0
     assert "functional correctness" in result.output.lower() or "Code generation" in result.output
+
+
+def _partial_codegen_summary():
+    from datetime import UTC, datetime
+
+    from atomics.eval.codegen.fixtures import ALL_CODEGEN_FIXTURES
+    from atomics.eval.codegen.runner import CodegenFixtureResult, CodegenRunSummary
+    from atomics.models import TaskCategory, TaskResult, TaskStatus
+
+    now = datetime.now(UTC)
+    fixture = ALL_CODEGEN_FIXTURES[0]
+    task = TaskResult(
+        run_id="cg-partial",
+        category=TaskCategory.GENERAL_QA,
+        task_name=fixture.id,
+        provider="mock",
+        model="x",
+        status=TaskStatus.FAILED,
+    )
+    return CodegenRunSummary(
+        run_id="cg-partial",
+        provider="mock",
+        model="x",
+        started_at=now,
+        completed_at=now,
+        fixture_results=[
+            CodegenFixtureResult(
+                fixture=fixture,
+                task_result=task,
+                tests_passed=0,
+                tests_total=1,
+                pass_rate=0.0,
+                extracted_code=None,
+                test_details=[],
+            )
+        ],
+    )
+
+
+def test_codegen_cli_partial_integrity_exits_nonzero(monkeypatch) -> None:
+    from click.testing import CliRunner
+
+    from atomics.cli import cli
+
+    provider = SimpleNamespace(name="mock", default_model="x")
+
+    async def fake_run(*_args, **_kwargs):
+        return _partial_codegen_summary()
+
+    monkeypatch.setattr(
+        "atomics.commands.rag._make_provider",
+        lambda *_args, **_kwargs: provider,
+    )
+    monkeypatch.setattr("atomics.eval.codegen.runner.run_codegen", fake_run)
+    result = CliRunner().invoke(cli, ["--no-progress", "codegen", "--no-save"])
+    assert result.exit_code == 1, result.output
+
+
+def test_codegen_cli_allow_partial_exits_zero(monkeypatch) -> None:
+    from click.testing import CliRunner
+
+    from atomics.cli import cli
+
+    provider = SimpleNamespace(name="mock", default_model="x")
+
+    async def fake_run(*_args, **_kwargs):
+        return _partial_codegen_summary()
+
+    monkeypatch.setattr(
+        "atomics.commands.rag._make_provider",
+        lambda *_args, **_kwargs: provider,
+    )
+    monkeypatch.setattr("atomics.eval.codegen.runner.run_codegen", fake_run)
+    result = CliRunner().invoke(
+        cli, ["--no-progress", "codegen", "--no-save", "--allow-partial"]
+    )
+    assert result.exit_code == 0, result.output

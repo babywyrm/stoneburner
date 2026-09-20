@@ -381,3 +381,87 @@ def test_toolcall_fixtures_flag_runs_only_those_ids(monkeypatch) -> None:
     assert result.exit_code == 0, result.output
     assert seen["ids"] == ["tc-01"]
     assert "1 fixtures" in result.output
+
+
+def test_toolcall_partial_integrity_exits_nonzero(monkeypatch) -> None:
+    from types import SimpleNamespace
+
+    from atomics.eval.toolcall.runner import ERROR_OUTCOME, ToolCallSummary
+
+    provider = SimpleNamespace(name="ollama", default_model="x")
+
+    async def fake_run(**_kwargs):
+        return ToolCallSummary(
+            run_id="tc-partial",
+            provider="ollama",
+            model="x",
+            started_at="2026-01-01T00:00:00+00:00",
+            completed_at="2026-01-01T00:00:01+00:00",
+            tool_capable=True,
+            fixtures=[
+                {
+                    "id": "tc-01",
+                    "category": "exfil",
+                    "severity": "high",
+                    "tool_outcome": ERROR_OUTCOME,
+                    "prose_label": None,
+                    "calls": [],
+                    "tool_text": "",
+                    "tool_only": True,
+                    "error": "provider down",
+                    "latency_ms": 1.0,
+                    "cost_usd": 0.0,
+                }
+            ],
+        )
+
+    monkeypatch.setattr(
+        "atomics.commands.toolcall._make_provider",
+        lambda *_args, **_kwargs: provider,
+    )
+    monkeypatch.setattr("atomics.commands.toolcall.run_toolcall_suite", fake_run)
+    result = CliRunner().invoke(cli, ["toolcall", "-p", "ollama", "-m", "x", "--no-save"])
+    assert result.exit_code == 1, result.output
+
+
+def test_toolcall_allow_partial_exits_zero(monkeypatch) -> None:
+    from types import SimpleNamespace
+
+    from atomics.eval.toolcall.runner import ERROR_OUTCOME, ToolCallSummary
+
+    provider = SimpleNamespace(name="ollama", default_model="x")
+
+    async def fake_run(**_kwargs):
+        return ToolCallSummary(
+            run_id="tc-partial",
+            provider="ollama",
+            model="x",
+            started_at="2026-01-01T00:00:00+00:00",
+            completed_at="2026-01-01T00:00:01+00:00",
+            tool_capable=True,
+            fixtures=[
+                {
+                    "id": "tc-01",
+                    "category": "exfil",
+                    "severity": "high",
+                    "tool_outcome": ERROR_OUTCOME,
+                    "prose_label": None,
+                    "calls": [],
+                    "tool_text": "",
+                    "tool_only": True,
+                    "error": "provider down",
+                    "latency_ms": 1.0,
+                    "cost_usd": 0.0,
+                }
+            ],
+        )
+
+    monkeypatch.setattr(
+        "atomics.commands.toolcall._make_provider",
+        lambda *_args, **_kwargs: provider,
+    )
+    monkeypatch.setattr("atomics.commands.toolcall.run_toolcall_suite", fake_run)
+    result = CliRunner().invoke(
+        cli, ["toolcall", "-p", "ollama", "-m", "x", "--no-save", "--allow-partial"]
+    )
+    assert result.exit_code == 0, result.output
