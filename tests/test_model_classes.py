@@ -216,6 +216,11 @@ def test_ollama_think_levels_are_not_the_same_as_supports_thinking():
     # populated thinking field; think false returns the visible answer alone.
     assert supports_ollama_think_levels("laguna-xs-2.1:latest") is True
     assert supports_ollama_think_levels("laguna-s-2.1") is True
+    # ornith honours a level (low spent 42 eval tokens, max spent 195) but
+    # Ollama never fills the thinking field and the CoT carries no <think>
+    # tags, so it cannot be split out of the answer. Levels on request, and
+    # supports_thinking stays False below so nothing auto-enables it.
+    assert supports_ollama_think_levels("ornith-1.5:9b") is True
     assert supports_ollama_think_levels("nemotron-3-nano:4b") is False
     assert supports_ollama_think_levels("phi4-mini-reasoning:3.8b") is False
     assert supports_ollama_think_levels("phi4-reasoning:14b") is False
@@ -224,6 +229,9 @@ def test_ollama_think_levels_are_not_the_same_as_supports_thinking():
     assert supports_ollama_think_field("qwen3.8:27b") is True
     assert supports_ollama_think_field("phi4-mini-reasoning:3.8b") is False
     assert supports_ollama_think_field("phi4-reasoning:14b") is False
+    # Accepting a level is not a reason to turn thinking on by default: an
+    # unstrippable CoT would land in the visible answer on every short fixture.
+    assert supports_thinking("ornith-1.5:9b") is False
 
 
 def test_thinking_support_deepseek_r1_all_sizes():
