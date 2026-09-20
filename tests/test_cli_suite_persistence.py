@@ -425,11 +425,11 @@ def _patch_codegen(monkeypatch, db_path, *, fail: bool = False) -> list[MetricsR
         )
 
     monkeypatch.setattr(
-        "atomics.commands.rag._make_provider",
+        "atomics.commands.codegen._make_provider",
         lambda *_args, **_kwargs: provider,
     )
     monkeypatch.setattr(
-        "atomics.commands.rag.load_settings",
+        "atomics.commands.codegen.load_settings",
         lambda: _settings(db_path),
     )
     monkeypatch.setattr(codegen_runner, "run_codegen", fake_run_codegen)
@@ -483,11 +483,11 @@ def _patch_probe(monkeypatch, db_path, *, fail: bool = False) -> list[MetricsRep
         return ProbeSummary()
 
     monkeypatch.setattr(
-        "atomics.commands.rag._make_provider",
+        "atomics.commands.probe._make_provider",
         lambda *_args, **_kwargs: provider,
     )
     monkeypatch.setattr(
-        "atomics.commands.rag.load_settings",
+        "atomics.commands.probe.load_settings",
         lambda: _settings(db_path),
     )
     monkeypatch.setattr(probe_runner, "run_probe", fake_run_probe)
@@ -591,7 +591,7 @@ def _patch_archreview(
         ]
 
     monkeypatch.setattr(
-        "atomics.commands.rag.load_settings",
+        "atomics.commands.archreview.load_settings",
         lambda: _settings(db_path),
     )
     monkeypatch.setattr(archreview_runner, "run_archreview", fake_run_archreview)

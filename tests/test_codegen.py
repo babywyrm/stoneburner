@@ -345,7 +345,7 @@ def test_codegen_cli_partial_integrity_exits_nonzero(monkeypatch) -> None:
         return _partial_codegen_summary()
 
     monkeypatch.setattr(
-        "atomics.commands.rag._make_provider",
+        "atomics.commands.codegen._make_provider",
         lambda *_args, **_kwargs: provider,
     )
     monkeypatch.setattr("atomics.eval.codegen.runner.run_codegen", fake_run)
@@ -364,7 +364,7 @@ def test_codegen_cli_allow_partial_exits_zero(monkeypatch) -> None:
         return _partial_codegen_summary()
 
     monkeypatch.setattr(
-        "atomics.commands.rag._make_provider",
+        "atomics.commands.codegen._make_provider",
         lambda *_args, **_kwargs: provider,
     )
     monkeypatch.setattr("atomics.eval.codegen.runner.run_codegen", fake_run)

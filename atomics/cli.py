@@ -8,12 +8,16 @@ from atomics import DIST_NAME
 from atomics.commands import admin as admin_commands
 from atomics.commands import agreement as agreement_commands
 from atomics.commands import api as api_commands
+from atomics.commands import archreview as archreview_commands
 from atomics.commands import battery as battery_commands
 from atomics.commands import benchmark as benchmark_commands
+from atomics.commands import codegen as codegen_commands
 from atomics.commands import distributed as distributed_commands
 from atomics.commands import eval as eval_commands
 from atomics.commands import load as load_commands
 from atomics.commands import mcp as mcp_commands
+from atomics.commands import probe as probe_commands
+from atomics.commands import qa as qa_commands
 from atomics.commands import rag as rag_commands
 from atomics.commands import repl as repl_commands
 from atomics.commands import security as security_commands
@@ -76,16 +80,16 @@ cli.add_command(benchmark_commands.sweep)
 cli.add_command(benchmark_commands.labcompare)
 cli.add_command(eval_commands.eval)
 cli.add_command(eval_commands.advisor)
-cli.add_command(rag_commands.codegen)
+cli.add_command(codegen_commands.codegen)
 cli.add_command(security_commands.multiturn)
 cli.add_command(rag_commands.rag)
 cli.add_command(rag_commands.rag_index)
 cli.add_command(rag_commands.rag_retrieval)
 cli.add_command(security_commands.adversarial)
 cli.add_command(security_commands.redblue)
-cli.add_command(rag_commands.probe)
-cli.add_command(rag_commands.qa)
-cli.add_command(rag_commands.archreview)
+cli.add_command(probe_commands.probe)
+cli.add_command(qa_commands.qa)
+cli.add_command(archreview_commands.archreview)
 cli.add_command(battery_commands.battery)
 
 # Re-export for tests/importers that still pull helpers from atomics.cli.

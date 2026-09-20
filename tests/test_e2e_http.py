@@ -20,7 +20,7 @@ import pytest
 from click.testing import CliRunner, Result
 
 from atomics.commands.eval import eval as eval_command
-from atomics.commands.rag import qa as qa_command
+from atomics.commands.qa import qa as qa_command
 from atomics.commands.security import adversarial as adversarial_command
 from tests.inference_stub import (
     GENERATION_REPLY,
