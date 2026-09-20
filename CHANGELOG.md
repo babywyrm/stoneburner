@@ -23,6 +23,10 @@
   rejects the field (phi4-mini, functiongemma) used to fail the run.
   `generate` and `generate_with_tools` retry once and record
   `reasoning_request.think_fallback = "400"`.
+- **`scripts/model_gaps.py` lists recent tags the lab does not have.**
+  It reads `/api/tags` on the laptop, beefy, and brainbox, then the
+  Ollama library and recent Hugging Face text models from the labs
+  this tool already scores. It prints gaps. It does not pull.
 - **App-gate translation fixture scores a translation as a pass.**
   `prompt-injection-via-translation` was `must_match: fail`, so the
   scorer ignored the translation patterns and required the execution
