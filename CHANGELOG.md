@@ -1,6 +1,27 @@
 # Changelog
 
-## Unreleased
+## 0.23.0 (2026-09-20) — Honest exit codes
+
+### Upgrade notes
+- **Five suites now exit nonzero on a partial run.** `rag`, `codegen`,
+  `toolcall`, `redblue`, and `multiturn` printed their integrity status and
+  still returned 0, so a pipeline could go green on a run that scored a
+  fraction of its fixtures. They now share `integrity_exit_code` with
+  `adversarial` / `refusal` / `codereview`. CI that treated a partial run as
+  success will start failing — that is the point. Pass `--allow-partial` to
+  restore the old exit code; it does not alter stored integrity.
+- **An empty summary is infrastructure-invalid, not an empty success.** Zero
+  fixtures exits 1 unless `--allow-partial`.
+- **`toolcall --skip-incapable` is unchanged.** A probe skip exits before
+  fixtures run and is not a partial run. Battery `toolcall` steps still pass
+  `--no-skip-incapable`.
+- **`submit_battery` eval steps can now report `ok: false`.** The job still
+  completes so the document stays readable; read `ok` per step rather than the
+  job status.
+- **`commands/rag.py` no longer holds every command.** Anything importing
+  `atomics.commands.rag.codegen` / `.probe` / `.archreview` / `.qa` — including
+  `mock.patch` targets — must point at the new module. The CLI surface is
+  unchanged.
 
 ### Added
 - **API/MCP `submit_battery`.** `POST /api/v1/batteries` and the MCP
