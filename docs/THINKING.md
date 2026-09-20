@@ -46,7 +46,7 @@ uv run atomics provider-test -p ollama -m qwen3.8:27b --no-thinking
 | **OpenAI** | o3, o3-mini, o3-pro, o4-mini, gpt-5.x (including Sol/Terra/Luna) | Reasoning tokens (`completion_tokens_details`) |
 | **Ollama** | qwen3 family (including qwen3.8), granite4.2, gemma4, gpt-oss, lfm2.5, laguna, muse-glimmer, nemotron-3.5-lightning, north-mini-code | Native `think` field: bool, or `low` / `medium` / `high` / `max` from `--effort`. |
 | | deepseek-r1 | Thinking-capable; `--effort` that would be a level becomes `think: true` (string levels 400). `<think>` tags in the completion. |
-| | ornith | Accepts and honours a level, but Ollama leaves `thinking` empty and the CoT has no `<think>` tags, so it cannot be split out of the answer. Levels only when you ask; never auto-enabled. |
+| | ornith | Accepts and honours a level, but Ollama leaves `thinking` empty and the CoT has no `<think>` tags, so it cannot be split out of the answer. Levels only when you ask; never auto-enabled. Matched by model name: it reports `details.family` as `qwen35moe` yet does not share Qwen's thinking shape. |
 | | phi4-*-reasoning | CoT in the completion. Ollama 400s any think field (`does not support thinking`). We send `think: false`. `--no-thinking` still leaves `<think>` in the body; we split it out of visible text. |
 | | mistral, gemma3, phi4-mini, ministral | No thinking. `--effort` does not invent a dial (`think: false`). A string level is a 400. |
 | **vLLM / SGLang** (`--provider vllm`) | qwen3 family (including qwen3.8) | `chat_template_kwargs.enable_thinking` plus mapped `reasoning_effort`; optional `custom_params.thinking_budget` |
