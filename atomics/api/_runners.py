@@ -108,6 +108,26 @@ def _fixture_rows(results: Any) -> list[FixtureRow]:
     return rows
 
 
+def _coverage(summary: Any) -> dict[str, Any]:
+    """Integrity and tool-capability, when the suite summary has them.
+
+    The CLI exits nonzero on incomplete coverage. The job document has to
+    carry the same signal or an API caller treats a partial run as a pass.
+    """
+    extra: dict[str, Any] = {}
+    integrity = getattr(summary, "integrity", None)
+    status = getattr(integrity, "status", None)
+    exit_nonzero = getattr(integrity, "should_exit_nonzero", None)
+    if status is not None and exit_nonzero is not None:
+        extra["integrity"] = {
+            "status": getattr(status, "value", status),
+            "should_exit_nonzero": bool(exit_nonzero),
+        }
+    if hasattr(summary, "tool_capable"):
+        extra["tool_capable"] = bool(summary.tool_capable)
+    return extra
+
+
 def _summary_fixture_items(summary: Any) -> Any:
     for attr in ("fixture_results", "conversation_results", "fixtures", "results"):
         items = getattr(summary, attr, None)
@@ -472,4 +492,5 @@ async def run_eval_suite(payload: EvalRequest, job: Job | None = None) -> dict[s
         "total_tokens": total_tokens,
         "total_cost_usd": total_cost_usd,
         "fixtures": _completed_fixtures(summary, job),
+        **_coverage(summary),
     }

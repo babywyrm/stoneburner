@@ -495,6 +495,32 @@ async def test_run_eval_suite_dispatches_toolcall():
 
 
 @pytest.mark.asyncio
+async def test_run_eval_suite_reports_partial_integrity():
+    payload = EvalRequest(suite="rag", provider="ollama", model="m1")
+    summary = SimpleNamespace(
+        overall_rag_score=None,
+        fixture_results=[1],
+        total_tokens=1,
+        total_cost_usd=0.0,
+        integrity=SimpleNamespace(
+            status=SimpleNamespace(value="partial"),
+            should_exit_nonzero=True,
+        ),
+    )
+
+    with (
+        patch.object(runners, "_provider_for", side_effect=[MagicMock(), MagicMock()]),
+        patch.object(runners, "run_rag", new_callable=AsyncMock, return_value=summary),
+    ):
+        result = await runners.run_eval_suite(payload)
+
+    assert result["integrity"] == {
+        "status": "partial",
+        "should_exit_nonzero": True,
+    }
+
+
+@pytest.mark.asyncio
 async def test_run_eval_suite_forwards_runs_to_toolcall():
     payload = EvalRequest(
         suite="toolcall", provider="ollama", model="m1", judge_model="j1", runs=3

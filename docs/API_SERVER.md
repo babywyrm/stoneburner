@@ -214,6 +214,12 @@ worse).
 | `toolcall` | dangerous-call rate | Tool-channel leaks (higher is worse) |
 | `codereview` | review score | Planted-vuln detection vs false positives |
 
+The job result includes `integrity` (`status`, `should_exit_nonzero`) when the
+suite summary has it, and `tool_capable` for `toolcall`. A partial run still
+completes the job so the document is readable. `submit_battery` marks that
+step `ok: false`, matching the CLI exit. A toolcall probe skip is `ok: false`
+too (`--no-skip-incapable` on battery toolcall steps).
+
 `GET /jobs/{id}` includes resolved `request` (suite, provider, model, judge,
 host) at submit time. Every eval suite carries `progress` (`current` /
 `total` from that suite's catalog; `fixtures` is an id subset on every
