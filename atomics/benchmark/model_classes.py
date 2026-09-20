@@ -227,6 +227,12 @@ def supports_thinking(model_id: str) -> bool:
 # level, yet Ollama leaves the thinking field empty and the reasoning carries no
 # <think> tags, so _strip_thinking cannot lift it out of the answer. Send a
 # level when asked, never by default.
+#
+# Match on the model name, not Ollama's details.family. ornith-1.5:35b reports
+# family "qwen35moe" because it is built on Qwen3.5, but it does not inherit
+# Qwen's thinking shape: qwen3.8:27b returns CoT in the thinking field and a
+# bare answer in response, while ornith returns the reasoning as the response.
+# A family-keyed lookup would get this exactly backwards.
 _OLLAMA_THINK_LEVEL_PREFIXES: tuple[str, ...] = (
     "qwen3",
     "granite4.2",
