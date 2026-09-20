@@ -366,3 +366,31 @@ def test_invoke_atomics_maps_click_usage_error_to_exit_code():
     code = invoke_atomics(["eval", "--budget", "0"])
     assert code != 0
     assert invoke_atomics(["eval", "--help"]) == 0
+
+
+def test_invoke_atomics_propagates_a_suite_exit_code(monkeypatch):
+    """A suite that signals partial coverage must not look like a pass.
+
+    The judged suites raise `click.exceptions.Exit(1)`, and Click *returns*
+    that code from `main()` under `standalone_mode=False` rather than
+    raising it. Dropping the return value made a battery whose every step
+    was infrastructure_invalid exit 0.
+    """
+    import click
+
+    from atomics.commands.battery import invoke_atomics
+
+    @click.group()
+    @click.option("--no-progress", is_flag=True)
+    def fake_cli(no_progress: bool) -> None: ...
+
+    @fake_cli.command("redblue")
+    def fake_redblue() -> None:
+        raise click.exceptions.Exit(1)
+
+    @fake_cli.command("refusal")
+    def fake_refusal() -> None: ...
+
+    monkeypatch.setattr("atomics.cli.cli", fake_cli)
+    assert invoke_atomics(["redblue"]) == 1
+    assert invoke_atomics(["refusal"]) == 0

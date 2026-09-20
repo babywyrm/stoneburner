@@ -157,11 +157,19 @@ def invoke_atomics(args: list[str]) -> int:
     `standalone_mode=False` so Click does not `sys.exit`. Usage errors
     (`BadParameter`, `ctx.exit`) must still become an integer code or
     `battery run` tracebacks on the first bad step.
+
+    That same flag makes Click *return* `Exit.exit_code` instead of raising
+    it, so the return value is the only signal a judged suite gives when it
+    reports partial or infrastructure_invalid coverage. Dropping it made a
+    battery whose every step failed exit 0. A command's own return value is
+    None, so only an int counts.
     """
     from atomics.cli import cli
 
     try:
-        cli.main(args=["--no-progress", *args], standalone_mode=False)
+        rv = cli.main(args=["--no-progress", *args], standalone_mode=False)
+        if isinstance(rv, int) and not isinstance(rv, bool):
+            return rv
     except SystemExit as exc:
         code = exc.code
         if code in (None, False):

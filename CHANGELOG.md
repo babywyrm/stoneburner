@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### Fixed
+- **`battery run` reports a failed step instead of exiting 0.** Click
+  *returns* `Exit.exit_code` from `main()` under `standalone_mode=False`
+  rather than raising it, and `invoke_atomics` dropped that return value. A
+  battery whose every eval step was `infrastructure_invalid` at 0% coverage
+  exited 0, with and without `--keep-going` — the exact failure 0.23.0 set
+  out to remove, one layer up. Caught when a six-model sweep scored a dead
+  Ollama as a clean pass. Every existing battery test stubbed
+  `invoke_atomics`, so the seam was never exercised; there is now a test on
+  the real function.
+
 ### Changed
 - **`load.py` and `benchmark.py` split on their oversized commands.** `soak`,
   `scenario`, `compare`, `sweep`, and `labcompare` are their own modules;
