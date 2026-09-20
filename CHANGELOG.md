@@ -9,6 +9,11 @@
   provider-test runs the fixed 2+2 probe; qa runs the battery's fixture
   file or profile and a FAIL marks the step not-ok. archreview stays
   on the CLI.
+- **`laguna` is a native Ollama think-level family.** poolside's coding MoE
+  answers `think: "low"` and `think: true` with a populated `thinking` field
+  and `think: false` with the visible answer alone, so `--effort` sends a
+  level instead of nothing. Probed before it was added, not assumed from the
+  model card. First desk-pass row is in `docs/BATTERIES.md`.
 - **`scripts/model_gaps.py` lists recent tags the lab does not have.**
   It reads `/api/tags` on the laptop, beefy, and brainbox, then the
   Ollama library and recent Hugging Face text models from the labs
