@@ -56,10 +56,12 @@ qa/local/
 .tmp_*
 *.tmp.html
 
-# Active planning docs are kept local-only (committed on the planning-local
-# branch), never pushed to origin. Archived docs under archive/ remain tracked.
-docs/superpowers/specs/
-docs/superpowers/plans/
+# Planning docs stay local. They were 60% of the tracked markdown and nothing
+# links to them: a shipped plan is a record of intent that git history already
+# keeps, and an archived one goes stale claiming "unreleased" for a feature
+# that shipped. The source of truth for what exists today is the code, the
+# tests, and CHANGELOG.md.
+docs/superpowers/
 
 # Node (optional workers)
 node_modules/
