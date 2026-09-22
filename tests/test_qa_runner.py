@@ -776,3 +776,25 @@ class TestQACLI:
 
         assert result.exit_code == 1
         assert "FAIL" in result.output
+
+
+@pytest.mark.asyncio
+async def test_qa_ollama_sends_bounded_context() -> None:
+    """Raw QA posts /api/generate itself, so the provider cap does not apply."""
+    from atomics.providers.ollama import DEFAULT_NUM_CTX
+    from atomics.qa_runner import _query_ollama
+
+    mock_response = MagicMock()
+    mock_response.raise_for_status = MagicMock()
+    mock_response.json.return_value = {
+        "response": "ok",
+        "eval_count": 2,
+        "prompt_eval_count": 3,
+    }
+    client = AsyncMock()
+    client.post = AsyncMock(return_value=mock_response)
+
+    await _query_ollama(client, "http://fake:11434", "granite4.2:30b", "hi", num_predict=32)
+    body = client.post.call_args.kwargs["json"]
+    assert body["options"]["num_ctx"] == DEFAULT_NUM_CTX
+    assert body["options"]["num_predict"] == 32

@@ -506,6 +506,9 @@ class TestSingleRequestProfile:
         assert body["system"] == "You are a gate."
         assert body["options"]["temperature"] == 0.0
         assert body["options"]["num_predict"] == 24
+        from atomics.providers.ollama import DEFAULT_NUM_CTX
+
+        assert body["options"]["num_ctx"] == DEFAULT_NUM_CTX
 
     @pytest.mark.asyncio
     async def test_http_mode_json(self):
