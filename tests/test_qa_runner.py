@@ -778,6 +778,42 @@ class TestQACLI:
         assert "FAIL" in result.output
 
 
+def test_qa_profile_fail_fast_reports_the_stop() -> None:
+    """--profile --fail-fast used to NameError: model/host exist only in raw mode."""
+    from click.testing import CliRunner
+
+    from atomics.cli import cli
+
+    qa_path = _yaml_file(
+        "model: test\nhost: http://fake:11434\n"
+        "fixtures:\n"
+        "  - id: first\n    prompt: p\n    pass_patterns: ['YES']\n    must_match: pass\n"
+        "  - id: second\n    prompt: q\n    must_match: any\n"
+    )
+    profile_path = _yaml_file(
+        "name: test-gate\ntype: http\n"
+        "http:\n"
+        "  url: http://gate-host:8080/api/ask\n"
+        "  method: POST\n"
+        "  body: '{\"query\": \"{prompt}\"}'\n"
+        "  response_field: response\n"
+    )
+
+    async def _nope(client, profile, prompt):
+        return ("nope", 10.0)
+
+    with patch("atomics.qa_runner._query_profile", side_effect=_nope):
+        result = CliRunner().invoke(
+            cli, ["qa", "--file", qa_path, "--profile", profile_path, "--fail-fast"]
+        )
+
+    assert result.exit_code == 1, result.output
+    assert result.exception is None or isinstance(result.exception, SystemExit)
+    assert "stopped early" in result.output
+    assert "first" in result.output
+    assert "second" not in result.output
+
+
 @pytest.mark.asyncio
 async def test_qa_ollama_sends_bounded_context() -> None:
     """Raw QA posts /api/generate itself, so the provider cap does not apply."""

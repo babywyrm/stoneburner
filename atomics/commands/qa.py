@@ -112,6 +112,13 @@ def qa(
 
     file_model, file_host, fixtures = load_qa_suite(qa_file)
 
+    # Set in both modes. --fail-fast raises KeyboardInterrupt from the
+    # result callback, and that handler records the partial suite. Profile
+    # mode never assigns these, so the handler used to raise UnboundLocalError
+    # instead of reporting the stop.
+    effective_model = ""
+    effective_host = ""
+
     # Load profile if given — it handles all transport details
     loaded_profile = None
     target_label: str
