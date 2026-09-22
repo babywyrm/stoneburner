@@ -275,10 +275,9 @@ Suite convergence is done. `rag.py`, `load.py`, and `benchmark.py` are
 split, no command module is over 500 lines, and the `results` alias is
 in place. Do not reopen it to warm up.
 
-`laguna-xs-2.1` is on the laptop and not in the think registry.
-Same for any later glm, ornith, or deepseek-v4 pull. Add a prefix
-only after a live generate shows whether Ollama accepts a think
-level, a bool, or neither.
+Think prefixes for laguna and ornith are in. New families still need a
+live generate before a prefix: a level, a bool, or neither. Do not key
+class or thinking off Ollama `details.family`.
 
 ## Beyond
 

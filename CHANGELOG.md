@@ -3,6 +3,10 @@
 ## Unreleased
 
 ### Fixed
+- **`laguna` classifies heavy without a size tag.** Ollama publishes
+  `laguna-xs-2.1:latest`, so the `:Nb` heuristic returned `unknown` and
+  `compare` recorded a blank class. XS is 33B total and S is 118B; both
+  are heavy. Sized tags (`gemma4:31b`, `ornith-1.5:9b`) were already fine.
 - **`battery run` reports a failed step instead of exiting 0.** Click
   *returns* `Exit.exit_code` from `main()` under `standalone_mode=False`
   rather than raising it, and `invoke_atomics` dropped that return value. A
