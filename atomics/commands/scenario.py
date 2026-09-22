@@ -29,7 +29,7 @@ from atomics.config import load_settings
     type=str,
     multiple=True,
     help="Repeatable CLI shorthand: type:model:concurrency[:sla_ms]. "
-    "Example: gate:qwen2.5:3b:2:5000",
+    "Example: gate:YOUR_MODEL:2:5000",
 )
 @click.option(
     "--ollama-host",
@@ -81,9 +81,9 @@ def scenario(
 
     \b
     Examples:
-      atomics scenario -w "gate:qwen2.5:3b:2:5000" -w "eval:qwen2.5:7b:1:15000" -d 60
-      atomics scenario --file scenario.yaml --ollama-host http://gpu-host:11434
-      atomics scenario -w "gate:qwen2.5:3b:3" -d 30
+      atomics scenario --file profiles/examples/scenario-gate-and-eval.yaml -d 60
+      atomics scenario -w "gate:YOUR_MODEL:2:5000" -w "eval:YOUR_MODEL:1:15000" -d 60
+      atomics scenario -w "gate:YOUR_MODEL:3" -d 30
     """
     from atomics.load.scenario import run_scenario
     from atomics.load.scenario_models import load_scenario_yaml, parse_workload_flag

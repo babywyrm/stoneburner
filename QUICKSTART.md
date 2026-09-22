@@ -12,27 +12,35 @@ security). The PyPI listing is `stoneburner-atomics`; the CLI stays
 
 ---
 
-## 1. 60-second setup
+## 1. Launch
 
-From PyPI (Ollama on `http://localhost:11434`, no cloud key):
+Install, confirm the box, then run desk-pass. `MODEL` is a tag from
+`atomics models` on this machine.
 
 ```bash
 uv tool install stoneburner-atomics
 atomics doctor
 atomics provider-test --provider ollama --no-thinking
-atomics provider-test --provider ollama --effort low
+atomics models
+atomics battery show desk-pass -p ollama -m MODEL
+atomics battery run desk-pass -p ollama -m MODEL
 ```
 
-Thinking models (qwen3, qwen3.8, granite4.2, gemma4, gpt-oss, lfm2.5,
-muse-glimmer, nemotron-3.5-lightning, north-mini-code, deepseek-r1,
-phi4-*-reasoning) need `--no-thinking` or a larger `--max-output-tokens`
-or the visible answer can come back empty (`THINK`). `--effort low` is
-the native Ollama think dial on tags that advertise levels. `phi4-*-reasoning`
-always gets `think: false` (any other value 400s) and still leaks CoT in
-the body. `lfm2.5` leaks CoT with `think: false` too.
+`doctor` prints one `Next:` line when the check is healthy. `show` prints
+the desk-pass steps and does not spend. `run` is health, the app-gate
+patterns in `qa/examples/app-gate-guardrails.yaml`, and tool fixtures
+`tc-01` and `tc-02`. Exit 0 is the first success. A paid provider needs
+`--budget`. See [`docs/BATTERIES.md`](docs/BATTERIES.md).
 
-From a clone: `uv sync --all-extras`, then prefix commands with `uv run`.
-Bare `uv sync` drops the API, MCP, RAG, and test extras.
+Thinking models need `--no-thinking` on short fixtures, or the visible
+answer can come back empty (`THINK`). `--effort low` is the native Ollama
+think dial when you want reasoning on. From a clone: `uv sync --all-extras`,
+then prefix commands with `uv run`. Bare `uv sync` drops the API, MCP, RAG,
+and test extras.
+
+Later goals (cost, a judged eval, sweep, stress) are in section 3. Replace
+any `-m` tag there with one this box serves. A missing tag is a 404, not a
+failed score.
 
 Cloud keys are optional. Store them in the OS keychain if you use them:
 
@@ -235,10 +243,10 @@ Start with a named battery, not the full 72-fixture adversarial suite.
 
 ```bash
 uv run atomics battery list
-uv run atomics battery show desk-pass -p ollama -m granite4.2:8b
-uv run atomics battery run desk-pass -p ollama -m granite4.2:8b
+uv run atomics battery show desk-pass -p ollama -m MODEL
+uv run atomics battery run desk-pass -p ollama -m MODEL
 uv run atomics battery run desk-pass -p openai -m gpt-4.1 --budget 5
-uv run atomics battery run blue-capability -p ollama -m granite4.2:8b \
+uv run atomics battery run blue-capability -p ollama -m MODEL \
   --judge-provider claude --judge-model claude-sonnet-4-6 --budget 5
 ```
 
@@ -303,8 +311,11 @@ uv run atomics capacity --users 200 --model qwen2.5:7b
 # Hold load for 30 min, classify STABLE/DEGRADED/UNSTABLE (catches VRAM leaks)
 uv run atomics soak --model qwen2.5:7b --duration 30m -c 4
 
-# Multiple agentic services competing for one GPU
-uv run atomics scenario -w "gate:qwen2.5:3b:2:5000" -w "eval:qwen2.5:7b:1:15000" -d 60
+# Multiple services on one GPU. Edit YOUR_MODEL in the file first
+# (a tag from `atomics models`). Fields are name, type (gate|eval),
+# model, concurrency, and sla_ms. The same shape on one line is
+# type:model:concurrency:sla_ms.
+atomics scenario --file profiles/examples/scenario-gate-and-eval.yaml -d 60
 ```
 
 ### "Does my AI gate still work?" — QA regression
@@ -312,9 +323,9 @@ uv run atomics scenario -w "gate:qwen2.5:3b:2:5000" -w "eval:qwen2.5:7b:1:15000"
 Exit 1 if any fixture is FAIL or ERROR (`--fail-fast` stops early, still 1).
 
 ```bash
-# Test a model directly against pass/fail patterns
-uv run atomics qa --file qa/examples/app-gate-guardrails.yaml \
-                  --model qwen3.8:27b --no-thinking
+# Pass --model. The tag comes from `atomics models`. --no-thinking keeps
+# a short fixture from spending its budget on hidden reasoning.
+atomics qa --file qa/examples/app-gate-guardrails.yaml --model MODEL --no-thinking
 
 # Test a real app endpoint (secrets stay in a gitignored profile)
 uv run atomics qa --file qa/examples/ai-gate-regression.yaml \

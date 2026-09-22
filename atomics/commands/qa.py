@@ -81,7 +81,7 @@ def qa(
 
     \b
     RAW OLLAMA (default): talks directly to an Ollama model.
-      atomics qa --file qa/examples/ctf-solvability.yaml --model gemma4:26b
+      atomics qa --file qa/examples/ctf-solvability.yaml --model MODEL
 
     \b
     PROFILE MODE: routes requests through an app-level HTTP target.
@@ -93,7 +93,7 @@ def qa(
 
     \b
     Other examples:
-      atomics qa --file qa/examples/app-gate-guardrails.yaml --model qwen3.8:27b --no-thinking
+      atomics qa --file qa/examples/app-gate-guardrails.yaml --model MODEL --no-thinking
       atomics qa --file qa/examples/ai-gate-regression.yaml --fail-fast
       atomics qa --file qa/examples/app-gate-guardrails.yaml \\
                  --profile profiles/local/my-policy.yaml
