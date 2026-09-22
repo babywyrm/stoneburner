@@ -228,7 +228,10 @@ tags and the tool-channel probe.
 **v0.23.0** is honest exit codes: the last five report-only suites
 exit nonzero on a partial run, `submit_battery` marks a partial step
 not-ok, and bandit gates the security workflow.
-Package version is **0.23.0**.
+**v0.23.1** is a bounded Ollama context: unset `num_ctx` is 8192,
+`battery run` exits nonzero on a failed step, and local endpoint URLs
+are checked wherever a request is built.
+Package version is **0.23.1**.
 
 - [x] **REPL line editing.** Stdlib `readline` for in-process
       history. No `prompt_toolkit`. Not session persistence to disk.
@@ -265,7 +268,7 @@ Package version is **0.23.0**.
 
 ## Next
 
-Current package is **0.23.0** — honest exit codes. Do not retag
+Current package is **0.23.1** — bounded Ollama context. Do not retag
 `v0.22.5`, `v0.21.0`, or `v0.20.0`. Do not mix a feature into a tag
 commit. `RELEASING.md`.
 
