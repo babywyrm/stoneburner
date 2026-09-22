@@ -8,6 +8,8 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
+from atomics.load.profiles import TargetProfile
+from atomics.providers.base import BaseProvider
 from atomics.reporting.stats import percentile as _percentile
 
 
@@ -262,7 +264,7 @@ async def run_soak(
 
 
 async def run_soak_provider(
-    provider: object,
+    provider: BaseProvider,
     model: str = "",
     concurrency: int = 4,
     duration_seconds: float = 1800,
@@ -398,7 +400,7 @@ async def run_soak_provider(
 
 
 async def run_soak_profile(
-    profile: object,
+    profile: TargetProfile,
     concurrency: int = 4,
     duration_seconds: float = 1800,
     sample_interval: int = 30,
@@ -408,24 +410,22 @@ async def run_soak_profile(
     """Run a soak test against a custom target profile (ollama or http)."""
     import httpx
 
-    from atomics.load.profiles import TargetProfile, _single_request_profile
+    from atomics.load.profiles import _single_request_profile
 
-    tp: TargetProfile = profile  # type: ignore[assignment]
-
-    prompts = tp.prompts
+    prompts = profile.prompts
     if not prompts:
         from atomics.load.stress import STRESS_PROMPTS
 
         prompts = list(STRESS_PROMPTS)
 
-    host = tp.ollama_host if tp.type == "ollama" else tp.http_url
+    host = profile.ollama_host if profile.type == "ollama" else profile.http_url
     from atomics.validation import validate_endpoint_url
 
     host = validate_endpoint_url(host, label="profile host")
     result = SoakResult(
-        model=tp.model,
+        model=profile.model,
         host=host,
-        provider=f"profile:{tp.type}",
+        provider=f"profile:{profile.type}",
         concurrency=concurrency,
         duration_seconds=duration_seconds,
         sample_interval=sample_interval,
@@ -446,7 +446,7 @@ async def run_soak_profile(
             prompt = prompts[prompt_idx % len(prompts)]
             prompt_idx += concurrency
             try:
-                _text, lat_ms, _cls = await _single_request_profile(client, tp, prompt)
+                _text, lat_ms, _cls = await _single_request_profile(client, profile, prompt)
                 async with window_lock:
                     window_latencies.append(lat_ms)
                     window_requests += 1
@@ -491,7 +491,7 @@ async def run_soak_profile(
             if on_sample:
                 on_sample(sample)
 
-    timeout = max(float(tp.http_timeout), 120.0) if tp.type == "http" else 300.0
+    timeout = max(float(profile.http_timeout), 120.0) if profile.type == "http" else 300.0
     async with httpx.AsyncClient(timeout=httpx.Timeout(timeout)) as client:
         workers_list = [asyncio.create_task(_worker(client, i)) for i in range(concurrency)]
         sampler_task = asyncio.create_task(_sampler())
