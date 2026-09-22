@@ -23,20 +23,21 @@ Put real profiles with IPs, API keys, and spoiler system prompts in `local/`.
 ## Usage
 
 ```bash
+# Scenario: a gate and an eval on one box
+atomics scenario --file profiles/examples/scenario-gate-and-eval.yaml -d 60
+
 # Soak test against a profile
 atomics soak --profile profiles/local/my-gate.yaml -d 30m
 
 # Stress test (ramp concurrency)
 atomics stress --profile profiles/local/my-gate.yaml
-
-# Scenario with profile-based workloads (add profile: field to workload YAML)
-atomics scenario --file scenario.yaml
 ```
 
 ## YAML Format
 
-See `ollama-with-system-prompt.yaml` and `http-flask-endpoint.yaml` for
-annotated examples.
+See `scenario-gate-and-eval.yaml` for two workloads on one box,
+`ollama-with-system-prompt.yaml` for a soak profile, and
+`http-flask-endpoint.yaml` for an HTTP gate.
 
 ### Template Variables
 

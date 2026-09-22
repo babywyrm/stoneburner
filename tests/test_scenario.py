@@ -157,6 +157,19 @@ class TestLoadScenarioYaml:
         assert specs[1].name == "review"
         assert specs[1].sla_ms is None
 
+    def test_example_file_loads(self) -> None:
+        path = (
+            Path(__file__).resolve().parents[1]
+            / "profiles/examples/scenario-gate-and-eval.yaml"
+        )
+        specs = load_scenario_yaml(str(path))
+        assert [s.type for s in specs] == ["gate", "eval"]
+        assert specs[0].concurrency == 2
+        assert specs[0].sla_ms == 5000
+        assert specs[1].concurrency == 1
+        assert specs[1].sla_ms == 15000
+        assert specs[0].model == specs[1].model == "YOUR_MODEL"
+
     def test_missing_workloads_key(self, tmp_path: Path) -> None:
         f = tmp_path / "bad.yaml"
         f.write_text("something: else\n")

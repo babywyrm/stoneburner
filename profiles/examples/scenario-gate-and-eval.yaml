@@ -1,0 +1,22 @@
+# Two services on one Ollama box: a short gate and a short eval.
+#
+# Replace YOUR_MODEL with a tag from `atomics models` before running.
+# type is gate or eval. concurrency is how many workers of that
+# workload run at once. sla_ms is that workload's latency budget.
+#
+#   atomics scenario --file profiles/examples/scenario-gate-and-eval.yaml -d 60
+#
+# The same shape on one line is type:model:concurrency:sla_ms, for example
+#   atomics scenario -w "gate:YOUR_MODEL:2:5000" -w "eval:YOUR_MODEL:1:15000" -d 60
+
+workloads:
+  - name: gate
+    type: gate
+    model: YOUR_MODEL
+    concurrency: 2
+    sla_ms: 5000
+  - name: eval
+    type: eval
+    model: YOUR_MODEL
+    concurrency: 1
+    sla_ms: 15000

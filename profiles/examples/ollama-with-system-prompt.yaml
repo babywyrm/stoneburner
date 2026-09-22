@@ -1,10 +1,7 @@
-# Example: Soak-test an Ollama model with a custom system prompt.
+# Example: soak-test an Ollama model with a custom system prompt.
 #
-# Simulates what an application sends to the inference backend — system prompt,
-# temperature, and constrained output length — so you can measure how the model
-# behaves under sustained load with your exact app configuration.
+# Replace YOUR_MODEL with a tag from `atomics models`.
 #
-# Usage:
 #   atomics soak  --profile profiles/examples/ollama-with-system-prompt.yaml -d 10m
 #   atomics stress --profile profiles/examples/ollama-with-system-prompt.yaml
 
@@ -13,7 +10,7 @@ type: ollama
 
 ollama:
   host: "http://localhost:11434"
-  model: qwen2.5:3b
+  model: YOUR_MODEL
   system_prompt: |
     You are a security policy evaluator. Given a pod specification,
     respond with exactly APPROVE or DENY followed by a one-sentence

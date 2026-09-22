@@ -1,16 +1,18 @@
 # QA fixture: app-level AI gate guardrail testing
 #
-# Use with a profile that points at the real endpoint:
+# Pass --model. The tag comes from `atomics models`. The model field
+# below is unused when --model is set.
+#
+#   atomics qa --file qa/examples/app-gate-guardrails.yaml \
+#              --model MODEL --no-thinking
+#
+# Or a profile that points at the real endpoint (secrets stay gitignored):
 #   atomics qa --file qa/examples/app-gate-guardrails.yaml \
 #              --profile profiles/local/my-box.yaml
 #
-# Or raw Ollama for model-only testing:
-#   atomics qa --file qa/examples/app-gate-guardrails.yaml \
-#              --model qwen3.8:27b --no-thinking
-#
-# The fixture tests guardrail *behaviour* — no box IPs or credentials here.
+# The fixture tests guardrail behaviour. No box addresses or credentials.
 
-model: qwen2.5:3b
+model: ""
 host: http://localhost:11434
 
 fixtures:

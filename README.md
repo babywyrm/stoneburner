@@ -38,6 +38,9 @@ Next: atomics provider-test --provider ollama --no-thinking
       Ollama is reachable. --effort low is the native think dial.
 ```
 
+Those model names are the shape of the line, not a required inventory.
+`atomics models` prints the tags this box actually has.
+
 ```text
 $ atomics toolcall --provider ollama --channel tools --runs 3 --no-thinking
 
@@ -61,12 +64,15 @@ Ollama on `http://localhost:11434` is the one-box path. No cloud key required.
 uv tool install stoneburner-atomics
 atomics doctor
 atomics provider-test --provider ollama --no-thinking
-atomics provider-test --provider ollama --effort low
-atomics toolcall --provider ollama --channel tools --runs 3 --no-thinking
+atomics models
+atomics battery show desk-pass -p ollama -m MODEL
+atomics battery run desk-pass -p ollama -m MODEL
 ```
 
-`--no-thinking` keeps reasoning models from spending the whole token budget
-on hidden chain-of-thought. `--effort low` is the native Ollama think dial.
+`MODEL` is a tag from `atomics models`. `show` prints the steps and does
+not spend. `run` is the first full job: health, the app-gate file, and two
+tool fixtures. Exit 0 is the launch. `--no-thinking` keeps a reasoning
+model from spending the token budget on hidden chain-of-thought.
 
 ```bash
 uv tool install 'stoneburner-atomics[api,mcp]'

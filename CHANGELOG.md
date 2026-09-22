@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Changed
+- The first recipe is desk-pass: `doctor`, `provider-test`, `atomics models`,
+  then `battery show` and `battery run`. Example files take that tag
+  (`YOUR_MODEL` / `--model`) instead of a model the reader may not have.
+  `profiles/examples/scenario-gate-and-eval.yaml` is the labeled form of
+  `scenario -w type:model:concurrency:sla_ms`.
+
 ## 0.23.1 (2026-09-21) — Bounded Ollama context
 
 ### Upgrade notes
