@@ -11,6 +11,10 @@
   still wins. The provider was not the only poster: `qa`, stress, and
   ollama target profiles build `/api/generate` themselves and now send
   the same cap.
+- **`qa --profile --fail-fast` reports the stop.** The model and host
+  names were assigned only in raw Ollama mode, so a profile run that
+  stopped on the first failure raised `UnboundLocalError` instead of
+  the partial result.
 - **`laguna` classifies heavy without a size tag.** Ollama publishes
   `laguna-xs-2.1:latest`, so the `:Nb` heuristic returned `unknown` and
   `compare` recorded a blank class. XS is 33B total and S is 118B; both
