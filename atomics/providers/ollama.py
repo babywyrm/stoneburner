@@ -16,6 +16,13 @@ from atomics.providers._tool_dialects import (
 from atomics.providers.base import BaseProvider, ProviderResponse, compute_tps
 from atomics.providers.effort import normalize_effort, ollama_think_value
 
+# Ollama uses the model's full window when num_ctx is omitted. granite4.2:30b
+# at 131072 tokens allocated a 52 GiB runner on a 64 GiB machine. 8192 matches
+# the Ollama judge context archreview already requests and fits the short
+# batteries. Callers that pass context_tokens, including a larger window,
+# still override this.
+DEFAULT_NUM_CTX = 8192
+
 _THINK_TAG_RE = re.compile(r"<think>(.*?)</think>", re.DOTALL)
 
 
@@ -85,6 +92,11 @@ class OllamaProvider(BaseProvider):
         self._context_tokens = context_tokens
         self._client = client or httpx.AsyncClient()
 
+    def _num_ctx(self) -> int:
+        if self._context_tokens is None:
+            return DEFAULT_NUM_CTX
+        return self._context_tokens
+
     @property
     def name(self) -> str:
         return "ollama"
@@ -117,8 +129,7 @@ class OllamaProvider(BaseProvider):
             options["temperature"] = temperature
         if max_tokens:
             options["num_predict"] = max_tokens
-        if self._context_tokens:
-            options["num_ctx"] = self._context_tokens
+        options["num_ctx"] = self._num_ctx()
         if thinking_budget and use_thinking:
             options["num_predict"] = max_tokens + thinking_budget
 
@@ -244,11 +255,9 @@ class OllamaProvider(BaseProvider):
             )
             messages.append({"role": "tool", "content": injected_tool_output})
 
-        options: dict[str, Any] = {"num_predict": max_tokens}
+        options: dict[str, Any] = {"num_predict": max_tokens, "num_ctx": self._num_ctx()}
         if thinking_budget and use_thinking:
             options["num_predict"] = max_tokens + thinking_budget
-        if self._context_tokens is not None:
-            options["num_ctx"] = self._context_tokens
 
         body: dict[str, Any] = {
             "model": model,

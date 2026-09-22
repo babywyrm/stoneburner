@@ -3,6 +3,12 @@
 ## Unreleased
 
 ### Fixed
+- **Ollama requests send `num_ctx` 8192 unless the caller sets a context.**
+  Omitting it lets Ollama use the model's full window. `granite4.2:30b` at
+  131072 tokens allocated a 52 GiB runner on a 64 GiB machine and the box
+  started swapping. 8192 is the context archreview already uses for an
+  Ollama judge. An explicit `context_tokens`, including a larger window,
+  still wins.
 - **`laguna` classifies heavy without a size tag.** Ollama publishes
   `laguna-xs-2.1:latest`, so the `:Nb` heuristic returned `unknown` and
   `compare` recorded a blank class. XS is 33B total and S is 118B; both
@@ -38,8 +44,8 @@
   Ollama side; `docs/THINKING.md` now lists it.
 - **Red-capability on five local peers.** `ornith-1.5:35b` and
   `gemma4:26b` 100%; `laguna-xs-2.1` 95%; `qwen3.8:27b` and `gemma4:31b`
-  93%. Judge was laptop `granite4.2:8b`. `granite4.2:30b` was not run.
-  `docs/BATTERIES.md`.
+  93%. Judge was laptop `granite4.2:8b`. `granite4.2:30b` was not run:
+  its default window allocated a 52 GiB runner. `docs/BATTERIES.md`.
 - **Desk-pass rows for the six newest local tags.** `gemma4:26b` (6/6),
   `gemma4:31b`, `granite4.2:30b`, `laguna-xs-2.1` (5/6 each), and
   `ornith-1.5` at `9b` and `35b` (4/6 each). All six are tool-capable; only

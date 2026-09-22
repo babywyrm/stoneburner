@@ -150,3 +150,8 @@ Precedence, highest first:
 The provider name is never taken from the file. `atomics run` with no
 `--provider` still uses Claude. A box wired to Ollama is
 `atomics run --provider ollama`.
+
+Ollama calls send `num_ctx` 8192 when the caller does not set a context.
+Omitting it lets Ollama use the model's full window, which allocated a
+52 GiB runner for `granite4.2:30b` on a 64 GiB machine. An explicit
+context, including a larger window, still wins.

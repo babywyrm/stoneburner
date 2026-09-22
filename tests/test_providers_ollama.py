@@ -163,6 +163,47 @@ async def test_ollama_generate_sets_configured_context_tokens():
 
 
 @pytest.mark.asyncio
+async def test_ollama_sends_a_bounded_context_when_unset():
+    """Unset num_ctx lets Ollama use the model's full window.
+
+    granite4.2:30b at 131072 tokens allocated a 52 GiB runner on a 64 GiB
+    machine. 8192 is what archreview already uses for an Ollama judge, and
+    it is enough for the short batteries. An explicit context_tokens still
+    wins, including a larger one.
+    """
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.raise_for_status = MagicMock()
+    mock_response.json.return_value = {
+        "response": "ok",
+        "eval_count": 2,
+        "prompt_eval_count": 3,
+        "eval_duration": 1,
+    }
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock(return_value=mock_response)
+
+    provider = OllamaProvider(host="http://fake:11434", client=mock_client)
+    await provider.generate("hi", max_tokens=32)
+    body = mock_client.post.call_args.kwargs["json"]
+    assert body["options"]["num_ctx"] == 8192
+
+    chat = MagicMock()
+    chat.status_code = 200
+    chat.raise_for_status = MagicMock()
+    chat.json.return_value = {
+        "message": {"content": "ok"},
+        "eval_count": 2,
+        "prompt_eval_count": 3,
+        "eval_duration": 1,
+    }
+    mock_client.post = AsyncMock(return_value=chat)
+    await provider.generate_with_tools("hi", tools=[])
+    chat_body = mock_client.post.call_args.kwargs["json"]
+    assert chat_body["options"]["num_ctx"] == 8192
+
+
+@pytest.mark.asyncio
 async def test_ollama_generate_forwards_native_think_flag():
     mock_response = MagicMock()
     mock_response.status_code = 200
