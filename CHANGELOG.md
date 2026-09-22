@@ -37,6 +37,10 @@
   the real function.
 
 ### Changed
+- **Stress and soak name the provider they call.** The cloud and local
+  load paths took `object` and silenced `generate` with a type ignore.
+  They now take `BaseProvider`, the type every inference backend
+  implements.
 - **`load.py` and `benchmark.py` split on their oversized commands.** `soak`,
   `scenario`, `compare`, `sweep`, and `labcompare` are their own modules;
   `load.py` keeps stress / capacity / baselines and `benchmark.py` keeps

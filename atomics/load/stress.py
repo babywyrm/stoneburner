@@ -11,6 +11,8 @@ from dataclasses import dataclass, field
 
 import httpx
 
+from atomics.load.profiles import TargetProfile
+from atomics.providers.base import BaseProvider
 from atomics.providers.ollama import DEFAULT_NUM_CTX
 from atomics.reporting.stats import percentile as _percentile
 from atomics.validation import validate_endpoint_url
@@ -279,12 +281,12 @@ async def run_stress(
 
 
 async def _single_request_provider(
-    provider: object,
+    provider: BaseProvider,
     prompt: str,
     num_predict: int,
 ) -> tuple[int, int, float, float, float]:
     """Fire one request via BaseProvider. Returns (out_tokens, in_tokens, latency_ms, tps, cost)."""
-    resp = await provider.generate(prompt, max_tokens=num_predict)  # type: ignore[attr-defined]
+    resp = await provider.generate(prompt, max_tokens=num_predict)
     tps = resp.tokens_per_second
     if tps is None and resp.output_tokens > 0 and resp.latency_ms > 0:
         tps = resp.output_tokens / (resp.latency_ms / 1000)
@@ -298,7 +300,7 @@ async def _single_request_provider(
 
 
 async def _run_phase_provider(
-    provider: object,
+    provider: BaseProvider,
     concurrency: int,
     duration_seconds: float,
     num_predict: int,
@@ -341,7 +343,7 @@ async def _run_phase_provider(
 
 
 async def run_stress_provider(
-    provider: object,
+    provider: BaseProvider,
     model: str = "",
     max_concurrency: int = 8,
     phase_seconds: float = 15.0,
@@ -383,15 +385,14 @@ async def run_stress_provider(
 
 async def _run_phase_profile(
     client: httpx.AsyncClient,
-    profile: object,
+    profile: TargetProfile,
     concurrency: int,
     duration_seconds: float,
 ) -> ConcurrencyResult:
     """Run profile-based requests at a given concurrency for a fixed duration."""
-    from atomics.load.profiles import TargetProfile, _single_request_profile
+    from atomics.load.profiles import _single_request_profile
 
-    tp: TargetProfile = profile  # type: ignore[assignment]
-    prompts = tp.prompts or list(STRESS_PROMPTS)
+    prompts = profile.prompts or list(STRESS_PROMPTS)
 
     result = ConcurrencyResult(concurrency=concurrency)
     start = time.monotonic()
@@ -403,7 +404,7 @@ async def _run_phase_profile(
             prompt = prompts[prompt_idx % len(prompts)]
             prompt_idx += 1
             try:
-                _text, lat_ms, _cls = await _single_request_profile(client, tp, prompt)
+                _text, lat_ms, _cls = await _single_request_profile(client, profile, prompt)
                 result.requests += 1
                 result.latencies.append(lat_ms)
             except Exception:
@@ -424,31 +425,28 @@ async def _run_phase_profile(
 
 
 async def run_stress_profile(
-    profile: object,
+    profile: TargetProfile,
     max_concurrency: int = 8,
     phase_seconds: float = 15.0,
     on_phase: Callable[[object], None] | None = None,
 ) -> StressResult:
     """Stress test against a custom target profile — ramp concurrency."""
-    from atomics.load.profiles import TargetProfile
-
-    tp: TargetProfile = profile  # type: ignore[assignment]
-    host = tp.ollama_host if tp.type == "ollama" else tp.http_url
+    host = profile.ollama_host if profile.type == "ollama" else profile.http_url
     host = validate_endpoint_url(host, label="profile host")
 
     result = StressResult(
-        model=tp.model,
+        model=profile.model,
         host=host,
-        provider=f"profile:{tp.type}",
+        provider=f"profile:{profile.type}",
     )
 
     t0 = time.monotonic()
-    timeout = max(float(tp.http_timeout), 120.0) if tp.type == "http" else 300.0
+    timeout = max(float(profile.http_timeout), 120.0) if profile.type == "http" else 300.0
 
     async with httpx.AsyncClient(timeout=httpx.Timeout(timeout)) as client:
         conc = 1
         while conc <= max_concurrency:
-            phase = await _run_phase_profile(client, tp, conc, phase_seconds)
+            phase = await _run_phase_profile(client, profile, conc, phase_seconds)
             result.phases.append(phase)
             result.total_requests += phase.requests
             result.total_failed += phase.failed
