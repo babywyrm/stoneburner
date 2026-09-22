@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+## 0.23.1 (2026-09-21) — Bounded Ollama context
+
+### Upgrade notes
+- **Ollama sends `num_ctx` 8192 when the caller does not set a context.**
+  A run that depended on the model's full window must pass
+  `context_tokens`. An explicit value, including a larger window, still
+  wins. `granite4.2:30b` at the old default allocated a 52 GiB runner on
+  a 64 GiB machine. With the cap it loaded at context 8192 and 18.7 GiB.
+- **`battery run` exits nonzero when a step fails.** That includes the
+  end of a `--keep-going` run. A battery whose every step was
+  `infrastructure_invalid` used to exit 0.
+- **Local endpoint URLs must be `http` or `https`, with no embedded
+  credentials.** Settings fallbacks, raw stress, soak, contention,
+  scenario, QA, and target profiles are checked, not only the host flags.
+  `file://` and `user:pass@host` fail before a request is sent.
+
 ### Fixed
 - **Ollama requests send `num_ctx` 8192 unless the caller sets a context.**
   Omitting it lets Ollama use the model's full window. `granite4.2:30b` at
