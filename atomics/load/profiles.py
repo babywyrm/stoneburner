@@ -59,6 +59,18 @@ class TargetProfile:
             raise ProfileError(f"Profile '{self.name}': ollama type requires ollama.host")
         if self.type == "http" and not self.http_url:
             raise ProfileError(f"Profile '{self.name}': http type requires http.url")
+        from atomics.validation import validate_endpoint_url
+
+        endpoint = self.ollama_host if self.type == "ollama" else self.http_url
+        label = "ollama.host" if self.type == "ollama" else "http.url"
+        try:
+            cleaned = validate_endpoint_url(endpoint, label=label)
+        except ValueError as exc:
+            raise ProfileError(str(exc)) from exc
+        if self.type == "ollama":
+            self.ollama_host = cleaned
+        else:
+            self.http_url = cleaned
 
 
 def load_profile(path: str) -> TargetProfile:
@@ -199,6 +211,9 @@ async def _single_request_profile(
     t0 = time.monotonic()
 
     if profile.type == "ollama":
+        from atomics.validation import validate_endpoint_url
+
+        host = validate_endpoint_url(profile.ollama_host, label="ollama.host")
         body: dict = {
             "model": profile.model,
             "prompt": prompt,
@@ -211,7 +226,7 @@ async def _single_request_profile(
             body["options"]["temperature"] = profile.temperature
 
         resp = await client.post(
-            f"{profile.ollama_host.rstrip('/')}/api/generate",
+            f"{host}/api/generate",
             json=body,
             timeout=300.0,
         )
@@ -222,12 +237,15 @@ async def _single_request_profile(
         latency_ms = (server_lat / 1e6) if server_lat else (time.monotonic() - t0) * 1000
 
     elif profile.type == "http":
+        from atomics.validation import validate_endpoint_url
+
+        url = validate_endpoint_url(profile.http_url, label="http.url")
         rendered = render_body(profile, prompt)
         headers = dict(profile.http_headers)
 
         if profile.http_method == "GET":
             resp = await client.get(
-                profile.http_url,
+                url,
                 headers=headers,
                 timeout=float(profile.http_timeout),
             )
@@ -236,7 +254,7 @@ async def _single_request_profile(
                 headers["Content-Type"] = "application/json"
             resp = await client.request(
                 profile.http_method,
-                profile.http_url,
+                url,
                 content=rendered,
                 headers=headers,
                 timeout=float(profile.http_timeout),

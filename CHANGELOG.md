@@ -11,6 +11,13 @@
   still wins. The provider was not the only poster: `qa`, stress, and
   ollama target profiles build `/api/generate` themselves and now send
   the same cap.
+- **Local endpoint URLs are checked wherever a request is built.**
+  `make_provider` checked a host flag and then used `settings` when the
+  flag was absent, so a credentialed or non-HTTP `ollama_host`,
+  `vllm_host`, `llamacpp_host`, or `brain_gateway_url` was sent as-is.
+  Stress, soak, contention, scenario, raw QA, and target profiles never
+  called that check at all. They now use the same `http`/`https` rules
+  before any request, including a settings URL with no flag.
 - **`qa --profile --fail-fast` reports the stop.** The model and host
   names were assigned only in raw Ollama mode, so a profile run that
   stopped on the first failure raised `UnboundLocalError` instead of

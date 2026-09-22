@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 import httpx
 
 from atomics.reporting.stats import percentile as _percentile
+from atomics.validation import validate_endpoint_url
 
 
 @dataclass
@@ -117,6 +118,7 @@ async def run_contention(
     Phase 1: Each model runs solo to establish a baseline TPS.
     Phase 2: All models run simultaneously to measure contention degradation.
     """
+    host = validate_endpoint_url(host, label="ollama host")
     result = ContentionResult(host=host, models=list(models), phase_seconds=phase_seconds)
     t0 = time.monotonic()
 

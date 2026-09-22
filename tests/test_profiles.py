@@ -32,6 +32,14 @@ class TestTargetProfile:
         assert p.type == "http"
         assert p.http_method == "POST"
 
+    def test_http_rejects_embedded_credentials(self):
+        with pytest.raises(ProfileError, match="embedded credentials"):
+            TargetProfile(
+                name="bad",
+                type="http",
+                http_url="http://user:pass@gate.example/ask",
+            )
+
     def test_invalid_type(self):
         with pytest.raises(ProfileError, match="must be 'ollama' or 'http'"):
             TargetProfile(name="bad", type="grpc")

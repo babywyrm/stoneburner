@@ -189,6 +189,9 @@ async def _query_ollama(
     from atomics.benchmark.model_classes import supports_thinking
     from atomics.providers.effort import ollama_think_value
     from atomics.providers.ollama import DEFAULT_NUM_CTX, _visible_and_thinking
+    from atomics.validation import validate_endpoint_url
+
+    host = validate_endpoint_url(host, label="ollama host")
 
     auto = thinking if thinking is not None else supports_thinking(model)
     think_field = ollama_think_value(thinking=auto, effort=effort, model=model)
@@ -253,6 +256,10 @@ async def run_qa_suite(
     The profile handles endpoint URL, auth headers, body template, and response
     extraction — keeping all sensitive connection details out of fixture files.
     """
+    if profile is None:
+        from atomics.validation import validate_endpoint_url
+
+        host = validate_endpoint_url(host, label="ollama host")
     suite = QASuiteResult(model=model, host=host)
     t0 = time.monotonic()
 

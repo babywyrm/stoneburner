@@ -136,6 +136,9 @@ async def run_soak(
     import httpx
 
     from atomics.load.stress import STRESS_PROMPTS, _get_vram_used_mb, _single_request
+    from atomics.validation import validate_endpoint_url
+
+    host = validate_endpoint_url(host, label="ollama host")
 
     result = SoakResult(
         model=model,
@@ -416,6 +419,9 @@ async def run_soak_profile(
         prompts = list(STRESS_PROMPTS)
 
     host = tp.ollama_host if tp.type == "ollama" else tp.http_url
+    from atomics.validation import validate_endpoint_url
+
+    host = validate_endpoint_url(host, label="profile host")
     result = SoakResult(
         model=tp.model,
         host=host,
