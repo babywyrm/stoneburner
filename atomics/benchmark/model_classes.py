@@ -289,7 +289,15 @@ def classify_model(model_id: str) -> ModelClass:
     mapped = MODEL_CLASS_MAP.get(model_id)
     if mapped is not None:
         return mapped
-    return _class_from_parameter_tag(model_id) or ModelClass.UNKNOWN
+    sized = _class_from_parameter_tag(model_id)
+    if sized is not None:
+        return sized
+    # laguna's published tags are `laguna-xs-2.1:latest` — no `:33b`. XS is
+    # 33B total / 3B active (~20GB); S is 118B. Both sit with the heavy local
+    # cohort. Class follows total weights, same as `35b-a3b`, not active params.
+    if model_id.startswith("laguna"):
+        return ModelClass.HEAVY
+    return ModelClass.UNKNOWN
 
 
 def get_models_for_class(cls: ModelClass) -> list[str]:

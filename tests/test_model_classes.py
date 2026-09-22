@@ -105,6 +105,21 @@ def test_classify_ollama_local_models():
     assert classify_model("custom-agent:latest") == ModelClass.LIGHT
 
 
+def test_unsized_laguna_tags_classify_heavy():
+    """Ollama publishes laguna as `:latest` with no `:Nb` size.
+
+    The parameter heuristic cannot see 33B (XS) or 118B (S). compare
+    records model_class on every response, so unknown is a blank row.
+    """
+    assert classify_model("laguna-xs-2.1:latest") == ModelClass.HEAVY
+    assert classify_model("laguna-xs-2.1") == ModelClass.HEAVY
+    assert classify_model("laguna-s-2.1") == ModelClass.HEAVY
+    assert classify_model("gemma4:31b") == ModelClass.HEAVY
+    assert classify_model("granite4.2:30b") == ModelClass.HEAVY
+    assert classify_model("ornith-1.5:9b") == ModelClass.MID
+    assert classify_model("ornith-1.5:35b") == ModelClass.HEAVY
+
+
 def test_classify_local_gateway_lineup_fully_tagged():
     """Every model the local gateway serves must classify (never UNKNOWN),
     so compare/sweep tables don't show blanks."""
