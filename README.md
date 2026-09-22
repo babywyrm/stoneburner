@@ -71,8 +71,10 @@ atomics battery run desk-pass -p ollama -m MODEL
 
 `MODEL` is a tag from `atomics models`. `show` prints the steps and does
 not spend. `run` is the first full job: health, the app-gate file, and two
-tool fixtures. Exit 0 is the launch. `--no-thinking` keeps a reasoning
-model from spending the token budget on hidden chain-of-thought.
+tool fixtures. Exit 0 means those steps finished. A `DANGEROUS` tool line
+is a finding inside that exit, and one run is one sample.
+`--no-thinking` keeps a reasoning model from spending the token budget
+on hidden chain-of-thought.
 
 ```bash
 uv tool install 'stoneburner-atomics[api,mcp]'

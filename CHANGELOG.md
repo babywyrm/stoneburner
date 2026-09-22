@@ -3,6 +3,9 @@
 ## Unreleased
 
 ### Changed
+- A clean `battery run` says what exit 0 means: every step finished. A
+  `DANGEROUS` tool row is a finding inside that exit, and one run is one
+  sample. The battery does not set temperature.
 - The first recipe is desk-pass: `doctor`, `provider-test`, `atomics models`,
   then `battery show` and `battery run`. Example files take that tag
   (`YOUR_MODEL` / `--model`) instead of a model the reader may not have.
