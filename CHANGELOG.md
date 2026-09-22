@@ -8,7 +8,9 @@
   131072 tokens allocated a 52 GiB runner on a 64 GiB machine and the box
   started swapping. 8192 is the context archreview already uses for an
   Ollama judge. An explicit `context_tokens`, including a larger window,
-  still wins.
+  still wins. The provider was not the only poster: `qa`, stress, and
+  ollama target profiles build `/api/generate` themselves and now send
+  the same cap.
 - **`laguna` classifies heavy without a size tag.** Ollama publishes
   `laguna-xs-2.1:latest`, so the `:Nb` heuristic returned `unknown` and
   `compare` recorded a blank class. XS is 33B total and S is 118B; both

@@ -2,7 +2,8 @@
 
 Supports two modes:
 - ``ollama``: Hit Ollama /api/generate with a custom system prompt, temperature,
-  and num_predict.  Simulates what an app sends to the inference backend.
+  num_predict, and a bounded ``num_ctx``.  Simulates what an app sends to the
+  inference backend.
 - ``http``: Hit any arbitrary HTTP endpoint (Flask, Spring, MCP JSON-RPC, …)
   with full control over method, headers, body template, and response parsing.
 """
@@ -16,6 +17,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import httpx
+
+from atomics.providers.ollama import DEFAULT_NUM_CTX
 
 
 class ProfileError(ValueError):
@@ -200,7 +203,7 @@ async def _single_request_profile(
             "model": profile.model,
             "prompt": prompt,
             "stream": False,
-            "options": {"num_predict": profile.num_predict},
+            "options": {"num_predict": profile.num_predict, "num_ctx": DEFAULT_NUM_CTX},
         }
         if profile.system_prompt:
             body["system"] = profile.system_prompt

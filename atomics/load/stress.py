@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 
 import httpx
 
+from atomics.providers.ollama import DEFAULT_NUM_CTX
 from atomics.reporting.stats import percentile as _percentile
 
 STRESS_PROMPTS = [
@@ -164,7 +165,7 @@ async def _single_request(
             "model": model,
             "prompt": prompt,
             "stream": False,
-            "options": {"num_predict": num_predict},
+            "options": {"num_predict": num_predict, "num_ctx": DEFAULT_NUM_CTX},
         },
         timeout=300.0,
     )

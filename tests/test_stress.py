@@ -23,6 +23,29 @@ def test_percentile_single():
     assert _percentile([42.0], 50) == 42.0
 
 
+@pytest.mark.asyncio
+async def test_stress_request_sends_bounded_context() -> None:
+    """Stress posts /api/generate itself, so the provider cap does not apply."""
+    from atomics.providers.ollama import DEFAULT_NUM_CTX
+    from atomics.stress import _single_request
+
+    mock_response = MagicMock()
+    mock_response.raise_for_status = MagicMock()
+    mock_response.json.return_value = {
+        "eval_count": 4,
+        "prompt_eval_count": 2,
+        "eval_duration": 1_000_000_000,
+        "total_duration": 2_000_000,
+    }
+    client = AsyncMock()
+    client.post = AsyncMock(return_value=mock_response)
+
+    await _single_request(client, "http://fake:11434", "granite4.2:30b", "hi", 64)
+    body = client.post.call_args.kwargs["json"]
+    assert body["options"]["num_ctx"] == DEFAULT_NUM_CTX
+    assert body["options"]["num_predict"] == 64
+
+
 def test_percentile_p50():
     assert _percentile([1.0, 2.0, 3.0, 4.0, 5.0], 50) == 3.0
 
