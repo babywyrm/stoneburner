@@ -272,8 +272,8 @@ commit. `RELEASING.md`.
 Nothing user-visible is scheduled. Do not invent HTTP MCP.
 
 Suite convergence is done. `rag.py`, `load.py`, and `benchmark.py` are
-split, no command module is over 500 lines, and the `results` alias is
-in place. Do not reopen it to warm up.
+split. `admin.py` and `rag.py` are still over 500 lines. Do not reopen
+the split to chase that number. The `results` alias is in place.
 
 Think prefixes for laguna and ornith are in. New families still need a
 live generate before a prefix: a level, a bool, or neither. Do not key

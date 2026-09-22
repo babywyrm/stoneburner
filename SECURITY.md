@@ -147,9 +147,14 @@ use `--show` to reveal.
 
 ## URL validation
 
-All `--ollama-host`, `--vllm-host`, `--judge-host`, and `--host` endpoints are
-validated to require `http://` or `https://` schemes. Embedded credentials,
-`file://` URIs, and path traversal are rejected.
+Endpoint URLs must be `http://` or `https://`. Embedded credentials, `file://`,
+and path traversal are rejected.
+
+That check runs on `--ollama-host`, `--vllm-host`, `--judge-host`, and `--host`,
+and on the settings value used when the flag is omitted (`ollama_host`,
+`vllm_host`, `llamacpp_host`, `brain_gateway_url`). Raw stress, soak,
+contention, scenario, and QA posts use it too, as do ollama and http target
+profiles. A bad URL fails before a request is sent.
 
 ## API server exposure
 
