@@ -834,3 +834,13 @@ async def test_qa_ollama_sends_bounded_context() -> None:
     body = client.post.call_args.kwargs["json"]
     assert body["options"]["num_ctx"] == DEFAULT_NUM_CTX
     assert body["options"]["num_predict"] == 32
+
+
+@pytest.mark.asyncio
+async def test_qa_ollama_refuses_a_non_http_host() -> None:
+    from atomics.qa_runner import _query_ollama
+
+    client = AsyncMock()
+    with pytest.raises(ValueError, match="unsupported scheme"):
+        await _query_ollama(client, "file:///etc/passwd", "m", "hi")
+    client.post.assert_not_called()

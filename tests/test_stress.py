@@ -24,6 +24,12 @@ def test_percentile_single():
 
 
 @pytest.mark.asyncio
+async def test_stress_refuses_a_non_http_host() -> None:
+    with pytest.raises(ValueError, match="unsupported scheme"):
+        await run_stress(host="file:///etc/passwd", max_concurrency=1, phase_seconds=0.1)
+
+
+@pytest.mark.asyncio
 async def test_stress_request_sends_bounded_context() -> None:
     """Stress posts /api/generate itself, so the provider cap does not apply."""
     from atomics.providers.ollama import DEFAULT_NUM_CTX

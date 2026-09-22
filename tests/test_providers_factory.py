@@ -101,6 +101,27 @@ def test_caller_supplied_labels_reach_the_error_message() -> None:
     assert str(excinfo.value).startswith("--my-flag:")
 
 
+@pytest.mark.parametrize(
+    "name",
+    ["ollama", "vllm", "llamacpp", "brain-gateway"],
+)
+def test_settings_endpoint_is_validated(monkeypatch: pytest.MonkeyPatch, name: str) -> None:
+    """A URL from settings is the request target when no flag was passed."""
+    monkeypatch.setattr("atomics.inference.load_control_file", lambda path=None: None)
+    settings = SimpleNamespace(
+        ollama_host="http://user:pass@127.0.0.1:11434",
+        ollama_model="m",
+        ollama_timeout=1,
+        vllm_host="http://user:pass@127.0.0.1:8000/v1",
+        vllm_model="m",
+        vllm_timeout=1,
+        llamacpp_host="http://user:pass@127.0.0.1:8080",
+        brain_gateway_url="http://user:pass@127.0.0.1:8080",
+    )
+    with pytest.raises(ProviderConfigError, match="embedded credentials"):
+        make_provider(name, None, None, settings)
+
+
 def test_ollama_uses_control_file_when_host_and_model_unset(tmp_path, monkeypatch):
     from atomics.config import AtomicsSettings
     from atomics.providers.ollama import OllamaProvider

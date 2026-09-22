@@ -84,6 +84,12 @@ def make_provider(
         except ValueError as exc:
             raise ProviderConfigError(str(exc)) from exc
 
+    def _endpoint(url: str, *, label: str) -> str:
+        try:
+            return validate_endpoint_url(url, label=label)
+        except ValueError as exc:
+            raise ProviderConfigError(str(exc)) from exc
+
     if name == "claude":
         if not settings.anthropic_api_key:
             raise ProviderConfigError("ANTHROPIC_API_KEY not set. Export it or add to .env")
@@ -115,7 +121,7 @@ def make_provider(
         from atomics.providers.vllm import VllmProvider
 
         return VllmProvider(
-            base_url=vllm_host or settings.vllm_host,
+            base_url=_endpoint(vllm_host or settings.vllm_host, label=vllm_host_label),
             default_model=model or settings.vllm_model,
             timeout=inference_timeout or settings.vllm_timeout,
         )
@@ -123,14 +129,14 @@ def make_provider(
         from atomics.providers.brain_gateway import BrainGatewayProvider
 
         return BrainGatewayProvider(
-            url=host or settings.brain_gateway_url,
+            url=_endpoint(host or settings.brain_gateway_url, label=host_label),
             default_model=model,
         )
     if name == "ollama":
         from atomics.providers.ollama import OllamaProvider
 
         return OllamaProvider(
-            host=host or settings.ollama_host,
+            host=_endpoint(host or settings.ollama_host, label=host_label),
             default_model=model or settings.ollama_model,
             timeout=inference_timeout or settings.ollama_timeout,
             context_tokens=context_tokens,
@@ -139,7 +145,7 @@ def make_provider(
         from atomics.providers.llamacpp import LlamaCppProvider
 
         return LlamaCppProvider(
-            base_url=host or settings.llamacpp_host,
+            base_url=_endpoint(host or settings.llamacpp_host, label=host_label),
             default_model=model or "local",
         )
     if name == "groq":

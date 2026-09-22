@@ -22,6 +22,7 @@ from atomics.load.scenario_models import (
 )
 from atomics.load.scenario_prompts import resolve_prompts
 from atomics.load.stress import _single_request
+from atomics.validation import validate_endpoint_url
 
 if TYPE_CHECKING:
     from atomics.load.profiles import TargetProfile
@@ -117,6 +118,7 @@ async def run_scenario(
     3. Run all workloads concurrently
     4. Compute interference factors
     """
+    host = validate_endpoint_url(host, label="ollama host")
     loaded_profiles: dict[str, TargetProfile] = {}
     for spec in specs:
         if spec.profile:

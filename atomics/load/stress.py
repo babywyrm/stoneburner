@@ -13,6 +13,7 @@ import httpx
 
 from atomics.providers.ollama import DEFAULT_NUM_CTX
 from atomics.reporting.stats import percentile as _percentile
+from atomics.validation import validate_endpoint_url
 
 STRESS_PROMPTS = [
     (
@@ -159,6 +160,7 @@ async def _single_request(
     num_predict: int,
 ) -> tuple[int, int, float, float]:
     """Fire one request. Returns (output_tokens, input_tokens, latency_ms, tps)."""
+    host = validate_endpoint_url(host, label="ollama host")
     resp = await client.post(
         f"{host}/api/generate",
         json={
@@ -231,6 +233,7 @@ async def run_stress(
     on_phase: Callable[[object], None] | None = None,
 ) -> StressResult:
     """Ramp concurrency from 1 to max_concurrency, spending phase_seconds at each level."""
+    host = validate_endpoint_url(host, label="ollama host")
     gpu_name, vram_total = _get_gpu_info()
     result = StressResult(
         model=model,
@@ -431,6 +434,7 @@ async def run_stress_profile(
 
     tp: TargetProfile = profile  # type: ignore[assignment]
     host = tp.ollama_host if tp.type == "ollama" else tp.http_url
+    host = validate_endpoint_url(host, label="profile host")
 
     result = StressResult(
         model=tp.model,
