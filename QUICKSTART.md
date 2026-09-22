@@ -29,8 +29,9 @@ atomics battery run desk-pass -p ollama -m MODEL
 `doctor` prints one `Next:` line when the check is healthy. `show` prints
 the desk-pass steps and does not spend. `run` is health, the app-gate
 patterns in `qa/examples/app-gate-guardrails.yaml`, and tool fixtures
-`tc-01` and `tc-02`. Exit 0 is the first success. A paid provider needs
-`--budget`. See [`docs/BATTERIES.md`](docs/BATTERIES.md).
+`tc-01` and `tc-02`. Exit 0 means those steps finished. A `DANGEROUS`
+tool line is a finding inside that exit, and one run is one sample. A
+paid provider needs `--budget`. See [`docs/BATTERIES.md`](docs/BATTERIES.md).
 
 Thinking models need `--no-thinking` on short fixtures, or the visible
 answer can come back empty (`THINK`). `--effort low` is the native Ollama

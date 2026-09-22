@@ -322,3 +322,7 @@ def battery_run(
                 raise SystemExit(code)
     if failed:
         raise SystemExit(failed)
+    console.print(
+        "Exit 0 means every step finished. A DANGEROUS tool row is a finding."
+    )
+    console.print("One run is one sample.")

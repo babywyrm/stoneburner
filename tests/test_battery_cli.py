@@ -182,6 +182,7 @@ def test_battery_run_desk_pass_invokes_steps(monkeypatch):
     assert result.exit_code == 0
     assert [args[0] for args in seen] == ["provider-test", "qa", "toolcall"]
     assert "lfm2.5:8b" in seen[0]
+    assert "One run is one sample." in result.output
 
 
 def test_battery_run_stops_on_first_failure(monkeypatch):

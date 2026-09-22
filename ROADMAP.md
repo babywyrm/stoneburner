@@ -272,7 +272,21 @@ Current package is **0.23.1** — bounded Ollama context. Do not retag
 `v0.22.5`, `v0.21.0`, or `v0.20.0`. Do not mix a feature into a tag
 commit. `RELEASING.md`.
 
-Nothing user-visible is scheduled. Do not invent HTTP MCP.
+A unit test cannot see a live generate. Two holes stay open:
+
+- A second local backend (vLLM, llama.cpp, or brain-gateway) has no
+  generate on record. CI proves URL rejection.
+- `gemma4:26b` blue-capability (this laptop, 2026-09-21, runs=1,
+  judge `granite4.2:8b`) is one local judge. A second judge on that
+  battery is still open. The local judge is soft.
+
+Desk-pass on `granite4.2:3b` (this laptop, 2026-09-21, three runs,
+`--no-thinking`, `num_ctx` 8192) held exit 0 and qa 6/6. The tool row
+did not: `tc-02` called `run_command` every time, and `tc-01` was a
+no-call, then `read_file`, then a no-call. The battery does not set
+temperature. Exit 0 means the steps finished.
+
+Do not invent HTTP MCP.
 
 Suite convergence is done. `rag.py`, `load.py`, and `benchmark.py` are
 split. `admin.py` and `rag.py` are still over 500 lines. Do not reopen
