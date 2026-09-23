@@ -10,8 +10,15 @@
   Two of three judges called that a false positive. A capped answer with
   fewer than 64 visible tokens after reasoning is now `thinking_budget`
   and not scored. A capped answer with a real body is `truncated` and
-  still scored. Codereview, refusal, and adversarial read this. Red/blue
-  and the older suites do not read provider outcomes yet.
+  still scored.
+- **Every judged suite skips a reply cut off during reasoning.** Red/blue,
+  eval, RAG, multiturn, codegen, the toolcall prose twin, and
+  `judge-agreement` judged whatever text came back. They now record
+  `thinking_budget`, send nothing to the judge, and count the fixture as
+  a generation failure, not an infrastructure failure. The headline goes
+  to `n/a (scored/total)` instead of averaging in a judged heading. The
+  toolcall tool channel does not read the cap yet: a model that reasons
+  past the cap without calling a tool still scores `no_call`.
 
 ### Changed
 - A sweep log line carries the number. Toolcall is

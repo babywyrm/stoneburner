@@ -17,6 +17,7 @@ from atomics.eval.judge import (
     score_consensus,
     score_response,
 )
+from atomics.eval.provider_attempt import unscorable_outcome
 from atomics.models import TaskCategory, TaskResult, TaskStatus
 from atomics.providers.base import BaseProvider
 from atomics.validation import sanitize_error
@@ -260,6 +261,17 @@ async def run_eval(
             continue
 
         task_result.completed_at = datetime.now(UTC)
+
+        skipped = unscorable_outcome(resp)
+        if skipped is not None:
+            task_result.status = TaskStatus.FAILED
+            task_result.error_class = skipped.kind.value
+            task_result.error_message = skipped.kind.value
+            fr = FixtureResult(fixture=fixture, task_result=task_result, judge=None)
+            fixture_results.append(fr)
+            logger.warning("[eval] %s not judged: %s", fixture.id, skipped.kind.value)
+            await _call_hook(on_fixture_done, fr)
+            continue
 
         judge_tag = judge_model or getattr(judge_provider, "default_model", None)
         await _call_hook(on_phase, fixture.id, "judge", judge_tag)

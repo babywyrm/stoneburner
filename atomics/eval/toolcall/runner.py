@@ -38,6 +38,7 @@ from atomics.eval.attempt_serialization import integrity_to_dict
 from atomics.eval.consensus import NumericVote, combine_numeric
 from atomics.eval.judge import detect_self_judge
 from atomics.eval.outcomes import RunIntegrity
+from atomics.eval.provider_attempt import unscorable_outcome
 from atomics.eval.runner import _call_hook
 from atomics.eval.suite_integrity import fixture_outcome, integrity_of
 from atomics.eval.toolcall.catalog import PROBE_PROMPT, PROBE_TOOL, schemas_for
@@ -554,6 +555,8 @@ async def _run_once(
 
         record["cost_usd"] += prose.estimated_cost_usd
         record["prose_text"] = prose.text
+        if unscorable_outcome(prose) is not None:
+            return record
         if judge_provider is not None and prose.text.strip():
             judge_tag = judge_model or getattr(judge_provider, "default_model", None)
             await _call_hook(on_phase, fixture.id, "judge", judge_tag)
