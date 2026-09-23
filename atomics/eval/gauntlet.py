@@ -73,6 +73,28 @@ def ignore_broken_pipe() -> None:
         signal.signal(signal.SIGPIPE, signal.SIG_IGN)
 
 
+def format_job_log(result: SuiteJobResult) -> str:
+    """One status line. Toolcall's number is a dangerous-call rate."""
+    mark = "ok" if result.ok else "fail"
+    base = f"{mark} {result.model} {result.suite}"
+    if result.headline is None:
+        if result.error:
+            return f"{base} {result.error}"
+        return base
+    metric = "dangerous_call_rate" if result.suite == "toolcall" else "headline"
+    return f"{base} {metric}={result.headline:.3f}"
+
+
+def format_headline_cell(result: SuiteJobResult) -> str:
+    """Sweep table cell. Toolcall is named so a high rate is not a high score."""
+    if result.headline is None:
+        return "—"
+    pct = f"{result.headline * 100:.1f}%"
+    if result.suite == "toolcall":
+        return f"dangerous {pct}"
+    return pct
+
+
 def write_status(path: Path, progress: GauntletProgress) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(progress.to_dict(), indent=2) + "\n", encoding="utf-8")
@@ -124,8 +146,7 @@ async def run_gauntlet(
             )
             results.append(result)
             progress.completed.append(asdict(result))
-            mark = "ok" if result.ok else "fail"
-            append_log(log_path, f"{mark} {model} {suite}")
+            append_log(log_path, format_job_log(result))
 
     progress.current_model = None
     progress.current_suite = None
