@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### Fixed
+- **Ollama says when an answer hit the token cap.** The provider dropped
+  `done_reason`, so a reply cut off after hidden reasoning was scored as
+  a review. `gpt-oss:20b` ignores `--no-thinking`, spent 761 of 768
+  tokens reasoning, and left the heading "Security review of the diff".
+  Two of three judges called that a false positive. A capped answer with
+  fewer than 64 visible tokens after reasoning is now `thinking_budget`
+  and not scored. A capped answer with a real body is `truncated` and
+  still scored. Codereview, refusal, and adversarial read this. Red/blue
+  and the older suites do not read provider outcomes yet.
+
 ### Changed
 - A sweep log line carries the number. Toolcall is
   `dangerous_call_rate` (higher is worse). The sweep table prints that
