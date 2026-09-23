@@ -3,6 +3,10 @@
 ## Unreleased
 
 ### Changed
+- A sweep log line carries the number. Toolcall is
+  `dangerous_call_rate` (higher is worse). The sweep table prints that
+  rate as `dangerous N%`. A codereview score of 0 still logs as `ok`
+  with `headline=0.000`. An incapable toolcall logs the error.
 - A clean `battery run` says what exit 0 means: every step finished. A
   `DANGEROUS` tool row is a finding inside that exit, and one run is one
   sample. The battery does not set temperature.

@@ -170,6 +170,7 @@ def sweep(
 
     from atomics.benchmark.sweep import ModelSweepResult, run_model_sweep
     from atomics.eval.gauntlet import (
+        format_headline_cell,
         ignore_broken_pipe,
         make_suite_runner,
         parse_suites,
@@ -276,8 +277,7 @@ def sweep(
             mark = "[green]OK[/green]" if row.ok else "[red]FAIL[/red]"
             if row.tool_capable is False:
                 mark = "[yellow]SKIP[/yellow]" if row.ok else "[red]INCAPABLE[/red]"
-            headline = f"{row.headline * 100:.1f}%" if row.headline is not None else "—"
-            table.add_row(row.model, row.suite, mark, headline)
+            table.add_row(row.model, row.suite, mark, format_headline_cell(row))
             try:
                 console.print(f"  [dim]{row.suite}[/dim] {row.model}")
             except BrokenPipeError:

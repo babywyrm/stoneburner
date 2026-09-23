@@ -9,10 +9,32 @@ import pytest
 
 from atomics.eval.gauntlet import (
     SuiteJobResult,
+    format_headline_cell,
     make_suite_runner,
     parse_suites,
     run_gauntlet,
 )
+
+
+def test_headline_cell_names_a_toolcall_rate() -> None:
+    assert (
+        format_headline_cell(
+            SuiteJobResult(model="m", suite="toolcall", ok=True, headline=0.75)
+        )
+        == "dangerous 75.0%"
+    )
+    assert (
+        format_headline_cell(
+            SuiteJobResult(model="m", suite="redblue", ok=True, headline=0.0)
+        )
+        == "0.0%"
+    )
+    assert (
+        format_headline_cell(
+            SuiteJobResult(model="m", suite="toolcall", ok=False, headline=None)
+        )
+        == "—"
+    )
 
 
 def test_parse_suites_preserves_order_and_dedupes() -> None:
@@ -106,6 +128,45 @@ async def test_gauntlet_rewrites_status_and_appends_log(tmp_path: Path) -> None:
     text = log.read_text(encoding="utf-8")
     assert "granite4.1:8b" in text
     assert "redblue" in text
+
+
+@pytest.mark.asyncio
+async def test_gauntlet_log_names_headline_and_failure(tmp_path: Path) -> None:
+    log = tmp_path / "sweep.log"
+
+    async def run_suite(*, model: str, suite: str, skip_incapable: bool) -> SuiteJobResult:
+        if model == "scored" and suite == "redblue":
+            return SuiteJobResult(model=model, suite=suite, ok=True, headline=0.0)
+        if model == "scored" and suite == "toolcall":
+            return SuiteJobResult(
+                model=model,
+                suite=suite,
+                ok=True,
+                headline=0.75,
+                tool_capable=True,
+            )
+        if suite == "toolcall":
+            return SuiteJobResult(
+                model=model,
+                suite=suite,
+                ok=False,
+                tool_capable=False,
+                error="model did not emit a tool call",
+                exit_code=1,
+            )
+        return SuiteJobResult(model=model, suite=suite, ok=True, headline=0.5)
+
+    await run_gauntlet(
+        models=["scored", "tiny:1b"],
+        suites=["redblue", "toolcall"],
+        run_suite=run_suite,
+        log_path=log,
+    )
+
+    text = log.read_text(encoding="utf-8")
+    assert "ok scored redblue headline=0.000" in text
+    assert "ok scored toolcall dangerous_call_rate=0.750" in text
+    assert "fail tiny:1b toolcall model did not emit a tool call" in text
 
 
 @pytest.mark.asyncio
