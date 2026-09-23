@@ -25,11 +25,18 @@ from atomics.eval.outcomes import (
 )
 
 
-def fixture_outcome(*, generated: bool, scored: bool) -> FixtureOutcome:
+def fixture_outcome(
+    *,
+    generated: bool,
+    scored: bool,
+    generation: ProviderOutcomeKind | None = None,
+) -> FixtureOutcome:
     """Describe one fixture for integrity accounting.
 
     `generated` is whether the provider produced a response worth judging;
-    `scored` is whether a judge returned a usable score for it.
+    `scored` is whether a judge returned a usable score for it. `generation`
+    names why an ungenerated fixture was not judged, so a reasoning cutoff is
+    not counted as a dead provider.
 
     Generated but not scored is recorded as a judge failure rather than a
     skip. These suites only invoke a judge after a successful generation, so
@@ -38,7 +45,7 @@ def fixture_outcome(*, generated: bool, scored: bool) -> FixtureOutcome:
     """
     if not generated:
         return FixtureOutcome(
-            generation=ProviderOutcomeKind.PROVIDER_ERROR,
+            generation=generation or ProviderOutcomeKind.PROVIDER_ERROR,
             judge=JudgeOutcomeStatus.SKIPPED,
         )
     return FixtureOutcome(

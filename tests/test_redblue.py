@@ -421,6 +421,33 @@ def test_on_run_done_fires_when_generate_fails():
     assert events == ["failed"] * (len(RED_FIXTURES) * 2)
 
 
+def test_redblue_does_not_judge_an_answer_cut_off_by_reasoning():
+    from atomics.eval.redblue.fixtures import RED_FIXTURES
+    from atomics.eval.redblue.runner import run_redblue
+    from atomics.providers.outcomes import ProviderOutcome, ProviderOutcomeKind
+
+    p = _provider(text="**Recon plan**")
+    p.generate.return_value.outcome = ProviderOutcome(
+        ProviderOutcomeKind.THINKING_BUDGET, finish_reason="length"
+    )
+    judge = _judge()
+    events: list[str] = []
+
+    def on_run(_index, _fixture, _run_number, _runs, record):
+        events.append(record["status"])
+
+    summary = asyncio.run(
+        run_redblue(p, judge_provider=judge, mode="red", on_run_done=on_run)
+    )
+
+    judge.generate.assert_not_called()
+    assert events == ["thinking_budget"] * len(RED_FIXTURES)
+    assert summary.integrity.infrastructure_failures == 0
+    assert summary.integrity.generation_failures == len(RED_FIXTURES)
+    assert summary.to_dict()["overall_quality"] is None
+    assert summary.to_dict()["fixtures"][0]["error"] == "thinking_budget"
+
+
 def test_on_run_done_awaits_async_callback():
     from atomics.eval.redblue.runner import run_redblue
 

@@ -23,6 +23,7 @@ from atomics.eval.judge import (
     score_consensus,
 )
 from atomics.eval.outcomes import RunIntegrity
+from atomics.eval.provider_attempt import recorded_outcome_kind, unscorable_outcome
 from atomics.eval.redblue.fixtures import ALL_FIXTURES, BLUE_FIXTURES, RED_FIXTURES, RedBlueFixture
 from atomics.eval.runner import _call_hook
 from atomics.eval.suite_integrity import fixture_outcome, headline_rate, integrity_of
@@ -131,6 +132,7 @@ class RedBlueSummary:
                 fixture_outcome(
                     generated=r.task_result.status is not TaskStatus.FAILED,
                     scored=r.judge is not None and not r.judge.parse_failed,
+                    generation=recorded_outcome_kind(r.task_result.error_class),
                 )
                 for r in self.results
             ]
@@ -315,6 +317,22 @@ async def run_redblue(
                     run_num,
                     runs,
                     {"score": None, "status": "failed"},
+                )
+                continue
+
+            outcome = unscorable_outcome(resp)
+            if outcome is not None:
+                task_result.status = TaskStatus.FAILED
+                task_result.error_class = outcome.kind.value
+                task_result.error_message = outcome.kind.value
+                failed_task = task_result
+                await _emit_run_done(
+                    on_run_done,
+                    idx,
+                    fixture,
+                    run_num,
+                    runs,
+                    {"score": None, "status": outcome.kind.value},
                 )
                 continue
 
