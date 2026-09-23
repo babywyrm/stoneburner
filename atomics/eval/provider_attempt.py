@@ -24,6 +24,22 @@ def provider_outcome_from_response(response: ProviderResponse) -> ProviderOutcom
     return ProviderOutcome(kind=kind, finish_reason=response.finish_reason)
 
 
+def unscorable_outcome(response: object) -> ProviderOutcome | None:
+    """The adapter's outcome when it says this reply is not worth judging."""
+    outcome = getattr(response, "outcome", None)
+    if isinstance(outcome, ProviderOutcome) and not outcome.is_scorable:
+        return outcome
+    return None
+
+
+def recorded_outcome_kind(error_class: str) -> ProviderOutcomeKind | None:
+    """Read back a kind a runner stored in `error_class` instead of an exception name."""
+    try:
+        return ProviderOutcomeKind(error_class)
+    except ValueError:
+        return None
+
+
 def build_attempt(
     *,
     attempt_index: int,

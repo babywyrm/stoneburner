@@ -73,6 +73,19 @@ class TestFixtureOutcomeMapping:
         assert outcome.generation is ProviderOutcomeKind.PROVIDER_ERROR
         assert outcome.judge is JudgeOutcomeStatus.SKIPPED
 
+    def test_a_reasoning_cutoff_is_not_a_dead_provider(self):
+        outcome = fixture_outcome(
+            generated=False,
+            scored=False,
+            generation=ProviderOutcomeKind.THINKING_BUDGET,
+        )
+        assert outcome.generation is ProviderOutcomeKind.THINKING_BUDGET
+        assert outcome.judge is JudgeOutcomeStatus.SKIPPED
+        integrity = integrity_of([outcome, fixture_outcome(generated=True, scored=True)])
+        assert integrity.infrastructure_failures == 0
+        assert integrity.generation_failures == 1
+        assert integrity.status is RunStatus.PARTIAL
+
 
 class TestIntegrityCounting:
     def test_a_clean_run_is_complete(self):
