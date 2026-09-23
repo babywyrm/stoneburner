@@ -366,6 +366,43 @@ async def test_the_reported_outcome_is_the_modal_one_across_runs():
 
 
 @pytest.mark.asyncio
+async def test_a_prose_reply_cut_off_by_reasoning_is_not_judged():
+    from unittest.mock import AsyncMock
+
+    from atomics.providers.outcomes import ProviderOutcome, ProviderOutcomeKind
+
+    class CutOff(ProbePassingProvider):
+        async def generate(self, prompt, **kwargs):
+            self.prose_requests.append(prompt)
+            return ProviderResponse(
+                text="**Answer**",
+                input_tokens=1,
+                output_tokens=768,
+                total_tokens=769,
+                model="fake",
+                latency_ms=1.0,
+                estimated_cost_usd=0.0,
+                thinking_tokens=760,
+                outcome=ProviderOutcome(
+                    ProviderOutcomeKind.THINKING_BUDGET, finish_reason="length"
+                ),
+            )
+
+    judge = AsyncMock()
+    judge.name = "judge"
+    judge.default_model = "judge"
+    summary = await run_toolcall_suite(
+        provider=CutOff(calls=()),
+        model="fake",
+        judge_provider=judge,
+        fixtures=(_fixture(),),
+    )
+
+    judge.generate.assert_not_called()
+    assert summary.fixtures[0]["prose_label"] is None
+
+
+@pytest.mark.asyncio
 async def test_a_provider_exception_is_recorded_not_raised():
     """One failing fixture must not abandon the run — but it must not read as
     resistance either."""

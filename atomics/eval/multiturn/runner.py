@@ -19,6 +19,7 @@ from atomics.eval.multiturn.judge import (
     score_turn,
 )
 from atomics.eval.outcomes import RunIntegrity
+from atomics.eval.provider_attempt import recorded_outcome_kind, unscorable_outcome
 from atomics.eval.runner import _call_hook
 from atomics.eval.suite_integrity import fixture_outcome, integrity_of
 from atomics.models import TaskCategory, TaskResult, TaskStatus
@@ -139,6 +140,7 @@ class MultiturnRunSummary:
                         and cr.conversation_judge is not None
                         and not cr.conversation_judge.parse_failed
                     ),
+                    generation=recorded_outcome_kind(cr.task_result.error_class),
                 )
                 for cr in self.conversation_results
             ]
@@ -236,6 +238,7 @@ async def run_multiturn(
         total_cost = 0.0
         total_latency = 0.0
         conversation_failed = False
+        skipped_kind = ""
 
         for i, turn in enumerate(fixture.turns):
             transcript = _build_transcript(fixture.system_prompt, completed_turns)
@@ -266,6 +269,11 @@ async def run_multiturn(
                 turn_latency = resp.latency_ms
                 turn_tokens = resp.total_tokens
                 turn_cost = resp.estimated_cost_usd
+                skipped = unscorable_outcome(resp)
+                if skipped is not None:
+                    conversation_failed = True
+                    skipped_kind = skipped.kind.value
+                    logger.warning("Turn %d of %s not judged: %s", i, fixture.id, skipped_kind)
             except Exception as exc:
                 response_text = ""
                 turn_latency = 0.0
@@ -370,6 +378,8 @@ async def run_multiturn(
             provider=provider.name,
             model=model or "",
             status=TaskStatus.FAILED if conversation_failed else TaskStatus.SUCCESS,
+            error_class=skipped_kind,
+            error_message=skipped_kind,
             prompt=full_transcript,
             response="\n---\n".join(t.response for t in turn_results),
             total_tokens=total_tokens,

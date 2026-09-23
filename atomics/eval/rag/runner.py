@@ -12,6 +12,7 @@ from typing import Any
 from atomics.eval.attempt_serialization import integrity_to_dict
 from atomics.eval.judge import detect_self_judge
 from atomics.eval.outcomes import RunIntegrity
+from atomics.eval.provider_attempt import recorded_outcome_kind, unscorable_outcome
 from atomics.eval.rag import RAGFixture
 from atomics.eval.rag.fixtures import ALL_RAG_FIXTURES
 from atomics.eval.rag.judge import RAGJudgeResult, compute_hallucination, score_rag_consensus
@@ -122,6 +123,7 @@ class RAGRunSummary:
                 fixture_outcome(
                     generated=r.task_result.status is not TaskStatus.FAILED,
                     scored=r.judge is not None and not r.judge.parse_failed,
+                    generation=recorded_outcome_kind(r.task_result.error_class),
                 )
                 for r in self.fixture_results
             ]
@@ -302,6 +304,17 @@ async def run_rag(
                 started_at=task_started,
                 completed_at=datetime.now(UTC),
             )
+            fr = RAGFixtureResult(fixture=fixture, task_result=tr, judge=None)
+            results.append(fr)
+            if on_fixture_done:
+                on_fixture_done(fr)
+            continue
+
+        skipped = unscorable_outcome(resp)
+        if skipped is not None:
+            tr.status = TaskStatus.FAILED
+            tr.error_class = skipped.kind.value
+            tr.error_message = skipped.kind.value
             fr = RAGFixtureResult(fixture=fixture, task_result=tr, judge=None)
             results.append(fr)
             if on_fixture_done:

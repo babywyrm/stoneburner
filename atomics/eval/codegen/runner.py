@@ -13,6 +13,7 @@ from atomics.eval.attempt_serialization import integrity_to_dict
 from atomics.eval.codegen import CodegenFixture, CodeTestCase, sandbox
 from atomics.eval.codegen.fixtures import ALL_CODEGEN_FIXTURES
 from atomics.eval.outcomes import RunIntegrity
+from atomics.eval.provider_attempt import recorded_outcome_kind, unscorable_outcome
 from atomics.eval.runner import _call_hook
 from atomics.eval.suite_integrity import fixture_outcome, integrity_of
 from atomics.models import TaskCategory, TaskResult, TaskStatus
@@ -199,6 +200,7 @@ class CodegenRunSummary:
                 fixture_outcome(
                     generated=r.task_result.status is not TaskStatus.FAILED,
                     scored=r.task_result.status is not TaskStatus.FAILED,
+                    generation=recorded_outcome_kind(r.task_result.error_class),
                 )
                 for r in self.fixture_results
             ]
@@ -315,6 +317,25 @@ async def run_codegen(
                 started_at=task_started,
                 completed_at=datetime.now(UTC),
             )
+            fr = CodegenFixtureResult(
+                fixture=fixture,
+                task_result=tr,
+                tests_passed=0,
+                tests_total=len(fixture.test_cases),
+                pass_rate=0.0,
+                extracted_code=None,
+                test_details=[],
+            )
+            results.append(fr)
+            if on_fixture_done:
+                on_fixture_done(fr)
+            continue
+
+        skipped = unscorable_outcome(resp)
+        if skipped is not None:
+            tr.status = TaskStatus.FAILED
+            tr.error_class = skipped.kind.value
+            tr.error_message = skipped.kind.value
             fr = CodegenFixtureResult(
                 fixture=fixture,
                 task_result=tr,

@@ -21,8 +21,9 @@ from atomics.eval.consensus import (
     combine_numeric,
 )
 from atomics.eval.outcomes import JudgeOutcomeStatus
+from atomics.eval.provider_attempt import unscorable_outcome
 from atomics.eval.refusal.scorer import classify_response
-from atomics.providers.base import BaseProvider
+from atomics.providers.base import BaseProvider, ProviderResponse
 
 STUDY_SUITES = (
     "redblue",
@@ -255,7 +256,7 @@ async def _generate(
                 model=model,
                 max_tokens=fixture.max_output_tokens,
             )
-            return response.text, response.estimated_cost_usd
+            return _judgeable(response)
         if suite == "adversarial":
             from atomics.eval.adversarial.runner import _render_prompt
 
@@ -273,7 +274,7 @@ async def _generate(
                 model=model,
                 max_tokens=_MAX_TOKENS,
             )
-            return response.text, response.estimated_cost_usd
+            return _judgeable(response)
         elif suite == "rag":
             from atomics.eval.rag.runner import _build_rag_prompt
 
@@ -283,7 +284,7 @@ async def _generate(
                 model=model,
                 max_tokens=fixture.max_output_tokens,
             )
-            return response.text, response.estimated_cost_usd
+            return _judgeable(response)
         else:
             prompt = fixture.prompt
             system = "You are a helpful assistant."
@@ -291,9 +292,16 @@ async def _generate(
         response = await provider.generate(
             prompt, system=system, model=model, max_tokens=max_tokens
         )
-        return response.text, response.estimated_cost_usd
+        return _judgeable(response)
     except Exception:
         return None, 0.0
+
+
+def _judgeable(response: ProviderResponse) -> tuple[str | None, float]:
+    """No text for the judges when the reply was cut off during reasoning."""
+    if unscorable_outcome(response) is not None:
+        return None, response.estimated_cost_usd
+    return response.text, response.estimated_cost_usd
 
 
 async def _generate_multiturn(
@@ -319,8 +327,10 @@ async def _generate_multiturn(
             )
         except Exception:
             return None, cost
-        completed.append((turn.user_message, response.text))
         cost += response.estimated_cost_usd
+        if unscorable_outcome(response) is not None:
+            return None, cost
+        completed.append((turn.user_message, response.text))
     return _build_transcript(fixture.system_prompt, completed), cost
 
 
