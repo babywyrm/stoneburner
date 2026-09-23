@@ -244,7 +244,10 @@ EXAMPLES_DIR = Path(__file__).resolve().parent.parent / "profiles" / "examples"
 
 
 def _example_profiles() -> list[Path]:
-    paths = sorted(EXAMPLES_DIR.glob("*.yaml"))
+    # scenario-*.yaml is a workload file. test_scenario.py loads it.
+    paths = sorted(
+        path for path in EXAMPLES_DIR.glob("*.yaml") if not path.name.startswith("scenario-")
+    )
     assert paths, f"no example profiles found in {EXAMPLES_DIR}"
     return paths
 
