@@ -35,7 +35,9 @@ paid provider needs `--budget`. See [`docs/BATTERIES.md`](docs/BATTERIES.md).
 
 Thinking models need `--no-thinking` on short fixtures, or the visible
 answer can come back empty (`THINK`). `--effort low` is the native Ollama
-think dial when you want reasoning on. From a clone: `uv sync --all-extras`,
+think dial when you want reasoning on. Ollama sends `num_ctx` 8192 unless
+you set a context. An explicit value, including a larger window, still
+wins. From a clone: `uv sync --all-extras`,
 then prefix commands with `uv run`. Bare `uv sync` drops the API, MCP, RAG,
 and test extras.
 
