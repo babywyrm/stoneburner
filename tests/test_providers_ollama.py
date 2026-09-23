@@ -580,6 +580,69 @@ async def test_ollama_reads_native_thinking_field():
     assert resp.output_tokens == 512
 
 
+def _capped_client(*, response: str, thinking: str, done_reason: str) -> AsyncMock:
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.raise_for_status = MagicMock()
+    mock_response.json.return_value = {
+        "response": response,
+        "thinking": thinking,
+        "eval_count": 768,
+        "prompt_eval_count": 40,
+        "eval_duration": 1_000_000_000,
+        "done_reason": done_reason,
+    }
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock(return_value=mock_response)
+    return mock_client
+
+
+@pytest.mark.asyncio
+async def test_ollama_capped_reasoning_with_a_fragment_is_thinking_budget():
+    """gpt-oss spent 761 of 768 tokens reasoning and left a bare heading."""
+    from atomics.providers.outcomes import ProviderOutcomeKind
+
+    client = _capped_client(
+        response="**Security review of the diff**",
+        thinking="x" * 4000,
+        done_reason="length",
+    )
+    provider = OllamaProvider(host="http://fake:11434", client=client)
+    resp = await provider.generate("review", model="gpt-oss:20b", max_tokens=768)
+
+    assert resp.finish_reason == "length"
+    assert resp.outcome is not None
+    assert resp.outcome.kind is ProviderOutcomeKind.THINKING_BUDGET
+    assert resp.outcome.is_scorable is False
+
+
+@pytest.mark.asyncio
+async def test_ollama_capped_answer_with_a_body_is_truncated_and_scored():
+    from atomics.providers.outcomes import ProviderOutcomeKind
+
+    client = _capped_client(
+        response="SQL injection via string concatenation. " * 20,
+        thinking="x" * 2000,
+        done_reason="length",
+    )
+    provider = OllamaProvider(host="http://fake:11434", client=client)
+    resp = await provider.generate("review", model="gpt-oss:20b", max_tokens=768)
+
+    assert resp.outcome is not None
+    assert resp.outcome.kind is ProviderOutcomeKind.TRUNCATED
+    assert resp.outcome.is_scorable is True
+
+
+@pytest.mark.asyncio
+async def test_ollama_normal_stop_leaves_outcome_to_the_caller():
+    client = _capped_client(response="Looks secure.", thinking="", done_reason="stop")
+    provider = OllamaProvider(host="http://fake:11434", client=client)
+    resp = await provider.generate("review", model="granite4.2:3b")
+
+    assert resp.finish_reason == "stop"
+    assert resp.outcome is None
+
+
 @pytest.mark.asyncio
 async def test_ollama_generate_zero_eval_duration():
     mock_response = MagicMock()

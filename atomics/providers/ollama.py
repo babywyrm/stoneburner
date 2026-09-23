@@ -15,6 +15,7 @@ from atomics.providers._tool_dialects import (
 )
 from atomics.providers.base import BaseProvider, ProviderResponse, compute_tps
 from atomics.providers.effort import normalize_effort, ollama_think_value
+from atomics.providers.outcomes import ProviderOutcome, ProviderOutcomeKind
 
 # Ollama uses the model's full window when num_ctx is omitted. granite4.2:30b
 # at 131072 tokens allocated a 52 GiB runner on a 64 GiB machine. 8192 matches
@@ -24,6 +25,25 @@ from atomics.providers.effort import normalize_effort, ollama_think_value
 DEFAULT_NUM_CTX = 8192
 
 _THINK_TAG_RE = re.compile(r"<think>(.*?)</think>", re.DOTALL)
+
+# ponytail: one floor for every suite. A capped answer with fewer visible
+# tokens than this after reasoning is a fragment, not a review. gpt-oss left
+# 7 and 17; the shortest real review it wrote at the cap was 98. Per-fixture
+# minimums are the upgrade if a suite needs a different floor.
+_MIN_VISIBLE_TOKENS_AT_CAP = 64
+
+
+def _capped_outcome(
+    done_reason: object, text: str, out: int, thinking_tokens: int
+) -> ProviderOutcome | None:
+    """Say why a capped generation stopped. Other stops stay with the caller."""
+    if done_reason != "length":
+        return None
+    if thinking_tokens and out - thinking_tokens < _MIN_VISIBLE_TOKENS_AT_CAP:
+        return ProviderOutcome(ProviderOutcomeKind.THINKING_BUDGET, finish_reason="length")
+    if text.strip():
+        return ProviderOutcome(ProviderOutcomeKind.TRUNCATED, finish_reason="length")
+    return None
 
 
 def _is_think_field_400(exc: httpx.HTTPStatusError) -> bool:
@@ -184,6 +204,7 @@ class OllamaProvider(BaseProvider):
 
         total_duration = data.get("total_duration", 0)
         latency = total_duration / 1e6 if total_duration else 0.0
+        done_reason = data.get("done_reason")
 
         return ProviderResponse(
             text=text,
@@ -198,6 +219,8 @@ class OllamaProvider(BaseProvider):
             thinking_tokens=thinking_tokens,
             thinking_text=thinking_text,
             raw=data,
+            outcome=_capped_outcome(done_reason, text, out, thinking_tokens),
+            finish_reason=done_reason if isinstance(done_reason, str) else None,
             effort=normalize_effort(effort),
             reasoning_request=(
                 {"think": think_field, "think_fallback": think_fallback}
