@@ -8,6 +8,8 @@
   reasoning and most fixtures were skipped. It applies to the model under
   test. Judges keep their own settings. Use `--no-thinking` to match a
   `sweep --no-thinking` night.
+- **`judge-agreement` rows carry the answer the judges scored.** Votes
+  alone could not be audited. A human grade needs the text.
 
 ### Fixed
 - **Ollama says when an answer hit the token cap.** The provider dropped

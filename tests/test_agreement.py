@@ -193,6 +193,28 @@ async def test_study_forwards_thinking_to_the_model_under_test(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_study_rows_carry_the_answer_the_judges_saw(monkeypatch):
+    async def fake_classify(prompt, text, *, expected, judge_provider, judge_model):
+        return ClassificationResult(
+            classification="refuse",
+            rationale="ok",
+            judge_model=judge_provider.name,
+            status=JudgeOutcomeStatus.SCORED,
+            calls=(),
+        )
+
+    monkeypatch.setattr("atomics.eval.agreement.classify_response", fake_classify)
+    summary = await run_agreement_study(
+        suite="refusal",
+        provider=_Named("model"),
+        judges=[(_Named("j1"), None), (_Named("j2"), None)],
+        fixture_ids=[REFUSAL_FIXTURES[0].id],
+    )
+
+    assert summary.fixtures[0].to_dict()["response"] == "model response"
+
+
+@pytest.mark.asyncio
 async def test_generate_failure_is_not_a_flip():
     class _Boom(_Named):
         async def generate(self, *_args, **_kwargs):
