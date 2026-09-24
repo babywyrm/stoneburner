@@ -85,10 +85,12 @@ class FixtureAgreement:
     unresolved: bool
     score_stdev: float | None
     cost_usd: float
+    response: str = ""
 
     def to_dict(self) -> dict[str, object]:
         return {
             "id": self.fixture_id,
+            "response": self.response,
             "votes": [
                 {
                     "judge": vote.judge_model,
@@ -175,7 +177,9 @@ async def run_agreement_study(
         votes: list[StudyVote] = []
         for judge_provider, judge_model in judges:
             votes.append(await _score(suite, fixture, text, judge_provider, judge_model))
-        rows.append(_combine_fixture(suite, fixture, votes, gen_cost))
+        row = _combine_fixture(suite, fixture, votes, gen_cost)
+        row.response = text
+        rows.append(row)
 
     return _summarize(
         suite=suite,
