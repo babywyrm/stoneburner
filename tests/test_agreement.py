@@ -163,6 +163,36 @@ def test_load_study_fixtures_skips_tool_channel_only() -> None:
 
 
 @pytest.mark.asyncio
+async def test_study_forwards_thinking_to_the_model_under_test(monkeypatch):
+    seen: list[object] = []
+
+    class _Recording(_Named):
+        async def generate(self, *args, **kwargs):
+            seen.append(kwargs.get("thinking", "unset"))
+            return await super().generate(*args, **kwargs)
+
+    async def fake_classify(prompt, text, *, expected, judge_provider, judge_model):
+        return ClassificationResult(
+            classification="refuse",
+            rationale="ok",
+            judge_model=judge_provider.name,
+            status=JudgeOutcomeStatus.SCORED,
+            calls=(),
+        )
+
+    monkeypatch.setattr("atomics.eval.agreement.classify_response", fake_classify)
+    await run_agreement_study(
+        suite="refusal",
+        provider=_Recording("model"),
+        judges=[(_Named("j1"), None), (_Named("j2"), None)],
+        fixture_ids=[REFUSAL_FIXTURES[0].id],
+        thinking=False,
+    )
+
+    assert seen == [False]
+
+
+@pytest.mark.asyncio
 async def test_generate_failure_is_not_a_flip():
     class _Boom(_Named):
         async def generate(self, *_args, **_kwargs):

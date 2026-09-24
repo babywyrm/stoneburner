@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Added
+- **`judge-agreement --thinking/--no-thinking`.** The study had no dial, so
+  a model that thinks by default spent the 1024-token red/blue cap on
+  reasoning and most fixtures were skipped. It applies to the model under
+  test. Judges keep their own settings. Use `--no-thinking` to match a
+  `sweep --no-thinking` night.
+
 ### Fixed
 - **Ollama says when an answer hit the token cap.** The provider dropped
   `done_reason`, so a reply cut off after hidden reasoning was scored as
