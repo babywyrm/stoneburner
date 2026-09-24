@@ -115,6 +115,23 @@ def test_judge_agreement_prints_flip_rate(monkeypatch, tmp_path) -> None:
     assert "3 of 1 would change the headline" in result.output or "3 of" in result.output
 
 
+def test_judge_agreement_forwards_no_thinking(monkeypatch, tmp_path) -> None:
+    seen: dict[str, object] = {}
+    _patch_study(monkeypatch, tmp_path)
+
+    async def capture(**kwargs):
+        seen.update(kwargs)
+        return _summary()
+
+    monkeypatch.setattr("atomics.commands.agreement.run_agreement_study", capture)
+    result = CliRunner().invoke(
+        cli,
+        ["judge-agreement", "--suite", "redblue", "--judges", "ollama:a,ollama:b", "--no-thinking"],
+    )
+    assert result.exit_code == 0, result.output
+    assert seen["thinking"] is False
+
+
 def test_judge_agreement_no_save_opens_no_repository(monkeypatch, tmp_path) -> None:
     opened: list[MetricsRepository] = []
     _patch_study(monkeypatch, tmp_path)

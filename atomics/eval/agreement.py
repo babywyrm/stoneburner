@@ -145,6 +145,7 @@ async def run_agreement_study(
     model: str | None = None,
     fixture_ids: list[str] | None = None,
     run_id: str | None = None,
+    thinking: bool | None = None,
 ) -> AgreementSummary:
     """Generate each fixture once and score the same response with every judge."""
     if suite not in STUDY_SUITES:
@@ -155,7 +156,7 @@ async def run_agreement_study(
     fixtures = load_study_fixtures(suite, fixture_ids)
     rows: list[FixtureAgreement] = []
     for fixture in fixtures:
-        text, gen_cost = await _generate(suite, provider, model, fixture)
+        text, gen_cost = await _generate(suite, provider, model, fixture, thinking)
         if text is None or not text.strip():
             rows.append(
                 FixtureAgreement(
@@ -239,10 +240,11 @@ async def _generate(
     provider: BaseProvider,
     model: str | None,
     fixture: Any,
+    thinking: bool | None = None,
 ) -> tuple[str | None, float]:
     try:
         if suite == "multiturn":
-            return await _generate_multiturn(provider, model, fixture)
+            return await _generate_multiturn(provider, model, fixture, thinking)
         if suite == "codereview":
             from atomics.eval.codereview.runner import _REVIEW_SYSTEM, _REVIEW_TEMPLATE
 
@@ -255,6 +257,7 @@ async def _generate(
                 system=_REVIEW_SYSTEM,
                 model=model,
                 max_tokens=fixture.max_output_tokens,
+                thinking=thinking,
             )
             return _judgeable(response)
         if suite == "adversarial":
@@ -273,6 +276,7 @@ async def _generate(
                 system=_SYSTEM_PROMPT,
                 model=model,
                 max_tokens=_MAX_TOKENS,
+                thinking=thinking,
             )
             return _judgeable(response)
         elif suite == "rag":
@@ -283,6 +287,7 @@ async def _generate(
                 prompt,
                 model=model,
                 max_tokens=fixture.max_output_tokens,
+                thinking=thinking,
             )
             return _judgeable(response)
         else:
@@ -290,7 +295,7 @@ async def _generate(
             system = "You are a helpful assistant."
         max_tokens = getattr(fixture, "max_output_tokens", 512)
         response = await provider.generate(
-            prompt, system=system, model=model, max_tokens=max_tokens
+            prompt, system=system, model=model, max_tokens=max_tokens, thinking=thinking
         )
         return _judgeable(response)
     except Exception:
@@ -308,6 +313,7 @@ async def _generate_multiturn(
     provider: BaseProvider,
     model: str | None,
     fixture: Any,
+    thinking: bool | None = None,
 ) -> tuple[str | None, float]:
     from atomics.eval.multiturn.runner import _build_transcript
 
@@ -324,6 +330,7 @@ async def _generate_multiturn(
                 system=fixture.system_prompt if not completed else "",
                 model=model,
                 max_tokens=fixture.max_output_tokens,
+                thinking=thinking,
             )
         except Exception:
             return None, cost

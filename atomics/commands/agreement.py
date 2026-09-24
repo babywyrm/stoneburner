@@ -79,6 +79,12 @@ def _no_parent_finalize(_repository: MetricsRepository, _run_id: str) -> None:
     show_default=True,
     help="Write study rows. Default off — this is not a leaderboard run.",
 )
+@click.option(
+    "--thinking/--no-thinking",
+    "thinking_flag",
+    default=None,
+    help="Thinking for the model under test (default: auto-detect). Judges are unchanged.",
+)
 @budget_option
 def judge_agreement(
     suite: str,
@@ -90,6 +96,7 @@ def judge_agreement(
     fixtures_filter: str | None,
     json_out: Path | None,
     save: bool,
+    thinking_flag: bool | None,
     budget_usd: float | None,
 ) -> None:
     """Generate each fixture once and score it with every judge.
@@ -146,6 +153,7 @@ def judge_agreement(
                 model=model,
                 fixture_ids=fixture_ids,
                 run_id=run_id,
+                thinking=thinking_flag,
             ),
             provider,
             *(p for p, _ in judge_pairs),
