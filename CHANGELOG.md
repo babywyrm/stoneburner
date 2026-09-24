@@ -4,14 +4,18 @@
 
 ### Added
 - **`judge-agreement --thinking/--no-thinking`.** The study had no dial, so
-  a model that thinks by default spent the 1024-token red/blue cap on
-  reasoning and most fixtures were skipped. It applies to the model under
+  a model that thinks by default could spend the red/blue output cap on
+  reasoning and have the fixture skipped. It applies to the model under
   test. Judges keep their own settings. Use `--no-thinking` to match a
   `sweep --no-thinking` night.
 - **`judge-agreement` rows carry the answer the judges scored.** Votes
   alone could not be audited. A human grade needs the text.
 
 ### Fixed
+- **A red/blue `judge-agreement` study judges the same text the suite does.**
+  It cut answers at 3000 characters. The suite shows the judge up to 8192
+  for a 2048-token fixture. Longer answers, usually the stronger ones, were
+  judged on their first third.
 - **Ollama says when an answer hit the token cap.** The provider dropped
   `done_reason`, so a reply cut off after hidden reasoning was scored as
   a review. `gpt-oss:20b` ignores `--no-thinking`, spent 761 of 768
