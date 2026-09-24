@@ -390,7 +390,7 @@ async def _score(
                 cost_usd=cost,
             )
         if suite == "redblue":
-            from atomics.eval.judge import score_response
+            from atomics.eval.judge import char_budget_for_tokens, score_response
 
             scored = await score_response(
                 fixture.prompt,
@@ -398,6 +398,7 @@ async def _score(
                 judge_provider=judge_provider,
                 judge_model=judge_model,
                 gold_criteria=list(fixture.gold_criteria),
+                max_response_chars=char_budget_for_tokens(fixture.max_output_tokens),
             )
             return StudyVote(
                 judge_model=scored.judge_model,

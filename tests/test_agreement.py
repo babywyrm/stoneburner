@@ -269,7 +269,7 @@ async def test_redblue_study_numeric_flip(monkeypatch):
     from atomics.eval.judge import JudgeResult
     from atomics.eval.redblue.fixtures import ALL_FIXTURES
 
-    async def fake_score(prompt, text, *, judge_provider, judge_model, gold_criteria=None):
+    async def fake_score(prompt, text, *, judge_provider, judge_model, **_kwargs):
         score = 0.9 if judge_provider.name == "high" else 0.3
         return JudgeResult(
             score=score,
@@ -292,6 +292,36 @@ async def test_redblue_study_numeric_flip(monkeypatch):
     assert row.flipped is True
     assert row.score_stdev == pytest.approx(0.3)
     assert summary.mean_stdev == pytest.approx(0.3)
+
+
+@pytest.mark.asyncio
+async def test_redblue_study_judges_as_much_text_as_the_suite(monkeypatch):
+    from atomics.eval.judge import JudgeResult, char_budget_for_tokens
+    from atomics.eval.redblue.fixtures import ALL_FIXTURES
+
+    budgets: list[int | None] = []
+
+    async def fake_score(prompt, text, *, judge_provider, judge_model, **kwargs):
+        budgets.append(kwargs.get("max_response_chars"))
+        return JudgeResult(
+            score=0.5,
+            accuracy=2,
+            completeness=2,
+            format_score=1,
+            rationale="ok",
+            judge_model=judge_provider.name,
+        )
+
+    monkeypatch.setattr("atomics.eval.judge.score_response", fake_score)
+    fixture = ALL_FIXTURES[0]
+    await run_agreement_study(
+        suite="redblue",
+        provider=_Named("model"),
+        judges=[(_Named("a"), None), (_Named("b"), None)],
+        fixture_ids=[fixture.id],
+    )
+
+    assert budgets == [char_budget_for_tokens(fixture.max_output_tokens)] * 2
 
 
 @pytest.mark.asyncio
