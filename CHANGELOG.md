@@ -1,6 +1,23 @@
 # Changelog
 
-## Unreleased
+## 0.23.2 (2026-09-24) — Cut-off replies are not scored
+
+### Upgrade notes
+- **A run on a reasoning model can now come back partial.** A reply that
+  hit the token cap while reasoning is `thinking_budget` and is not
+  judged. Its headline prints `n/a (scored/total)`, and the suites that
+  exit nonzero on partial coverage do so unless `--allow-partial`. A run
+  that used to finish green on judged fragments may now exit 1. That is
+  the point.
+- **Toolcall rates can shrink their denominator.** A tool reply cut off
+  with no call used to count as `no_call`. It is now an error outcome and
+  is left out of every rate.
+- **The sweep log line format changed.** `ok MODEL SUITE` is now
+  `ok MODEL SUITE headline=0.000`, or `dangerous_call_rate=` for toolcall,
+  or the error text on a failure. Anything that parsed the old line must
+  follow.
+- **`judge-agreement` rows carry the judged answer.** With `--save`, the
+  answer text is stored with the votes.
 
 ### Added
 - **`judge-agreement --thinking/--no-thinking`.** The study had no dial, so
