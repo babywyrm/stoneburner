@@ -131,6 +131,126 @@ async def test_gauntlet_rewrites_status_and_appends_log(tmp_path: Path) -> None:
 
 
 @pytest.mark.asyncio
+async def test_resume_skips_finished_jobs_and_reruns_the_rest(tmp_path: Path) -> None:
+    status = tmp_path / "status.json"
+    status.write_text(
+        json.dumps(
+            {
+                "started_at": "2026-09-22T04:05:12+00:00",
+                "models": ["done:1b", "cut:30b"],
+                "suites": ["redblue", "toolcall"],
+                "current_model": "cut:30b",
+                "current_suite": "redblue",
+                "completed": [
+                    {"model": "done:1b", "suite": "redblue", "ok": True, "headline": 0.9,
+                     "error": None, "tool_capable": None, "exit_code": 0},
+                    {"model": "done:1b", "suite": "toolcall", "ok": False, "headline": None,
+                     "error": "model did not emit a tool call", "tool_capable": False,
+                     "exit_code": 1},
+                ],
+                "finished_at": None,
+            }
+        ),
+        encoding="utf-8",
+    )
+    calls: list[tuple[str, str]] = []
+
+    async def run_suite(*, model: str, suite: str, skip_incapable: bool) -> SuiteJobResult:
+        calls.append((model, suite))
+        return SuiteJobResult(model=model, suite=suite, ok=True, headline=0.5)
+
+    results = await run_gauntlet(
+        models=["done:1b", "cut:30b"],
+        suites=["redblue", "toolcall"],
+        run_suite=run_suite,
+        status_path=status,
+        resume=True,
+    )
+
+    assert calls == [("done:1b", "toolcall"), ("cut:30b", "redblue"), ("cut:30b", "toolcall")]
+    assert [(r.model, r.suite, r.headline) for r in results] == [
+        ("done:1b", "redblue", 0.9),
+        ("done:1b", "toolcall", 0.5),
+        ("cut:30b", "redblue", 0.5),
+        ("cut:30b", "toolcall", 0.5),
+    ]
+    final = json.loads(status.read_text(encoding="utf-8"))
+    assert final["started_at"] == "2026-09-22T04:05:12+00:00"
+    assert [(c["model"], c["suite"]) for c in final["completed"]] == [
+        ("done:1b", "redblue"),
+        ("done:1b", "toolcall"),
+        ("cut:30b", "redblue"),
+        ("cut:30b", "toolcall"),
+    ]
+    assert final["finished_at"]
+
+
+def test_sweep_resume_needs_a_status_file() -> None:
+    from click.testing import CliRunner
+
+    from atomics.cli import cli
+
+    result = CliRunner().invoke(
+        cli, ["sweep", "--models", "a:1b", "--suites", "redblue", "--resume"]
+    )
+
+    assert result.exit_code != 0
+    assert "--resume needs --status" in result.output
+
+
+def test_sweep_resume_is_forwarded(monkeypatch, tmp_path: Path) -> None:
+    from types import SimpleNamespace
+
+    from click.testing import CliRunner
+
+    from atomics.cli import cli
+
+    seen: dict[str, object] = {}
+
+    async def fake_gauntlet(**kwargs):
+        seen.update(kwargs)
+        return [SuiteJobResult(model="a:1b", suite="redblue", ok=True, headline=0.9)]
+
+    monkeypatch.setattr("atomics.eval.gauntlet.run_gauntlet", fake_gauntlet)
+    monkeypatch.setattr(
+        "atomics.commands.sweep._make_provider",
+        lambda *_a, **_k: SimpleNamespace(name="ollama", default_model="m"),
+    )
+    result = CliRunner().invoke(
+        cli,
+        [
+            "sweep",
+            "--models",
+            "a:1b",
+            "--suites",
+            "redblue",
+            "--status",
+            str(tmp_path / "s.json"),
+            "--resume",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert seen["resume"] is True
+
+
+@pytest.mark.asyncio
+async def test_resume_without_a_status_file_starts_fresh(tmp_path: Path) -> None:
+    status = tmp_path / "status.json"
+    calls: list[tuple[str, str]] = []
+
+    async def run_suite(*, model: str, suite: str, skip_incapable: bool) -> SuiteJobResult:
+        calls.append((model, suite))
+        return SuiteJobResult(model=model, suite=suite, ok=True, headline=0.5)
+
+    await run_gauntlet(
+        models=["a:1b"], suites=["redblue"], run_suite=run_suite, status_path=status, resume=True
+    )
+
+    assert calls == [("a:1b", "redblue")]
+
+
+@pytest.mark.asyncio
 async def test_gauntlet_log_names_headline_and_failure(tmp_path: Path) -> None:
     log = tmp_path / "sweep.log"
 
