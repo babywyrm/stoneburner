@@ -12,7 +12,7 @@ import json
 import logging
 import signal
 from collections.abc import Awaitable, Callable, Sequence
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -25,6 +25,7 @@ logger = logging.getLogger("atomics.gauntlet")
 KNOWN_SUITES = ("eval", "redblue", "refusal", "toolcall", "codereview")
 
 RunSuite = Callable[..., Awaitable["SuiteJobResult"]]
+Persist = Callable[[str, str, str, object], None]
 
 
 @dataclass
@@ -201,8 +202,14 @@ def make_suite_runner(
     fixture_ids: list[str] | None = None,
     effort: str | None = None,
     reasoning_mode: str | None = None,
+    persist: Persist | None = None,
 ) -> RunSuite:
-    """Build the in-process suite callback the CLI hands to `run_gauntlet`."""
+    """Build the in-process suite callback the CLI hands to `run_gauntlet`.
+
+    `persist(suite, provider_name, model, summary)` runs after each suite
+    that produced a summary. A save that raises fails the job rather than
+    losing the night quietly.
+    """
 
     async def run_suite(
         *,
@@ -212,7 +219,7 @@ def make_suite_runner(
     ) -> SuiteJobResult:
         provider = provider_factory(model)
         try:
-            return await _dispatch_suite(
+            result, summary = await _dispatch_suite(
                 suite=suite,
                 provider=provider,
                 judge_provider=judge_provider,
@@ -236,6 +243,15 @@ def make_suite_runner(
                 error=err,
                 exit_code=1,
             )
+        if persist is None or summary is None:
+            return result
+        try:
+            persist(suite, provider.name, model, summary)
+        except Exception as exc:
+            err = sanitize_error(exc)[:200]
+            logger.warning("[gauntlet] %s %s save failed: %s", model, suite, err)
+            return replace(result, ok=False, error=f"save failed: {err}", exit_code=1)
+        return result
 
     return run_suite
 
@@ -254,7 +270,7 @@ async def _dispatch_suite(
     skip_incapable: bool,
     effort: str | None = None,
     reasoning_mode: str | None = None,
-) -> SuiteJobResult:
+) -> tuple[SuiteJobResult, object | None]:
     if suite == "eval":
         from atomics.benchmark.sweep import _filter_fixtures
         from atomics.eval.runner import run_eval
@@ -275,7 +291,7 @@ async def _dispatch_suite(
             suite=suite,
             ok=eval_summary.overall_accuracy is not None,
             headline=eval_summary.overall_accuracy,
-        )
+        ), eval_summary
     if suite == "redblue":
         from atomics.eval.redblue.runner import run_redblue
 
@@ -295,7 +311,7 @@ async def _dispatch_suite(
             suite=suite,
             ok=redblue_summary.overall_quality is not None,
             headline=redblue_summary.overall_quality,
-        )
+        ), redblue_summary
     if suite == "refusal":
         from atomics.eval.refusal import run_refusal
 
@@ -314,7 +330,7 @@ async def _dispatch_suite(
             suite=suite,
             ok=refusal_summary.calibration_score is not None,
             headline=refusal_summary.calibration_score,
-        )
+        ), refusal_summary
     if suite == "toolcall":
         from atomics.eval.toolcall.fixtures import ALL_FIXTURES
         from atomics.eval.toolcall.runner import run_toolcall_suite
@@ -339,14 +355,14 @@ async def _dispatch_suite(
                 tool_capable=False,
                 error="model did not emit a tool call",
                 exit_code=0 if skip_incapable else 1,
-            )
+            ), None
         return SuiteJobResult(
             model=model,
             suite=suite,
             ok=True,
             tool_capable=True,
             headline=toolcall_summary.dangerous_call_rate,
-        )
+        ), toolcall_summary
     if suite == "codereview":
         from atomics.eval.codereview import run_codereview
 
@@ -365,5 +381,5 @@ async def _dispatch_suite(
             suite=suite,
             ok=review_summary.review_score is not None,
             headline=review_summary.review_score,
-        )
+        ), review_summary
     raise ValueError(f"unknown suite: {suite}")
