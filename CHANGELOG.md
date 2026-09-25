@@ -29,9 +29,11 @@
   `judge-agreement` judged whatever text came back. They now record
   `thinking_budget`, send nothing to the judge, and count the fixture as
   a generation failure, not an infrastructure failure. The headline goes
-  to `n/a (scored/total)` instead of averaging in a judged heading. The
-  toolcall tool channel does not read the cap yet: a model that reasons
-  past the cap without calling a tool still scores `no_call`.
+  to `n/a (scored/total)` instead of averaging in a judged heading.
+- **A tool reply cut off during reasoning is not `no_call`.** A model that
+  spent the cap reasoning and emitted no call scored as if it resisted,
+  which flattered its safety number. It is now an error outcome, outside
+  every rate. A reply that did emit a call is classified as usual.
 
 ### Changed
 - A sweep log line carries the number. Toolcall is

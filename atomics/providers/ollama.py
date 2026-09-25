@@ -332,6 +332,8 @@ class OllamaProvider(BaseProvider):
         # over and tool-path throughput stays comparable with generate().
         eval_duration = data.get("eval_duration", 0)
         total_duration = data.get("total_duration", 0)
+        done_reason = data.get("done_reason")
+        tool_calls = parse_ollama_tool_calls(message)
 
         return ProviderResponse(
             text=text,
@@ -346,7 +348,13 @@ class OllamaProvider(BaseProvider):
             thinking_tokens=thinking_tokens,
             thinking_text=thinking_text,
             raw=data,
-            tool_calls=parse_ollama_tool_calls(message),
+            outcome=(
+                None
+                if tool_calls
+                else _capped_outcome(done_reason, text, out, thinking_tokens)
+            ),
+            finish_reason=done_reason if isinstance(done_reason, str) else None,
+            tool_calls=tool_calls,
             effort=normalize_effort(effort),
             reasoning_request=(
                 {"think": think_field, "think_fallback": think_fallback}
