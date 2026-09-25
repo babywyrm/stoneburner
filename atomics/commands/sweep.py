@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from pathlib import Path
+
 import click
 from rich.console import Console
 from rich.table import Table
@@ -18,6 +21,68 @@ from atomics.commands.common import (
 from atomics.config import load_settings
 from atomics.eval.budget import BudgetMeter
 from atomics.providers.base import BaseProvider, aclose_providers
+
+
+def suite_persister(db_path: Path) -> Callable[[str, str, str, object], None]:
+    """Save one sweep job's rows the way that suite's own command does."""
+    from atomics.commands.common import evaluation_record_from_fixture
+    from atomics.commands.suite_run import (
+        finalize_evaluation_run,
+        finalize_task_run,
+        suite_run,
+    )
+    from atomics.commands.toolcall import _save as save_toolcall
+    from atomics.eval.codereview.runner import CodeReviewSummary
+    from atomics.eval.redblue.runner import RedBlueSummary
+    from atomics.eval.refusal.runner import RefusalSummary
+    from atomics.eval.runner import EvalRunSummary
+    from atomics.eval.toolcall.runner import ToolCallSummary
+
+    def persist(suite: str, provider_name: str, model: str, summary: object) -> None:
+        if isinstance(summary, ToolCallSummary):
+            save_toolcall(summary, db_path=db_path)
+            return
+        judged = isinstance(summary, (RefusalSummary, CodeReviewSummary))
+        with suite_run(
+            suite=suite,
+            db_path=db_path,
+            save=True,
+            finalize=finalize_evaluation_run if judged else finalize_task_run,
+            failure_prefix=f"Sweep {suite} save failed",
+        ) as run:
+            if isinstance(summary, RedBlueSummary):
+                run.begin(
+                    summary.run_id,
+                    provider=provider_name,
+                    model=model,
+                    tier=f"redblue-{summary.mode}",
+                    pass_count=summary.runs,
+                )
+                repo = run.require_repository()
+                for fr in summary.results:
+                    repo.save_task_result(fr.task_result, suite=f"redblue-{fr.fixture.team}")
+            elif isinstance(summary, EvalRunSummary):
+                run.begin(summary.run_id, provider=provider_name, model=model, trigger="eval")
+                repo = run.require_repository()
+                for er in summary.fixture_results:
+                    repo.save_task_result(er.task_result)
+            elif isinstance(summary, (RefusalSummary, CodeReviewSummary)):
+                run.begin(summary.run_id, provider=provider_name, model=model)
+                repo = run.require_repository()
+                for result in summary.results:
+                    repo.save_evaluation_result(
+                        evaluation_record_from_fixture(
+                            run_id=summary.run_id,
+                            suite=suite,
+                            provider=provider_name,
+                            model=model,
+                            payload=result.to_dict(),
+                        )
+                    )
+            else:
+                raise TypeError(f"no saver for {type(summary).__name__}")
+
+    return persist
 
 
 @click.command("sweep")
@@ -90,7 +155,8 @@ from atomics.providers.base import BaseProvider, aclose_providers
     "--save/--no-save",
     "save_results",
     default=False,
-    help="Persist sweep results to database (default: off)",
+    help="Persist results to the database (default: off). With --suites, each "
+    "model×suite is saved as its suite's own command would save it.",
 )
 @click.option(
     "--suites",
@@ -269,6 +335,7 @@ def sweep(
                         fixture_ids=fixture_ids,
                         effort=effort,
                         reasoning_mode=reasoning_mode,
+                        persist=suite_persister(settings.db_path) if save_results else None,
                     ),
                     status_path=Path(status_path) if status_path else None,
                     log_path=Path(log_path) if log_path else None,

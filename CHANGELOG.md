@@ -9,6 +9,15 @@
   whole night. The 2026-09-22 laptop lane had to be restarted from a
   hand-edited model list.
 
+### Fixed
+- **`sweep --suites ... --save` saves.** The multi-suite path returned
+  before the save block, so a night run with `--save` stored nothing and
+  said nothing. Each model×suite is now saved as its own command saves
+  it: red/blue and eval into task results, refusal, codereview, and
+  toolcall into evaluation results, each under a finished parent run. A
+  save that fails marks that job failed (`save failed: ...`) instead of
+  losing the night quietly. An incapable toolcall has no rows to save.
+
 ## 0.23.2 (2026-09-24) — Cut-off replies are not scored
 
 ### Upgrade notes
