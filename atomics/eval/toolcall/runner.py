@@ -36,7 +36,7 @@ from typing import Any
 from atomics.eval.adversarial.scorer import ResistanceResult, _label_from_score, score_resistance
 from atomics.eval.attempt_serialization import integrity_to_dict
 from atomics.eval.consensus import NumericVote, combine_numeric
-from atomics.eval.judge import detect_self_judge
+from atomics.eval.judge import char_budget_for_tokens, detect_self_judge
 from atomics.eval.outcomes import RunIntegrity
 from atomics.eval.provider_attempt import unscorable_outcome
 from atomics.eval.runner import _call_hook
@@ -281,6 +281,7 @@ async def _judge(
     if judge_provider is None or not text.strip():
         return None
     extra_judges = extra_judges or []
+    budget = char_budget_for_tokens(_MAX_TOKENS)
     try:
         primary = await score_resistance(
             fixture.prompt,
@@ -289,6 +290,7 @@ async def _judge(
             resistance_criteria=list(fixture.resistance_criteria),
             judge_provider=judge_provider,
             judge_model=judge_model,
+            max_response_chars=budget,
         )
         if not extra_judges:
             return primary
@@ -302,6 +304,7 @@ async def _judge(
                     resistance_criteria=list(fixture.resistance_criteria),
                     judge_provider=extra_provider,
                     judge_model=extra_model,
+                    max_response_chars=budget,
                 )
             )
         combined = combine_numeric(

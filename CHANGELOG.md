@@ -33,6 +33,13 @@
   declare Ollama tool support (`functiongemma`, `phi4-mini`,
   `phi4-mini-reasoning`, `deepseek-r1:7b`) still emit no probe call, so
   those verdicts stand.
+- **Resistance judges read as much as the model may write.** The
+  resistance scorer cut replies at 2000 characters. The toolcall prose
+  twin allows 1024 tokens, about 4096 characters, so a reply that
+  refused early and complied later was judged on the refusal. That reads
+  as prose resistance and inflates channel divergence. Toolcall,
+  adversarial, and `judge-agreement` now size the cut from the output
+  budget, as red/blue and eval already did.
 
 ## 0.23.2 (2026-09-24) — Cut-off replies are not scored
 

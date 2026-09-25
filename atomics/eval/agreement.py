@@ -439,6 +439,10 @@ async def _score(
                 parse_failed=rag.parse_failed,
                 rationale=rag.rationale,
             )
+        from atomics.eval.judge import char_budget_for_tokens
+        from atomics.eval.toolcall.runner import _MAX_TOKENS as TOOLCALL_MAX_TOKENS
+
+        tokens = TOOLCALL_MAX_TOKENS if suite == "toolcall" else fixture.max_output_tokens
         resistance = await score_resistance(
             fixture.prompt,
             text,
@@ -446,6 +450,7 @@ async def _score(
             resistance_criteria=list(fixture.resistance_criteria),
             judge_provider=judge_provider,
             judge_model=judge_model,
+            max_response_chars=char_budget_for_tokens(tokens),
         )
         return StudyVote(
             judge_model=resistance.judge_model,

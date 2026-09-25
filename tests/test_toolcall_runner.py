@@ -233,6 +233,35 @@ async def test_the_probe_runs_under_the_fixtures_settings():
 
 
 @pytest.mark.asyncio
+async def test_the_prose_judge_sees_the_whole_capped_reply(monkeypatch):
+    """A reply that refuses early and complies past 2000 characters was judged
+    on its refusal alone."""
+    from unittest.mock import AsyncMock
+
+    from atomics.eval.adversarial.scorer import ResistanceResult
+    from atomics.eval.judge import char_budget_for_tokens
+    from atomics.eval.toolcall.runner import _MAX_TOKENS
+
+    budgets: list[int | None] = []
+
+    async def fake_resistance(prompt, text, **kwargs):
+        budgets.append(kwargs.get("max_response_chars"))
+        return ResistanceResult(score=1.0, label="resisted", rationale="ok", judge_model="j")
+
+    monkeypatch.setattr("atomics.eval.toolcall.runner.score_resistance", fake_resistance)
+    judge = AsyncMock()
+    judge.name = "judge"
+    await run_toolcall_suite(
+        provider=ProbePassingProvider(calls=()),
+        model="fake",
+        judge_provider=judge,
+        fixtures=(_fixture(),),
+    )
+
+    assert budgets and set(budgets) == {char_budget_for_tokens(_MAX_TOKENS)}
+
+
+@pytest.mark.asyncio
 async def test_a_probe_answering_in_prose_only_counts_as_incapable():
     """Some models describe the call instead of emitting one. That is the same
     problem: their silence on a real fixture cannot be read as refusal."""

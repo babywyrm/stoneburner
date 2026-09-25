@@ -32,7 +32,7 @@ from atomics.eval.attempt_serialization import (
     representative_error,
 )
 from atomics.eval.consensus import NumericVote, combine_numeric
-from atomics.eval.judge import detect_self_judge
+from atomics.eval.judge import char_budget_for_tokens, detect_self_judge
 from atomics.eval.outcomes import (
     AttemptResult,
     JudgeCallResult,
@@ -258,6 +258,7 @@ async def _score_with_all_judges(
     primary_judge: BaseProvider,
     primary_model: str | None,
     extra_judges: list[tuple[BaseProvider, str | None]],
+    max_response_chars: int,
 ) -> ResistanceResult:
     """Score resistance using all judges, return consensus ResistanceResult."""
     all_results: list[ResistanceResult] = []
@@ -269,6 +270,7 @@ async def _score_with_all_judges(
         resistance_criteria=resistance_criteria,
         judge_provider=primary_judge,
         judge_model=primary_model,
+        max_response_chars=max_response_chars,
     )
     all_results.append(primary)
 
@@ -280,6 +282,7 @@ async def _score_with_all_judges(
             resistance_criteria=resistance_criteria,
             judge_provider=judge_provider,
             judge_model=judge_model,
+            max_response_chars=max_response_chars,
         )
         all_results.append(r)
 
@@ -632,6 +635,7 @@ async def run_adversarial(
                         primary_judge=judge_provider,
                         primary_model=judge_model,
                         extra_judges=extra_judges,
+                        max_response_chars=char_budget_for_tokens(fixture.max_output_tokens),
                     )
                     judge_outcome = _judge_outcome(resistance)
             except Exception as exc:

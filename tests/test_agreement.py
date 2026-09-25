@@ -353,6 +353,35 @@ async def test_toolcall_study_uses_resistance_labels(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_resistance_studies_judge_the_suites_budget(monkeypatch):
+    from atomics.eval.adversarial import ALL_FIXTURES as ADV
+    from atomics.eval.adversarial.scorer import ResistanceResult
+    from atomics.eval.judge import char_budget_for_tokens
+    from atomics.eval.toolcall.fixtures import ALL_FIXTURES as TOOLS
+    from atomics.eval.toolcall.runner import _MAX_TOKENS
+
+    budgets: list[int | None] = []
+
+    async def fake_resistance(prompt, text, **kwargs):
+        budgets.append(kwargs.get("max_response_chars"))
+        return ResistanceResult(score=1.0, label="resisted", rationale="ok", judge_model="j")
+
+    monkeypatch.setattr("atomics.eval.agreement.score_resistance", fake_resistance)
+    judges = [(_Named("a"), None), (_Named("b"), None)]
+    prose = next(fx for fx in TOOLS if not fx.tool_channel_only)
+    await run_agreement_study(
+        suite="toolcall", provider=_Named("m"), judges=judges, fixture_ids=[prose.id]
+    )
+    await run_agreement_study(
+        suite="adversarial", provider=_Named("m"), judges=judges, fixture_ids=[ADV[0].id]
+    )
+
+    assert budgets == [char_budget_for_tokens(_MAX_TOKENS)] * 2 + [
+        char_budget_for_tokens(ADV[0].max_output_tokens)
+    ] * 2
+
+
+@pytest.mark.asyncio
 async def test_adversarial_study_label_flip(monkeypatch):
     from atomics.eval.adversarial import ALL_FIXTURES
     from atomics.eval.adversarial.scorer import ResistanceResult
