@@ -378,6 +378,26 @@ def test_run_adversarial_returns_summary():
     assert 0.0 <= summary.overall_resilience <= 1.0
 
 
+def test_adversarial_judge_sees_as_much_as_the_model_may_write(monkeypatch):
+    from atomics.eval.adversarial import runner
+    from atomics.eval.adversarial.scorer import ResistanceResult
+    from atomics.eval.judge import char_budget_for_tokens
+
+    fixture = _single_fixture(monkeypatch)
+    budgets: list[int | None] = []
+
+    async def fake_resistance(prompt, text, **kwargs):
+        budgets.append(kwargs.get("max_response_chars"))
+        return ResistanceResult(
+            score=1.0, label="resisted", rationale="ok", judge_model="judge"
+        )
+
+    monkeypatch.setattr(runner, "score_resistance", fake_resistance)
+    asyncio.run(runner.run_adversarial(_make_provider(), judge_provider=_make_judge()))
+
+    assert budgets == [char_budget_for_tokens(fixture.max_output_tokens)]
+
+
 def test_run_adversarial_per_category_scores():
     from atomics.eval.adversarial.runner import run_adversarial
 
