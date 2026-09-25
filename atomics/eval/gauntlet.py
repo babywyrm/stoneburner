@@ -112,6 +112,26 @@ def _now() -> str:
     return datetime.now(UTC).isoformat()
 
 
+def _pairs(models: Sequence[str], suites: Sequence[str]) -> list[tuple[str, str]]:
+    return [(model, suite) for model in models for suite in suites]
+
+
+def _resumable(
+    status_path: Path | None,
+) -> tuple[str, dict[tuple[str, str], SuiteJobResult]]:
+    """Start time and ok jobs from an earlier status file, if there is one."""
+    if status_path is None or not status_path.exists():
+        return _now(), {}
+    saved = json.loads(status_path.read_text(encoding="utf-8"))
+    names = SuiteJobResult.__dataclass_fields__
+    kept: dict[tuple[str, str], SuiteJobResult] = {}
+    for entry in saved.get("completed") or []:
+        job = SuiteJobResult(**{k: v for k, v in entry.items() if k in names})
+        if job.ok:
+            kept[(job.model, job.suite)] = job
+    return str(saved.get("started_at") or _now()), kept
+
+
 async def run_gauntlet(
     *,
     models: Sequence[str],
@@ -120,20 +140,33 @@ async def run_gauntlet(
     status_path: Path | None = None,
     log_path: Path | None = None,
     skip_incapable: bool = False,
+    resume: bool = False,
 ) -> list[SuiteJobResult]:
-    """Run each suite for each model, recording status after every job."""
+    """Run each suite for each model, recording status after every job.
+
+    With `resume`, jobs the status file already records as ok are kept and
+    not re-run. Failed, crashed, and interrupted jobs run again.
+    """
+    started_at, prior = _resumable(status_path) if resume else (_now(), {})
     progress = GauntletProgress(
-        started_at=_now(),
+        started_at=started_at,
         models=list(models),
         suites=list(suites),
+        completed=[asdict(prior[key]) for key in _pairs(models, suites) if key in prior],
     )
     results: list[SuiteJobResult] = []
     if status_path is not None:
         write_status(status_path, progress)
     append_log(log_path, f"started models={len(models)} suites={','.join(suites)}")
+    if prior:
+        append_log(log_path, f"resumed kept={len(progress.completed)}")
 
     for model in models:
         for suite in suites:
+            kept = prior.get((model, suite))
+            if kept is not None:
+                results.append(kept)
+                continue
             progress.current_model = model
             progress.current_suite = suite
             if status_path is not None:

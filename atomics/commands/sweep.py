@@ -127,6 +127,12 @@ from atomics.providers.base import BaseProvider, aclose_providers
     default=None,
     help="Discover models from the provider (ollama is --all-local).",
 )
+@click.option(
+    "--resume",
+    is_flag=True,
+    default=False,
+    help="Keep jobs the --status file records as ok. Re-run failed and unfinished ones.",
+)
 @budget_option
 def sweep(
     provider_name: str,
@@ -149,6 +155,7 @@ def sweep(
     status_path: str | None,
     log_path: str | None,
     models_from: str | None,
+    resume: bool,
     budget_usd: float | None,
 ) -> None:
     """Sweep eval fixtures across multiple models and compare results.
@@ -177,6 +184,8 @@ def sweep(
         run_gauntlet,
     )
 
+    if resume and not status_path:
+        raise click.UsageError("--resume needs --status: that file is what it resumes from")
     settings = load_settings()
     setup_logging(settings.log_level)
     console = Console()
@@ -264,6 +273,7 @@ def sweep(
                     status_path=Path(status_path) if status_path else None,
                     log_path=Path(log_path) if log_path else None,
                     skip_incapable=False,
+                    resume=resume,
                 )
             ),
             judge_provider,

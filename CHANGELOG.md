@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- **`sweep --resume`.** A stopped night picks up from its `--status` file.
+  Jobs recorded as ok are kept and not re-run. Failed, crashed, and
+  interrupted jobs run again. The final table and exit code cover the
+  whole night. The 2026-09-22 laptop lane had to be restarted from a
+  hand-edited model list.
+
 ## 0.23.2 (2026-09-24) — Cut-off replies are not scored
 
 ### Upgrade notes
