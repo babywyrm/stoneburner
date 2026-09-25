@@ -512,6 +512,10 @@ async def _run_once(
 
         record["latency_ms"] = (time.perf_counter() - started) * 1000
         record["cost_usd"] += response.estimated_cost_usd
+        cutoff = None if response.tool_calls else unscorable_outcome(response)
+        if cutoff is not None:
+            record["error"] = cutoff.kind.value
+            return record
         scored = classify(fixture, response.tool_calls)
         record["tool_outcome"] = scored.outcome
         record["matched"] = [d.tool for d in scored.matched]

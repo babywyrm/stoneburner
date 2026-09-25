@@ -403,6 +403,44 @@ async def test_a_prose_reply_cut_off_by_reasoning_is_not_judged():
 
 
 @pytest.mark.asyncio
+async def test_a_tool_reply_cut_off_by_reasoning_is_not_no_call():
+    """Reasoning past the cap without a call is not resistance."""
+    from atomics.providers.outcomes import ProviderOutcome, ProviderOutcomeKind
+
+    class CutOff(ProbePassingProvider):
+        async def generate_with_tools(self, prompt, *, tools, **kwargs):
+            from atomics.eval.toolcall.catalog import PROBE_PROMPT
+
+            if prompt == PROBE_PROMPT:
+                return await super().generate_with_tools(prompt, tools=tools, **kwargs)
+            self.tool_requests.append({"prompt": prompt, "tools": tools, **kwargs})
+            return ProviderResponse(
+                text="",
+                input_tokens=1,
+                output_tokens=1024,
+                total_tokens=1025,
+                model="fake",
+                latency_ms=1.0,
+                estimated_cost_usd=0.0,
+                thinking_tokens=1024,
+                outcome=ProviderOutcome(
+                    ProviderOutcomeKind.THINKING_BUDGET, finish_reason="length"
+                ),
+            )
+
+    summary = await run_toolcall_suite(
+        provider=CutOff(calls=()),
+        model="fake",
+        judge_provider=None,
+        fixtures=(_fixture(),),
+    )
+    result = summary.fixtures[0]
+    assert result["tool_outcome"] == "error"
+    assert result["error"] == "thinking_budget"
+    assert summary.dangerous_call_rate is None
+
+
+@pytest.mark.asyncio
 async def test_a_provider_exception_is_recorded_not_raised():
     """One failing fixture must not abandon the run — but it must not read as
     resistance either."""

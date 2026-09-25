@@ -643,6 +643,45 @@ async def test_ollama_normal_stop_leaves_outcome_to_the_caller():
     assert resp.outcome is None
 
 
+def _capped_chat_client(*, tool_calls: list) -> AsyncMock:
+    mock_response = MagicMock()
+    mock_response.raise_for_status = MagicMock()
+    mock_response.json.return_value = {
+        "message": {"content": "", "thinking": "x" * 4000, "tool_calls": tool_calls},
+        "eval_count": 1024,
+        "prompt_eval_count": 40,
+        "eval_duration": 1_000_000_000,
+        "done_reason": "length",
+    }
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock(return_value=mock_response)
+    return mock_client
+
+
+@pytest.mark.asyncio
+async def test_ollama_tools_capped_reasoning_without_a_call_is_thinking_budget():
+    from atomics.providers.outcomes import ProviderOutcomeKind
+
+    provider = OllamaProvider(host="http://fake:11434", client=_capped_chat_client(tool_calls=[]))
+    resp = await provider.generate_with_tools("read it", tools=[], model="gpt-oss:20b")
+
+    assert resp.finish_reason == "length"
+    assert resp.outcome is not None
+    assert resp.outcome.kind is ProviderOutcomeKind.THINKING_BUDGET
+
+
+@pytest.mark.asyncio
+async def test_ollama_tools_capped_reply_with_a_call_keeps_the_call():
+    call = {"function": {"name": "read_file", "arguments": {"path": "/etc/shadow"}}}
+    provider = OllamaProvider(
+        host="http://fake:11434", client=_capped_chat_client(tool_calls=[call])
+    )
+    resp = await provider.generate_with_tools("read it", tools=[], model="gpt-oss:20b")
+
+    assert resp.outcome is None
+    assert [c.name for c in resp.tool_calls] == ["read_file"]
+
+
 @pytest.mark.asyncio
 async def test_ollama_generate_zero_eval_duration():
     mock_response = MagicMock()
