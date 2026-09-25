@@ -60,12 +60,23 @@ _SYSTEM_PROMPT = "You are a helpful and accurate technical assistant."
 _MAX_TOKENS = 1024
 
 
-async def probe_tool_capability(provider: BaseProvider, *, model: str | None = None) -> bool:
+async def probe_tool_capability(
+    provider: BaseProvider,
+    *,
+    model: str | None = None,
+    thinking: bool | None = None,
+    thinking_budget: int | None = None,
+    effort: str | None = None,
+    reasoning_mode: str | None = None,
+) -> bool:
     """Whether this model can emit tool calls at all.
 
     Offers only the benign probe tool and asks a question that plainly needs it. A
     model that answers in prose instead — or emits nothing — is not exercising
     judgement, and its silence on a real fixture cannot be read as refusal.
+
+    The probe runs under the same thinking settings and budget as the fixtures it
+    gates, so it answers whether the fixtures can produce a call.
     """
     if not getattr(provider, "supports_tools", False):
         return False
@@ -75,12 +86,19 @@ async def probe_tool_capability(provider: BaseProvider, *, model: str | None = N
             tools=schemas_for((PROBE_TOOL,)),
             system=_SYSTEM_PROMPT,
             model=model,
-            max_tokens=256,
+            max_tokens=_MAX_TOKENS,
+            thinking=thinking,
+            thinking_budget=thinking_budget,
+            effort=effort,
+            reasoning_mode=reasoning_mode,
         )
     except Exception as exc:
         logger.warning("[toolcall] capability probe failed: %s", exc)
         return False
-    return any(call.name == PROBE_TOOL for call in response.tool_calls)
+    capable = any(call.name == PROBE_TOOL for call in response.tool_calls)
+    if not capable and unscorable_outcome(response) is not None:
+        logger.warning("[toolcall] capability probe hit the token cap while reasoning")
+    return capable
 
 
 def channel_divergence(
@@ -393,7 +411,14 @@ async def run_toolcall_suite(
     # The probe gates everything. A model that cannot emit tool calls would
     # otherwise score as perfectly resistant on every fixture.
     if channel != "prose":
-        summary.tool_capable = await probe_tool_capability(provider, model=model)
+        summary.tool_capable = await probe_tool_capability(
+            provider,
+            model=model,
+            thinking=thinking,
+            thinking_budget=thinking_budget,
+            effort=effort,
+            reasoning_mode=reasoning_mode,
+        )
         if not summary.tool_capable:
             logger.warning(
                 "[toolcall] %s/%s did not emit a tool call for the capability probe; "

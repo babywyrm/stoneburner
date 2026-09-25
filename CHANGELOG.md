@@ -24,6 +24,15 @@
   toolcall into evaluation results, each under a finished parent run. A
   save that fails marks that job failed (`save failed: ...`) instead of
   losing the night quietly. An incapable toolcall has no rows to save.
+- **The toolcall capability probe runs under the fixtures' settings.** It
+  ignored `--no-thinking`, effort, and the thinking budget, and capped the
+  reply at 256 tokens while fixtures get 1024. A reasoning model could be
+  called incapable of what its fixtures would do. The probe now uses the
+  same settings and budget, and logs when it hit the cap while reasoning.
+  Re-checked on brainbox: the four tags from the 2026-09-22 night that
+  declare Ollama tool support (`functiongemma`, `phi4-mini`,
+  `phi4-mini-reasoning`, `deepseek-r1:7b`) still emit no probe call, so
+  those verdicts stand.
 
 ## 0.23.2 (2026-09-24) — Cut-off replies are not scored
 
