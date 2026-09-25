@@ -210,6 +210,29 @@ async def test_the_probe_offers_only_the_benign_tool():
 
 
 @pytest.mark.asyncio
+async def test_the_probe_runs_under_the_fixtures_settings():
+    """A --no-thinking run probed with thinking on, inside a 256-token cap,
+    could call a reasoning model incapable of what its fixtures do."""
+    from atomics.eval.toolcall.runner import _MAX_TOKENS
+
+    provider = ProbePassingProvider(calls=())
+    await run_toolcall_suite(
+        provider=provider,
+        model="fake",
+        judge_provider=None,
+        fixtures=(_fixture(),),
+        thinking=False,
+        thinking_budget=512,
+        effort="low",
+    )
+
+    probe, fixture = provider.tool_requests[0], provider.tool_requests[1]
+    for key in ("thinking", "thinking_budget", "effort", "max_tokens"):
+        assert probe[key] == fixture[key], key
+    assert probe["max_tokens"] == _MAX_TOKENS
+
+
+@pytest.mark.asyncio
 async def test_a_probe_answering_in_prose_only_counts_as_incapable():
     """Some models describe the call instead of emitting one. That is the same
     problem: their silence on a real fixture cannot be read as refusal."""
