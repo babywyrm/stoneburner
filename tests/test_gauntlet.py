@@ -16,6 +16,39 @@ from atomics.eval.gauntlet import (
 )
 
 
+def test_run_spread_is_the_stdev_of_per_run_means() -> None:
+    from types import SimpleNamespace
+
+    from atomics.eval.gauntlet import run_mean_stdev
+
+    summary = SimpleNamespace(
+        runs=3,
+        results=[
+            SimpleNamespace(run_scores=[0.8, 0.9, 1.0]),
+            SimpleNamespace(run_scores=[0.4, 0.5, 0.6]),
+        ],
+    )
+    assert run_mean_stdev(summary) == pytest.approx(0.1)
+
+    uneven = SimpleNamespace(
+        runs=3,
+        results=[
+            SimpleNamespace(run_scores=[0.8, 0.9]),
+            SimpleNamespace(run_scores=[0.4, 0.5, 0.6]),
+        ],
+    )
+    assert run_mean_stdev(uneven) is None
+    assert run_mean_stdev(SimpleNamespace(runs=1, results=summary.results)) is None
+
+
+def test_spread_shows_in_the_log_and_the_table() -> None:
+    from atomics.eval.gauntlet import format_job_log
+
+    row = SuiteJobResult(model="m", suite="redblue", ok=True, headline=0.806, stdev=0.012)
+    assert format_job_log(row) == "ok m redblue headline=0.806 stdev=0.012"
+    assert format_headline_cell(row) == "80.6% ±1.2"
+
+
 def test_headline_cell_names_a_toolcall_rate() -> None:
     assert (
         format_headline_cell(

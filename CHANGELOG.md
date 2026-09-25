@@ -8,6 +8,13 @@
   interrupted jobs run again. The final table and exit code cover the
   whole night. The 2026-09-22 laptop lane had to be restarted from a
   hand-edited model list.
+- **Sweep red/blue reports its run-to-run spread.** With `--runs` above 1,
+  the log, status file, and table carry the sample stdev of each run's
+  mean over the same fixtures (`headline=0.896 stdev=0.025`,
+  `89.6% ±2.5`). That is how far the headline moves between passes. It
+  is left out unless every fixture scored every run. It is not the
+  existing `quality_stddev`, which mixes fixture difficulty with run
+  noise.
 
 ### Fixed
 - **`sweep --suites ... --save` saves.** The multi-suite path returned

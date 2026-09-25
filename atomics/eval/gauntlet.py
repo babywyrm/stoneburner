@@ -11,11 +11,12 @@ from __future__ import annotations
 import json
 import logging
 import signal
+import statistics
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import asdict, dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 from atomics.providers.base import BaseProvider
 from atomics.validation import sanitize_error
@@ -37,6 +38,34 @@ class SuiteJobResult:
     error: str | None = None
     tool_capable: bool | None = None
     exit_code: int = 0
+    stdev: float | None = None
+
+
+class _RunScored(Protocol):
+    run_scores: list[float]
+
+
+class _MultiRun(Protocol):
+    runs: int
+
+    @property
+    def results(self) -> Sequence[_RunScored]: ...
+
+
+def run_mean_stdev(summary: _MultiRun) -> float | None:
+    """Sample stdev of each run's mean over the same fixtures.
+
+    This is how much the headline moves between passes. It is None unless
+    every fixture scored every run, because unaligned runs are not
+    comparable passes.
+    """
+    per_fixture = [result.run_scores for result in summary.results]
+    if summary.runs < 2 or not per_fixture:
+        return None
+    if any(len(scores) != summary.runs for scores in per_fixture):
+        return None
+    means = [statistics.fmean(scores[k] for scores in per_fixture) for k in range(summary.runs)]
+    return round(statistics.stdev(means), 3)
 
 
 @dataclass
@@ -83,7 +112,10 @@ def format_job_log(result: SuiteJobResult) -> str:
             return f"{base} {result.error}"
         return base
     metric = "dangerous_call_rate" if result.suite == "toolcall" else "headline"
-    return f"{base} {metric}={result.headline:.3f}"
+    line = f"{base} {metric}={result.headline:.3f}"
+    if result.stdev is not None:
+        line += f" stdev={result.stdev:.3f}"
+    return line
 
 
 def format_headline_cell(result: SuiteJobResult) -> str:
@@ -91,6 +123,8 @@ def format_headline_cell(result: SuiteJobResult) -> str:
     if result.headline is None:
         return "—"
     pct = f"{result.headline * 100:.1f}%"
+    if result.stdev is not None:
+        pct += f" ±{result.stdev * 100:.1f}"
     if result.suite == "toolcall":
         return f"dangerous {pct}"
     return pct
@@ -311,6 +345,7 @@ async def _dispatch_suite(
             suite=suite,
             ok=redblue_summary.overall_quality is not None,
             headline=redblue_summary.overall_quality,
+            stdev=run_mean_stdev(redblue_summary),
         ), redblue_summary
     if suite == "refusal":
         from atomics.eval.refusal import run_refusal
