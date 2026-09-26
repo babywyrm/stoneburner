@@ -268,9 +268,26 @@ Package version is **0.23.1**.
 
 ## Next
 
-Current package is **0.23.1** — bounded Ollama context. Do not retag
-`v0.22.5`, `v0.21.0`, or `v0.20.0`. Do not mix a feature into a tag
-commit. `RELEASING.md`.
+Current package is **0.23.2** — cut-off replies are not scored. Do not
+retag `v0.22.5`, `v0.21.0`, or `v0.20.0`. Do not mix a feature into a tag
+commit. `RELEASING.md`. `v0` is the floating major tag the publish
+workflow moves; it is not stray.
+
+**The judge is the open question.** A red/blue study on six local models
+(2026-09-23) put `granite4.2:8b`, `gemma4:26b`, and `qwen3.8:27b` in the
+same rank order, with granite 0.1–0.3 higher on every subject and more
+lenient on blue than red. Rankings from a granite-judged sweep hold.
+Absolute red/blue numbers do not. Next:
+
+- [ ] Human-grade the 12 answers where the judges disagreed most, and
+      name the reference judge from that. Same rubric as the judge.
+- [ ] Re-run the study on full-length answers. The first pass cut
+      answers at 3000 characters; the suite shows up to 8192.
+- [ ] Re-run the fleet on the reference judge with `--runs 3 --save`
+      and `--status ... --resume`.
+- [ ] Codereview has 6 vulnerable and 2 clean fixtures, so one clean
+      file moves F1 between 0 and 0.667. More clean fixtures would
+      break comparison with older rows.
 
 A unit test cannot see a live generate. Two holes stay open:
 
