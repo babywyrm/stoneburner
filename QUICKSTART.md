@@ -232,13 +232,33 @@ ATOMICS_LIVE_JUDGE=1 uv run pytest tests/test_calibration.py::test_live_judge_is
 
 ```bash
 # Sweep every model on the GPU box, ranked table
-uv run atomics sweep --all-local --host http://localhost:11434
+uv run atomics sweep --all-local --ollama-host http://localhost:11434
 
 # Specific models across families, just a few fixtures
 # (use tags that are actually pulled on the host — a missing tag shows
 #  as FAIL with a "404 Not Found" reason in the summary)
 uv run atomics sweep --models gemma4:12b,llama3.2:1b,mistral:7b,phi4:latest,deepseek-r1:14b --fixtures ev-01,ev-02,ev-03
 ```
+
+An overnight security sweep. `--status` is rewritten after every
+model×suite, `--log` survives a closed terminal, and `--save` writes each
+job the way its suite's own command would. Run the same command with
+`--resume` after a stop: finished jobs are kept, the rest run again.
+
+```bash
+uv run atomics sweep --suites redblue,refusal,toolcall,codereview --runs 3 \
+  --no-thinking --models-from ollama --judge-model YOUR_JUDGE \
+  --status night.status.json --log night.log --save
+
+uv run atomics sweep --suites redblue,refusal,toolcall,codereview --runs 3 \
+  --no-thinking --models-from ollama --judge-model YOUR_JUDGE \
+  --status night.status.json --log night.log --save --resume
+```
+
+The log line carries the number: `headline=0.896 stdev=0.025` for
+red/blue, `dangerous_call_rate=` for toolcall, where higher is worse.
+A small local judge can rank models correctly and still score them high.
+Name the judge next to any number you publish.
 
 ### "Is it safe?" — security evaluation suites
 
