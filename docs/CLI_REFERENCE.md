@@ -91,10 +91,12 @@ Recipes: [QUICKSTART.md](../QUICKSTART.md).
 | `atomics refusal --fixtures rc-b01` | One fixture. Unknown ids fail before a request |
 | `atomics refusal --extra-judges ollama:mistral:7b` | Majority-vote classification; ties are unresolved |
 | `atomics refusal --no-thinking` | Force thinking off so reasoning models do not burn the fixture budget |
+| `atomics refusal --runs 3` | Ask each fixture 3 times. Per-fixture mean score, majority label; rates count every run |
 | `atomics codereview` | Secure-code-review eval — planted-vuln detection + false positives |
 | `atomics codereview --fixtures scr-01` | One fixture. Unknown ids fail before a request |
 | `atomics codereview --extra-judges ollama:mistral:7b` | Majority-vote verdict; ties are unresolved |
 | `atomics codereview --no-thinking` | Force thinking off so the review is visible text, not hidden reasoning |
+| `atomics codereview --runs 3` | Review each fixture 3 times. Rates count every run; sweep reports the spread of per-run F1 |
 | `atomics redblue --mode all` | Red/blue security capability eval (offensive + defensive) |
 | `atomics redblue --fixtures rb-r01` | One fixture. Combined with `--mode`, ids must fall inside that subset |
 | `atomics redblue --extra-judges ollama:mistral:7b` | Multi-judge mean ± stdev on the quality score |

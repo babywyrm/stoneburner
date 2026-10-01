@@ -12,13 +12,18 @@ Rollups:
   false_positive_rate = false_positives / clean
   review_score        = F1 of (detection, 1 - false_positive) — high only when
                         the model both finds real bugs and stays quiet on clean code.
+
+With `runs` above 1 each fixture is reviewed again. The rates count every
+scored run, and `review_score_stdev` is the spread of each run's F1.
 """
 
 from __future__ import annotations
 
 import inspect
 import logging
+import statistics
 import uuid
+from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -51,6 +56,8 @@ from atomics.eval.outcomes import (
     JudgeOutcomeStatus,
     RunIntegrity,
     provider_outcome_from_exception,
+    sum_attempt_costs,
+    sum_attempt_latency,
 )
 from atomics.eval.provider_attempt import build_attempt, provider_outcome_from_response
 from atomics.eval.runner import _call_hook
@@ -89,16 +96,21 @@ class CodeReviewResult:
     attempts: list[AttemptResult] = field(default_factory=list)
     judge_agreement: float | None = None
 
+    @property
+    def run_scores(self) -> list[float]:
+        return [score for _, score in _scored_runs(self.attempts)]
+
+    @property
+    def run_labels(self) -> list[str]:
+        return [label for label, _ in _scored_runs(self.attempts)]
+
     def to_dict(self) -> dict[str, object]:
         integrity = RunIntegrity.from_fixture_attempts([self.attempts])
         generation_status, generation_counts = generation_summary(self.attempts)
         judge_status, judge_counts = judge_summary(self.attempts)
         error_class, error_message = representative_error(self.attempts)
-        score = (
-            self.attempts[0].judge.score
-            if _is_scored_result(self) and self.attempts[0].judge is not None
-            else None
-        )
+        scores = self.run_scores
+        score = sum(scores) / len(scores) if scores else None
         return {
             "id": self.fixture.id,
             "cwe": self.fixture.cwe,
@@ -137,6 +149,7 @@ class CodeReviewSummary:
     started_at: datetime
     completed_at: datetime
     results: list[CodeReviewResult] = field(default_factory=list)
+    runs: int = 1
 
     @property
     def fixture_results(self) -> list[CodeReviewResult]:
@@ -148,29 +161,33 @@ class CodeReviewSummary:
 
     @property
     def detection_rate(self) -> float | None:
-        vuln = [r for r in self.results if r.fixture.is_vulnerable and _is_scored_result(r)]
-        if not vuln:
-            return None
-        return round(sum(1 for r in vuln if r.verdict == "detected") / len(vuln), 3)
+        return _detection_rate(self._verdicts())
 
     @property
     def false_positive_rate(self) -> float | None:
-        clean = [r for r in self.results if not r.fixture.is_vulnerable and _is_scored_result(r)]
-        if not clean:
-            return None
-        return round(sum(1 for r in clean if r.verdict == "false_positive") / len(clean), 3)
+        return _false_positive_rate(self._verdicts())
 
     @property
     def review_score(self) -> float | None:
-        det = self.detection_rate
-        fpr = self.false_positive_rate
-        if det is None or fpr is None:
+        return _review_f1(self._verdicts())
+
+    @property
+    def review_score_stdev(self) -> float | None:
+        """Sample stdev of each run's F1. None unless every fixture scored every run."""
+        if self.runs < 2 or any(len(r.run_labels) != self.runs for r in self.results):
             return None
-        # Treat detection as recall and (1 - FPR) as precision-ish; harmonic mean.
-        spec = 1.0 - fpr
-        if det + spec == 0:
-            return 0.0
-        return round(2 * det * spec / (det + spec), 3)
+        per_run = [_review_f1(self._verdicts(run)) for run in range(self.runs)]
+        if any(score is None for score in per_run):
+            return None
+        return round(statistics.stdev(s for s in per_run if s is not None), 3)
+
+    def _verdicts(self, run: int | None = None) -> list[tuple[bool, str]]:
+        return [
+            (r.fixture.is_vulnerable, label)
+            for r in self.results
+            for k, label in enumerate(r.run_labels)
+            if run is None or k == run
+        ]
 
     @property
     def total_cost_usd(self) -> float:
@@ -186,6 +203,7 @@ class CodeReviewSummary:
             "judge_model": self.judge_model,
             "started_at": self.started_at.isoformat(),
             "completed_at": self.completed_at.isoformat(),
+            "runs": self.runs,
             "detection_rate": headline_rate(self.detection_rate, integrity),
             "false_positive_rate": headline_rate(self.false_positive_rate, integrity),
             "review_score": headline_rate(self.review_score, integrity),
@@ -212,8 +230,11 @@ async def run_codereview(
     on_fixture_start: Callable[[SecureCodeFixture], object] | None = None,
     on_fixture_done: Callable[[CodeReviewResult], object] | None = None,
     on_phase: Callable[..., object] | None = None,
+    runs: int = 1,
 ) -> CodeReviewSummary:
     """Run secure-code-review fixtures and score detection vs false positives."""
+    if runs < 1:
+        raise ValueError("runs must be at least 1")
     extra_judges = extra_judges or []
     collisions = detect_self_judge(
         provider,
@@ -232,8 +253,7 @@ async def run_codereview(
     fixture_set = fixtures if fixtures is not None else SECURE_CODE_FIXTURES
     results: list[CodeReviewResult] = []
 
-    for fx in fixture_set:
-        await _invoke_callback(on_fixture_start, fx)
+    async def run_once(fx: SecureCodeFixture, run: int) -> tuple[AttemptResult, float | None]:
         response = None
         generate_model = model or getattr(provider, "default_model", None)
         await _call_hook(on_phase, fx.id, "generate", generate_model)
@@ -272,12 +292,22 @@ async def run_codereview(
             )
 
         attempt = build_attempt(
-            attempt_index=0,
+            attempt_index=run,
             outcome=provider_outcome,
             response=response,
             judge=judge_outcome,
         )
-        result = _result_from_attempt(fx, attempt, judge_agreement=judge_agreement)
+        return attempt, judge_agreement
+
+    for fx in fixture_set:
+        await _invoke_callback(on_fixture_start, fx)
+        passes = [await run_once(fx, run) for run in range(runs)]
+        agreements = [agreement for _, agreement in passes if agreement is not None]
+        result = _result_from_attempts(
+            fx,
+            [attempt for attempt, _ in passes],
+            judge_agreement=sum(agreements) / len(agreements) if agreements else None,
+        )
         results.append(result)
         await _invoke_callback(on_fixture_done, result)
 
@@ -289,6 +319,7 @@ async def run_codereview(
         started_at=started,
         completed_at=datetime.now(UTC),
         results=results,
+        runs=runs,
     )
 
 
@@ -369,42 +400,57 @@ def _outcome_from_categorical(
     )
 
 
-def _result_from_attempt(
+def _result_from_attempts(
     fixture: SecureCodeFixture,
-    attempt: AttemptResult,
+    attempts: list[AttemptResult],
     *,
     judge_agreement: float | None = None,
 ) -> CodeReviewResult:
-    verdict = (
-        attempt.judge.label
-        if (
-            attempt.judge is not None
-            and attempt.judge.is_scored
-            and attempt.judge.label is not None
-        )
-        else "unknown"
-    )
-    _, error_message = representative_error([attempt])
+    labels = [label for label, _ in _scored_runs(attempts)]
+    verdict = Counter(labels).most_common(1)[0][0] if labels else "unknown"
+    _, error_message = representative_error(attempts)
     return CodeReviewResult(
         fixture=fixture,
         verdict=verdict,
         passed=verdict in {"detected", "clean"},
-        review_text=attempt.response_text,
-        latency_ms=attempt.latency_ms,
+        review_text=attempts[0].response_text if attempts else "",
+        latency_ms=sum_attempt_latency(attempts),
         error=error_message or None,
-        estimated_cost_usd=attempt.estimated_cost_usd,
-        attempts=[attempt],
+        estimated_cost_usd=sum_attempt_costs(attempts),
+        attempts=attempts,
         judge_agreement=judge_agreement,
     )
 
 
-def _is_scored_result(result: CodeReviewResult) -> bool:
-    return bool(
-        result.attempts
-        and result.attempts[0].judge is not None
-        and result.attempts[0].judge.is_scored
-        and result.attempts[0].judge.score is not None
-    )
+def _scored_runs(attempts: list[AttemptResult]) -> list[tuple[str, float]]:
+    """(verdict, score) for each attempt the judge scored, in run order."""
+    return [
+        (attempt.judge.label or "unknown", attempt.judge.score)
+        for attempt in attempts
+        if attempt.judge is not None and attempt.judge.is_scored and attempt.judge.score is not None
+    ]
+
+
+def _detection_rate(verdicts: list[tuple[bool, str]]) -> float | None:
+    vuln = [label for vulnerable, label in verdicts if vulnerable]
+    return round(vuln.count("detected") / len(vuln), 3) if vuln else None
+
+
+def _false_positive_rate(verdicts: list[tuple[bool, str]]) -> float | None:
+    clean = [label for vulnerable, label in verdicts if not vulnerable]
+    return round(clean.count("false_positive") / len(clean), 3) if clean else None
+
+
+def _review_f1(verdicts: list[tuple[bool, str]]) -> float | None:
+    det = _detection_rate(verdicts)
+    fpr = _false_positive_rate(verdicts)
+    if det is None or fpr is None:
+        return None
+    # Treat detection as recall and (1 - FPR) as precision-ish; harmonic mean.
+    spec = 1.0 - fpr
+    if det + spec == 0:
+        return 0.0
+    return round(2 * det * spec / (det + spec), 3)
 
 
 async def _invoke_callback(

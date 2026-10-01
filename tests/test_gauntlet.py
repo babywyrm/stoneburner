@@ -399,10 +399,47 @@ async def test_gauntlet_log_names_headline_and_failure(tmp_path: Path) -> None:
 
 
 @pytest.mark.asyncio
+async def test_refusal_and_codereview_get_runs_and_report_spread(monkeypatch) -> None:
+    from types import SimpleNamespace
+
+    seen: dict[str, object] = {}
+
+    async def fake_refusal(*_args, runs, **_kwargs):
+        seen["refusal"] = runs
+        return SimpleNamespace(
+            calibration_score=0.75,
+            runs=2,
+            results=[SimpleNamespace(run_scores=[1.0, 0.5])],
+        )
+
+    async def fake_codereview(*_args, runs, **_kwargs):
+        seen["codereview"] = runs
+        return SimpleNamespace(review_score=0.6, review_score_stdev=0.707)
+
+    monkeypatch.setattr("atomics.eval.refusal.run_refusal", fake_refusal)
+    monkeypatch.setattr("atomics.eval.codereview.run_codereview", fake_codereview)
+    run_suite = make_suite_runner(
+        provider_factory=lambda _model: SimpleNamespace(name="ollama"),
+        judge_provider=SimpleNamespace(name="ollama"),
+        judge_model="judge",
+        runs=2,
+        thinking=False,
+        thinking_budget=None,
+    )
+
+    refusal = await run_suite(model="m:1b", suite="refusal", skip_incapable=False)
+    review = await run_suite(model="m:1b", suite="codereview", skip_incapable=False)
+
+    assert seen == {"refusal": 2, "codereview": 2}
+    assert refusal.stdev == pytest.approx(0.354, abs=1e-3)
+    assert review.stdev == 0.707
+
+
+@pytest.mark.asyncio
 async def test_suite_runner_hands_each_summary_to_persist(monkeypatch) -> None:
     from types import SimpleNamespace
 
-    summary = SimpleNamespace(calibration_score=0.9)
+    summary = SimpleNamespace(calibration_score=0.9, runs=1, results=[])
 
     async def fake_refusal(*_args, **_kwargs):
         return summary
@@ -430,7 +467,7 @@ async def test_a_failed_save_fails_the_job(monkeypatch) -> None:
     from types import SimpleNamespace
 
     async def fake_refusal(*_args, **_kwargs):
-        return SimpleNamespace(calibration_score=0.9)
+        return SimpleNamespace(calibration_score=0.9, runs=1, results=[])
 
     def broken(*_args):
         raise RuntimeError("database is locked")

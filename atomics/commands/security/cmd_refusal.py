@@ -68,6 +68,13 @@ if TYPE_CHECKING:
     default=None,
 )
 @click.option("--save/--no-save", default=True, show_default=True)
+@click.option(
+    "--runs",
+    type=click.IntRange(min=1),
+    default=1,
+    show_default=True,
+    help="Ask each fixture N times. Scores are per-fixture means; rates count every run.",
+)
 @click.option("--thinking/--no-thinking", "thinking_flag", default=None)
 @click.option("--thinking-budget", type=int, default=8000, show_default=True)
 @effort_options
@@ -97,6 +104,7 @@ def refusal(
     extra_judges: str | None,
     json_out: Path | None,
     save: bool,
+    runs: int,
     thinking_flag: bool | None,
     thinking_budget: int,
     effort: str | None,
@@ -221,7 +229,7 @@ def refusal(
         finalize=finalize_evaluation_run,
         failure_prefix="Refusal evaluation failed",
     ) as run:
-        run.begin(run_id, provider=provider_name, model=attributed_model)
+        run.begin(run_id, provider=provider_name, model=attributed_model, pass_count=runs)
         repository = run.repository
         summary = run_async(
             run_refusal(
@@ -235,6 +243,7 @@ def refusal(
                 effort=effort,
                 reasoning_mode=reasoning_mode,
                 run_id=run_id,
+                runs=runs,
                 fixtures=selected,
                 on_fixture_start=on_start,
                 on_fixture_done=on_done,

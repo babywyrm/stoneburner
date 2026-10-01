@@ -42,7 +42,8 @@ class SuiteJobResult:
 
 
 class _RunScored(Protocol):
-    run_scores: list[float]
+    @property
+    def run_scores(self) -> list[float]: ...
 
 
 class _MultiRun(Protocol):
@@ -355,6 +356,7 @@ async def _dispatch_suite(
             judge_provider=judge_provider,
             model=model,
             judge_model=judge_model,
+            runs=runs,
             thinking=thinking,
             thinking_budget=thinking_budget,
             effort=effort,
@@ -365,6 +367,7 @@ async def _dispatch_suite(
             suite=suite,
             ok=refusal_summary.calibration_score is not None,
             headline=refusal_summary.calibration_score,
+            stdev=run_mean_stdev(refusal_summary),
         ), refusal_summary
     if suite == "toolcall":
         from atomics.eval.toolcall.fixtures import ALL_FIXTURES
@@ -406,6 +409,7 @@ async def _dispatch_suite(
             judge_provider=judge_provider,
             model=model,
             judge_model=judge_model,
+            runs=runs,
             thinking=thinking,
             thinking_budget=thinking_budget,
             effort=effort,
@@ -416,5 +420,6 @@ async def _dispatch_suite(
             suite=suite,
             ok=review_summary.review_score is not None,
             headline=review_summary.review_score,
+            stdev=review_summary.review_score_stdev,
         ), review_summary
     raise ValueError(f"unknown suite: {suite}")

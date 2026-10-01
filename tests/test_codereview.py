@@ -412,3 +412,49 @@ async def test_extra_judges_tie_is_unresolved_and_drops_from_rates():
     assert result.to_dict()["score"] is None
     assert result.judge_agreement == pytest.approx(0.5)
     assert summary.detection_rate is None
+
+
+class _ScriptedVerdictJudge(_FixedVerdictJudge):
+    """Answers each call with the next verdict, so runs can disagree."""
+
+    def __init__(self, verdicts: list[str]) -> None:
+        super().__init__("")
+        self._verdicts = iter(verdicts)
+
+    async def generate(self, prompt, **kwargs):
+        self._verdict = next(self._verdicts)
+        return await super().generate(prompt, **kwargs)
+
+
+@pytest.mark.asyncio
+async def test_runs_repeat_each_fixture_and_spread_is_per_run_f1():
+    """Run 0 is perfect (F1 1.0). Run 1 misses one bug and flags the clean
+    file (F1 0.0). Pooled: detection 3/4, false positives 1/2."""
+    vulnerable = [f for f in SECURE_CODE_FIXTURES if f.is_vulnerable][:2]
+    clean = [f for f in SECURE_CODE_FIXTURES if not f.is_vulnerable][:1]
+    summary = await run_codereview(
+        _FakeProvider(),
+        judge_provider=_ScriptedVerdictJudge(
+            ["DETECTED", "MISSED", "DETECTED", "DETECTED", "CLEAN", "FALSE_POSITIVE"]
+        ),
+        fixtures=[*vulnerable, *clean],
+        runs=2,
+    )
+    first = summary.results[0]
+    assert summary.runs == 2
+    assert first.to_dict()["attempt_count"] == 2
+    assert first.to_dict()["score"] == 0.5
+    assert summary.detection_rate == 0.75
+    assert summary.false_positive_rate == 0.5
+    assert summary.review_score == 0.6
+    assert summary.review_score_stdev == pytest.approx(0.707, abs=1e-3)
+
+
+@pytest.mark.asyncio
+async def test_single_run_has_no_review_spread():
+    summary = await run_codereview(
+        _FakeProvider(),
+        judge_provider=_FakeJudge(perfect=True),
+    )
+    assert summary.runs == 1
+    assert summary.review_score_stdev is None
