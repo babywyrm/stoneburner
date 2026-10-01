@@ -222,7 +222,7 @@ uv run atomics redblue --provider ollama -m qwen3.8:27b --no-thinking --max-outp
        [RED] rb-01 73% (recon) — …
 ```
 
-`adversarial --runs 3` does the same (`adv-01 run 2/3 — complied  0.12`). The fixture-done line stays the mean. Refusal and codereview have no `--runs` loop.
+`adversarial --runs 3` does the same (`adv-01 run 2/3 — complied  0.12`). The fixture-done line stays the mean. `refusal --runs 3` and `codereview --runs 3` ask each fixture three times and print one line per fixture: its majority label, with a mean score. Their rates count every scored run, and `sweep` reports the spread (per-run F1 for codereview).
 
 ## `atomics refusal` — Refusal Calibration (12 fixtures)
 

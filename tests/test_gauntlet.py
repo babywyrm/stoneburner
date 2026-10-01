@@ -249,7 +249,7 @@ async def test_sweep_save_writes_suite_rows_and_closes_the_parent(tmp_path: Path
     grader.generate = AsyncMock(return_value=_reply("VERDICT: DETECTED\nRATIONALE: ok"))
 
     redblue = await run_redblue(_provider(), judge_provider=_judge(), mode="red")
-    review = await run_codereview(reviewer, judge_provider=grader, model="m:1b")
+    review = await run_codereview(reviewer, judge_provider=grader, model="m:1b", runs=2)
     db = tmp_path / "atomics.db"
     persist = suite_persister(db)
     persist("redblue", "ollama", "m:1b", redblue)
@@ -261,6 +261,7 @@ async def test_sweep_save_writes_suite_rows_and_closes_the_parent(tmp_path: Path
         assert len(repo.get_evaluation_results(run_id=review.run_id)) == len(review.results)
         assert repo.get_run(redblue.run_id)["completed_at"]
         assert repo.get_run(review.run_id)["completed_at"]
+        assert repo.get_run(review.run_id)["pass_count"] == 2
     finally:
         repo.close()
 
