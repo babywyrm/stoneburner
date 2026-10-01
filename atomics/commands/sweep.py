@@ -67,7 +67,9 @@ def suite_persister(db_path: Path) -> Callable[[str, str, str, object], None]:
                 for er in summary.fixture_results:
                     repo.save_task_result(er.task_result)
             elif isinstance(summary, (RefusalSummary, CodeReviewSummary)):
-                run.begin(summary.run_id, provider=provider_name, model=model)
+                run.begin(
+                    summary.run_id, provider=provider_name, model=model, pass_count=summary.runs
+                )
                 repo = run.require_repository()
                 for result in summary.results:
                     repo.save_evaluation_result(
@@ -170,7 +172,8 @@ def suite_persister(db_path: Path) -> Callable[[str, str, str, object], None]:
     type=click.IntRange(min=1),
     default=1,
     show_default=True,
-    help="Passes per fixture for suites that support --runs (redblue, toolcall).",
+    help="Passes per fixture for suites that support --runs "
+    "(redblue, toolcall, refusal, codereview).",
 )
 @click.option(
     "--status",

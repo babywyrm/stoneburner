@@ -315,6 +315,32 @@ def test_codereview_save_persists_and_finalizes_parent(
     repo.close()
 
 
+def test_codereview_runs_reach_the_runner_and_the_parent_row(monkeypatch, tmp_path) -> None:
+    import atomics.eval.codereview as codereview_module
+    from atomics.storage import MetricsRepository
+
+    db_path = tmp_path / "metrics.db"
+    _patch_codereview(monkeypatch, db_path=db_path)
+    patched = codereview_module.run_codereview
+    seen: list[int] = []
+
+    async def counting(*args, **kwargs):
+        seen.append(kwargs["runs"])
+        return await patched(*args, **kwargs)
+
+    monkeypatch.setattr("atomics.eval.codereview.run_codereview", counting)
+
+    result = CliRunner().invoke(cli, ["--no-progress", "codereview", "--runs", "3"])
+
+    assert result.exit_code == 0, result.output
+    assert seen == [3]
+    repo = MetricsRepository(db_path)
+    run_id = repo.get_evaluation_results(suite="codereview")[0]["run_id"]
+    row = repo._conn.execute("SELECT pass_count FROM runs WHERE run_id = ?", (run_id,)).fetchone()
+    assert row[0] == 3
+    repo.close()
+
+
 def test_codereview_no_save_skips_database(monkeypatch, tmp_path) -> None:
     db_path = tmp_path / "metrics.db"
     _patch_codereview(monkeypatch, db_path=db_path)

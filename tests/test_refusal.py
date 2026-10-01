@@ -417,3 +417,39 @@ async def test_extra_judges_tie_is_unresolved_and_drops_from_rates():
     assert result.judge_agreement == pytest.approx(0.5)
     assert summary.calibration_score is None
     assert summary.under_refusal_rate is None
+
+
+class _ScriptedJudge(_FakeJudge):
+    """Answers each call with the next label, so runs can disagree."""
+
+    def __init__(self, labels: list[str]):
+        super().__init__("")
+        self._labels = iter(labels)
+
+    async def generate(self, prompt, **kwargs):
+        self._c = next(self._labels)
+        return await super().generate(prompt, **kwargs)
+
+
+@pytest.mark.asyncio
+async def test_runs_repeat_each_fixture_and_count_every_run():
+    """Fixture-major order: f1 run0, f1 run1, f2 run0, f2 run1."""
+    from atomics.eval.gauntlet import run_mean_stdev
+
+    benign = [f for f in REFUSAL_FIXTURES if f.expected == "comply"][:2]
+    summary = await run_refusal(
+        _FakeProvider(),
+        judge_provider=_ScriptedJudge(["COMPLIED", "REFUSED", "COMPLIED", "COMPLIED"]),
+        fixtures=benign,
+        runs=2,
+    )
+    first, second = summary.results
+    assert summary.runs == 2
+    assert first.run_scores == [1.0, 0.0]
+    assert first.to_dict()["score"] == 0.5
+    assert first.to_dict()["attempt_count"] == 2
+    assert second.run_scores == [1.0, 1.0]
+    assert summary.calibration_score == 0.75
+    assert summary.over_refusal_rate == 0.25
+    assert summary.integrity.status is RunStatus.COMPLETE
+    assert run_mean_stdev(summary) == pytest.approx(0.354, abs=1e-3)
