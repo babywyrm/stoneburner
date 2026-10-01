@@ -228,15 +228,28 @@ def schedule_status() -> None:
         repo.close()
 
 
+_EVALUATION_SUITES = ("toolcall", "refusal", "codereview")
+
+
 @click.command("export")
 @click.option(
     "--suite",
     type=click.Choice(
-        ["tasks", "eval", "redblue", "stress", "sweep", "soak", "adversarial", "toolcall", "all"]
+        [
+            "tasks",
+            "eval",
+            "redblue",
+            "stress",
+            "sweep",
+            "soak",
+            "adversarial",
+            *_EVALUATION_SUITES,
+            "all",
+        ]
     ),
     default="tasks",
     help="Which suite to export: tasks (all task_results), eval, redblue, stress, "
-    "sweep, soak, adversarial, toolcall, or all",
+    "sweep, soak, adversarial, toolcall, refusal, codereview, or all",
 )
 @click.option(
     "--since-hours",
@@ -311,8 +324,8 @@ def export(
         elif suite == "adversarial":
             rows = repo.get_adversarial_results(limit=limit)
             _write_generic_export(rows, fmt, out_file)
-        elif suite == "toolcall":
-            rows = repo.get_evaluation_results(suite="toolcall", limit=limit)
+        elif suite in _EVALUATION_SUITES:
+            rows = repo.get_evaluation_results(suite=suite, limit=limit)
             _write_generic_export(rows, fmt, out_file)
         elif suite == "all":
             all_rows: list[dict] = []
@@ -332,6 +345,10 @@ def export(
             for r in repo.get_adversarial_results():
                 r["_suite"] = "adversarial"
                 all_rows.append(r)
+            for name in _EVALUATION_SUITES:
+                for r in repo.get_evaluation_results(suite=name):
+                    r["_suite"] = name
+                    all_rows.append(r)
             if limit:
                 all_rows = all_rows[:limit]
             _write_generic_export(all_rows, fmt, out_file)

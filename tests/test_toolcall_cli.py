@@ -134,6 +134,58 @@ def test_export_toolcall_returns_saved_rows(tmp_path):
     assert "dangerous_call" in result.output
 
 
+def test_export_returns_every_evaluation_suite_by_name_and_under_all(tmp_path):
+    """refusal and codereview save to evaluation_results like toolcall, from
+    their own commands and from `sweep --save`. Saved rows nobody can export
+    are rows nobody can hand over."""
+    import json
+
+    from atomics.storage.records import EvaluationResultRecord
+    from atomics.storage.repository import MetricsRepository
+
+    db = tmp_path / "eval-suites.db"
+    repo = MetricsRepository(db)
+    for suite in ("toolcall", "refusal", "codereview"):
+        repo.create_run(f"r-{suite}", tier=suite, provider="ollama", model="test-model")
+        repo.save_evaluation_result(
+            EvaluationResultRecord(
+                run_id=f"r-{suite}",
+                suite=suite,
+                fixture_id=f"{suite}-01",
+                status="complete",
+                generation_status="ok",
+                judge_status="ok",
+                latency_ms=1.0,
+                input_tokens=0,
+                output_tokens=0,
+                total_tokens=0,
+                score=1.0,
+                provider="ollama",
+                model="test-model",
+                result_json={"id": f"{suite}-01"},
+            )
+        )
+    repo.close()
+
+    runner = CliRunner(env={"ATOMICS_DB_PATH": str(db)})
+    for suite in ("refusal", "codereview"):
+        result = runner.invoke(cli, ["export", "--suite", suite])
+        assert result.exit_code == 0, result.output
+        assert [json.loads(line)["fixture_id"] for line in result.output.splitlines()] == [
+            f"{suite}-01"
+        ]
+
+    result = runner.invoke(cli, ["export", "--suite", "all"])
+    assert result.exit_code == 0, result.output
+    tagged = {
+        (row["_suite"], row["fixture_id"])
+        for row in map(json.loads, result.output.splitlines())
+        if "fixture_id" in row
+    }
+    assert {("toolcall", "toolcall-01"), ("refusal", "refusal-01")} <= tagged
+    assert ("codereview", "codereview-01") in tagged
+
+
 def _one_fixture_summary():
     from atomics.eval.toolcall.runner import ToolCallSummary
 
