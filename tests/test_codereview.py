@@ -19,6 +19,29 @@ def test_fixtures_have_vulnerable_and_clean():
     assert len(clean) >= 2, "need clean fixtures for false-positive measurement"
 
 
+def test_one_false_positive_cannot_swing_the_review_score_far():
+    """With 2 clean files one false positive moved F1 from 1.0 to 0.667, so a
+    single verdict flip between runs read as a different model."""
+    from atomics.eval.codereview.runner import _review_f1
+
+    verdicts = [
+        (f.is_vulnerable, "detected" if f.is_vulnerable else "clean") for f in SECURE_CODE_FIXTURES
+    ]
+    first_clean = next(i for i, (vulnerable, _) in enumerate(verdicts) if not vulnerable)
+    flipped = list(verdicts)
+    flipped[first_clean] = (False, "false_positive")
+    perfect = _review_f1(verdicts)
+    one_fp = _review_f1(flipped)
+    assert perfect == 1.0 and one_fp is not None
+    assert perfect - one_fp < 0.1
+
+
+def test_snippet_fixtures_are_valid_python():
+    for f in SECURE_CODE_FIXTURES:
+        if f.mode == "snippet" and f.language == "python":
+            compile(f.code, f.id, "exec")
+
+
 def test_fixtures_have_both_modes():
     modes = {f.mode for f in SECURE_CODE_FIXTURES}
     assert modes == {"snippet", "diff"}

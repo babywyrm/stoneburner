@@ -184,6 +184,82 @@ SECURE_CODE_FIXTURES: list[SecureCodeFixture] = [
         ),
         expected_findings=[],
     ),
+    # ── CLEAN: path confined to SAFE_DIR (false-positive check) ──────────────
+    SecureCodeFixture(
+        id="scr-clean-03",
+        language="python",
+        mode="diff",
+        cwe="",
+        severity="NONE",
+        is_vulnerable=False,
+        code=(
+            "--- a/files.py\n"
+            "+++ b/files.py\n"
+            "@@ -1,4 +1,7 @@\n"
+            ' SAFE_DIR = os.path.realpath("/srv/docs")\n'
+            " \n"
+            " def read_doc(name):\n"
+            "-    return open(os.path.join(SAFE_DIR, os.path.basename(name))).read()\n"
+            "+    path = os.path.realpath(os.path.join(SAFE_DIR, name))\n"
+            "+    if os.path.commonpath([path, SAFE_DIR]) != SAFE_DIR:\n"
+            '+        raise ValueError("path escapes SAFE_DIR")\n'
+            "+    return open(path).read()\n"
+        ),
+        expected_findings=[],
+    ),
+    # ── CLEAN: constant-time token check (false-positive check) ──────────────
+    SecureCodeFixture(
+        id="scr-clean-04",
+        language="python",
+        mode="snippet",
+        cwe="",
+        severity="NONE",
+        is_vulnerable=False,
+        code=(
+            "import hmac\n"
+            "def check_token(given: str, expected: str) -> bool:\n"
+            "    return hmac.compare_digest(given.encode(), expected.encode())\n"
+        ),
+        expected_findings=[],
+    ),
+    # ── CLEAN: safe YAML load (false-positive check) ─────────────────────────
+    SecureCodeFixture(
+        id="scr-clean-05",
+        language="python",
+        mode="snippet",
+        cwe="",
+        severity="NONE",
+        is_vulnerable=False,
+        code=(
+            "import yaml\n"
+            "def load_config(path: str) -> dict:\n"
+            '    with open(path, encoding="utf-8") as fh:\n'
+            "        return yaml.safe_load(fh) or {}\n"
+        ),
+        expected_findings=[],
+    ),
+    # ── CLEAN: salted scrypt password hash (false-positive check) ────────────
+    SecureCodeFixture(
+        id="scr-clean-06",
+        language="python",
+        mode="diff",
+        cwe="",
+        severity="NONE",
+        is_vulnerable=False,
+        code=(
+            "--- a/auth.py\n"
+            "+++ b/auth.py\n"
+            "@@ -1,3 +1,6 @@\n"
+            " def store_password(pw: str):\n"
+            "-    return hashlib.md5(pw.encode()).hexdigest()\n"
+            "+    salt = os.urandom(16)\n"
+            "+    digest = hashlib.scrypt(\n"
+            "+        pw.encode(), salt=salt, n=2**17, r=8, p=1, maxmem=2**28\n"
+            "+    )\n"
+            '+    return salt.hex() + ":" + digest.hex()\n'
+        ),
+        expected_findings=[],
+    ),
 ]
 
 

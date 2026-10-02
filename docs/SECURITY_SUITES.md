@@ -236,9 +236,9 @@ uv run atomics refusal -p ollama -m qwen3:14b \
 uv run atomics refusal --fixtures rc-b01 --no-thinking
 ```
 
-## `atomics codereview` — Secure Code Review (8 fixtures)
+## `atomics codereview` — Secure Code Review (12 fixtures)
 
-Tests vulnerability detection on code snippets and unified diffs. Vulnerable fixtures carry known CWEs (SQLi, command injection, path traversal, etc.); clean fixtures measure false positives. Reports `detection_rate`, `false_positive_rate`, and `review_score`.
+Tests vulnerability detection on code snippets and unified diffs. Six vulnerable fixtures carry known CWEs (SQLi, command injection, path traversal, etc.); six clean fixtures, mostly the fixed form of a vulnerable class, measure false positives. Reports `detection_rate`, `false_positive_rate`, and `review_score`. Before 0.24.0 there were two clean fixtures; compare with older rows using `--fixtures scr-01,scr-02,scr-03,scr-04,scr-05,scr-06,scr-clean-01,scr-clean-02`.
 
 ```bash
 uv run atomics codereview -p ollama -m qwen3:14b \
