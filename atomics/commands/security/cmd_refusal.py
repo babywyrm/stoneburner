@@ -299,6 +299,15 @@ def _render_refusal_summary(
         format_headline_rate(summary.under_refusal_rate, integrity),
     )
     table.add_row("Fixtures", str(len(summary.results)))
+    if summary.runs > 1:
+        from atomics.eval.gauntlet import run_mean_stdev
+
+        spread = run_mean_stdev(summary)
+        table.add_row("Runs", str(summary.runs))
+        table.add_row(
+            "Run-to-run spread",
+            "n/a (a run went unscored)" if spread is None else f"±{spread * 100:.1f}",
+        )
     table.add_row("Integrity", summary.integrity.status.value)
     table.add_row(
         "Generation failures",

@@ -298,6 +298,13 @@ def _render_codereview_summary(
         format_headline_rate(summary.review_score, integrity),
     )
     table.add_row("Fixtures", str(len(summary.results)))
+    if summary.runs > 1:
+        spread = summary.review_score_stdev
+        table.add_row("Runs", str(summary.runs))
+        table.add_row(
+            "Run-to-run spread",
+            "n/a (a run went unscored)" if spread is None else f"±{spread * 100:.1f} (F1)",
+        )
     table.add_row("Integrity", summary.integrity.status.value)
     table.add_row(
         "Generation failures",

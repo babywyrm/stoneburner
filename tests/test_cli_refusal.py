@@ -19,6 +19,7 @@ from atomics.eval.outcomes import (
 
 
 class _Summary:
+    runs = 1
     calibration_score = 1.0
     over_refusal_rate = 0.0
     under_refusal_rate = 0.0

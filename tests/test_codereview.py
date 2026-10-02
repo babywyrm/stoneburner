@@ -472,6 +472,17 @@ async def test_runs_repeat_each_fixture_and_spread_is_per_run_f1():
     assert summary.review_score == 0.6
     assert summary.review_score_stdev == pytest.approx(0.707, abs=1e-3)
 
+    from rich.console import Console
+
+    from atomics.commands.security.cmd_codereview import _render_codereview_summary
+
+    console = Console(record=True, width=120)
+    _render_codereview_summary(
+        console, summary, provider_name="p", model="m", judge_provider="j", judge_model="jm"
+    )
+    table = console.export_text()
+    assert "Run-to-run spread" in table and "±70.7" in table
+
 
 @pytest.mark.asyncio
 async def test_single_run_has_no_review_spread():
