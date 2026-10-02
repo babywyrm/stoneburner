@@ -467,7 +467,7 @@ atomics refusal --model qwen2.5:7b --judge-model qwen2.5:14b
 
 Presents code snippets and unified diffs; vulnerable fixtures carry a known CWE
 (SQLi, command injection, path traversal, hardcoded secret, insecure
-deserialization, weak password hash), and clean fixtures measure false positives.
+deserialization, weak password hash), and six clean fixtures measure false positives.
 
 | Metric | Meaning |
 |--------|---------|
