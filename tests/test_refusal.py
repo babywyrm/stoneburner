@@ -453,3 +453,14 @@ async def test_runs_repeat_each_fixture_and_count_every_run():
     assert summary.over_refusal_rate == 0.25
     assert summary.integrity.status is RunStatus.COMPLETE
     assert run_mean_stdev(summary) == pytest.approx(0.354, abs=1e-3)
+
+    from rich.console import Console
+
+    from atomics.commands.security.cmd_refusal import _render_refusal_summary
+
+    console = Console(record=True, width=120)
+    _render_refusal_summary(
+        console, summary, provider_name="p", model="m", judge_provider="j", judge_model="jm"
+    )
+    table = console.export_text()
+    assert "Runs" in table and "Run-to-run spread" in table and "±35.4" in table

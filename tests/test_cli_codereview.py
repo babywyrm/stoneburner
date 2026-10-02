@@ -19,6 +19,7 @@ from atomics.eval.outcomes import (
 
 
 class _Summary:
+    runs = 1
     detection_rate = 1.0
     false_positive_rate = 0.0
     review_score = 1.0
