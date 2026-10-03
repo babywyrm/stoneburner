@@ -8,6 +8,7 @@ from rich.markup import escape
 from rich.table import Table
 
 from atomics.inventory import Capability, Inventory, ModelRecord
+from atomics.inventory.cohorts import Cohorts
 
 _CLASS_STYLE = {"light": "green", "mid": "yellow", "heavy": "red"}
 _SHOWN = ("tools", "thinking", "vision")
@@ -117,3 +118,30 @@ def render(inv: Inventory, console: Console) -> None:
             f"\n[yellow]{unknown} unregistered model(s) — "
             f"add to model_classes.py for accurate comparison[/yellow]"
         )
+
+
+def render_cohorts(result: Cohorts, console: Console) -> None:
+    if not result.cohorts:
+        console.print("[yellow]No cohorts: fewer than two candidates in every band.[/yellow]")
+    for c in result.cohorts:
+        title = f"[bold]{c.band}[/bold] — {len(c.members)} models"
+        if c.judge:
+            title += f" — judge: {escape(c.judge.name)} on {escape(c.judge.host or '?')}"
+        elif result.needs_judge:
+            title += " — [red]no eligible judge[/red]"
+        console.print(title)
+        table = Table(box=box.SIMPLE_HEAD)
+        table.add_column("Model", style="cyan bold", no_wrap=True)
+        table.add_column("Host", no_wrap=True)
+        table.add_column("Thinking", no_wrap=True)
+        table.add_column("Size", justify="right", no_wrap=True)
+        for m in c.members:
+            table.add_row(
+                escape(m.name),
+                escape(m.host or "?"),
+                "on" if m.thinking else "off",
+                f"{m.size_bytes / 1e9:.1f} GB" if m.size_bytes else "",
+            )
+        console.print(table)
+    for x in result.excluded:
+        console.print(f"[dim]excluded {escape(x.name)}: {x.reason}[/dim]")

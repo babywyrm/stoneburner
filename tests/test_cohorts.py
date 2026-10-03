@@ -2,8 +2,13 @@
 
 from __future__ import annotations
 
-import pytest
+import json
 
+import click
+import pytest
+from click.testing import CliRunner
+
+from atomics.cli import cli
 from atomics.eval.batteries import get_battery
 from atomics.inventory.cohorts import CohortError, battery_needs, form_cohorts, parameter_band
 
@@ -263,3 +268,73 @@ def test_cohort_without_eligible_judge_keeps_none():
 def test_no_judge_when_battery_does_not_need_one():
     inv = _inv(_model("a:8b"), _model("b:8b"), _model("j:30b", params="30B", judge=_fit(1, 0)))
     assert form_cohorts(inv, DESK).cohorts[0].judge is None
+
+
+def _run(tmp_path, inv, *args):
+    path = tmp_path / "inv.json"
+    path.write_text(json.dumps(inv))
+    return CliRunner().invoke(cli, ["cohorts", str(path), *args])
+
+
+def test_cli_renders_and_writes_json(tmp_path, monkeypatch):
+    monkeypatch.setenv("COLUMNS", "200")
+    inv = _inv(
+        _model("a:8b"),
+        _model("b:8b"),
+        _model("c:3b", params="3B"),
+        _model("ref:30b", params="30B", judge=_fit(1.0, 0.3)),
+    )
+    out = tmp_path / "sub" / "cohorts.json"
+    result = _run(
+        tmp_path, inv, "-b", "red-capability", "-m", "a:*", "-m", "b:*", "--json-out", str(out)
+    )
+    assert result.exit_code == 0, result.output
+    text = click.unstyle(result.output)
+    assert "judge: ref:30b on laptop" in text
+    assert "a:8b" in text
+    assert "excluded c:3b: filtered by -m" in text
+    data = json.loads(out.read_text())
+    assert data["schema"] == 1
+    assert data["battery"] == "red-capability"
+    assert data["inventory_taken_at"] == "t"
+    assert data["cohorts"][0]["band"] == "5-15B"
+    assert data["cohorts"][0]["judge"] == {"name": "ref:30b", "host": "laptop"}
+    assert data["cohorts"][0]["members"][0] == {
+        "name": "a:8b",
+        "host": "laptop",
+        "digest": "sha-a:8b",
+        "thinking": False,
+    }
+    assert {"name": "c:3b", "reason": "filtered by -m"} in data["excluded"]
+
+
+def test_cli_says_when_there_are_no_cohorts(tmp_path):
+    result = _run(tmp_path, _inv(_model("a:8b")), "-b", "desk-pass")
+    assert result.exit_code == 0
+    assert "No cohorts" in result.output
+
+
+def test_cli_unknown_battery(tmp_path):
+    result = _run(tmp_path, _inv(), "--battery", "nope")
+    assert result.exit_code == 1
+    assert "Known:" in result.output
+
+
+def test_cli_bad_json(tmp_path):
+    path = tmp_path / "inv.json"
+    path.write_text("{")
+    result = CliRunner().invoke(cli, ["cohorts", str(path), "-b", "desk-pass"])
+    assert result.exit_code == 1
+
+
+def test_cli_no_fit_judge(tmp_path):
+    result = _run(tmp_path, _inv(_model("a:8b"), _model("b:8b")), "-b", "red-capability")
+    assert result.exit_code == 1
+    assert "--probe-judge" in result.output
+
+
+def test_cli_missing_judge_exits_1_after_render(tmp_path):
+    inv = _inv(_model("ref:8b", judge=_fit(1.0, 0.3)), _model("b:8b"))
+    result = _run(tmp_path, inv, "-b", "red-capability")
+    assert result.exit_code == 1
+    assert "no eligible judge" in result.output

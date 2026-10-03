@@ -476,6 +476,56 @@ def models(
         click.echo(f"Wrote {json_out}")
 
 
+@click.command("cohorts")
+@click.argument("inventory_file", type=click.Path(exists=True, dir_okay=False, path_type=Path))
+@click.option("--battery", "-b", "battery_id", required=True, help="Battery id (atomics battery)")
+@click.option(
+    "--model", "-m", "patterns", multiple=True, help="Only tags matching this glob; repeatable"
+)
+@click.option(
+    "--max-members",
+    type=click.IntRange(min=2),
+    default=None,
+    help="Split size bands larger than this",
+)
+@click.option(
+    "--json-out",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=None,
+    help="Write cohorts JSON for the plan step",
+)
+def cohorts(
+    inventory_file: Path,
+    battery_id: str,
+    patterns: tuple[str, ...],
+    max_members: int | None,
+    json_out: Path | None,
+) -> None:
+    """Group a saved inventory into fair comparison sets for one battery."""
+    from atomics.eval.batteries import get_battery
+    from atomics.inventory.cohorts import CohortError, form_cohorts, to_dict
+    from atomics.inventory.render import render_cohorts
+
+    try:
+        battery = get_battery(battery_id)
+    except KeyError as exc:
+        click.echo(exc.args[0], err=True)
+        raise SystemExit(1)
+    try:
+        inventory = json.loads(inventory_file.read_text())
+        result = form_cohorts(inventory, battery, patterns, max_members)
+    except (CohortError, json.JSONDecodeError) as exc:
+        click.echo(f"{inventory_file}: {exc}", err=True)
+        raise SystemExit(1)
+    render_cohorts(result, Console())
+    if json_out is not None:
+        json_out.parent.mkdir(parents=True, exist_ok=True)
+        json_out.write_text(json.dumps(to_dict(result), indent=2) + "\n")
+        click.echo(f"Wrote {json_out}")
+    if result.needs_judge and any(c.judge is None for c in result.cohorts):
+        raise SystemExit(1)
+
+
 @click.command("provider-test")
 @click.option(
     "--provider",
