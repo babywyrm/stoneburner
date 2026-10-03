@@ -110,7 +110,34 @@ async def read_openai(
     return HostRecord(label=label, provider="vllm"), models
 
 
-_READERS: dict[str, Reader] = {"ollama": read_ollama, "vllm": read_openai}
+async def read_llamacpp(
+    client: httpx.AsyncClient, url: str, *, label: str, context_tokens: int | None
+) -> tuple[HostRecord, list[ModelRecord]]:
+    base = url.rstrip("/")
+    listing = await _fetch(client, f"{base}/v1/models")
+    try:
+        props = await _fetch(client, f"{base}/props")
+    except ConnectionError:
+        props = {}
+    settings = props.get("default_generation_settings") or {}
+    n_ctx = settings.get("n_ctx", props.get("n_ctx"))
+    models = [
+        ModelRecord(
+            host=label,
+            name=entry.get("id", ""),
+            declared_context=n_ctx if isinstance(n_ctx, int) else None,
+            requested_context=context_tokens,
+        )
+        for entry in listing.get("data", [])
+    ]
+    return HostRecord(label=label, provider="llamacpp"), models
+
+
+_READERS: dict[str, Reader] = {
+    "ollama": read_ollama,
+    "vllm": read_openai,
+    "llamacpp": read_llamacpp,
+}
 
 
 async def take_inventory(

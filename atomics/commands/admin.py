@@ -380,14 +380,17 @@ def _write_generic_export(rows: list[dict], fmt: str, out_file) -> None:
     "--provider",
     "-p",
     "provider_name",
-    type=click.Choice(["ollama", "vllm"], case_sensitive=False),
+    type=click.Choice(["ollama", "vllm", "llamacpp"], case_sensitive=False),
     default="ollama",
     help="Backend to inventory (default: ollama)",
 )
 @click.option(
     "--host",
     default=None,
-    help="Host URL (default: ATOMICS_OLLAMA_HOST, or ATOMICS_VLLM_HOST with -p vllm)",
+    help=(
+        "Host URL (default per provider: ATOMICS_OLLAMA_HOST, ATOMICS_VLLM_HOST, "
+        "ATOMICS_LLAMACPP_HOST)"
+    ),
 )
 @click.option(
     "--vllm-host",
@@ -421,7 +424,11 @@ def models(
     from atomics.inventory.render import render
 
     settings = load_settings()
-    defaults = {"ollama": settings.ollama_host, "vllm": vllm_host or settings.vllm_host}
+    defaults = {
+        "ollama": settings.ollama_host,
+        "vllm": vllm_host or settings.vllm_host,
+        "llamacpp": settings.llamacpp_host,
+    }
     url = host or defaults[provider_name]
     try:
         inventory = asyncio.run(take_inventory(provider_name, url, context_tokens=context_tokens))
