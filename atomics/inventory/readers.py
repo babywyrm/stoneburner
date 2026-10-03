@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Awaitable, Callable, Sequence
 from datetime import UTC, datetime
 from fnmatch import fnmatch
@@ -10,7 +11,7 @@ from urllib.parse import urlsplit
 
 import httpx
 
-from atomics.inventory import HostRecord, Inventory, ModelRecord
+from atomics.inventory import HostRecord, Inventory, ModelRecord, mark_digest_mismatches
 from atomics.inventory.probe import probe_model
 from atomics.providers.base import BaseProvider
 from atomics.providers.llamacpp import LlamaCppProvider
@@ -156,28 +157,71 @@ def probe_provider(
     return OllamaProvider(host=url, client=client, context_tokens=context_tokens)
 
 
-async def take_inventory(
+def unique_labels(urls: Sequence[str]) -> list[str]:
+    names = [host_label(u) for u in urls]
+    return [urlsplit(u).netloc if names.count(n) > 1 else n for u, n in zip(urls, names)]
+
+
+async def _take_host(
+    client: httpx.AsyncClient,
     provider: str,
     url: str,
+    label: str,
+    *,
+    context_tokens: int | None,
+    patterns: Sequence[str],
+    probe: bool,
+    on_model: Callable[[ModelRecord], None] | None,
+) -> tuple[HostRecord, list[ModelRecord]]:
+    try:
+        host, models = await _READERS[provider](
+            client, url, label=label, context_tokens=context_tokens
+        )
+    except ConnectionError as exc:
+        return HostRecord(label=label, provider=provider, error=str(exc)), []
+    if patterns:
+        models = [m for m in models if any(fnmatch(m.name, p) for p in patterns)]
+    if probe:
+        target = probe_provider(provider, url, client, context_tokens)
+        for record in models:
+            if record.evaluable:
+                await probe_model(target, record)
+            if on_model is not None:
+                on_model(record)
+    return host, models
+
+
+async def take_inventory(
+    provider: str,
+    urls: Sequence[str],
     *,
     context_tokens: int | None = None,
     patterns: Sequence[str] = (),
     probe: bool = False,
     on_model: Callable[[ModelRecord], None] | None = None,
 ) -> Inventory:
-    """Read one host. Probes run one model at a time: a host serves one generate at once."""
+    """Read every host at once. Within a host, probes run one model at a time:
+    a host serves one generate at once, so parallel probes would only queue."""
     async with new_client() as client:
-        host, models = await _READERS[provider](
-            client, url, label=host_label(url), context_tokens=context_tokens
+        taken = await asyncio.gather(
+            *(
+                _take_host(
+                    client,
+                    provider,
+                    url,
+                    label,
+                    context_tokens=context_tokens,
+                    patterns=patterns,
+                    probe=probe,
+                    on_model=on_model,
+                )
+                for url, label in zip(urls, unique_labels(urls))
+            )
         )
-        if patterns:
-            models = [m for m in models if any(fnmatch(m.name, p) for p in patterns)]
-        if probe:
-            target = probe_provider(provider, url, client, context_tokens)
-            for record in models:
-                if record.evaluable:
-                    await probe_model(target, record)
-                if on_model is not None:
-                    on_model(record)
+    hosts = [h for h, _ in taken]
+    if all(h.error for h in hosts):
+        raise ConnectionError("; ".join(f"{h.label}: {h.error}" for h in hosts))
+    models = [m for _, ms in taken for m in ms]
+    mark_digest_mismatches(models)
     taken_at = datetime.now(UTC).isoformat(timespec="seconds")
-    return Inventory(taken_at=taken_at, hosts=[host], models=models)
+    return Inventory(taken_at=taken_at, hosts=hosts, models=models)

@@ -51,6 +51,7 @@ def _notes(m: ModelRecord) -> list[str]:
 
 
 def render(inv: Inventory, console: Console) -> None:
+    multi = len(inv.hosts) > 1
     for host in inv.hosts:
         line = f"[bold]{escape(host.label)}[/bold] {host.provider} {host.version or ''}".rstrip()
         if host.loaded:
@@ -59,6 +60,8 @@ def render(inv: Inventory, console: Console) -> None:
 
     probed = any(m.probe for m in inv.models)
     table = Table(box=box.SIMPLE_HEAD)
+    if multi:
+        table.add_column("Host", no_wrap=True)
     longest = max((len(m.name) for m in inv.models), default=5)
     table.add_column("Model", style="cyan bold", no_wrap=True, min_width=longest)
     table.add_column("Size", justify="right", no_wrap=True)
@@ -73,7 +76,8 @@ def render(inv: Inventory, console: Console) -> None:
         table.add_column("Thinking switch", no_wrap=True)
     for m in sorted(inv.models, key=lambda m: (m.host, m.size_bytes or 0)):
         style = _CLASS_STYLE.get(m.model_class, "dim")
-        row = [
+        row = [escape(m.host)] if multi else []
+        row += [
             escape(m.name),
             f"{m.size_bytes / 1e9:.1f} GB" if m.size_bytes else "",
             m.parameter_size or "",
@@ -88,10 +92,11 @@ def render(inv: Inventory, console: Console) -> None:
     console.print(table)
 
     for m in inv.models:
+        who = escape(f"{m.host}/{m.name}" if multi else m.name)
         for note in _notes(m):
-            console.print(f"[yellow]{escape(m.name)}[/yellow] {note}")
+            console.print(f"[yellow]{who}[/yellow] {note}")
         for error in m.errors:
-            console.print(f"[red]{escape(m.name)}[/red] {escape(error)}")
+            console.print(f"[red]{who}[/red] {escape(error)}")
     unknown = sum(1 for m in inv.models if m.model_class == "unknown")
     if unknown:
         console.print(
