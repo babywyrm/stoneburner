@@ -60,6 +60,26 @@ class ProbeResult:
         }
 
 
+# granite4.2:3b gave a confidently wrong answer 0.6 against 0.7 for the right
+# one; ranking alone called it fit. The gap is what makes a judge usable.
+JUDGE_FIT_MARGIN = 0.3
+
+
+@dataclass(frozen=True)
+class JudgeFitness:
+    good: float | None
+    bad: float | None
+
+    @property
+    def fit(self) -> bool:
+        if self.good is None or self.bad is None:
+            return False
+        return self.good - self.bad >= JUDGE_FIT_MARGIN
+
+    def to_dict(self) -> dict[str, object]:
+        return {"good": self.good, "bad": self.bad, "fit": self.fit}
+
+
 @dataclass
 class ModelRecord:
     host: str
@@ -76,6 +96,7 @@ class ModelRecord:
     probed: dict[str, bool] = field(default_factory=dict)
     errors: list[str] = field(default_factory=list)
     probe: ProbeResult | None = None
+    judge: JudgeFitness | None = None
     marks: list[str] = field(default_factory=list)
 
     @property
@@ -146,6 +167,7 @@ class ModelRecord:
             "disagreements": self.disagreements,
             "errors": list(self.errors),
             "probe": self.probe.to_dict() if self.probe else None,
+            "judge": self.judge.to_dict() if self.judge else None,
         }
 
 

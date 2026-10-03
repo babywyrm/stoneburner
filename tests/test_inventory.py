@@ -10,9 +10,19 @@ import pytest
 from click.testing import CliRunner
 
 from atomics.cli import cli
+from atomics.eval.judge import JudgeResult
+from atomics.eval.redblue.fixtures import BLUE_FIXTURES
 from atomics.eval.toolcall.catalog import PROBE_TOOL
 from atomics.inventory import Capability, ModelRecord, Reply, mark_digest_mismatches, readers
-from atomics.inventory.probe import probe_model, thinking_verdict
+from atomics.inventory import probe as probe_mod
+from atomics.inventory.probe import (
+    BAD_ANSWER,
+    GOOD_ANSWER,
+    JUDGE_FIXTURE_ID,
+    probe_judge,
+    probe_model,
+    thinking_verdict,
+)
 from atomics.inventory.readers import (
     read_llamacpp,
     read_ollama,
@@ -543,3 +553,67 @@ def test_models_spans_hosts_and_flags_digests(monkeypatch, tmp_path):
         ("beefy", "gemma4:26b"),
         ("beefy", "qwen3:8b"),
     ]
+
+
+def _judged(scores: dict[str, float | None]):
+    """Fake score_response: score by answer; None means the reply did not parse."""
+
+    async def score(prompt, response, *, judge_provider, judge_model=None, **_):
+        value = scores[response]
+        return JudgeResult(
+            score=value or 0.0,
+            accuracy=0,
+            completeness=0,
+            format_score=0,
+            rationale="",
+            judge_model=judge_model or "",
+            parse_failed=value is None,
+        )
+
+    return score
+
+
+def test_judge_fixture_is_a_blue_fixture():
+    assert JUDGE_FIXTURE_ID in {f.id for f in BLUE_FIXTURES}
+
+
+@pytest.mark.parametrize(
+    ("good", "bad", "fit"),
+    [
+        (0.9, 0.1, True),
+        (0.7, 0.6, False),
+        (0.4, 0.6, False),
+        (None, 0.1, False),
+    ],
+)
+async def test_judge_fitness(monkeypatch, good, bad, fit):
+    monkeypatch.setattr(probe_mod, "score_response", _judged({GOOD_ANSWER: good, BAD_ANSWER: bad}))
+    rec = _rec()
+    await probe_judge(_Scripted(), rec)
+    assert (rec.judge.good, rec.judge.bad, rec.judge.fit) == (good, bad, fit)
+    assert rec.to_dict()["judge"] == {"good": good, "bad": bad, "fit": fit}
+
+
+async def test_judge_error_is_recorded(monkeypatch):
+    async def boom(*a, **k):
+        raise ConnectionError("Cannot connect")
+
+    monkeypatch.setattr(probe_mod, "score_response", boom)
+    rec = _rec()
+    await probe_judge(_Scripted(), rec)
+    assert rec.judge is None
+    assert rec.errors[0].startswith("judge:")
+
+
+def test_models_probe_judge(monkeypatch, tmp_path):
+    fake = _Scripted()
+    monkeypatch.setattr(readers, "probe_provider", lambda *a, **k: fake)
+    monkeypatch.setattr(probe_mod, "score_response", _judged({GOOD_ANSWER: 0.9, BAD_ANSWER: 0.1}))
+    out = tmp_path / "inv.json"
+    args = ["--host", "http://laptop:11434", "--probe-judge", "-m", "phi4*", "--json-out", str(out)]
+    result = _invoke(monkeypatch, OLLAMA, *args)
+    assert result.exit_code == 0, result.output
+    model = json.loads(out.read_text())["models"][0]
+    assert model["judge"] == {"good": 0.9, "bad": 0.1, "fit": True}
+    assert model["probe"] is None
+    assert fake.calls == []
