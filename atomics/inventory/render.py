@@ -39,6 +39,12 @@ def _answer_cell(m: ModelRecord) -> str:
     return f"{word} {off.tokens_per_second:.0f} t/s" if off.tokens_per_second else word
 
 
+def _switch_cell(m: ModelRecord) -> str:
+    if m.probe is None or m.probe.verdict is None:
+        return ""
+    return f"{m.probe.verdict} → {m.probe.recommended}"
+
+
 def _notes(m: ModelRecord) -> list[str]:
     evaluable = [] if m.evaluable else ["not evaluable: no completion capability"]
     return [*evaluable, *m.disagreements, *m.flags]
@@ -64,6 +70,7 @@ def render(inv: Inventory, console: Console) -> None:
         table.add_column(cap.capitalize(), justify="center", no_wrap=True)
     if probed:
         table.add_column("Answer", no_wrap=True)
+        table.add_column("Thinking switch", no_wrap=True)
     for m in sorted(inv.models, key=lambda m: (m.host, m.size_bytes or 0)):
         style = _CLASS_STYLE.get(m.model_class, "dim")
         row = [
@@ -76,7 +83,7 @@ def render(inv: Inventory, console: Console) -> None:
             *(_cap_cell(m.capability(c)) for c in _SHOWN),
         ]
         if probed:
-            row.append(_answer_cell(m))
+            row += [_answer_cell(m), _switch_cell(m)]
         table.add_row(*row)
     console.print(table)
 
