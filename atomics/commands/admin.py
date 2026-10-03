@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
+import json
 import sys
+from pathlib import Path
 
 import click
 from rich.console import Console
@@ -379,12 +382,12 @@ def _write_generic_export(rows: list[dict], fmt: str, out_file) -> None:
     "provider_name",
     type=click.Choice(["ollama", "vllm"], case_sensitive=False),
     default="ollama",
-    help="Backend to list models from (default: ollama)",
+    help="Backend to inventory (default: ollama)",
 )
 @click.option(
     "--host",
     default=None,
-    help="Ollama host URL (default: ATOMICS_OLLAMA_HOST or http://localhost:11434)",
+    help="Host URL (default: ATOMICS_OLLAMA_HOST, or ATOMICS_VLLM_HOST with -p vllm)",
 )
 @click.option(
     "--vllm-host",
@@ -392,60 +395,33 @@ def _write_generic_export(rows: list[dict], fmt: str, out_file) -> None:
     default=None,
     help="vLLM/OpenAI-compatible base URL (default: ATOMICS_VLLM_HOST or http://localhost:8000/v1)",
 )
-def models(provider_name: str, host: str | None, vllm_host: str | None) -> None:
-    """List available models on an Ollama or vLLM/OpenAI-compatible instance."""
+@click.option(
+    "--json-out",
+    "json_out",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=None,
+    help="Also write the inventory as JSON (schema 1)",
+)
+def models(
+    provider_name: str, host: str | None, vllm_host: str | None, json_out: Path | None
+) -> None:
+    """Inventory a host: sizes, declared capabilities, and where each value came from."""
+    from atomics.inventory.readers import take_inventory
+    from atomics.inventory.render import render
+
     settings = load_settings()
-    console = Console()
-
-    provider: BaseProvider
-    if provider_name == "vllm":
-        from atomics.providers.vllm import VllmProvider
-
-        base_url = vllm_host or settings.vllm_host
-        provider = VllmProvider(base_url=base_url)
-        title = f"vLLM Models — {base_url}"
-    else:
-        from atomics.providers.ollama import OllamaProvider
-
-        effective_host = host or settings.ollama_host
-        provider = OllamaProvider(host=effective_host)
-        title = f"Ollama Models — {effective_host}"
-
+    defaults = {"ollama": settings.ollama_host, "vllm": vllm_host or settings.vllm_host}
+    url = host or defaults[provider_name]
     try:
-        result = run_async(provider.list_models(), provider)
+        inventory = asyncio.run(take_inventory(provider_name, url))
     except ConnectionError as exc:
         click.echo(str(exc), err=True)
         raise SystemExit(1)
-
-    table = Table(title=title, show_lines=True)
-    table.add_column("Model", style="cyan bold")
-    if provider_name == "ollama":
-        table.add_column("Size", justify="right")
-        table.add_column("Params", justify="right")
-    table.add_column("Family", style="dim")
-    table.add_column("Class", style="yellow")
-    table.add_column("Thinking", justify="center")
-
-    for m in sorted(result, key=lambda x: x.get("size_gb", 0)):
-        cls_str = str(m["model_class"])
-        cls_style = {"light": "green", "mid": "yellow", "heavy": "red"}.get(cls_str, "dim")
-        row = [str(m["name"])]
-        if provider_name == "ollama":
-            row += [f"{m['size_gb']:.1f} GB", str(m.get("parameter_size", ""))]
-        row += [
-            str(m.get("family", "")),
-            f"[{cls_style}]{cls_str}[/{cls_style}]",
-            "[green]yes[/green]" if m.get("thinking") else "[dim]no[/dim]",
-        ]
-        table.add_row(*row)
-
-    console.print(table)
-    unknown = [m for m in result if m["model_class"] == "unknown"]
-    if unknown:
-        console.print(
-            f"\n[yellow]{len(unknown)} unregistered model(s) — "
-            f"add to model_classes.py for accurate comparison[/yellow]"
-        )
+    render(inventory, Console())
+    if json_out is not None:
+        json_out.parent.mkdir(parents=True, exist_ok=True)
+        json_out.write_text(json.dumps(inventory.to_dict(), indent=2) + "\n")
+        click.echo(f"Wrote {json_out}")
 
 
 @click.command("provider-test")

@@ -1,0 +1,62 @@
+"""Rich table for an inventory."""
+
+from __future__ import annotations
+
+from rich import box
+from rich.console import Console
+from rich.markup import escape
+from rich.table import Table
+
+from atomics.inventory import Capability, Inventory, ModelRecord
+
+_CLASS_STYLE = {"light": "green", "mid": "yellow", "heavy": "red"}
+_SHOWN = ("tools", "thinking", "vision")
+
+
+def _cap_cell(cap: Capability) -> str:
+    if cap.value is None:
+        return "[dim]?[/dim]"
+    word = "[green]yes[/green]" if cap.value else "[dim]no[/dim]"
+    return word if cap.source == "declared" else f"{word} [dim]{cap.source}[/dim]"
+
+
+def _notes(m: ModelRecord) -> list[str]:
+    evaluable = [] if m.evaluable else ["not evaluable: no completion capability"]
+    return [*evaluable, *m.disagreements]
+
+
+def render(inv: Inventory, console: Console) -> None:
+    for host in inv.hosts:
+        line = f"[bold]{escape(host.label)}[/bold] {host.provider} {host.version or ''}".rstrip()
+        console.print(f"{line} [red]{escape(host.error)}[/red]" if host.error else line)
+
+    table = Table(box=box.SIMPLE_HEAD)
+    longest = max((len(m.name) for m in inv.models), default=5)
+    table.add_column("Model", style="cyan bold", no_wrap=True, min_width=longest)
+    table.add_column("Size", justify="right", no_wrap=True)
+    table.add_column("Params", justify="right", no_wrap=True)
+    table.add_column("Quant", no_wrap=True)
+    table.add_column("Class", no_wrap=True)
+    for cap in _SHOWN:
+        table.add_column(cap.capitalize(), justify="center", no_wrap=True)
+    for m in sorted(inv.models, key=lambda m: (m.host, m.size_bytes or 0)):
+        style = _CLASS_STYLE.get(m.model_class, "dim")
+        table.add_row(
+            escape(m.name),
+            f"{m.size_bytes / 1e9:.1f} GB" if m.size_bytes else "",
+            m.parameter_size or "",
+            m.quantization or "",
+            f"[{style}]{m.model_class}[/{style}]",
+            *(_cap_cell(m.capability(c)) for c in _SHOWN),
+        )
+    console.print(table)
+
+    for m in inv.models:
+        for note in _notes(m):
+            console.print(f"[yellow]{escape(m.name)}[/yellow] {note}")
+    unknown = sum(1 for m in inv.models if m.model_class == "unknown")
+    if unknown:
+        console.print(
+            f"\n[yellow]{unknown} unregistered model(s) — "
+            f"add to model_classes.py for accurate comparison[/yellow]"
+        )
