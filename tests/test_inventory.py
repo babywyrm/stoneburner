@@ -11,8 +11,8 @@ from click.testing import CliRunner
 
 from atomics.cli import cli
 from atomics.eval.toolcall.catalog import PROBE_TOOL
-from atomics.inventory import Capability, ModelRecord, readers
-from atomics.inventory.probe import probe_model
+from atomics.inventory import Capability, ModelRecord, Reply, readers
+from atomics.inventory.probe import probe_model, thinking_verdict
 from atomics.inventory.readers import read_llamacpp, read_ollama, read_openai
 from atomics.providers.base import ProviderResponse
 from atomics.providers.toolcalls import ToolCall
@@ -412,3 +412,53 @@ def test_models_probe_skips_models_that_cannot_complete(monkeypatch, tmp_path):
     assert result.exit_code == 0, result.output
     assert fake.calls == []
     assert json.loads(out.read_text())["models"][0]["probe"] is None
+
+
+def _reply(*, out: int = 4, thinking: int = 0, answered: bool = True) -> Reply:
+    return Reply(answered, "completed", out, thinking, 100.0, 40.0)
+
+
+@pytest.mark.parametrize(
+    ("off", "on", "verdict"),
+    [
+        (_reply(), _reply(out=60, thinking=50), "off-works"),
+        (_reply(out=60, thinking=40), _reply(out=60, thinking=50), "off-ignored"),
+        (_reply(out=4), _reply(out=120), "inline"),
+        (_reply(out=4), _reply(out=6), "no-channel"),
+    ],
+)
+def test_thinking_verdict(off, on, verdict):
+    assert thinking_verdict(off, on) == verdict
+
+
+async def test_thinking_is_probed_only_when_claimed():
+    rec, fake = _rec(), _Scripted()
+    await probe_model(fake, rec)
+    assert [c for c in fake.calls if c[0] == "generate"] == [("generate", False)]
+    assert rec.probe.verdict is None
+
+
+async def test_probe_settles_a_name_table_disagreement():
+    rec = _rec(name="phi4-mini-reasoning:3.8b")
+    fake = _Scripted(on=_resp(out=60, thinking=50))
+    await probe_model(fake, rec)
+    assert rec.probe.verdict == "off-works"
+    assert rec.probe.recommended == "--no-thinking"
+    assert rec.capability("thinking") == Capability(True, "probe")
+    assert "thinking: probe=true declared=false name-table=true" in rec.disagreements
+    assert fake.calls[-1] == ("tools", False)
+
+
+async def test_off_ignored_recommends_thinking_and_the_tool_probe_follows():
+    rec = _rec(caps=("completion", "tools", "thinking"))
+    fake = _Scripted(off=_resp(out=60, thinking=40), on=_resp(out=60, thinking=50))
+    await probe_model(fake, rec)
+    assert rec.probe.verdict == "off-ignored"
+    assert rec.probe.recommended == "--thinking"
+    assert fake.calls[-1] == ("tools", True)
+
+
+async def test_an_answer_with_thinking_on_counts_as_completion():
+    rec = _rec(caps=("completion", "thinking"))
+    await probe_model(_Scripted(off=_resp(text=""), on=_resp(out=60, thinking=50)), rec)
+    assert rec.probed["completion"] is True

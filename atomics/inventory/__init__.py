@@ -34,12 +34,29 @@ class Reply:
     tokens_per_second: float | None
 
 
+Verdict = Literal["off-works", "off-ignored", "inline", "no-channel"]
+
+
 @dataclass
 class ProbeResult:
     off: Reply | None = None
+    on: Reply | None = None
+    verdict: Verdict | None = None
+
+    @property
+    def recommended(self) -> str | None:
+        """The thinking flag to evaluate this model with."""
+        if self.verdict is None:
+            return None
+        return "--thinking" if self.verdict == "off-ignored" else "--no-thinking"
 
     def to_dict(self) -> dict[str, object]:
-        return {"off": asdict(self.off) if self.off else None}
+        return {
+            "off": asdict(self.off) if self.off else None,
+            "on": asdict(self.on) if self.on else None,
+            "verdict": self.verdict,
+            "recommended": self.recommended,
+        }
 
 
 @dataclass
@@ -72,6 +89,10 @@ class ModelRecord:
         if cap == "thinking":
             seen["name-table"] = supports_thinking(self.name)
         return seen
+
+    def claims(self, cap: str) -> bool:
+        """Any declaration or name table says yes, whatever a probe found."""
+        return any(v for s, v in self._sources(cap).items() if s != "probe")
 
     def capability(self, cap: str) -> Capability:
         seen = self._sources(cap)
