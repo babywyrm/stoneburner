@@ -268,7 +268,7 @@ Package version is **0.23.1**.
 
 ## Next
 
-Current package is **0.23.2** — cut-off replies are not scored. Do not
+Current package is **0.24.0** — resumable, saved sweeps. Do not
 retag `v0.22.5`, `v0.21.0`, or `v0.20.0`. Do not mix a feature into a tag
 commit. `RELEASING.md`. `v0` is the floating major tag the publish
 workflow moves; it is not stray.
@@ -285,9 +285,9 @@ Absolute red/blue numbers do not. Next:
       answers at 3000 characters; the suite shows up to 8192.
 - [ ] Re-run the fleet on the reference judge with `--runs 3 --save`
       and `--status ... --resume`.
-- [ ] Codereview has 6 vulnerable and 2 clean fixtures, so one clean
-      file moves F1 between 0 and 0.667. More clean fixtures would
-      break comparison with older rows.
+- [x] Codereview has 6 vulnerable and 6 clean fixtures (0.24.0). One
+      false positive moves F1 by 0.09, not 0.33. Older rows compare
+      only with `--fixtures scr-01,...,scr-06,scr-clean-01,scr-clean-02`.
 
 A unit test cannot see a live generate. Two holes stay open:
 
