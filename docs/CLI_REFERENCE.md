@@ -52,8 +52,13 @@ Recipes: [QUICKSTART.md](../QUICKSTART.md).
 | `atomics provider-test -p together` | Health check Together AI |
 | `atomics provider-test -p gemini` | Health check Gemini |
 | `atomics provider-test -p llamacpp` | Health check llama.cpp |
-| `atomics models` | List available models on Ollama host with class/thinking annotations |
-| `atomics models --provider vllm` | List models on a vLLM-compatible endpoint |
+| `atomics models` | Inventory a host: size, quantization, declared capabilities and context, and disagreements with the name tables |
+| `atomics models --host URL --host URL` | One inventory across hosts; flags a tag whose digest differs between them |
+| `atomics models -p vllm` / `-p llamacpp` | Inventory an OpenAI-compatible or llama.cpp server |
+| `atomics models --context-tokens N` | Flag models whose window is below N, or loaded at another size |
+| `atomics models --probe -m 'gemma4*'` | Live check: answer, speed, thinking-switch verdict, tool call |
+| `atomics models --probe-judge -m TAG` | Can this model judge: grades a right and a wrong answer, fit if right wins by 0.3 |
+| `atomics models --json-out FILE` | Write the inventory as JSON (schema 1) |
 | `atomics doctor` | Check installation health, config, and `inference.env` (never prints the API key). Prints one next command when the check is healthy. |
 
 ## Evaluation Suites
