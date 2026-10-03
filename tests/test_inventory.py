@@ -178,6 +178,7 @@ def test_models_table_and_json(monkeypatch, tmp_path):
             "version": "0.34.4",
             "error": None,
             "loaded": [],
+            "url": "http://laptop:11434",
         }
     ]
     phi, _, embed = data["models"]

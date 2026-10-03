@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import click
 from rich.console import Console
 from rich.table import Table
 
 from atomics.commands.common import PROVIDER_CHOICES, effort_options
-from atomics.eval.batteries import BATTERIES, get_battery, step_args, visible_steps
+from atomics.eval.batteries import BATTERIES, Battery, get_battery, step_args, visible_steps
 
 
 def _format_command(args: list[str]) -> str:
@@ -202,8 +205,80 @@ def _positive_budget(budget: str | None) -> bool:
         return False
 
 
+def _run_battery(
+    item: Battery,
+    *,
+    model: str | None,
+    provider: str,
+    ollama_host: str | None,
+    vllm_host: str | None,
+    judge_provider: str | None,
+    judge_model: str | None,
+    judge_host: str | None,
+    budget: str | None,
+    profile: str | None,
+    runs: int | None,
+    keep_going: bool,
+    thinking: bool,
+    effort: str | None,
+    reasoning_mode: str | None,
+    console: Console,
+) -> int:
+    if item.needs_judge and not judge_model:
+        click.echo(
+            f"{item.id} needs a judge. Pass --judge-model (and --judge-provider).",
+            err=True,
+        )
+        return 2
+    if budget is not None and not _positive_budget(budget):
+        click.echo("Pass a positive --budget.", err=True)
+        return 2
+    paid = provider in _PAID or (judge_provider in _PAID)
+    if paid and not _positive_budget(budget):
+        click.echo(
+            "Paid provider or judge. Pass --budget.",
+            err=True,
+        )
+        return 2
+    console.print(f"[bold]{item.id}[/bold] — {item.title}")
+    console.print(f"Not a pass: {item.not_a_pass}")
+    failed = 0
+    for step in visible_steps(item, provider=provider, profile=profile):
+        args = step_args(
+            step,
+            model=model,
+            provider=provider,
+            thinking_flag=_thinking_argv(thinking),
+            ollama_host=ollama_host,
+            vllm_host=vllm_host,
+            judge_provider=judge_provider,
+            judge_model=judge_model,
+            judge_host=judge_host,
+            budget=budget,
+            profile=profile,
+            effort=effort,
+            reasoning_mode=reasoning_mode,
+        )
+        if runs is not None and step.suite in _RUNS_SUITES:
+            args.extend(["--runs", str(runs)])
+        console.print(f"# {step.purpose}")
+        console.print(_format_command(args))
+        code = invoke_atomics(args)
+        if code != 0:
+            failed = code if failed == 0 else failed
+            if not keep_going:
+                return code
+    return failed
+
+
 @battery.command("run")
-@click.argument("name")
+@click.argument("name", required=False)
+@click.option(
+    "--cohorts",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=None,
+    help="Run every job in a cohorts JSON file from `atomics cohorts --json-out`.",
+)
 @click.option(
     "-m",
     "--model",
@@ -249,7 +324,8 @@ def _positive_budget(budget: str | None) -> bool:
 )
 @effort_options
 def battery_run(
-    name: str,
+    name: str | None,
+    cohorts: Path | None,
     model: str | None,
     provider: str,
     ollama_host: str | None,
@@ -269,38 +345,41 @@ def battery_run(
 
     Paid providers (`openai`, `claude`, `bedrock`, `groq`, `together`,
     `gemini`) as `-p` or `--judge-provider` require a positive `--budget`.
+    `--cohorts FILE` runs each job in a plan from `atomics cohorts --json-out`.
     """
     console = Console()
+    jobs = None
+    if cohorts is not None:
+        from atomics.inventory.cohorts import CohortError, jobs_from_plan
+
+        try:
+            jobs = jobs_from_plan(json.loads(cohorts.read_text()))
+        except (CohortError, json.JSONDecodeError, KeyError) as exc:
+            click.echo(f"{cohorts}: {exc}", err=True)
+            raise SystemExit(2) from exc
+        if not jobs:
+            click.echo(f"{cohorts}: no jobs", err=True)
+            raise SystemExit(2)
+        planned = jobs[0].battery
+        if name and name != planned:
+            click.echo(f"{cohorts}: battery is {planned}, not {name}", err=True)
+            raise SystemExit(2)
+        name = planned
+    if not name:
+        click.echo("Pass a battery name or --cohorts FILE.", err=True)
+        raise SystemExit(2)
     try:
         item = get_battery(name)
     except KeyError as exc:
         click.echo(str(exc), err=True)
         raise SystemExit(2) from exc
-    if item.needs_judge and not judge_model:
-        click.echo(
-            f"{item.id} needs a judge. Pass --judge-model (and --judge-provider).",
-            err=True,
-        )
-        raise SystemExit(2)
-    if budget is not None and not _positive_budget(budget):
-        click.echo("Pass a positive --budget.", err=True)
-        raise SystemExit(2)
-    paid = provider in _PAID or (judge_provider in _PAID)
-    if paid and not _positive_budget(budget):
-        click.echo(
-            "Paid provider or judge. Pass --budget.",
-            err=True,
-        )
-        raise SystemExit(2)
-    console.print(f"[bold]{item.id}[/bold] — {item.title}")
-    console.print(f"Not a pass: {item.not_a_pass}")
     failed = 0
-    for step in visible_steps(item, provider=provider, profile=profile):
-        args = step_args(
-            step,
+    work = jobs or ()
+    if not work:
+        failed = _run_battery(
+            item,
             model=model,
             provider=provider,
-            thinking_flag=_thinking_argv(thinking),
             ollama_host=ollama_host,
             vllm_host=vllm_host,
             judge_provider=judge_provider,
@@ -308,14 +387,34 @@ def battery_run(
             judge_host=judge_host,
             budget=budget,
             profile=profile,
+            runs=runs,
+            keep_going=keep_going,
+            thinking=thinking,
             effort=effort,
             reasoning_mode=reasoning_mode,
+            console=console,
         )
-        if runs is not None and step.suite in _RUNS_SUITES:
-            args.extend(["--runs", str(runs)])
-        console.print(f"# {step.purpose}")
-        console.print(_format_command(args))
-        code = invoke_atomics(args)
+    for job in work:
+        ollama = None if job.provider in {"vllm", "llamacpp"} else job.host
+        vllm = job.host if job.provider in {"vllm", "llamacpp"} else None
+        code = _run_battery(
+            item,
+            model=job.model,
+            provider=job.provider,
+            ollama_host=ollama,
+            vllm_host=vllm,
+            judge_provider=judge_provider,
+            judge_model=job.judge or judge_model,
+            judge_host=job.judge_host or judge_host,
+            budget=budget,
+            profile=profile,
+            runs=runs,
+            keep_going=keep_going,
+            thinking=job.thinking,
+            effort=effort,
+            reasoning_mode=reasoning_mode,
+            console=console,
+        )
         if code != 0:
             failed = code if failed == 0 else failed
             if not keep_going:

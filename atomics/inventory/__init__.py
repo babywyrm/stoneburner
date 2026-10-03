@@ -178,6 +178,7 @@ class HostRecord:
     version: str | None = None
     error: str | None = None
     loaded: list[tuple[str, int | None]] = field(default_factory=list)
+    url: str | None = None
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -186,6 +187,7 @@ class HostRecord:
             "version": self.version,
             "error": self.error,
             "loaded": [{"name": n, "context": c} for n, c in self.loaded],
+            "url": self.url,
         }
 
 

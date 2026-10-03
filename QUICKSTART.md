@@ -135,11 +135,14 @@ file only, so regroup freely.
 
 ```bash
 atomics cohorts logs/inventory/fleet.json -b red-capability \
-  -m 'gemma4*' -m 'qwen3*' --json-out logs/inventory/cohorts.json
+  -m 'gemma4*' -m 'qwen3*' --json-out logs/inventory/cohorts.json --plan
+atomics battery run --cohorts logs/inventory/cohorts.json --runs 3 --keep-going
 ```
 
-Every model left out is listed with the reason. A judged battery
-needs `--probe-judge` results in the inventory.
+`--plan` prints the `battery run` lines. `--cohorts` executes them.
+`--runs` and `--keep-going` apply to every member. Every model left
+out is listed with the reason. A judged battery needs `--probe-judge`
+results in the inventory.
 
 ### Cloud APIs (frontier quality, billed per token)
 

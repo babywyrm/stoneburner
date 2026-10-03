@@ -7,14 +7,17 @@
   declared capabilities and context, where each value came from, and
   every disagreement between the host and the name tables. The Family
   column is gone; Thinking now comes from the host when it declares
-  one. `--host` may repeat.
+  one. `--host` may repeat. Each host record now includes the URL
+  so a later `cohorts` plan can point `battery run` at the same box.
 
 ### Added
 - `atomics cohorts INVENTORY -b BATTERY` groups a saved inventory into
   fair comparison sets: host-declared size band, the capabilities the
   battery's suites need, each model's thinking flag, one host per
   digest spread by load, and one reference judge (widest good/bad
-  margin) outside each set's families. `--json-out` for the plan step.
+  margin) outside each set's families. `--json-out` writes a `jobs`
+  list. `--plan` prints `atomics battery run` lines. `battery run
+  --cohorts FILE` executes those jobs.
 - `models --json-out FILE` writes the inventory (schema 1).
 - `models --context-tokens N` with declared, requested, and loaded
   context per model, and flags for mismatches.

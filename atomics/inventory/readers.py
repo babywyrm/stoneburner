@@ -179,7 +179,7 @@ async def _take_host(
             client, url, label=label, context_tokens=context_tokens
         )
     except ConnectionError as exc:
-        return HostRecord(label=label, provider=provider, error=str(exc)), []
+        return HostRecord(label=label, provider=provider, error=str(exc), url=url), []
     if patterns:
         models = [m for m in models if any(fnmatch(m.name, p) for p in patterns)]
     if probe or judge:
@@ -192,6 +192,7 @@ async def _take_host(
                     await probe_judge(target, record)
             if on_model is not None:
                 on_model(record)
+    host.url = url
     return host, models
 
 
