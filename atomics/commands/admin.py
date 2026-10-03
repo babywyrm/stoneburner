@@ -402,8 +402,19 @@ def _write_generic_export(rows: list[dict], fmt: str, out_file) -> None:
     default=None,
     help="Also write the inventory as JSON (schema 1)",
 )
+@click.option(
+    "--context-tokens",
+    "context_tokens",
+    type=click.IntRange(min=1),
+    default=None,
+    help="Context Stoneburner requests (Ollama default 8192); flags models it exceeds",
+)
 def models(
-    provider_name: str, host: str | None, vllm_host: str | None, json_out: Path | None
+    provider_name: str,
+    host: str | None,
+    vllm_host: str | None,
+    json_out: Path | None,
+    context_tokens: int | None,
 ) -> None:
     """Inventory a host: sizes, declared capabilities, and where each value came from."""
     from atomics.inventory.readers import take_inventory
@@ -413,7 +424,7 @@ def models(
     defaults = {"ollama": settings.ollama_host, "vllm": vllm_host or settings.vllm_host}
     url = host or defaults[provider_name]
     try:
-        inventory = asyncio.run(take_inventory(provider_name, url))
+        inventory = asyncio.run(take_inventory(provider_name, url, context_tokens=context_tokens))
     except ConnectionError as exc:
         click.echo(str(exc), err=True)
         raise SystemExit(1)

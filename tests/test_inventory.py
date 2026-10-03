@@ -95,7 +95,9 @@ def test_no_completion_is_not_evaluable():
 
 async def test_read_ollama_records_declared_capabilities():
     async with _client({"/api/tags": TAGS, "/api/version": VERSION}) as client:
-        host, models = await read_ollama(client, "http://laptop:11434/", label="laptop")
+        host, models = await read_ollama(
+            client, "http://laptop:11434/", label="laptop", context_tokens=None
+        )
     assert (host.label, host.provider, host.version) == ("laptop", "ollama", "0.34.4")
     phi = models[0]
     assert phi.declared == frozenset({"tools", "completion"})
@@ -105,7 +107,9 @@ async def test_read_ollama_records_declared_capabilities():
 async def test_read_ollama_without_capabilities_uses_name_table():
     old = {"models": [{"name": "qwen3:8b", "size": 1, "digest": "d", "details": {}}]}
     async with _client({"/api/tags": old}) as client:
-        host, models = await read_ollama(client, "http://old:11434", label="old")
+        host, models = await read_ollama(
+            client, "http://old:11434", label="old", context_tokens=None
+        )
     assert host.version is None
     assert models[0].declared is None
     assert models[0].capability("thinking").source == "name-table"
@@ -114,13 +118,15 @@ async def test_read_ollama_without_capabilities_uses_name_table():
 async def test_read_ollama_unreachable_raises_connection_error():
     async with httpx.AsyncClient(transport=httpx.MockTransport(_down)) as client:
         with pytest.raises(ConnectionError, match="Cannot reach"):
-            await read_ollama(client, "http://gone:11434", label="gone")
+            await read_ollama(client, "http://gone:11434", label="gone", context_tokens=None)
 
 
 async def test_read_openai_lists_model_ids():
     listing = {"data": [{"id": "Qwen/Qwen3-8B", "max_model_len": 32768}]}
     async with _client({"/v1/models": listing}) as client:
-        host, models = await read_openai(client, "http://gpu:8000/v1", label="gpu")
+        host, models = await read_openai(
+            client, "http://gpu:8000/v1", label="gpu", context_tokens=None
+        )
     assert host.provider == "vllm"
     assert [m.name for m in models] == ["Qwen/Qwen3-8B"]
 
@@ -142,7 +148,13 @@ def test_models_table_and_json(monkeypatch, tmp_path):
     data = json.loads(out.read_text())
     assert data["schema"] == 1
     assert data["hosts"] == [
-        {"label": "laptop", "provider": "ollama", "version": "0.34.4", "error": None}
+        {
+            "label": "laptop",
+            "provider": "ollama",
+            "version": "0.34.4",
+            "error": None,
+            "loaded": [],
+        }
     ]
     phi, _, embed = data["models"]
     assert phi["capabilities"]["thinking"] == {"value": False, "source": "declared"}
@@ -174,3 +186,83 @@ def test_models_unreachable_host_exits_1(monkeypatch):
     result = CliRunner().invoke(cli, ["models", "--host", "http://gone:11434"])
     assert result.exit_code == 1
     assert "Cannot reach" in result.output
+
+
+# /api/show model_info, trimmed. phi3's rope key also ends in context_length.
+SHOWS = {
+    "phi4-mini-reasoning:3.8b": {
+        "capabilities": ["tools", "completion"],
+        "model_info": {
+            "general.architecture": "phi3",
+            "phi3.context_length": 131072,
+            "phi3.rope.scaling.original_context_length": 4096,
+        },
+    },
+    "ornith-1.5:9b": {
+        "model_info": {"general.architecture": "qwen35", "qwen35.context_length": 262144}
+    },
+}
+PS = {"models": [{"name": "ornith-1.5:9b", "context_length": 4096}]}
+
+
+def _show(request: httpx.Request) -> object:
+    name = json.loads(request.content)["model"]
+    return SHOWS.get(name, httpx.Response(500))
+
+
+OLLAMA = {"/api/tags": TAGS, "/api/version": VERSION, "/api/show": _show, "/api/ps": PS}
+
+
+async def test_ollama_context_reality():
+    async with _client(OLLAMA) as client:
+        host, (phi, ornith, embed) = await read_ollama(
+            client, "http://laptop:11434", label="laptop", context_tokens=None
+        )
+    assert (phi.declared_context, phi.requested_context, phi.loaded_context) == (
+        131072,
+        8192,
+        None,
+    )
+    assert phi.flags == []
+    assert ornith.loaded_context == 4096
+    assert ornith.flags == ["loaded-at-other-context"]
+    assert host.loaded == [("ornith-1.5:9b", 4096)]
+    assert embed.errors and embed.errors[0].startswith("show: Cannot reach")
+
+
+async def test_requested_above_declared_is_flagged():
+    async with _client(OLLAMA) as client:
+        _, (phi, _, _) = await read_ollama(
+            client, "http://laptop:11434", label="laptop", context_tokens=200000
+        )
+    assert phi.requested_context == 200000
+    assert "requested-above-declared" in phi.flags
+
+
+async def test_show_fills_capabilities_when_tags_lack_them():
+    old = {
+        "models": [{"name": "phi4-mini-reasoning:3.8b", "size": 1, "digest": "d", "details": {}}]
+    }
+    async with _client({"/api/tags": old, "/api/show": _show}) as client:
+        _, (phi,) = await read_ollama(client, "http://old:11434", label="old", context_tokens=None)
+    assert phi.declared == frozenset({"tools", "completion"})
+
+
+async def test_openai_reads_max_model_len():
+    listing = {"data": [{"id": "Qwen/Qwen3-8B", "max_model_len": 32768}]}
+    async with _client({"/v1/models": listing}) as client:
+        _, (m,) = await read_openai(client, "http://gpu:8000/v1", label="gpu", context_tokens=None)
+    assert (m.declared_context, m.requested_context) == (32768, None)
+
+
+def test_models_json_carries_context(monkeypatch, tmp_path):
+    out = tmp_path / "inv.json"
+    result = _invoke(monkeypatch, OLLAMA, "--context-tokens", "16384", "--json-out", str(out))
+    assert result.exit_code == 0, result.output
+    assert "loaded: ornith-1.5:9b (4096)" in result.output
+    assert "ornith-1.5:9b loaded-at-other-context" in result.output
+    data = json.loads(out.read_text())
+    assert data["hosts"][0]["loaded"] == [{"name": "ornith-1.5:9b", "context": 4096}]
+    phi = data["models"][0]
+    assert (phi["declared_context"], phi["requested_context"]) == (131072, 16384)
+    assert data["models"][1]["flags"] == ["loaded-at-other-context"]

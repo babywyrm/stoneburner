@@ -10,6 +10,7 @@ from urllib.parse import urlsplit
 import httpx
 
 from atomics.inventory import HostRecord, Inventory, ModelRecord
+from atomics.providers.ollama import DEFAULT_NUM_CTX
 
 _TIMEOUT = 10.0
 
@@ -37,8 +38,23 @@ async def _fetch(client: httpx.AsyncClient, url: str, body: dict[str, str] | Non
     return response.json()
 
 
+def _show_context(show: Any) -> int | None:
+    info = show.get("model_info") or {}
+    # Only the architecture's own key is the window; rope keys also end in context_length.
+    value = info.get(f"{info.get('general.architecture')}.context_length")
+    return value if isinstance(value, int) else None
+
+
+async def _loaded(client: httpx.AsyncClient, base: str) -> dict[str, int | None]:
+    try:
+        ps = await _fetch(client, f"{base}/api/ps")
+    except ConnectionError:
+        return {}
+    return {m.get("name", ""): m.get("context_length") for m in ps.get("models", [])}
+
+
 async def read_ollama(
-    client: httpx.AsyncClient, url: str, *, label: str
+    client: httpx.AsyncClient, url: str, *, label: str, context_tokens: int | None
 ) -> tuple[HostRecord, list[ModelRecord]]:
     base = url.rstrip("/")
     tags = await _fetch(client, f"{base}/api/tags")
@@ -46,38 +62,63 @@ async def read_ollama(
         version = (await _fetch(client, f"{base}/api/version")).get("version")
     except ConnectionError:
         version = None
+    loaded = await _loaded(client, base)
     models: list[ModelRecord] = []
     for entry in tags.get("models", []):
         details = entry.get("details") or {}
         caps = entry.get("capabilities")
-        models.append(
-            ModelRecord(
-                host=label,
-                name=entry.get("name", ""),
-                digest=entry.get("digest"),
-                size_bytes=entry.get("size"),
-                parameter_size=details.get("parameter_size") or None,
-                quantization=details.get("quantization_level") or None,
-                declared=frozenset(caps) if isinstance(caps, list) else None,
-            )
+        record = ModelRecord(
+            host=label,
+            name=entry.get("name", ""),
+            digest=entry.get("digest"),
+            size_bytes=entry.get("size"),
+            parameter_size=details.get("parameter_size") or None,
+            quantization=details.get("quantization_level") or None,
+            declared=frozenset(caps) if isinstance(caps, list) else None,
+            requested_context=context_tokens or DEFAULT_NUM_CTX,
         )
-    return HostRecord(label=label, provider="ollama", version=version), models
+        record.loaded_context = loaded.get(record.name)
+        try:
+            show = await _fetch(client, f"{base}/api/show", body={"model": record.name})
+        except ConnectionError as exc:
+            record.errors.append(f"show: {exc}")
+        else:
+            record.declared_context = _show_context(show)
+            if record.declared is None and isinstance(show.get("capabilities"), list):
+                record.declared = frozenset(show["capabilities"])
+        models.append(record)
+    host = HostRecord(label=label, provider="ollama", version=version, loaded=list(loaded.items()))
+    return host, models
 
 
 async def read_openai(
-    client: httpx.AsyncClient, url: str, *, label: str
+    client: httpx.AsyncClient, url: str, *, label: str, context_tokens: int | None
 ) -> tuple[HostRecord, list[ModelRecord]]:
     base = url.rstrip("/")
     listing = await _fetch(client, f"{base}/models")
-    models = [ModelRecord(host=label, name=e.get("id", "")) for e in listing.get("data", [])]
+    models = []
+    for entry in listing.get("data", []):
+        window = entry.get("max_model_len")
+        models.append(
+            ModelRecord(
+                host=label,
+                name=entry.get("id", ""),
+                declared_context=window if isinstance(window, int) else None,
+                requested_context=context_tokens,
+            )
+        )
     return HostRecord(label=label, provider="vllm"), models
 
 
 _READERS: dict[str, Reader] = {"ollama": read_ollama, "vllm": read_openai}
 
 
-async def take_inventory(provider: str, url: str) -> Inventory:
+async def take_inventory(
+    provider: str, url: str, *, context_tokens: int | None = None
+) -> Inventory:
     async with new_client() as client:
-        host, models = await _READERS[provider](client, url, label=host_label(url))
+        host, models = await _READERS[provider](
+            client, url, label=host_label(url), context_tokens=context_tokens
+        )
     taken_at = datetime.now(UTC).isoformat(timespec="seconds")
     return Inventory(taken_at=taken_at, hosts=[host], models=models)
