@@ -1,5 +1,30 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+- **`atomics models` is an inventory.** It shows quantization, digest,
+  declared capabilities and context, where each value came from, and
+  every disagreement between the host and the name tables. The Family
+  column is gone; Thinking now comes from the host when it declares
+  one. `--host` may repeat.
+
+### Added
+- `models --json-out FILE` writes the inventory (schema 1).
+- `models --context-tokens N` with declared, requested, and loaded
+  context per model, and flags for mismatches.
+- `models -p llamacpp` reads llama-server's model and `n_ctx`.
+- `models --probe`: an answer with thinking off and its speed, a
+  thinking-switch verdict (`off-works`, `off-ignored`, `inline`,
+  `no-channel`) with the recommended flag, and the toolcall capability
+  probe.
+- `models --probe-judge`: each model grades one right and one wrong
+  answer; fit if the right one wins by 0.3.
+- `models --host` repeats. Hosts are read in parallel, a down host is
+  reported without failing the rest, and a tag whose digest differs
+  between hosts is flagged.
+- `models -m PATTERN` limits the inventory to matching tags.
+
 ## 0.24.0 (2026-10-02) — Resumable, saved sweeps
 
 ### Upgrade notes

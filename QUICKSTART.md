@@ -87,7 +87,7 @@ commands and compare them side-by-side.
 | **brain-gateway** | `--provider brain-gateway` | Optional HTTP gateway in front of local models |
 
 ```bash
-# Ollama on this machine — list models (class + thinking annotations)
+# Ollama on this machine — inventory its models
 atomics models --host http://localhost:11434
 atomics run --provider ollama -m qwen2.5:7b --ollama-host http://localhost:11434 -n 5 -i 0
 
@@ -105,6 +105,26 @@ atomics run --provider brain-gateway --gateway-url http://localhost:30080 -n 5 -
 > thinking-mode detection and light/mid/heavy class tagging; an unrecognized
 > model still runs and simply defaults its class. Run `atomics models --host …`
 > to see what a box serves with its annotations.
+
+### Inventory before you evaluate
+
+`atomics models` reads what each host declares, not only names. A
+Tools, Thinking, or Vision value marked `name-table` is our guess; one
+marked `probe` was checked live. Note lines under the table name the
+tags where the host and our tables disagree, and models loaded at a
+different context than Stoneburner requests.
+
+```bash
+atomics models --host http://localhost:11434 --host http://brainbox:11434 \
+  --json-out logs/inventory/fleet.json
+atomics models --probe -m 'gemma4*'        # does it answer, think, call tools
+atomics models --probe-judge -m gemma4:26b # can it judge the others
+```
+
+`--probe` loads each model it checks, so pass `-m` on a shared host.
+The thinking-switch column says whether `--no-thinking` is obeyed
+(`off-works`), ignored (`off-ignored`), or has no separate channel
+(`inline`, `no-channel`), and which flag to evaluate the model with.
 
 ### Cloud APIs (frontier quality, billed per token)
 
