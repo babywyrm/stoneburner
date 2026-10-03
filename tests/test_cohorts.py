@@ -173,3 +173,93 @@ def test_model_without_size_is_excluded():
 def test_rejects_other_schema():
     with pytest.raises(CohortError, match="schema"):
         form_cohorts({"schema": 2, "models": []}, DESK)
+
+
+RED = get_battery("red-capability")
+
+
+def _fit(good, bad):
+    return {"good": good, "bad": bad, "fit": True}
+
+
+def test_placement_spreads_load_by_size():
+    inv = _inv(
+        _model("a:8b", size=9),
+        _model("a:8b", "beefy", size=9),
+        _model("b:8b", size=5),
+        _model("b:8b", "beefy", size=5),
+        _model("c:8b", size=4),
+        _model("c:8b", "beefy", size=4),
+        hosts=("laptop", "beefy"),
+    )
+    [cohort] = form_cohorts(inv, DESK).cohorts
+    assert {m.name: m.host for m in cohort.members} == {
+        "a:8b": "laptop",
+        "b:8b": "beefy",
+        "c:8b": "beefy",
+    }
+
+
+def test_placement_tie_goes_to_faster_host():
+    inv = _inv(
+        _model("a:8b", tps=10),
+        _model("a:8b", "beefy", tps=40),
+        _model("b:8b"),
+        hosts=("laptop", "beefy"),
+    )
+    [cohort] = form_cohorts(inv, DESK).cohorts
+    assert cohort.members[0].host == "beefy"
+
+
+def test_judge_is_widest_margin_and_recomputes_fit():
+    inv = _inv(
+        _model("a:8b"),
+        _model("b:8b"),
+        _model("weak:3b", params="3B", judge=_fit(0.7, 0.6)),
+        _model("ref:30b", params="30B", judge=_fit(1.0, 0.3)),
+        _model("alt:12b", params="12B", judge=_fit(0.9, 0.4)),
+    )
+    result = form_cohorts(inv, RED, patterns=("a:*", "b:*"))
+    assert result.cohorts[0].judge.name == "ref:30b"
+    assert result.cohorts[0].judge.host == "laptop"
+
+
+def test_judge_skips_members_and_their_family():
+    inv = _inv(
+        _model("ref:8b", judge=_fit(1.0, 0.3)),
+        _model("b:8b"),
+        _model("ref:30b", params="30B", judge=_fit(1.0, 0.2)),
+        _model("alt:12b", params="12B", judge=_fit(0.9, 0.4)),
+    )
+    result = form_cohorts(inv, RED, patterns=("ref:8b", "b:8b"))
+    assert result.cohorts[0].judge.name == "alt:12b"
+
+
+def test_judge_does_not_add_to_member_load():
+    inv = _inv(
+        _model("a:8b", size=9),
+        _model("a:8b", "beefy", size=9),
+        _model("b:8b", size=5),
+        _model("b:8b", "beefy", size=5),
+        _model("j:30b", params="30B", size=1, judge=_fit(1.0, 0.0)),
+        _model("j:30b", "beefy", params="30B", size=1, judge=_fit(1.0, 0.0)),
+        hosts=("laptop", "beefy"),
+    )
+    [cohort] = form_cohorts(inv, RED, patterns=("a:*", "b:*")).cohorts
+    assert cohort.judge.host == "beefy"
+
+
+def test_no_fit_judge_raises():
+    inv = _inv(_model("a:8b"), _model("b:8b", judge=_fit(0.7, 0.6)))
+    with pytest.raises(CohortError, match="--probe-judge"):
+        form_cohorts(inv, RED)
+
+
+def test_cohort_without_eligible_judge_keeps_none():
+    inv = _inv(_model("ref:8b", judge=_fit(1.0, 0.3)), _model("b:8b"))
+    assert form_cohorts(inv, RED).cohorts[0].judge is None
+
+
+def test_no_judge_when_battery_does_not_need_one():
+    inv = _inv(_model("a:8b"), _model("b:8b"), _model("j:30b", params="30B", judge=_fit(1, 0)))
+    assert form_cohorts(inv, DESK).cohorts[0].judge is None
