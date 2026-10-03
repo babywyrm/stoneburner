@@ -412,12 +412,27 @@ def _write_generic_export(rows: list[dict], fmt: str, out_file) -> None:
     default=None,
     help="Context Stoneburner requests (Ollama default 8192); flags models it exceeds",
 )
+@click.option(
+    "--model",
+    "-m",
+    "patterns",
+    multiple=True,
+    help="Only these tags; shell globs, repeatable (e.g. -m 'gemma4*')",
+)
+@click.option(
+    "--probe",
+    is_flag=True,
+    default=False,
+    help="Generate on each model: answer, speed, tool call. Loads every probed model.",
+)
 def models(
     provider_name: str,
     host: str | None,
     vllm_host: str | None,
     json_out: Path | None,
     context_tokens: int | None,
+    patterns: tuple[str, ...],
+    probe: bool,
 ) -> None:
     """Inventory a host: sizes, declared capabilities, and where each value came from."""
     from atomics.inventory.readers import take_inventory
@@ -431,7 +446,16 @@ def models(
     }
     url = host or defaults[provider_name]
     try:
-        inventory = asyncio.run(take_inventory(provider_name, url, context_tokens=context_tokens))
+        inventory = asyncio.run(
+            take_inventory(
+                provider_name,
+                url,
+                context_tokens=context_tokens,
+                patterns=patterns,
+                probe=probe,
+                on_model=lambda m: click.echo(f"probed {m.host} {m.name}", err=True),
+            )
+        )
     except ConnectionError as exc:
         click.echo(str(exc), err=True)
         raise SystemExit(1)

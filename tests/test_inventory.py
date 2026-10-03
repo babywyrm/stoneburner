@@ -10,8 +10,12 @@ import pytest
 from click.testing import CliRunner
 
 from atomics.cli import cli
+from atomics.eval.toolcall.catalog import PROBE_TOOL
 from atomics.inventory import Capability, ModelRecord, readers
+from atomics.inventory.probe import probe_model
 from atomics.inventory.readers import read_llamacpp, read_ollama, read_openai
+from atomics.providers.base import ProviderResponse
+from atomics.providers.toolcalls import ToolCall
 
 # Trimmed from the laptop's Ollama 0.34.4 on 2026-10-02. Digests shortened.
 TAGS = {
@@ -297,3 +301,114 @@ def test_models_llamacpp_provider(monkeypatch):
     assert result.exit_code == 0, result.output
     assert "qwen3-8b-q4_k_m.gguf" in result.output
     assert "box llamacpp" in result.output
+
+
+def _resp(text: str = "Paris", *, out: int = 4, thinking: int = 0, calls=()) -> ProviderResponse:
+    return ProviderResponse(
+        text=text,
+        input_tokens=10,
+        output_tokens=out,
+        total_tokens=10 + out,
+        model="m",
+        latency_ms=120.0,
+        estimated_cost_usd=0.0,
+        tokens_per_second=40.0,
+        thinking_tokens=thinking,
+        tool_calls=tuple(calls),
+    )
+
+
+class _Scripted:
+    """Answers thinking-off with `off`, thinking-on with `on`, tools with a call or not."""
+
+    supports_tools = True
+
+    def __init__(self, *, off=None, on=None, tool=True, error=None):
+        self.off, self.on, self.tool, self.error = off or _resp(), on or _resp(), tool, error
+        self.calls: list[tuple[str, object]] = []
+
+    async def generate(self, prompt, *, model=None, max_tokens=0, thinking=None, **_):
+        self.calls.append(("generate", thinking))
+        if self.error:
+            raise self.error
+        return self.on if thinking else self.off
+
+    async def generate_with_tools(self, prompt, *, tools, thinking=None, **_):
+        self.calls.append(("tools", thinking))
+        return _resp(calls=(ToolCall(name=PROBE_TOOL),) if self.tool else ())
+
+
+def _rec(name="ministral-3:8b", caps=("completion", "tools")) -> ModelRecord:
+    return ModelRecord(host="laptop", name=name, declared=frozenset(caps))
+
+
+async def test_probe_records_answer_speed_and_tools():
+    rec, fake = _rec(), _Scripted()
+    await probe_model(fake, rec)
+    assert rec.probe.off.answered and rec.probe.off.tokens_per_second == 40.0
+    assert rec.capability("completion") == Capability(True, "probe")
+    assert rec.capability("tools") == Capability(True, "probe")
+    assert fake.calls == [("generate", False), ("tools", False)]
+
+
+async def test_declared_tools_that_never_call_are_a_disagreement():
+    rec = _rec()
+    await probe_model(_Scripted(tool=False), rec)
+    assert "tools: probe=false declared=true" in rec.disagreements
+
+
+async def test_tools_declared_absent_are_not_probed():
+    rec, fake = _rec(caps=("completion",)), _Scripted()
+    await probe_model(fake, rec)
+    assert ("tools", False) not in fake.calls
+    assert "tools" not in rec.probed
+
+
+async def test_probe_error_is_recorded_and_nothing_is_probed():
+    rec = _rec()
+    await probe_model(_Scripted(error=ConnectionError("Cannot connect")), rec)
+    assert rec.probe.off is None
+    assert rec.probed == {}
+    assert rec.errors and rec.errors[0].startswith("probe:")
+
+
+def test_models_probe_filters_and_shows_speed(monkeypatch, tmp_path):
+    fake = _Scripted()
+    monkeypatch.setattr(readers, "probe_provider", lambda *a, **k: fake)
+    out = tmp_path / "inv.json"
+    result = _invoke(
+        monkeypatch,
+        OLLAMA,
+        "--host",
+        "http://laptop:11434",
+        "--probe",
+        "-m",
+        "phi4*",
+        "--json-out",
+        str(out),
+    )
+    assert result.exit_code == 0, result.output
+    assert "probed laptop phi4-mini-reasoning:3.8b" in result.output
+    data = json.loads(out.read_text())
+    assert [m["name"] for m in data["models"]] == ["phi4-mini-reasoning:3.8b"]
+    assert data["models"][0]["probe"]["off"]["tokens_per_second"] == 40.0
+
+
+def test_models_probe_skips_models_that_cannot_complete(monkeypatch, tmp_path):
+    fake = _Scripted()
+    monkeypatch.setattr(readers, "probe_provider", lambda *a, **k: fake)
+    out = tmp_path / "inv.json"
+    result = _invoke(
+        monkeypatch,
+        OLLAMA,
+        "--host",
+        "http://laptop:11434",
+        "--probe",
+        "-m",
+        "nomic*",
+        "--json-out",
+        str(out),
+    )
+    assert result.exit_code == 0, result.output
+    assert fake.calls == []
+    assert json.loads(out.read_text())["models"][0]["probe"] is None

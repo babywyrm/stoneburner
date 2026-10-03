@@ -7,7 +7,7 @@ never read from a name. Sources that disagree are listed, not hidden.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from typing import Literal
 
 from atomics.benchmark.model_classes import classify_model, supports_thinking
@@ -22,6 +22,24 @@ Source = Literal["probe", "declared", "name-table", "unknown"]
 class Capability:
     value: bool | None
     source: Source
+
+
+@dataclass(frozen=True)
+class Reply:
+    answered: bool
+    outcome: str
+    output_tokens: int
+    thinking_tokens: int
+    latency_ms: float
+    tokens_per_second: float | None
+
+
+@dataclass
+class ProbeResult:
+    off: Reply | None = None
+
+    def to_dict(self) -> dict[str, object]:
+        return {"off": asdict(self.off) if self.off else None}
 
 
 @dataclass
@@ -39,6 +57,7 @@ class ModelRecord:
     declared: frozenset[str] | None = None
     probed: dict[str, bool] = field(default_factory=dict)
     errors: list[str] = field(default_factory=list)
+    probe: ProbeResult | None = None
 
     @property
     def model_class(self) -> str:
@@ -103,6 +122,7 @@ class ModelRecord:
             "evaluable": self.evaluable,
             "disagreements": self.disagreements,
             "errors": list(self.errors),
+            "probe": self.probe.to_dict() if self.probe else None,
         }
 
 
