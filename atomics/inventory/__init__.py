@@ -7,6 +7,7 @@ never read from a name. Sources that disagree are listed, not hidden.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import asdict, dataclass, field
 from typing import Literal
 
@@ -75,6 +76,7 @@ class ModelRecord:
     probed: dict[str, bool] = field(default_factory=dict)
     errors: list[str] = field(default_factory=list)
     probe: ProbeResult | None = None
+    marks: list[str] = field(default_factory=list)
 
     @property
     def model_class(self) -> str:
@@ -119,7 +121,7 @@ class ModelRecord:
             out.append("requested-above-declared")
         if req and self.loaded_context and self.loaded_context != req:
             out.append("loaded-at-other-context")
-        return out
+        return out + self.marks
 
     @property
     def evaluable(self) -> bool:
@@ -178,3 +180,14 @@ class Inventory:
             "hosts": [h.to_dict() for h in self.hosts],
             "models": [m.to_dict() for m in self.models],
         }
+
+
+def mark_digest_mismatches(models: Sequence[ModelRecord]) -> None:
+    """Flag a tag whose weights differ between hosts: same name, different model."""
+    digests: dict[str, set[str]] = {}
+    for m in models:
+        if m.digest:
+            digests.setdefault(m.name, set()).add(m.digest)
+    for m in models:
+        if len(digests.get(m.name, ())) > 1:
+            m.marks.append("digest-mismatch")

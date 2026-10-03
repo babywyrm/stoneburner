@@ -11,9 +11,15 @@ from click.testing import CliRunner
 
 from atomics.cli import cli
 from atomics.eval.toolcall.catalog import PROBE_TOOL
-from atomics.inventory import Capability, ModelRecord, Reply, readers
+from atomics.inventory import Capability, ModelRecord, Reply, mark_digest_mismatches, readers
 from atomics.inventory.probe import probe_model, thinking_verdict
-from atomics.inventory.readers import read_llamacpp, read_ollama, read_openai
+from atomics.inventory.readers import (
+    read_llamacpp,
+    read_ollama,
+    read_openai,
+    take_inventory,
+    unique_labels,
+)
 from atomics.providers.base import ProviderResponse
 from atomics.providers.toolcalls import ToolCall
 
@@ -462,3 +468,78 @@ async def test_an_answer_with_thinking_on_counts_as_completion():
     rec = _rec(caps=("completion", "thinking"))
     await probe_model(_Scripted(off=_resp(text=""), on=_resp(out=60, thinking=50)), rec)
     assert rec.probed["completion"] is True
+
+
+def _hosts(per_host: dict[str, dict[str, Body]]) -> httpx.AsyncClient:
+    """Route by hostname first; a host missing from the map refuses connections."""
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        routes = per_host.get(request.url.host)
+        if routes is None:
+            raise httpx.ConnectError("refused", request=request)
+        body = routes.get(request.url.path)
+        if body is None:
+            return httpx.Response(404)
+        return httpx.Response(200, json=body)
+
+    return httpx.AsyncClient(transport=httpx.MockTransport(handle))
+
+
+def _tags(*pairs: tuple[str, str]) -> dict[str, object]:
+    return {
+        "models": [
+            {"name": n, "digest": d, "size": 1, "capabilities": ["completion"], "details": {}}
+            for n, d in pairs
+        ]
+    }
+
+
+def test_digest_mismatch_flags_every_copy():
+    a = ModelRecord(host="laptop", name="gemma4:26b", digest="aaa")
+    b = ModelRecord(host="beefy", name="gemma4:26b", digest="bbb")
+    c = ModelRecord(host="brainbox", name="gemma4:26b", digest="aaa")
+    d = ModelRecord(host="beefy", name="qwen3:8b", digest="ccc")
+    mark_digest_mismatches([a, b, c, d])
+    assert [m.flags for m in (a, b, c, d)] == [["digest-mismatch"]] * 3 + [[]]
+
+
+def test_unique_labels_add_the_port_only_when_needed():
+    assert unique_labels(["http://box:11434", "http://box:11435", "http://beefy:11434"]) == [
+        "box:11434",
+        "box:11435",
+        "beefy",
+    ]
+
+
+async def test_unreachable_host_is_reported_and_skipped(monkeypatch):
+    per_host = {"laptop": {"/api/tags": _tags(("gemma4:26b", "aaa"))}}
+    monkeypatch.setattr(readers, "new_client", lambda: _hosts(per_host))
+    inv = await take_inventory("ollama", ["http://laptop:11434", "http://brainbox:11434"])
+    assert [h.label for h in inv.hosts] == ["laptop", "brainbox"]
+    assert inv.hosts[1].error and "Cannot reach" in inv.hosts[1].error
+    assert [m.host for m in inv.models] == ["laptop"]
+
+
+async def test_every_host_down_raises(monkeypatch):
+    monkeypatch.setattr(readers, "new_client", lambda: _hosts({}))
+    with pytest.raises(ConnectionError, match="brainbox"):
+        await take_inventory("ollama", ["http://laptop:11434", "http://brainbox:11434"])
+
+
+def test_models_spans_hosts_and_flags_digests(monkeypatch, tmp_path):
+    per_host = {
+        "laptop": {"/api/tags": _tags(("gemma4:26b", "aaa"))},
+        "beefy": {"/api/tags": _tags(("gemma4:26b", "bbb"), ("qwen3:8b", "ccc"))},
+    }
+    monkeypatch.setattr(readers, "new_client", lambda: _hosts(per_host))
+    out = tmp_path / "inv.json"
+    args = ["--host", "http://laptop:11434", "--host", "http://beefy:11434"]
+    result = CliRunner().invoke(cli, ["models", *args, "--json-out", str(out)])
+    assert result.exit_code == 0, result.output
+    assert "beefy/gemma4:26b digest-mismatch" in result.output
+    data = json.loads(out.read_text())
+    assert [(m["host"], m["name"]) for m in data["models"]] == [
+        ("laptop", "gemma4:26b"),
+        ("beefy", "gemma4:26b"),
+        ("beefy", "qwen3:8b"),
+    ]

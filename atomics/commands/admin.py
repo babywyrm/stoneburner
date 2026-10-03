@@ -386,10 +386,11 @@ def _write_generic_export(rows: list[dict], fmt: str, out_file) -> None:
 )
 @click.option(
     "--host",
-    default=None,
+    "hosts",
+    multiple=True,
     help=(
-        "Host URL (default per provider: ATOMICS_OLLAMA_HOST, ATOMICS_VLLM_HOST, "
-        "ATOMICS_LLAMACPP_HOST)"
+        "Host URL; repeat for several hosts (default per provider: ATOMICS_OLLAMA_HOST, "
+        "ATOMICS_VLLM_HOST, ATOMICS_LLAMACPP_HOST)"
     ),
 )
 @click.option(
@@ -427,7 +428,7 @@ def _write_generic_export(rows: list[dict], fmt: str, out_file) -> None:
 )
 def models(
     provider_name: str,
-    host: str | None,
+    hosts: tuple[str, ...],
     vllm_host: str | None,
     json_out: Path | None,
     context_tokens: int | None,
@@ -444,12 +445,12 @@ def models(
         "vllm": vllm_host or settings.vllm_host,
         "llamacpp": settings.llamacpp_host,
     }
-    url = host or defaults[provider_name]
+    urls = list(hosts) or [defaults[provider_name]]
     try:
         inventory = asyncio.run(
             take_inventory(
                 provider_name,
-                url,
+                urls,
                 context_tokens=context_tokens,
                 patterns=patterns,
                 probe=probe,
