@@ -9,7 +9,7 @@ from fnmatch import fnmatch
 from typing import Any
 
 from atomics.eval.batteries import Battery
-from atomics.inventory import SCHEMA
+from atomics.inventory import JUDGE_FIT_MARGIN, SCHEMA
 
 # Inventory JSON as written by `atomics models --json-out`.
 Record = dict[str, Any]
@@ -120,6 +120,42 @@ def _members(records: list[Record]) -> list[Member]:
     return members
 
 
+def _place(members: list[Member], load: dict[str, int], order: list[str]) -> None:
+    """Greedy: biggest first, each to its least-loaded host; faster host breaks ties."""
+    for m in sorted(members, key=lambda m: -m.size_bytes):
+        m.host = min(
+            m.hosts,
+            key=lambda h: (
+                load.get(h, 0),
+                -m.speed.get(h, 0.0),
+                order.index(h) if h in order else len(order),
+            ),
+        )
+        load[m.host] = load.get(m.host, 0) + m.size_bytes
+
+
+def _margin(record: Record) -> float | None:
+    judge = record.get("judge") or {}
+    good, bad = judge.get("good"), judge.get("bad")
+    return None if good is None or bad is None else float(good - bad)
+
+
+def _judges(records: list[Record]) -> list[Member]:
+    """Fit judges, widest margin first. Fit is recomputed: older inventories
+    stored it before the margin rule."""
+    fit = [r for r in records if (_margin(r) or 0.0) >= JUDGE_FIT_MARGIN]
+    margin = {r["name"]: _margin(r) or 0.0 for r in fit}
+    return sorted(_members(fit), key=lambda m: (-margin[_tag(m.name)], m.name))
+
+
+def _tag(name: str) -> str:
+    return name.split("@")[0]
+
+
+def _family(name: str) -> str:
+    return name.split(":")[0]
+
+
 def form_cohorts(
     inventory: Record,
     battery: Battery,
@@ -151,6 +187,20 @@ def form_cohorts(
                 cohorts.append(Cohort(band, chunk))
             else:
                 excluded.update({m.name: "alone in band" for m in chunk})
+    order = [h["label"] for h in inventory.get("hosts", [])]
+    load: dict[str, int] = {}
+    _place([m for c in cohorts for m in c.members], load, order)
+    if battery.needs_judge:
+        judges = _judges(inventory["models"])
+        if not judges:
+            raise CohortError(
+                "no fit judge in this inventory; run `atomics models --probe-judge` first"
+            )
+        for cohort in cohorts:
+            taken = {_family(m.name) for m in cohort.members}
+            cohort.judge = next((j for j in judges if _family(j.name) not in taken), None)
+            if cohort.judge:
+                _place([cohort.judge], dict(load), order)
     return Cohorts(
         battery=battery.id,
         needs_judge=battery.needs_judge,
