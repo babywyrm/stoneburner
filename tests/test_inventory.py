@@ -31,6 +31,7 @@ from atomics.inventory.readers import (
     unique_labels,
 )
 from atomics.providers.base import ProviderResponse
+from atomics.providers.outcomes import ProviderOutcome, ProviderOutcomeKind
 from atomics.providers.toolcalls import ToolCall
 
 # Trimmed from the laptop's Ollama 0.34.4 on 2026-10-02. Digests shortened.
@@ -319,7 +320,10 @@ def test_models_llamacpp_provider(monkeypatch):
     assert "box llamacpp" in result.output
 
 
-def _resp(text: str = "Paris", *, out: int = 4, thinking: int = 0, calls=()) -> ProviderResponse:
+def _resp(
+    text: str = "Paris", *, out: int = 4, thinking: int = 0, calls=(), capped: bool = False
+) -> ProviderResponse:
+    outcome = ProviderOutcome(ProviderOutcomeKind.TRUNCATED, finish_reason="length")
     return ProviderResponse(
         text=text,
         input_tokens=10,
@@ -331,6 +335,8 @@ def _resp(text: str = "Paris", *, out: int = 4, thinking: int = 0, calls=()) -> 
         tokens_per_second=40.0,
         thinking_tokens=thinking,
         tool_calls=tuple(calls),
+        outcome=outcome if capped else None,
+        finish_reason="length" if capped else None,
     )
 
 
@@ -430,8 +436,10 @@ def test_models_probe_skips_models_that_cannot_complete(monkeypatch, tmp_path):
     assert json.loads(out.read_text())["models"][0]["probe"] is None
 
 
-def _reply(*, out: int = 4, thinking: int = 0, answered: bool = True) -> Reply:
-    return Reply(answered, "completed", out, thinking, 100.0, 40.0)
+def _reply(
+    *, out: int = 4, thinking: int = 0, answered: bool = True, outcome: str = "completed"
+) -> Reply:
+    return Reply(answered, outcome, out, thinking, 100.0, 40.0)
 
 
 @pytest.mark.parametrize(
@@ -441,6 +449,15 @@ def _reply(*, out: int = 4, thinking: int = 0, answered: bool = True) -> Reply:
         (_reply(out=60, thinking=40), _reply(out=60, thinking=50), "off-ignored"),
         (_reply(out=4), _reply(out=120), "inline"),
         (_reply(out=4), _reply(out=6), "no-channel"),
+        # phi4-mini-reasoning on three hosts: reasons in visible text with thinking off.
+        (_reply(out=1024, outcome="truncated"), _reply(out=1024, thinking=900), "off-ignored"),
+        (
+            _reply(out=1024, outcome="truncated"),
+            _reply(out=1024, outcome="truncated"),
+            "off-ignored",
+        ),
+        # The laptop's Ollama left phi4's reasoning untagged: 565 visible tokens, none thinking.
+        (_reply(out=565), _reply(out=273, thinking=231), "off-ignored"),
     ],
 )
 def test_thinking_verdict(off, on, verdict):
@@ -617,3 +634,14 @@ def test_models_probe_judge(monkeypatch, tmp_path):
     assert model["judge"] == {"good": 0.9, "bad": 0.1, "fit": True}
     assert model["probe"] is None
     assert fake.calls == []
+
+
+async def test_a_capped_answer_with_thinking_off_checks_thinking_even_unclaimed():
+    rec = _rec(caps=("completion",))
+    fake = _Scripted(off=_resp(out=1024, capped=True))
+    await probe_model(fake, rec)
+    assert [c for c in fake.calls if c[0] == "generate"] == [
+        ("generate", False),
+        ("generate", True),
+    ]
+    assert rec.probe.verdict == "off-ignored"

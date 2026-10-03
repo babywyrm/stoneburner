@@ -11,7 +11,13 @@ from atomics.validation import sanitize_error
 
 # Long enough that tokens per second measures decoding, not one token's overhead.
 ANSWER_PROMPT = "Name the capital of France, then describe it in two sentences."
-_ANSWER_MAX_TOKENS = 256
+# Room for a reasoner to finish.
+_ANSWER_MAX_TOKENS = 1024
+_CAPPED = frozenset({"truncated", "thinking_budget"})
+# ponytail: a two-sentence answer runs 40-70 tokens. Past this, or capped, the
+# model was reasoning in visible text whatever the host's parser separated.
+# Hosts disagree on tagging (phi4: 565 untagged on Ollama 0.34, split on 0.32).
+_BRIEF_MAX_TOKENS = 256
 _INLINE_MIN_TOKENS = 64
 
 
@@ -29,9 +35,16 @@ async def _reply(provider: BaseProvider, model: str, *, thinking: bool) -> Reply
     )
 
 
+def _reasoned(off: Reply) -> bool:
+    """Thinking was off, and the model reasoned anyway."""
+    return bool(
+        off.thinking_tokens or off.outcome in _CAPPED or off.output_tokens > _BRIEF_MAX_TOKENS
+    )
+
+
 def thinking_verdict(off: Reply, on: Reply) -> Verdict:
     """How a model treats the thinking switch, from one reply each way."""
-    if off.thinking_tokens:
+    if _reasoned(off):
         return "off-ignored"
     if on.thinking_tokens:
         return "off-works"
@@ -51,7 +64,7 @@ async def probe_model(provider: BaseProvider, record: ModelRecord) -> None:
     except Exception as exc:
         record.errors.append(f"probe: {sanitize_error(exc)}")
         return
-    if off.thinking_tokens or record.claims("thinking"):
+    if _reasoned(off) or record.claims("thinking"):
         try:
             result.on = await _reply(provider, record.name, thinking=True)
         except Exception as exc:
