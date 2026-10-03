@@ -29,6 +29,16 @@ def _context_cell(m: ModelRecord) -> str:
     return text
 
 
+def _answer_cell(m: ModelRecord) -> str:
+    if m.probe is None:
+        return ""
+    off = m.probe.off
+    if off is None:
+        return "[red]error[/red]"
+    word = "[green]yes[/green]" if off.answered else f"[red]{off.outcome}[/red]"
+    return f"{word} {off.tokens_per_second:.0f} t/s" if off.tokens_per_second else word
+
+
 def _notes(m: ModelRecord) -> list[str]:
     evaluable = [] if m.evaluable else ["not evaluable: no completion capability"]
     return [*evaluable, *m.disagreements, *m.flags]
@@ -41,6 +51,7 @@ def render(inv: Inventory, console: Console) -> None:
             line += " — loaded: " + ", ".join(f"{escape(n)} ({c})" for n, c in host.loaded)
         console.print(f"{line} [red]{escape(host.error)}[/red]" if host.error else line)
 
+    probed = any(m.probe for m in inv.models)
     table = Table(box=box.SIMPLE_HEAD)
     longest = max((len(m.name) for m in inv.models), default=5)
     table.add_column("Model", style="cyan bold", no_wrap=True, min_width=longest)
@@ -51,9 +62,11 @@ def render(inv: Inventory, console: Console) -> None:
     table.add_column("Class", no_wrap=True)
     for cap in _SHOWN:
         table.add_column(cap.capitalize(), justify="center", no_wrap=True)
+    if probed:
+        table.add_column("Answer", no_wrap=True)
     for m in sorted(inv.models, key=lambda m: (m.host, m.size_bytes or 0)):
         style = _CLASS_STYLE.get(m.model_class, "dim")
-        table.add_row(
+        row = [
             escape(m.name),
             f"{m.size_bytes / 1e9:.1f} GB" if m.size_bytes else "",
             m.parameter_size or "",
@@ -61,12 +74,17 @@ def render(inv: Inventory, console: Console) -> None:
             _context_cell(m),
             f"[{style}]{m.model_class}[/{style}]",
             *(_cap_cell(m.capability(c)) for c in _SHOWN),
-        )
+        ]
+        if probed:
+            row.append(_answer_cell(m))
+        table.add_row(*row)
     console.print(table)
 
     for m in inv.models:
         for note in _notes(m):
             console.print(f"[yellow]{escape(m.name)}[/yellow] {note}")
+        for error in m.errors:
+            console.print(f"[red]{escape(m.name)}[/red] {escape(error)}")
     unknown = sum(1 for m in inv.models if m.model_class == "unknown")
     if unknown:
         console.print(

@@ -2,15 +2,20 @@
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
 from datetime import UTC, datetime
+from fnmatch import fnmatch
 from typing import Any
 from urllib.parse import urlsplit
 
 import httpx
 
 from atomics.inventory import HostRecord, Inventory, ModelRecord
-from atomics.providers.ollama import DEFAULT_NUM_CTX
+from atomics.inventory.probe import probe_model
+from atomics.providers.base import BaseProvider
+from atomics.providers.llamacpp import LlamaCppProvider
+from atomics.providers.ollama import DEFAULT_NUM_CTX, OllamaProvider
+from atomics.providers.vllm import VllmProvider
 
 _TIMEOUT = 10.0
 
@@ -140,12 +145,39 @@ _READERS: dict[str, Reader] = {
 }
 
 
+def probe_provider(
+    provider: str, url: str, client: httpx.AsyncClient, context_tokens: int | None
+) -> BaseProvider:
+    """Build the generating provider. Each request sets its own long timeout."""
+    if provider == "vllm":
+        return VllmProvider(base_url=url, client=client)
+    if provider == "llamacpp":
+        return LlamaCppProvider(base_url=url, client=client)
+    return OllamaProvider(host=url, client=client, context_tokens=context_tokens)
+
+
 async def take_inventory(
-    provider: str, url: str, *, context_tokens: int | None = None
+    provider: str,
+    url: str,
+    *,
+    context_tokens: int | None = None,
+    patterns: Sequence[str] = (),
+    probe: bool = False,
+    on_model: Callable[[ModelRecord], None] | None = None,
 ) -> Inventory:
+    """Read one host. Probes run one model at a time: a host serves one generate at once."""
     async with new_client() as client:
         host, models = await _READERS[provider](
             client, url, label=host_label(url), context_tokens=context_tokens
         )
+        if patterns:
+            models = [m for m in models if any(fnmatch(m.name, p) for p in patterns)]
+        if probe:
+            target = probe_provider(provider, url, client, context_tokens)
+            for record in models:
+                if record.evaluable:
+                    await probe_model(target, record)
+                if on_model is not None:
+                    on_model(record)
     taken_at = datetime.now(UTC).isoformat(timespec="seconds")
     return Inventory(taken_at=taken_at, hosts=[host], models=models)
