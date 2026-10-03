@@ -11,7 +11,7 @@ from click.testing import CliRunner
 
 from atomics.cli import cli
 from atomics.inventory import Capability, ModelRecord, readers
-from atomics.inventory.readers import read_ollama, read_openai
+from atomics.inventory.readers import read_llamacpp, read_ollama, read_openai
 
 # Trimmed from the laptop's Ollama 0.34.4 on 2026-10-02. Digests shortened.
 TAGS = {
@@ -266,3 +266,34 @@ def test_models_json_carries_context(monkeypatch, tmp_path):
     phi = data["models"][0]
     assert (phi["declared_context"], phi["requested_context"]) == (131072, 16384)
     assert data["models"][1]["flags"] == ["loaded-at-other-context"]
+
+
+# llama-server shapes: newer builds nest n_ctx, older ones put it at the top.
+LLAMA_MODELS = {"object": "list", "data": [{"id": "qwen3-8b-q4_k_m.gguf", "object": "model"}]}
+
+
+@pytest.mark.parametrize(
+    "props",
+    [{"default_generation_settings": {"n_ctx": 16384}}, {"n_ctx": 16384}],
+)
+async def test_llamacpp_reads_n_ctx(props):
+    async with _client({"/v1/models": LLAMA_MODELS, "/props": props}) as client:
+        host, (m,) = await read_llamacpp(
+            client, "http://box:8080", label="box", context_tokens=None
+        )
+    assert host.provider == "llamacpp"
+    assert (m.name, m.declared_context, m.declared) == ("qwen3-8b-q4_k_m.gguf", 16384, None)
+
+
+async def test_llamacpp_without_props_still_lists():
+    async with _client({"/v1/models": LLAMA_MODELS}) as client:
+        _, (m,) = await read_llamacpp(client, "http://box:8080", label="box", context_tokens=None)
+    assert m.declared_context is None
+
+
+def test_models_llamacpp_provider(monkeypatch):
+    routes = {"/v1/models": LLAMA_MODELS, "/props": {"n_ctx": 16384}}
+    result = _invoke(monkeypatch, routes, "-p", "llamacpp", "--host", "http://box:8080")
+    assert result.exit_code == 0, result.output
+    assert "qwen3-8b-q4_k_m.gguf" in result.output
+    assert "box llamacpp" in result.output
