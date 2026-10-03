@@ -126,6 +126,21 @@ The thinking-switch column says whether `--no-thinking` is obeyed
 (`off-works`), ignored (`off-ignored`), or has no separate channel
 (`inline`, `no-channel`), and which flag to evaluate the model with.
 
+`atomics cohorts` groups a saved inventory into sets that compare
+fairly on one battery: same size band (host-declared parameters,
+else the name table's class), every capability the battery needs,
+each model's recommended thinking flag, one host per model, and one
+judge from fit models outside the set and its family. It reads the
+file only, so regroup freely.
+
+```bash
+atomics cohorts logs/inventory/fleet.json -b red-capability \
+  -m 'gemma4*' -m 'qwen3*' --json-out logs/inventory/cohorts.json
+```
+
+Every model left out is listed with the reason. A judged battery
+needs `--probe-judge` results in the inventory.
+
 ### Cloud APIs (frontier quality, billed per token)
 
 | Backend | Flag | Install |

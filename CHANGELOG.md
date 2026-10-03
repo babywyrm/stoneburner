@@ -10,6 +10,11 @@
   one. `--host` may repeat.
 
 ### Added
+- `atomics cohorts INVENTORY -b BATTERY` groups a saved inventory into
+  fair comparison sets: host-declared size band, the capabilities the
+  battery's suites need, each model's thinking flag, one host per
+  digest spread by load, and one reference judge (widest good/bad
+  margin) outside each set's families. `--json-out` for the plan step.
 - `models --json-out FILE` writes the inventory (schema 1).
 - `models --context-tokens N` with declared, requested, and loaded
   context per model, and flags for mismatches.
