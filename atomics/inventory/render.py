@@ -20,14 +20,25 @@ def _cap_cell(cap: Capability) -> str:
     return word if cap.source == "declared" else f"{word} [dim]{cap.source}[/dim]"
 
 
+def _context_cell(m: ModelRecord) -> str:
+    text = str(m.declared_context) if m.declared_context else "?"
+    if m.requested_context:
+        text += f" → {m.requested_context}"
+    if m.loaded_context:
+        text += f" (loaded {m.loaded_context})"
+    return text
+
+
 def _notes(m: ModelRecord) -> list[str]:
     evaluable = [] if m.evaluable else ["not evaluable: no completion capability"]
-    return [*evaluable, *m.disagreements]
+    return [*evaluable, *m.disagreements, *m.flags]
 
 
 def render(inv: Inventory, console: Console) -> None:
     for host in inv.hosts:
         line = f"[bold]{escape(host.label)}[/bold] {host.provider} {host.version or ''}".rstrip()
+        if host.loaded:
+            line += " — loaded: " + ", ".join(f"{escape(n)} ({c})" for n, c in host.loaded)
         console.print(f"{line} [red]{escape(host.error)}[/red]" if host.error else line)
 
     table = Table(box=box.SIMPLE_HEAD)
@@ -36,6 +47,7 @@ def render(inv: Inventory, console: Console) -> None:
     table.add_column("Size", justify="right", no_wrap=True)
     table.add_column("Params", justify="right", no_wrap=True)
     table.add_column("Quant", no_wrap=True)
+    table.add_column("Context", justify="right", no_wrap=True)
     table.add_column("Class", no_wrap=True)
     for cap in _SHOWN:
         table.add_column(cap.capitalize(), justify="center", no_wrap=True)
@@ -46,6 +58,7 @@ def render(inv: Inventory, console: Console) -> None:
             f"{m.size_bytes / 1e9:.1f} GB" if m.size_bytes else "",
             m.parameter_size or "",
             m.quantization or "",
+            _context_cell(m),
             f"[{style}]{m.model_class}[/{style}]",
             *(_cap_cell(m.capability(c)) for c in _SHOWN),
         )
