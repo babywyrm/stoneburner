@@ -280,11 +280,21 @@ same rank order, with granite 0.1–0.3 higher on every subject and more
 lenient on blue than red. Rankings from a granite-judged sweep hold.
 Absolute red/blue numbers do not. Next:
 
-- [ ] Human-grade the 12 answers where the judges disagreed most, and
+- [x] Human-grade the 12 answers where the judges disagreed most, and
       name the reference judge from that. Same rubric as the judge.
-- [ ] Re-run the study on full-length answers. The first pass cut
-      answers at 3000 characters; the suite shows up to 8192.
-- [ ] Re-run the fleet on the reference judge with `--runs 3 --save`
+      Blind grade 2026-10-03 (`logs/judge-study/redblue/grading/`,
+      not in git). Mean absolute error against the grade:
+      `gemma4:26b` 0.09, `qwen3.8:27b` 0.18, `granite4.2:8b` 0.22.
+      Granite sits +0.22 on every item. Reference judge is
+      `gemma4:26b`. Rankings from a granite-judged sweep still hold;
+      absolute red/blue numbers do not.
+- [ ] Re-run the study on full-length answers. The graded sheet is the
+      2026-09-24 cut (answers end in `truncated for scoring`). The
+      suite now shows the judge up to 8192 characters. The subject
+      tags from that night (`llama3.2:1b`, `qwen2.5:1.5b`,
+      `llama3.2:3b`, `mistral:7b`, `qwen2.5:14b`, `gemma4:e4b`) are
+      not on this host.
+- [ ] Re-run the fleet on `gemma4:26b` with `--runs 3 --save`
       and `--status ... --resume`.
 - [x] Codereview has 6 vulnerable and 6 clean fixtures (0.24.0). One
       false positive moves F1 by 0.09, not 0.33. Older rows compare
