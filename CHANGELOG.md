@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## 0.24.1 (2026-10-03) — Inventory, cohorts, and battery plans
+
+### Upgrade notes
+- **`atomics models` output changed.** The Family column is gone. Thinking
+  comes from the host when it declares one. `--host` may repeat. A saved
+  inventory is schema 1 and now includes each host URL.
+- **New commands, no flag removals.** `atomics cohorts` reads an inventory
+  file. `atomics battery run --cohorts FILE` runs the jobs in it.
+- Do not retag `v0.24.0`.
+
 ### Changed
 - **`atomics models` is an inventory.** It shows quantization, digest,
   declared capabilities and context, where each value came from, and
