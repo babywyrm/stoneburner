@@ -12,7 +12,7 @@ from urllib.parse import urlsplit
 import httpx
 
 from atomics.inventory import HostRecord, Inventory, ModelRecord, mark_digest_mismatches
-from atomics.inventory.probe import probe_model
+from atomics.inventory.probe import probe_judge, probe_model
 from atomics.providers.base import BaseProvider
 from atomics.providers.llamacpp import LlamaCppProvider
 from atomics.providers.ollama import DEFAULT_NUM_CTX, OllamaProvider
@@ -171,6 +171,7 @@ async def _take_host(
     context_tokens: int | None,
     patterns: Sequence[str],
     probe: bool,
+    judge: bool,
     on_model: Callable[[ModelRecord], None] | None,
 ) -> tuple[HostRecord, list[ModelRecord]]:
     try:
@@ -181,11 +182,14 @@ async def _take_host(
         return HostRecord(label=label, provider=provider, error=str(exc)), []
     if patterns:
         models = [m for m in models if any(fnmatch(m.name, p) for p in patterns)]
-    if probe:
+    if probe or judge:
         target = probe_provider(provider, url, client, context_tokens)
         for record in models:
             if record.evaluable:
-                await probe_model(target, record)
+                if probe:
+                    await probe_model(target, record)
+                if judge:
+                    await probe_judge(target, record)
             if on_model is not None:
                 on_model(record)
     return host, models
@@ -198,6 +202,7 @@ async def take_inventory(
     context_tokens: int | None = None,
     patterns: Sequence[str] = (),
     probe: bool = False,
+    probe_judge: bool = False,
     on_model: Callable[[ModelRecord], None] | None = None,
 ) -> Inventory:
     """Read every host at once. Within a host, probes run one model at a time:
@@ -213,6 +218,7 @@ async def take_inventory(
                     context_tokens=context_tokens,
                     patterns=patterns,
                     probe=probe,
+                    judge=probe_judge,
                     on_model=on_model,
                 )
                 for url, label in zip(urls, unique_labels(urls))

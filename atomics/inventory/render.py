@@ -45,6 +45,15 @@ def _switch_cell(m: ModelRecord) -> str:
     return f"{m.probe.verdict} → {m.probe.recommended}"
 
 
+def _judge_cell(m: ModelRecord) -> str:
+    if m.judge is None:
+        return ""
+    good = "?" if m.judge.good is None else f"{m.judge.good:.2f}"
+    bad = "?" if m.judge.bad is None else f"{m.judge.bad:.2f}"
+    word = "[green]fit[/green]" if m.judge.fit else "[red]unfit[/red]"
+    return f"{word} {good}/{bad}"
+
+
 def _notes(m: ModelRecord) -> list[str]:
     evaluable = [] if m.evaluable else ["not evaluable: no completion capability"]
     return [*evaluable, *m.disagreements, *m.flags]
@@ -59,6 +68,7 @@ def render(inv: Inventory, console: Console) -> None:
         console.print(f"{line} [red]{escape(host.error)}[/red]" if host.error else line)
 
     probed = any(m.probe for m in inv.models)
+    judged = any(m.judge for m in inv.models)
     table = Table(box=box.SIMPLE_HEAD)
     if multi:
         table.add_column("Host", no_wrap=True)
@@ -74,6 +84,8 @@ def render(inv: Inventory, console: Console) -> None:
     if probed:
         table.add_column("Answer", no_wrap=True)
         table.add_column("Thinking switch", no_wrap=True)
+    if judged:
+        table.add_column("Judge (good/bad)", no_wrap=True)
     for m in sorted(inv.models, key=lambda m: (m.host, m.size_bytes or 0)):
         style = _CLASS_STYLE.get(m.model_class, "dim")
         row = [escape(m.host)] if multi else []
@@ -88,6 +100,8 @@ def render(inv: Inventory, console: Console) -> None:
         ]
         if probed:
             row += [_answer_cell(m), _switch_cell(m)]
+        if judged:
+            row.append(_judge_cell(m))
         table.add_row(*row)
     console.print(table)
 

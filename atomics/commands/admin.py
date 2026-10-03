@@ -426,6 +426,13 @@ def _write_generic_export(rows: list[dict], fmt: str, out_file) -> None:
     default=False,
     help="Generate on each model: answer, speed, tool call. Loads every probed model.",
 )
+@click.option(
+    "--probe-judge",
+    "probe_judge",
+    is_flag=True,
+    default=False,
+    help="Have each model grade a right and a wrong answer; fit if right wins by 0.3",
+)
 def models(
     provider_name: str,
     hosts: tuple[str, ...],
@@ -434,6 +441,7 @@ def models(
     context_tokens: int | None,
     patterns: tuple[str, ...],
     probe: bool,
+    probe_judge: bool,
 ) -> None:
     """Inventory a host: sizes, declared capabilities, and where each value came from."""
     from atomics.inventory.readers import take_inventory
@@ -454,6 +462,7 @@ def models(
                 context_tokens=context_tokens,
                 patterns=patterns,
                 probe=probe,
+                probe_judge=probe_judge,
                 on_model=lambda m: click.echo(f"probed {m.host} {m.name}", err=True),
             )
         )

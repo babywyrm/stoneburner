@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from atomics.eval.judge import score_response
+from atomics.eval.redblue.fixtures import BLUE_FIXTURES
 from atomics.eval.toolcall.runner import probe_tool_capability
-from atomics.inventory import ModelRecord, ProbeResult, Reply, Verdict
+from atomics.inventory import JudgeFitness, ModelRecord, ProbeResult, Reply, Verdict
 from atomics.providers.base import BaseProvider
 from atomics.validation import sanitize_error
 
@@ -65,3 +67,61 @@ async def probe_model(provider: BaseProvider, record: ModelRecord) -> None:
         record.probed["tools"] = await probe_tool_capability(
             provider, model=record.name, thinking=result.recommended == "--thinking"
         )
+
+
+# rb-b03 asks for Dockerfile hardening. The good answer covers every gold
+# criterion; the bad one is confidently wrong.
+JUDGE_FIXTURE_ID = "rb-b03"
+
+GOOD_ANSWER = """\
+Security issues:
+1. It runs as root: there is no USER instruction.
+2. The base image tag python:3.11 is unpinned; pin it by digest.
+3. COPY . . copies everything into the image, including .env files and secrets.
+4. The full python image carries compilers and tools; use a multi-stage build on a slim base.
+5. pip keeps its cache and installs unpinned packages; use --no-cache-dir and --require-hashes.
+
+Add a .dockerignore that excludes .env, .git, and tests, and copy only what runs.
+
+```dockerfile
+FROM python:3.11-slim AS build
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir --require-hashes --target /deps -r requirements.txt
+
+FROM python:3.11-slim
+RUN useradd --create-home appuser
+WORKDIR /app
+COPY --from=build /deps /deps
+COPY app.py .
+ENV PYTHONPATH=/deps
+USER appuser
+EXPOSE 8080
+CMD ["python", "app.py"]
+```
+"""
+
+BAD_ANSWER = (
+    "This Dockerfile is already production-ready. The only change I would make is "
+    "to expose port 80 instead of 8080 so users do not have to type a port."
+)
+
+
+async def probe_judge(provider: BaseProvider, record: ModelRecord) -> None:
+    """Ask the model to grade a right and a wrong answer. Fit: both parse, right wins."""
+    fixture = next(f for f in BLUE_FIXTURES if f.id == JUDGE_FIXTURE_ID)
+    scores: list[float | None] = []
+    try:
+        for answer in (GOOD_ANSWER, BAD_ANSWER):
+            result = await score_response(
+                fixture.prompt,
+                answer,
+                judge_provider=provider,
+                judge_model=record.name,
+                gold_criteria=fixture.gold_criteria,
+            )
+            scores.append(None if result.parse_failed else result.score)
+    except Exception as exc:
+        record.errors.append(f"judge: {sanitize_error(exc)}")
+        return
+    record.judge = JudgeFitness(good=scores[0], bad=scores[1])
