@@ -59,6 +59,10 @@ Recipes: [QUICKSTART.md](../QUICKSTART.md).
 | `atomics models --probe -m 'gemma4*'` | Live check: answer, speed, thinking-switch verdict, tool call |
 | `atomics models --probe-judge -m TAG` | Can this model judge: grades a right and a wrong answer, fit if right wins by 0.3 |
 | `atomics models --json-out FILE` | Write the inventory as JSON (schema 1) |
+| `atomics cohorts FILE -b BATTERY` | Group a saved inventory into fair comparison sets: size band, needed capabilities, thinking flag, host, judge |
+| `atomics cohorts FILE -b BATTERY -m 'gemma4*'` | Only tags matching the glob; repeatable. Others are listed as excluded |
+| `atomics cohorts FILE -b BATTERY --max-members N` | Split a size band larger than N into several cohorts |
+| `atomics cohorts FILE -b BATTERY --json-out FILE` | Write cohorts JSON (schema 1) for the plan step |
 | `atomics doctor` | Check installation health, config, and `inference.env` (never prints the API key). Prints one next command when the check is healthy. |
 
 ## Evaluation Suites
