@@ -1,3 +1,5 @@
+import json
+
 from click.testing import CliRunner
 
 from atomics.cli import cli
@@ -395,3 +397,42 @@ def test_invoke_atomics_propagates_a_suite_exit_code(monkeypatch):
     monkeypatch.setattr("atomics.cli.cli", fake_cli)
     assert invoke_atomics(["redblue"]) == 1
     assert invoke_atomics(["refusal"]) == 0
+
+
+def test_battery_run_cohorts_runs_each_job(tmp_path, monkeypatch):
+    plan = {
+        "schema": 1,
+        "battery": "desk-pass",
+        "jobs": [
+            {
+                "model": "a:8b",
+                "host": "http://laptop:11434",
+                "provider": "ollama",
+                "thinking": False,
+                "judge": None,
+            },
+            {
+                "model": "b:8b",
+                "host": "http://brainbox:11434",
+                "provider": "ollama",
+                "thinking": True,
+                "judge": None,
+            },
+        ],
+    }
+    path = tmp_path / "cohorts.json"
+    path.write_text(json.dumps(plan))
+    seen: list[list[str]] = []
+
+    def fake_invoke(args: list[str]) -> int:
+        seen.append(args)
+        return 0
+
+    monkeypatch.setattr("atomics.commands.battery.invoke_atomics", fake_invoke)
+    result = CliRunner().invoke(cli, ["battery", "run", "--cohorts", str(path)])
+    assert result.exit_code == 0, result.output
+    models = [args[args.index("-m") + 1] for args in seen if "-m" in args]
+    assert models.count("a:8b") == 3
+    assert models.count("b:8b") == 3
+    assert any("--ollama-host" in args and "http://brainbox:11434" in args for args in seen)
+    assert any("--thinking" in args and "b:8b" in args for args in seen)

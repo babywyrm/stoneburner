@@ -75,6 +75,92 @@ class Cohorts:
     taken_at: str | None
     cohorts: list[Cohort]
     excluded: list[Excluded]
+    hosts: list[Record] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class PlanJob:
+    battery: str
+    model: str
+    host: str
+    provider: str
+    thinking: bool
+    judge: str | None = None
+    judge_host: str | None = None
+    band: str = ""
+
+
+def _host_row(hosts: list[Record], label: str | None) -> Record:
+    return next((h for h in hosts if h.get("label") == label), {})
+
+
+def _resolve(hosts: list[Record], label: str | None) -> tuple[str, str]:
+    row = _host_row(hosts, label)
+    return str(row.get("url") or label or ""), str(row.get("provider") or "ollama")
+
+
+def plan_jobs(result: Cohorts) -> list[PlanJob]:
+    """One battery-run job per placed member."""
+    jobs: list[PlanJob] = []
+    for cohort in result.cohorts:
+        judge = _tag(cohort.judge.name) if cohort.judge else None
+        judge_host = _resolve(result.hosts, cohort.judge.host)[0] if cohort.judge else None
+        for member in cohort.members:
+            host, provider = _resolve(result.hosts, member.host)
+            jobs.append(
+                PlanJob(
+                    battery=result.battery,
+                    model=_tag(member.name),
+                    host=host,
+                    provider=provider,
+                    thinking=member.thinking,
+                    judge=judge,
+                    judge_host=judge_host,
+                    band=cohort.band,
+                )
+            )
+    return jobs
+
+
+def job_argv(job: PlanJob) -> list[str]:
+    args = ["battery", "run", job.battery, "-m", job.model, "-p", job.provider]
+    args.append("--thinking" if job.thinking else "--no-thinking")
+    if job.provider in {"vllm", "llamacpp"}:
+        args.extend(["--vllm-host", job.host])
+    else:
+        args.extend(["--ollama-host", job.host])
+    if job.judge:
+        args.extend(["--judge-model", job.judge])
+        if job.judge_host:
+            args.extend(["--judge-host", job.judge_host])
+    return args
+
+
+def jobs_from_plan(data: Record) -> list[PlanJob]:
+    if data.get("schema") != SCHEMA:
+        raise CohortError(f"cohorts schema {data.get('schema')!r}; expected {SCHEMA}")
+    raw = data.get("jobs")
+    if not isinstance(raw, list):
+        raise CohortError("no jobs; re-run atomics cohorts --json-out")
+    battery = str(data.get("battery") or "")
+    jobs: list[PlanJob] = []
+    for row in raw:
+        judge = row.get("judge") if isinstance(row, dict) else None
+        name = host = None
+        if isinstance(judge, dict):
+            name, host = judge.get("name"), judge.get("host")
+        jobs.append(
+            PlanJob(
+                battery=battery,
+                model=str(row["model"]),
+                host=str(row["host"]),
+                provider=str(row.get("provider") or "ollama"),
+                thinking=bool(row.get("thinking")),
+                judge=name,
+                judge_host=host,
+            )
+        )
+    return jobs
 
 
 def to_dict(result: Cohorts) -> dict[str, object]:
@@ -85,6 +171,19 @@ def to_dict(result: Cohorts) -> dict[str, object]:
         "schema": SCHEMA,
         "inventory_taken_at": result.taken_at,
         "battery": result.battery,
+        "jobs": [
+            {
+                "model": job.model,
+                "host": job.host,
+                "provider": job.provider,
+                "thinking": job.thinking,
+                "judge": (
+                    {"name": job.judge, "host": job.judge_host} if job.judge else None
+                ),
+                "band": job.band,
+            }
+            for job in plan_jobs(result)
+        ],
         "cohorts": [
             {
                 "band": c.band,
@@ -229,4 +328,5 @@ def form_cohorts(
         taken_at=inventory.get("taken_at"),
         cohorts=cohorts,
         excluded=[Excluded(n, r) for n, r in excluded.items()],
+        hosts=list(inventory.get("hosts") or []),
     )

@@ -492,7 +492,13 @@ def models(
     "--json-out",
     type=click.Path(dir_okay=False, path_type=Path),
     default=None,
-    help="Write cohorts JSON for the plan step",
+    help="Write cohorts JSON including jobs for battery run --cohorts",
+)
+@click.option(
+    "--plan",
+    is_flag=True,
+    default=False,
+    help="Print atomics battery run lines for each member",
 )
 def cohorts(
     inventory_file: Path,
@@ -500,10 +506,11 @@ def cohorts(
     patterns: tuple[str, ...],
     max_members: int | None,
     json_out: Path | None,
+    plan: bool,
 ) -> None:
     """Group a saved inventory into fair comparison sets for one battery."""
     from atomics.eval.batteries import get_battery
-    from atomics.inventory.cohorts import CohortError, form_cohorts, to_dict
+    from atomics.inventory.cohorts import CohortError, form_cohorts, job_argv, plan_jobs, to_dict
     from atomics.inventory.render import render_cohorts
 
     try:
@@ -518,6 +525,9 @@ def cohorts(
         click.echo(f"{inventory_file}: {exc}", err=True)
         raise SystemExit(1)
     render_cohorts(result, Console())
+    if plan:
+        for job in plan_jobs(result):
+            click.echo("atomics " + " ".join(job_argv(job)))
     if json_out is not None:
         json_out.parent.mkdir(parents=True, exist_ok=True)
         json_out.write_text(json.dumps(to_dict(result), indent=2) + "\n")

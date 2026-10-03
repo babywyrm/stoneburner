@@ -10,7 +10,14 @@ from click.testing import CliRunner
 
 from atomics.cli import cli
 from atomics.eval.batteries import get_battery
-from atomics.inventory.cohorts import CohortError, battery_needs, form_cohorts, parameter_band
+from atomics.inventory.cohorts import (
+    CohortError,
+    battery_needs,
+    form_cohorts,
+    job_argv,
+    parameter_band,
+    plan_jobs,
+)
 
 
 @pytest.mark.parametrize(
@@ -76,7 +83,9 @@ def _inv(*models, hosts=("laptop",)):
     return {
         "schema": 1,
         "taken_at": "t",
-        "hosts": [{"label": h} for h in hosts],
+        "hosts": [
+            {"label": h, "provider": "ollama", "url": f"http://{h}:11434"} for h in hosts
+        ],
         "models": list(models),
     }
 
@@ -338,3 +347,67 @@ def test_cli_missing_judge_exits_1_after_render(tmp_path):
     result = _run(tmp_path, inv, "-b", "red-capability")
     assert result.exit_code == 1
     assert "no eligible judge" in result.output
+
+
+def test_plan_jobs_one_battery_run_per_member():
+    inv = _inv(
+        _model("a:8b", host="beefy", recommended="--thinking"),
+        _model("b:8b", host="laptop"),
+        _model("ref:30b", params="30B", judge=_fit(1.0, 0.3)),
+        hosts=("laptop", "beefy"),
+    )
+    result = form_cohorts(inv, get_battery("red-capability"), ("a:*", "b:*"))
+    jobs = plan_jobs(result)
+    assert [j.model for j in jobs] == ["a:8b", "b:8b"]
+    assert jobs[0].host == "http://beefy:11434"
+    assert jobs[0].thinking is True
+    assert jobs[0].judge == "ref:30b"
+    assert jobs[0].judge_host == "http://laptop:11434"
+    assert jobs[0].provider == "ollama"
+    assert job_argv(jobs[0]) == [
+        "battery",
+        "run",
+        "red-capability",
+        "-m",
+        "a:8b",
+        "-p",
+        "ollama",
+        "--thinking",
+        "--ollama-host",
+        "http://beefy:11434",
+        "--judge-model",
+        "ref:30b",
+        "--judge-host",
+        "http://laptop:11434",
+    ]
+
+
+def test_json_out_includes_jobs(tmp_path):
+    inv = _inv(
+        _model("a:8b"),
+        _model("b:8b"),
+        _model("ref:30b", params="30B", judge=_fit(1.0, 0.3)),
+    )
+    out = tmp_path / "cohorts.json"
+    result = _run(
+        tmp_path, inv, "-b", "red-capability", "-m", "a:*", "-m", "b:*", "--json-out", str(out)
+    )
+    assert result.exit_code == 0, result.output
+    jobs = json.loads(out.read_text())["jobs"]
+    assert jobs[0]["model"] == "a:8b"
+    assert jobs[0]["host"] == "http://laptop:11434"
+    assert jobs[0]["judge"] == {"name": "ref:30b", "host": "http://laptop:11434"}
+
+
+def test_cli_plan_prints_battery_run_lines(tmp_path):
+    inv = _inv(
+        _model("a:8b"),
+        _model("b:8b"),
+        _model("ref:30b", params="30B", judge=_fit(1.0, 0.3)),
+    )
+    result = _run(tmp_path, inv, "-b", "red-capability", "-m", "a:*", "-m", "b:*", "--plan")
+    assert result.exit_code == 0, result.output
+    text = click.unstyle(result.output)
+    assert "atomics battery run red-capability -m a:8b" in text
+    assert "--ollama-host http://laptop:11434" in text
+    assert "--judge-model ref:30b" in text
