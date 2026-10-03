@@ -77,6 +77,28 @@ class Cohorts:
     excluded: list[Excluded]
 
 
+def to_dict(result: Cohorts) -> dict[str, object]:
+    def where(m: Member) -> dict[str, object]:
+        return {"name": m.name, "host": m.host}
+
+    return {
+        "schema": SCHEMA,
+        "inventory_taken_at": result.taken_at,
+        "battery": result.battery,
+        "cohorts": [
+            {
+                "band": c.band,
+                "judge": where(c.judge) if c.judge else None,
+                "members": [
+                    {**where(m), "digest": m.digest, "thinking": m.thinking} for m in c.members
+                ],
+            }
+            for c in result.cohorts
+        ],
+        "excluded": [{"name": x.name, "reason": x.reason} for x in result.excluded],
+    }
+
+
 def _has(record: Record, cap: str) -> bool:
     return (record.get("capabilities") or {}).get(cap, {}).get("value") is True
 
