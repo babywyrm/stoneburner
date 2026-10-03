@@ -31,8 +31,11 @@ from atomics.inventory.readers import (
     unique_labels,
 )
 from atomics.providers.base import ProviderResponse
+from atomics.providers.llamacpp import LlamaCppProvider
+from atomics.providers.ollama import OllamaProvider
 from atomics.providers.outcomes import ProviderOutcome, ProviderOutcomeKind
 from atomics.providers.toolcalls import ToolCall
+from atomics.providers.vllm import VllmProvider
 
 # Trimmed from the laptop's Ollama 0.34.4 on 2026-10-02. Digests shortened.
 TAGS = {
@@ -645,3 +648,50 @@ async def test_a_capped_answer_with_thinking_off_checks_thinking_even_unclaimed(
         ("generate", True),
     ]
     assert rec.probe.verdict == "off-ignored"
+
+
+@pytest.mark.parametrize(
+    ("provider", "kind"),
+    [("ollama", OllamaProvider), ("vllm", VllmProvider), ("llamacpp", LlamaCppProvider)],
+)
+async def test_probe_provider_matches_the_reader(provider, kind):
+    async with httpx.AsyncClient() as client:
+        target = readers.probe_provider(provider, "http://box:1", client, 16384)
+    assert isinstance(target, kind)
+    if provider == "ollama":
+        assert target._num_ctx() == 16384
+
+
+async def test_thinking_on_error_is_recorded_and_off_still_counts():
+    class _OnFails(_Scripted):
+        async def generate(self, prompt, *, thinking=None, **kw):
+            if thinking:
+                raise ConnectionError("Cannot connect")
+            return await super().generate(prompt, thinking=thinking, **kw)
+
+    rec = _rec(caps=("completion", "thinking"))
+    await probe_model(_OnFails(), rec)
+    assert rec.probe.verdict is None and "thinking" not in rec.probed
+    assert rec.probed["completion"] is True
+    assert rec.errors[0].startswith("probe thinking:")
+
+
+def test_render_shows_failed_probes_and_unparsed_judges(monkeypatch):
+    from rich.console import Console
+
+    from atomics.inventory import HostRecord, Inventory, JudgeFitness, ProbeResult
+    from atomics.inventory.render import render
+
+    errored = _rec(name="a:1b")
+    errored.probe = ProbeResult()
+    errored.errors.append("probe: Cannot connect")
+    unanswered = _rec(name="b:1b")
+    unanswered.probe = ProbeResult(off=_reply(answered=False, outcome="empty"))
+    unanswered.judge = JudgeFitness(good=None, bad=0.2)
+    monkeypatch.setenv("TERM", "xterm")  # Rich holds a dumb terminal to 80 columns
+    console = Console(width=200, record=True)
+    render(Inventory("t", [HostRecord("laptop", "ollama")], [errored, unanswered]), console)
+    text = console.export_text()
+    assert "a:1b probe: Cannot connect" in text
+    assert "error" in text and "empty" in text
+    assert "unfit ?/0.20" in text

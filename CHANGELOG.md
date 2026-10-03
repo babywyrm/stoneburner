@@ -17,7 +17,9 @@
 - `models --probe`: an answer with thinking off and its speed, a
   thinking-switch verdict (`off-works`, `off-ignored`, `inline`,
   `no-channel`) with the recommended flag, and the toolcall capability
-  probe.
+  probe. A thinking-off answer that is capped or runs past 256 tokens
+  counts as reasoning, because Ollama versions tag the same reasoning
+  differently.
 - `models --probe-judge`: each model grades one right and one wrong
   answer; fit if the right one wins by 0.3.
 - `models --host` repeats. Hosts are read in parallel, a down host is
