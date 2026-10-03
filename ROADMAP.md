@@ -268,7 +268,8 @@ Package version is **0.23.1**.
 
 ## Next
 
-Current package is **0.24.0** — resumable, saved sweeps. Do not
+Current package is **0.24.1** — inventory, cohorts, and battery plans.
+Do not
 retag `v0.22.5`, `v0.21.0`, or `v0.20.0`. Do not mix a feature into a tag
 commit. `RELEASING.md`. `v0` is the floating major tag the publish
 workflow moves; it is not stray.
