@@ -1,6 +1,30 @@
 # Changelog
 
-## Unreleased
+## 0.24.0 (2026-10-02) — Resumable, saved sweeps
+
+### Upgrade notes
+- **`sweep --suites ... --save` now writes rows.** It used to store
+  nothing. A night run with `--save` fills task and evaluation results
+  under one finished parent run per model×suite.
+- **Toolcall and adversarial scores can move.** The resistance judge now
+  sees up to 4096 characters of toolcall prose and 3000 of an
+  adversarial reply, not 2000. A reply that complied after an early
+  refusal is now judged on the compliance, so prose resistance and
+  channel divergence can drop.
+- **The toolcall probe follows the run's thinking settings.** A
+  `--thinking` run now probes with thinking on, and a `--no-thinking` run
+  with it off, both at the fixtures' 1024-token budget. The set of
+  tool-capable tags can change.
+- **Status entries gain `stdev`.** It is `null` unless red/blue, refusal,
+  or codereview ran with `--runs` above 1 and every fixture scored every
+  run.
+- **Codereview scores do not compare with older rows.** It now has six
+  clean fixtures, not two, so `false_positive_rate` and `review_score`
+  are measured on a different set. Re-run the old set with
+  `--fixtures scr-01,scr-02,scr-03,scr-04,scr-05,scr-06,scr-clean-01,scr-clean-02`.
+- **`sweep --runs` now repeats refusal and codereview too.** A night run
+  with `--runs 3` takes about three times as long on those suites as it
+  did before.
 
 ### Added
 - **`sweep --resume`.** A stopped night picks up from its `--status` file.
@@ -15,6 +39,21 @@
   is left out unless every fixture scored every run. It is not the
   existing `quality_stddev`, which mixes fixture difficulty with run
   noise.
+- **`refusal --runs` and `codereview --runs`.** Each fixture is asked N
+  times. A fixture's score is the mean of its runs and its label the
+  majority. Over/under-refusal, detection, and false-positive rates
+  count every scored run. `sweep --runs` now reaches both suites, and
+  the log, status file, and table carry their spread: the per-run-mean
+  stdev for refusal, the stdev of each run's F1 for codereview. Each
+  command's own summary shows the same spread. With the default
+  `--runs 1` scores are unchanged.
+- **Four more codereview clean fixtures.** `scr-clean-03` to
+  `scr-clean-06` are the fixed forms of path traversal, token
+  comparison, deserialization, and password hashing. With two clean
+  files one false positive moved F1 from 1.0 to 0.667, so a single
+  verdict flip between runs read as a different model (the 2026-09-30
+  laptop sweep showed an F1 stdev of 0.47 over two runs). With six it
+  moves 0.09.
 
 ### Fixed
 - **`sweep --suites ... --save` saves.** The multi-suite path returned
@@ -40,6 +79,16 @@
   as prose resistance and inflates channel divergence. Toolcall,
   adversarial, and `judge-agreement` now size the cut from the output
   budget, as red/blue and eval already did.
+- **Dependencies past new advisories.** `pyjwt` 2.13.0 → 2.15.1 (via
+  `mcp[crypto]`) and `urllib3` 2.7.0 → 2.8.0 (via `botocore`). pip-audit
+  failed on both from 2026-10-01, including a `pyjwt` claim-verification
+  bypass with no fix in the 2.13 line. Routine bumps: `boto3`, `openai`,
+  `uvicorn`, and `ruff` 0.16.9.
+- **`export` reaches refusal and codereview rows.** Both suites save to
+  evaluation results, from their own commands and from `sweep --save`,
+  but `export` offered only toolcall from that table. `--suite refusal`
+  and `--suite codereview` now work, and `--suite all` includes all
+  three.
 
 ## 0.23.2 (2026-09-24) — Cut-off replies are not scored
 
