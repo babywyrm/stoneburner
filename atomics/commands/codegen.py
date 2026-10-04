@@ -43,7 +43,7 @@ from atomics.eval.budget import share_budget
 )
 @click.option("--save/--no-save", "save_results", default=True, help="Persist results.")
 @click.option(
-    "--json-out", "json_out", type=click.Path(dir_okay=False, writable=True), default=None
+    "-o", "--json-out", "json_out", type=click.Path(dir_okay=False, writable=True), default=None
 )
 @click.option("--thinking/--no-thinking", "thinking_flag", default=None)
 @click.option("--thinking-budget", type=int, default=None)

@@ -80,6 +80,7 @@ from atomics.eval.budget import share_budget
 )
 @click.option("--save/--no-save", "save_results", default=True, show_default=True)
 @click.option(
+    "-o",
     "--json-out",
     "json_out",
     type=click.Path(dir_okay=False, writable=True),

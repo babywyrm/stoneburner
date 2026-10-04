@@ -180,6 +180,7 @@ def _render_full_table(job: dict, summary: dict) -> None:
 @click.option("--coordinator", default="http://127.0.0.1:8000", show_default=True)
 @click.option("--api-key", envvar="ATOMICS_API_KEY", help="Client API key")
 @click.option(
+    "-o",
     "--json-out",
     type=click.Path(dir_okay=False, writable=True, path_type=Path),
     help="Write the job and its per-worker rollup to this file.",

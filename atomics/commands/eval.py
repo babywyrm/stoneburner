@@ -74,6 +74,7 @@ from atomics.eval.budget import share_budget
     "--save/--no-save", "save_results", default=True, help="Persist results to the database"
 )
 @click.option(
+    "-o",
     "--json-out",
     "json_out",
     type=click.Path(dir_okay=False, writable=True),
@@ -367,6 +368,7 @@ def eval(
     help="Treat this model as the baseline to optimize from.",
 )
 @click.option(
+    "-o",
     "--json-out",
     "json_out",
     type=click.Path(dir_okay=False, writable=True),

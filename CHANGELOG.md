@@ -7,6 +7,10 @@
   caller only their own runs. Runs created before this release belong to
   no key and are visible only under `--no-auth`.
 
+### Changed
+- `-o` is short for `--json-out` on every command that writes JSON
+  (`toolcall`, `adversarial`, `redblue`, `eval`, `probe`, and the rest).
+
 ## 0.25.0 (2026-10-04) — Honest sweeps, tighter API, slimmer install
 
 ### Upgrade notes

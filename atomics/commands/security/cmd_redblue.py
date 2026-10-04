@@ -85,6 +85,7 @@ from atomics.eval.suite_integrity import format_headline_rate
 )
 @click.option("--save/--no-save", "save_results", default=True, show_default=True)
 @click.option(
+    "-o",
     "--json-out",
     "json_out",
     type=click.Path(dir_okay=False, writable=True),
