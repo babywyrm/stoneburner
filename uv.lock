@@ -2487,7 +2487,6 @@ name = "stoneburner-atomics"
 version = "0.24.1"
 source = { editable = "." }
 dependencies = [
-    { name = "anthropic" },
     { name = "click" },
     { name = "httpx" },
     { name = "keyring" },
@@ -2504,6 +2503,9 @@ api = [
 ]
 bedrock = [
     { name = "boto3" },
+]
+claude = [
+    { name = "anthropic" },
 ]
 dev = [
     { name = "mypy" },
@@ -2525,7 +2527,7 @@ rag = [
 
 [package.metadata]
 requires-dist = [
-    { name = "anthropic", specifier = ">=0.39.0" },
+    { name = "anthropic", marker = "extra == 'claude'", specifier = ">=0.39.0" },
     { name = "boto3", marker = "extra == 'bedrock'", specifier = ">=1.35.0" },
     { name = "click", specifier = ">=8.1.0" },
     { name = "fastapi", marker = "extra == 'api'", specifier = ">=0.100.0" },
@@ -2546,7 +2548,7 @@ requires-dist = [
     { name = "sqlite-vec", marker = "extra == 'rag'", specifier = ">=0.1.0" },
     { name = "uvicorn", marker = "extra == 'api'", specifier = ">=0.23.0" },
 ]
-provides-extras = ["bedrock", "openai", "rag", "api", "mcp", "dev"]
+provides-extras = ["bedrock", "claude", "openai", "rag", "api", "mcp", "dev"]
 
 [[package]]
 name = "sympy"

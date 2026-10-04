@@ -78,11 +78,12 @@ on hidden chain-of-thought.
 
 ```bash
 uv tool install 'stoneburner-atomics[api,mcp]'
+uv tool install 'stoneburner-atomics[claude]'  # Claude; openai, bedrock likewise
 uv add 'stoneburner-atomics[rag]'          # from another project
 ```
 
 From a clone, `uv sync --all-extras`. Bare `uv sync` drops the API, MCP,
-RAG, and test extras. `atomics server`, `atomics mcp`, and `atomics repl`
+RAG, cloud SDK, and test extras. `atomics server`, `atomics mcp`, and `atomics repl`
 need those extras and a running API server.
 
 Cloud providers take the same `--provider` / `--effort` flags once a key
