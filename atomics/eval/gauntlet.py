@@ -315,15 +315,21 @@ def _suite_job(
     """
     integrity = getattr(summary, "integrity", None)
     headline = score if integrity is None else headline_rate(score, integrity)
-    unreachable = (
-        integrity is not None and integrity.status is RunStatus.INFRASTRUCTURE_INVALID
-    )
+    error = None
+    if integrity is not None and integrity.status is RunStatus.INFRASTRUCTURE_INVALID:
+        error = "provider unreachable"
+    elif integrity is not None and headline is None:
+        error = (
+            f"{integrity.attempts_scored}/{integrity.attempts_total} attempts scored "
+            f"({integrity.generation_failures} unanswered, "
+            f"{integrity.judge_failures} unjudged)"
+        )
     return SuiteJobResult(
         model=model,
         suite=suite,
         ok=headline is not None,
         headline=headline,
-        error="provider unreachable" if unreachable else None,
+        error=error,
         stdev=stdev,
         exit_code=0 if headline is not None else 1,
     )
@@ -423,6 +429,11 @@ async def _dispatch_suite(
             effort=effort,
             reasoning_mode=reasoning_mode,
         )
+        probe_error = getattr(toolcall_summary, "probe_error", None)
+        if probe_error:
+            return SuiteJobResult(
+                model=model, suite=suite, ok=False, error=probe_error, exit_code=1
+            ), None
         if not toolcall_summary.tool_capable:
             return SuiteJobResult(
                 model=model,

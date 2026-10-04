@@ -269,6 +269,52 @@ async def test_a_probe_answering_in_prose_only_counts_as_incapable():
     assert await probe_tool_capability(provider, model="fake") is False
 
 
+class _Failing(FakeProvider):
+    def __init__(self, exc):
+        super().__init__(calls=())
+        self._exc = exc
+
+    async def generate_with_tools(self, prompt, *, tools, **kwargs):
+        self.tool_requests.append({"prompt": prompt})
+        raise self._exc
+
+
+def _http_400(text: str):
+    import httpx
+
+    request = httpx.Request("POST", "http://box:11434/api/chat")
+    response = httpx.Response(400, text=text, request=request)
+    return httpx.HTTPStatusError("400 Bad Request", request=request, response=response)
+
+
+@pytest.mark.asyncio
+async def test_a_host_that_says_no_tools_is_incapable():
+    provider = _Failing(_http_400('{"error":"library/gemma3:4b does not support tools"}'))
+    assert await probe_tool_capability(provider, model="fake") is False
+
+
+@pytest.mark.asyncio
+async def test_a_probe_error_is_not_incapable():
+    with pytest.raises(ConnectionError):
+        await probe_tool_capability(_Failing(ConnectionError("down")), model="fake")
+    with pytest.raises(Exception, match="400"):
+        await probe_tool_capability(_Failing(_http_400('{"error":"bad"}')), model="fake")
+
+
+@pytest.mark.asyncio
+async def test_suite_records_why_the_probe_failed():
+    summary = await run_toolcall_suite(
+        provider=_Failing(ConnectionError("down")),
+        model="fake",
+        judge_provider=None,
+        fixtures=(_fixture(),),
+    )
+    assert summary.tool_capable is False
+    assert summary.probe_error == "provider unreachable"
+    assert summary.fixtures == []
+    assert summary.to_dict()["probe_error"] == "provider unreachable"
+
+
 @pytest.mark.asyncio
 async def test_a_provider_without_tool_support_is_incapable_without_a_request():
     class Toolless(FakeProvider):

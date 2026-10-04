@@ -124,7 +124,10 @@ def _coverage(summary: Any) -> dict[str, Any]:
             "should_exit_nonzero": bool(exit_nonzero),
         }
     if hasattr(summary, "tool_capable"):
-        extra["tool_capable"] = bool(summary.tool_capable)
+        probe_error = getattr(summary, "probe_error", None)
+        extra["tool_capable"] = None if probe_error else bool(summary.tool_capable)
+        if probe_error:
+            extra["probe_error"] = probe_error
     return extra
 
 

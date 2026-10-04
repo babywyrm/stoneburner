@@ -5,6 +5,12 @@
 ### Fixed
 - A sweep headline requires every fixture scored. A dead provider stops
   the sweep instead of recording the rest of the fleet as failures.
+- A withheld sweep headline says why: attempts scored, unanswered, and
+  unjudged.
+- A toolcall capability probe that errors is a probe failure, not an
+  incapable model. Only a host that rejects tools for the model counts
+  as incapable. `toolcall`, `sweep`, `inventory`, and the API report the
+  error; `--skip-incapable` no longer hides it.
 
 ## 0.24.1 (2026-10-03) — Inventory, cohorts, and battery plans
 
