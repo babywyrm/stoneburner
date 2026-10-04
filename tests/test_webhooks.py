@@ -223,3 +223,9 @@ def test_send_webhook_generic_format():
     payload = client.calls[0]["json"]
     assert "event" in payload
     assert payload["event"] == "run_complete"
+
+
+def test_send_webhook_refuses_invalid_url():
+    client = FakeHttpClient(200)
+    assert send_webhook("file:///tmp/x", _make_summary(), client=client) is False
+    assert client.calls == []

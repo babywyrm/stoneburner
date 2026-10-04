@@ -178,3 +178,25 @@ class TestQuotaOverHttp:
             assert res.status_code == 202
             job_id = res.json()["job_id"]
             assert app.state.job_manager.jobs[job_id].owner == caller_id_from_key(ALICE)
+
+
+class TestJobVisibility:
+    def test_a_caller_sees_only_their_own_jobs(self, tmp_path):
+        from atomics.api.jobs import Job, JobStatus
+
+        app = create_app(ServerSettings(api_keys={ALICE, BOB}, db_path=tmp_path / "q.db"))
+        with TestClient(app) as client:
+            app.state.job_manager.jobs["j-alice"] = Job(
+                job_id="j-alice",
+                kind="eval",
+                status=JobStatus.COMPLETED,
+                created_at=0.0,
+                owner=caller_id_from_key(ALICE),
+            )
+            alice, bob = {"X-API-Key": ALICE}, {"X-API-Key": BOB}
+            assert client.get("/api/v1/jobs/j-alice", headers=alice).status_code == 200
+            assert client.get("/api/v1/jobs/j-alice", headers=bob).status_code == 404
+            assert [
+                j["job_id"] for j in client.get("/api/v1/jobs", headers=alice).json()["jobs"]
+            ] == ["j-alice"]
+            assert client.get("/api/v1/jobs", headers=bob).json()["jobs"] == []

@@ -34,6 +34,19 @@ curl -H "X-API-Key: $ATOMICS_API_KEY" http://127.0.0.1:8000/api/v1/runs \
   -d '{"provider": "ollama", "iterations": 3}'
 ```
 
+### What a key can do
+
+A submitter key is operator-equivalent. It can point inference and judges at
+any `host` the server can reach, private and loopback addresses included,
+because that is how local Ollama and lab boxes are evaluated. It can spend up
+to each request's budget ceiling. Give keys only to people you would let run
+the CLI on the server host.
+
+Keys are isolated from each other in two ways. `/api/v1/jobs` lists only the
+caller's own jobs, and per-caller capacity holds each key to its share.
+Distributed runs and saved reports are shared across keys. Battery `profile`
+paths must be relative and resolve under the server's `profiles/` directory.
+
 ### Separate worker keys
 
 Workers register, poll, and submit results with an `X-API-Key` too. Without

@@ -98,6 +98,20 @@ async def test_job_manager_failure():
 
 
 @pytest.mark.asyncio
+async def test_job_failure_message_is_sanitized():
+    manager = JobManager()
+
+    async def work(job_id):
+        raise RuntimeError("upstream said Bearer sk-abcdefghijklmnop")
+
+    job_id = await manager.submit("run", work)
+    await manager.wait_for(job_id, timeout=1.0)
+    message = manager.jobs[job_id].error["message"]
+    assert "sk-abcdefghijklmnop" not in message
+    assert "[REDACTED]" in message
+
+
+@pytest.mark.asyncio
 async def test_wait_for_timeout_zero_does_not_cancel():
     manager = JobManager()
     started = asyncio.Event()

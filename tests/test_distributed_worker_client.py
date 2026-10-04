@@ -140,6 +140,29 @@ async def test_poll_and_execute_reports_failure(mock_httpx_client):
 
 
 @pytest.mark.asyncio
+async def test_poll_and_execute_sanitizes_failure(mock_httpx_client):
+    assignment = {
+        "assignment_id": "a-3",
+        "job_id": "j-3",
+        "task_spec": {"task_name": "quick_question", "prompt": "x"},
+    }
+    mock_httpx_client.get.return_value = _mock_response(assignment)
+    mock_httpx_client.post.return_value = _mock_response({"status": "failed"})
+
+    executor = AsyncMock(side_effect=RuntimeError("Bearer sk-abcdefghijklmnop"))
+    worker = WorkerClient(
+        coordinator_url="http://coordinator:8000", api_key="secret", executor=executor
+    )
+    worker._worker_id = "w-1"
+
+    await worker.poll_and_execute()
+
+    error = mock_httpx_client.post.await_args.kwargs["json"]["error"]
+    assert "sk-abcdefghijklmnop" not in error
+    await worker.close()
+
+
+@pytest.mark.asyncio
 async def test_poll_and_execute_dispatches_full_mode_to_execute_full_run(mock_httpx_client):
     assignment = {
         "assignment_id": "a-3",

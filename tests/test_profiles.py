@@ -219,6 +219,24 @@ prompts_file: my_prompts.txt
         p = load_profile(path)
         assert p.prompts == ["A", "B"]
 
+    def test_prompts_file_outside_profile_dir_is_rejected(self, tmp_path):
+        outside = tmp_path / "secret.txt"
+        outside.write_text("nope\n")
+        sub = tmp_path / "profiles"
+        sub.mkdir()
+        path = self._write_yaml(
+            sub,
+            """
+name: t
+type: ollama
+ollama:
+  host: "http://h:11434"
+prompts_file: ../secret.txt
+""",
+        )
+        with pytest.raises(ValueError, match="prompts_file"):
+            load_profile(path)
+
     def test_inline_prompts_override_prompts_file(self, tmp_path):
         prompts_file = tmp_path / "prompts.txt"
         prompts_file.write_text("from file")

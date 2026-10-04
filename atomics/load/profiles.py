@@ -122,9 +122,9 @@ def load_profile(path: str) -> TargetProfile:
 
     prompts_file = kwargs.get("prompts_file")
     if prompts_file and not kwargs["prompts"]:
-        pf = Path(prompts_file)
-        if not pf.is_absolute():
-            pf = p.parent / pf
+        pf = (p.parent / prompts_file).resolve()
+        if not pf.is_relative_to(p.parent.resolve()):
+            raise ProfileError(f"{p}: prompts_file must stay inside the profile's directory")
         if pf.exists():
             kwargs["prompts"] = [
                 line.strip()

@@ -50,3 +50,14 @@ def test_list_workers_after_registration(tmp_path):
         data = res.json()
         assert len(data["workers"]) == 1
         assert "worker_id" in data["workers"][0]
+
+
+def test_distributed_list_limit_is_bounded():
+    from fastapi.testclient import TestClient
+
+    from atomics.api.config import ServerSettings
+    from atomics.api.server import create_app
+
+    app = create_app(settings=ServerSettings(no_auth=True))
+    with TestClient(app) as tc:
+        assert tc.get("/api/v1/distributed/runs?limit=100000").status_code == 422

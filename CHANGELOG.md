@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### Security
+- API job and distributed worker failures are sanitized before callers
+  see them.
+- `/api/v1/jobs` and `/api/v1/jobs/{id}` show a caller only their own
+  jobs.
+- A battery `profile` sent over the API must be a relative path under
+  `profiles/`. A profile's `prompts_file` must stay in the profile's
+  directory.
+- Probe HTTP sources and webhook URLs go through endpoint validation.
+- `limit` on `/reports/recent-runs` and `/distributed/runs` is capped at
+  100.
+- `docs/API_SERVER.md` states what a key can do.
+
 ### Fixed
 - A sweep headline requires every fixture scored. A dead provider stops
   the sweep instead of recording the rest of the fleet as failures.

@@ -17,6 +17,7 @@ from typing import Any
 import httpx
 
 from atomics.models import RunSummary
+from atomics.validation import validate_endpoint_url
 
 logger = logging.getLogger("atomics.webhooks")
 
@@ -132,6 +133,11 @@ def send_webhook(
     client: httpx.Client | None = None,
 ) -> bool:
     """Send a webhook notification. Returns True on success, False on failure."""
+    try:
+        url = validate_endpoint_url(url, label="webhook")
+    except ValueError as exc:
+        logger.warning("Webhook not sent: %s", exc)
+        return False
     if _is_slack_url(url):
         payload = _build_slack_payload(summary, tier=tier, provider=provider, alert=alert)
     elif _is_discord_url(url):

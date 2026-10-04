@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
 from atomics.api.dependencies import require_auth, require_worker_auth
 from atomics.distributed.coordinator import AssignmentRejectedError, Coordinator
@@ -205,12 +205,12 @@ async def get_job(
 
 @router.get("/distributed/runs")
 async def list_jobs(
-    limit: int = 20,
+    limit: int = Query(default=20, ge=1, le=100),
     coordinator: Coordinator = Depends(get_coordinator),
     _: None = Depends(require_auth),
 ) -> dict[str, list[DistributedJob]]:
     """List recent distributed jobs, newest first."""
-    jobs = coordinator.list_jobs(limit=max(1, limit))
+    jobs = coordinator.list_jobs(limit=limit)
     return {"jobs": jobs}
 
 
