@@ -2,10 +2,16 @@
 
 ## Unreleased
 
+## 0.25.1 (2026-10-04) — Distributed runs per key, -o everywhere
+
+### Upgrade notes
+- **Distributed runs created before 0.25.1 leave keyed listings.** They
+  belong to no key and are visible only under `--no-auth`. The database
+  migrates in place; nothing to run.
+
 ### Security
 - `/api/v1/distributed/runs` and `/api/v1/distributed/runs/{id}` show a
-  caller only their own runs. Runs created before this release belong to
-  no key and are visible only under `--no-auth`.
+  caller only their own runs, matching `/api/v1/jobs` since 0.25.0.
 
 ### Changed
 - `-o` is short for `--json-out` on every command that writes JSON
