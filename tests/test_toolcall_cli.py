@@ -251,6 +251,36 @@ def test_saving_finalizes_the_parent_run_row(tmp_path):
     assert parent["total_tasks"] == 1
 
 
+def test_probe_error_fails_even_with_skip_incapable(monkeypatch) -> None:
+    from types import SimpleNamespace
+
+    from atomics.eval.toolcall.runner import ToolCallSummary
+
+    async def fake_run(**_kwargs):
+        return ToolCallSummary(
+            run_id="r-probe",
+            provider="ollama",
+            model="x",
+            started_at="2026-01-01T00:00:00+00:00",
+            completed_at="2026-01-01T00:00:01+00:00",
+            tool_capable=False,
+            probe_error="provider unreachable",
+        )
+
+    monkeypatch.setattr(
+        "atomics.commands.toolcall._make_provider",
+        lambda *_args, **_kwargs: SimpleNamespace(name="ollama", default_model="x"),
+    )
+    monkeypatch.setattr("atomics.commands.toolcall.run_toolcall_suite", fake_run)
+
+    result = CliRunner().invoke(
+        cli, ["toolcall", "-p", "ollama", "-m", "x", "--no-save", "--skip-incapable"]
+    )
+    assert result.exit_code == 1, result.output
+    assert "provider unreachable" in result.output
+    assert "did not emit" not in result.output
+
+
 def test_toolcall_prints_live_fixture_progress(monkeypatch) -> None:
     """A 20-fixture × 3-run suite is silent for half an hour without this.
 

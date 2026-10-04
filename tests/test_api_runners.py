@@ -19,6 +19,15 @@ def _settings(db_path=":memory:", default_model="test-model"):
     return SimpleNamespace(db_path=db_path, default_model=default_model)
 
 
+def test_coverage_reports_a_probe_error_not_incapable():
+    summary = SimpleNamespace(tool_capable=False, probe_error="provider unreachable")
+    assert runners._coverage(summary) == {
+        "tool_capable": None,
+        "probe_error": "provider unreachable",
+    }
+    assert runners._coverage(SimpleNamespace(tool_capable=False)) == {"tool_capable": False}
+
+
 @pytest.mark.asyncio
 async def test_run_benchmark_from_request_returns_summary_dict():
     payload = RunRequest(provider="ollama", model="llama3", tier="ez", iterations=2)

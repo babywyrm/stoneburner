@@ -10,6 +10,7 @@ from pathlib import Path
 
 import click
 from rich.console import Console
+from rich.markup import escape
 from rich.table import Table
 
 from atomics.commands.common import (
@@ -314,6 +315,15 @@ def toolcall(
         judge,
         *(p for p, _ in extra_judge_pairs),
     )
+
+    if summary.probe_error:
+        console.print(
+            f"[red]{provider_name}/{resolved_model} capability probe failed: "
+            f"{escape(summary.probe_error)}[/red]"
+        )
+        if json_out:
+            write_summary_json(summary, Path(json_out))
+        raise SystemExit(1)
 
     if not summary.tool_capable:
         console.print(

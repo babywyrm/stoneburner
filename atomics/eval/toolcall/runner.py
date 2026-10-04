@@ -33,6 +33,8 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
+import httpx
+
 from atomics.eval.adversarial.scorer import ResistanceResult, _label_from_score, score_resistance
 from atomics.eval.attempt_serialization import integrity_to_dict
 from atomics.eval.consensus import NumericVote, combine_numeric
@@ -45,6 +47,7 @@ from atomics.eval.toolcall.catalog import PROBE_PROMPT, PROBE_TOOL, schemas_for
 from atomics.eval.toolcall.fixtures import ToolCallFixture
 from atomics.eval.toolcall.scorer import ToolOutcome, classify
 from atomics.providers.base import BaseProvider
+from atomics.validation import sanitize_error
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +80,9 @@ async def probe_tool_capability(
 
     The probe runs under the same thinking settings and budget as the fixtures it
     gates, so it answers whether the fixtures can produce a call.
+
+    A host that rejects the tools field for this model is incapable. Any other
+    error raises: a dead or misconfigured provider is not a model that declines.
     """
     if not getattr(provider, "supports_tools", False):
         return False
@@ -92,9 +98,10 @@ async def probe_tool_capability(
             effort=effort,
             reasoning_mode=reasoning_mode,
         )
-    except Exception as exc:
-        logger.warning("[toolcall] capability probe failed: %s", exc)
-        return False
+    except httpx.HTTPStatusError as exc:
+        if exc.response.status_code == 400 and "does not support tools" in exc.response.text:
+            return False
+        raise
     capable = any(call.name == PROBE_TOOL for call in response.tool_calls)
     if not capable and unscorable_outcome(response) is not None:
         logger.warning("[toolcall] capability probe hit the token cap while reasoning")
@@ -163,6 +170,7 @@ class ToolCallSummary:
     runs: int = 1
     total_cost_usd: float = 0.0
     judge_parse_failures: int = 0
+    probe_error: str | None = None
 
     @property
     def outcome_counts(self) -> dict[str, int]:
@@ -222,6 +230,7 @@ class ToolCallSummary:
             "completed_at": self.completed_at,
             "runs": self.runs,
             "tool_capable": self.tool_capable,
+            "probe_error": self.probe_error,
             "fixture_count": len(self.fixtures),
             "outcome_counts": self.outcome_counts,
             "dangerous_call_rate": self.dangerous_call_rate,
@@ -414,14 +423,24 @@ async def run_toolcall_suite(
     # The probe gates everything. A model that cannot emit tool calls would
     # otherwise score as perfectly resistant on every fixture.
     if channel != "prose":
-        summary.tool_capable = await probe_tool_capability(
-            provider,
-            model=model,
-            thinking=thinking,
-            thinking_budget=thinking_budget,
-            effort=effort,
-            reasoning_mode=reasoning_mode,
-        )
+        try:
+            summary.tool_capable = await probe_tool_capability(
+                provider,
+                model=model,
+                thinking=thinking,
+                thinking_budget=thinking_budget,
+                effort=effort,
+                reasoning_mode=reasoning_mode,
+            )
+        except Exception as exc:
+            summary.probe_error = (
+                "provider unreachable"
+                if isinstance(exc, ConnectionError)
+                else sanitize_error(exc)[:200]
+            )
+            logger.warning("[toolcall] capability probe failed: %s", summary.probe_error)
+            summary.completed_at = datetime.now(UTC).isoformat()
+            return summary
         if not summary.tool_capable:
             logger.warning(
                 "[toolcall] %s/%s did not emit a tool call for the capability probe; "

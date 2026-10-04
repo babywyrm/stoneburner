@@ -398,6 +398,17 @@ async def test_probe_error_is_recorded_and_nothing_is_probed():
     assert rec.errors and rec.errors[0].startswith("probe:")
 
 
+async def test_tool_probe_error_is_recorded_not_false():
+    class _ToolsDown(_Scripted):
+        async def generate_with_tools(self, prompt, *, tools, thinking=None, **_):
+            raise ConnectionError("Cannot connect")
+
+    rec = _rec()
+    await probe_model(_ToolsDown(), rec)
+    assert "tools" not in rec.probed
+    assert any(e.startswith("probe tools:") for e in rec.errors)
+
+
 def test_models_probe_filters_and_shows_speed(monkeypatch, tmp_path):
     fake = _Scripted()
     monkeypatch.setattr(readers, "probe_provider", lambda *a, **k: fake)

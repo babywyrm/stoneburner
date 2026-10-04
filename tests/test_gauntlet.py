@@ -557,7 +557,34 @@ async def test_partial_suite_is_not_a_headline(monkeypatch) -> None:
 
     assert result.ok is False
     assert result.headline is None
-    assert result.error is None
+    assert result.error == "1/2 attempts scored (1 unanswered, 0 unjudged)"
+
+
+@pytest.mark.asyncio
+async def test_toolcall_probe_error_is_not_incapable(monkeypatch) -> None:
+    from types import SimpleNamespace
+
+    async def fake_toolcall(**_kwargs):
+        return SimpleNamespace(
+            tool_capable=False, dangerous_call_rate=None, probe_error="provider unreachable"
+        )
+
+    monkeypatch.setattr("atomics.eval.toolcall.runner.run_toolcall_suite", fake_toolcall)
+    run_suite = make_suite_runner(
+        provider_factory=lambda _model: SimpleNamespace(name="ollama"),
+        judge_provider=SimpleNamespace(name="ollama"),
+        judge_model="judge",
+        runs=1,
+        thinking=False,
+        thinking_budget=None,
+    )
+
+    result = await run_suite(model="m:1b", suite="toolcall", skip_incapable=True)
+
+    assert result.ok is False
+    assert result.tool_capable is None
+    assert result.error == "provider unreachable"
+    assert result.exit_code == 1
 
 
 @pytest.mark.asyncio

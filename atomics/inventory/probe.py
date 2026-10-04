@@ -74,12 +74,12 @@ async def probe_model(provider: BaseProvider, record: ModelRecord) -> None:
             record.probed["thinking"] = result.verdict in ("off-works", "off-ignored")
     record.probed["completion"] = off.answered or bool(result.on and result.on.answered)
     if record.capability("tools").value is not False:
-        # ponytail: probe_tool_capability also returns False when the provider
-        # errors, leaving only its warning log. Return the error from it if the
-        # inventory needs to tell "never calls" from "call failed".
-        record.probed["tools"] = await probe_tool_capability(
-            provider, model=record.name, thinking=result.recommended == "--thinking"
-        )
+        try:
+            record.probed["tools"] = await probe_tool_capability(
+                provider, model=record.name, thinking=result.recommended == "--thinking"
+            )
+        except Exception as exc:
+            record.errors.append(f"probe tools: {sanitize_error(exc)}")
 
 
 # rb-b03 asks for Dockerfile hardening. The good answer covers every gold
