@@ -18,6 +18,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Protocol
 
+from atomics.eval.outcomes import RunStatus
+from atomics.eval.suite_integrity import headline_rate
 from atomics.providers.base import BaseProvider
 from atomics.validation import sanitize_error
 
@@ -197,7 +199,10 @@ async def run_gauntlet(
     if prior:
         append_log(log_path, f"resumed kept={len(progress.completed)}")
 
+    stopped = False
     for model in models:
+        if stopped:
+            break
         for suite in suites:
             kept = prior.get((model, suite))
             if kept is not None:
@@ -216,6 +221,10 @@ async def run_gauntlet(
             results.append(result)
             progress.completed.append(asdict(result))
             append_log(log_path, format_job_log(result))
+            if result.error == "provider unreachable":
+                append_log(log_path, "stopped provider unreachable")
+                stopped = True
+                break
 
     progress.current_model = None
     progress.current_suite = None
@@ -291,6 +300,35 @@ def make_suite_runner(
     return run_suite
 
 
+def _suite_job(
+    *,
+    model: str,
+    suite: str,
+    score: float | None,
+    summary: object,
+    stdev: float | None = None,
+) -> SuiteJobResult:
+    """Ok only when every fixture was scored.
+
+    The summary average is over judges that parsed. A server that dies on
+    the last fixture still has a number, and resume would keep it.
+    """
+    integrity = getattr(summary, "integrity", None)
+    headline = score if integrity is None else headline_rate(score, integrity)
+    unreachable = (
+        integrity is not None and integrity.status is RunStatus.INFRASTRUCTURE_INVALID
+    )
+    return SuiteJobResult(
+        model=model,
+        suite=suite,
+        ok=headline is not None,
+        headline=headline,
+        error="provider unreachable" if unreachable else None,
+        stdev=stdev,
+        exit_code=0 if headline is not None else 1,
+    )
+
+
 async def _dispatch_suite(
     *,
     suite: str,
@@ -341,11 +379,11 @@ async def _dispatch_suite(
             effort=effort,
             reasoning_mode=reasoning_mode,
         )
-        return SuiteJobResult(
+        return _suite_job(
             model=model,
             suite=suite,
-            ok=redblue_summary.overall_quality is not None,
-            headline=redblue_summary.overall_quality,
+            score=redblue_summary.overall_quality,
+            summary=redblue_summary,
             stdev=run_mean_stdev(redblue_summary),
         ), redblue_summary
     if suite == "refusal":
@@ -362,11 +400,11 @@ async def _dispatch_suite(
             effort=effort,
             reasoning_mode=reasoning_mode,
         )
-        return SuiteJobResult(
+        return _suite_job(
             model=model,
             suite=suite,
-            ok=refusal_summary.calibration_score is not None,
-            headline=refusal_summary.calibration_score,
+            score=refusal_summary.calibration_score,
+            summary=refusal_summary,
             stdev=run_mean_stdev(refusal_summary),
         ), refusal_summary
     if suite == "toolcall":
@@ -415,11 +453,11 @@ async def _dispatch_suite(
             effort=effort,
             reasoning_mode=reasoning_mode,
         )
-        return SuiteJobResult(
+        return _suite_job(
             model=model,
             suite=suite,
-            ok=review_summary.review_score is not None,
-            headline=review_summary.review_score,
+            score=review_summary.review_score,
+            summary=review_summary,
             stdev=review_summary.review_score_stdev,
         ), review_summary
     raise ValueError(f"unknown suite: {suite}")
