@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+## 0.25.0 (2026-10-04) — Honest sweeps, tighter API, slimmer install
+
+### Upgrade notes
+- **Claude needs an extra.** `uv tool install 'stoneburner-atomics[claude]'`
+  or `uv sync --extra claude`. Without it, `--provider claude` exits with
+  that instruction. Ollama, vLLM, and the httpx cloud providers are
+  unchanged.
+- **API jobs are per key.** `GET /api/v1/jobs` lists only the caller's jobs,
+  and another key's job id returns 404. One shared key behaves as before.
+- **Battery `profile` over the API** must be a relative path under the
+  server's `profiles/`. The CLI is unchanged.
+- **`prompts_file` must stay in the profile's directory.** An absolute or
+  `../` path outside it is now an error, not a silent read.
+- Do not retag `v0.24.1`.
+
 ### Security
 - API job and distributed worker failures are sanitized before callers
   see them.
