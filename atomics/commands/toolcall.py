@@ -423,8 +423,8 @@ def _render_summary(summary) -> None:
     )
     if payload["judge_parse_failures"]:
         console.print(
-            f"  [yellow]judge parse failures: {payload['judge_parse_failures']} "
-            f"(excluded from the rates above)[/yellow]"
+            f"  [yellow]judge failures (unparsed or unreachable): "
+            f"{payload['judge_parse_failures']} (excluded from the rates above)[/yellow]"
         )
     console.print(f"  cost: ${payload['total_cost_usd']:.4f}\n")
 

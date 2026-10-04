@@ -311,7 +311,12 @@ Absolute red/blue numbers do not. Next:
 A unit test cannot see a live generate. One hole stays open:
 
 - A second local backend (vLLM, llama.cpp, or brain-gateway) has no
-  generate on record. CI proves URL rejection.
+  generate on record. CI proves URL rejection. The OpenAI-compatible
+  wire path is proved: `--provider vllm` against Ollama's `/v1` on a lab
+  host (2026-10-04, `qwen3.5:4b`) completed toolcall 20/20 scored, 25%
+  dangerous calls against 30% native. The two are not a matched pair:
+  Ollama ignores `chat_template_kwargs`, so `--no-thinking` did not
+  apply on `/v1`. Still owed: a real vLLM or llama.cpp server.
 
 `gemma4:26b` blue-capability now has two judges: `granite4.2:8b`
 (2026-09-21) and `qwen3.8:27b` (2026-10-04) agree within 1.2 points on
