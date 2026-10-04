@@ -8,8 +8,8 @@ from datetime import UTC, datetime, timedelta
 from sqlite3 import Connection
 from typing import Any
 
-from atomics.api.callers import ANONYMOUS_CALLER
 from atomics.distributed.models import (
+    ANONYMOUS_OWNER,
     AssignmentStatus,
     DistributedJob,
     DistributedRunRequest,
@@ -234,7 +234,7 @@ class Coordinator:
         request: DistributedRunRequest,
         task_specs: list[dict[str, Any]],
         *,
-        owner: str = ANONYMOUS_CALLER,
+        owner: str = ANONYMOUS_OWNER,
     ) -> DistributedJob:
         """One assignment per task, claimable by whichever worker asks first."""
         job = self._insert_job(request, JobMode.SPLIT, owner)
@@ -249,7 +249,7 @@ class Coordinator:
         task_specs: list[dict[str, Any]],
         workers: list[Worker],
         *,
-        owner: str = ANONYMOUS_CALLER,
+        owner: str = ANONYMOUS_OWNER,
     ) -> DistributedJob:
         """Broadcast one task set to every worker, pinned per host.
 
@@ -271,7 +271,7 @@ class Coordinator:
         workers: list[Worker],
         task_spec: dict[str, Any] | None = None,
         *,
-        owner: str = ANONYMOUS_CALLER,
+        owner: str = ANONYMOUS_OWNER,
     ) -> DistributedJob:
         """Delegate an entire run to one worker as a single assignment.
 
@@ -295,7 +295,7 @@ class Coordinator:
         selector: dict[str, str] | None,
         task_spec: dict[str, Any] | None = None,
         *,
-        owner: str = ANONYMOUS_CALLER,
+        owner: str = ANONYMOUS_OWNER,
     ) -> DistributedJob:
         """Resolve matching workers and create a full-mode job pinned to the first.
 
