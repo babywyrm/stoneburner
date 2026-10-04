@@ -287,12 +287,13 @@ Absolute red/blue numbers do not. Next:
       Granite sits +0.22 on every item. Reference judge is
       `gemma4:26b`. Rankings from a granite-judged sweep still hold;
       absolute red/blue numbers do not.
-- [ ] Re-run the study on full-length answers. The graded sheet is the
-      2026-09-24 cut (answers end in `truncated for scoring`). The
-      suite now shows the judge up to 8192 characters. The subject
-      tags from that night (`llama3.2:1b`, `qwen2.5:1.5b`,
-      `llama3.2:3b`, `mistral:7b`, `qwen2.5:14b`, `gemma4:e4b`) are
-      not on this host.
+- [x] Re-run the study on full-length answers. 2026-10-04: subjects on
+      a lab Ollama host, the three judges on this laptop, up to 8192
+      characters shown. All three judges still rank the six subjects
+      the same way (`llama3.2:1b` lowest, `gemma4:e4b` highest).
+      Granite's lean over `gemma4:26b` shrinks from +0.16 to +0.10.
+      Exact-score agreement stays low (0.10–0.43), so absolute
+      red/blue numbers still need the reference judge.
 - [x] Re-run the fleet on `gemma4:26b` with `--runs 3 --save`
       and `--status ... --resume`. 2026-10-04, this laptop: 14 models
       × 4 suites, 51 of 56 jobs kept. `qwen3.5:9b` 0.926 red/blue,
