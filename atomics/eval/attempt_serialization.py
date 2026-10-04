@@ -130,6 +130,38 @@ def has_parse_failure(attempts: Sequence[AttemptResult]) -> bool:
     )
 
 
+def attempt_ledger(attempts: Sequence[AttemptResult]) -> dict[str, object]:
+    """Per-fixture attempt fields shared by every judged suite's `to_dict`."""
+    integrity = RunIntegrity.from_fixture_attempts([attempts])
+    generation_status, generation_counts = generation_summary(attempts)
+    judge_status, judge_counts = judge_summary(attempts)
+    error_class, error_message = representative_error(attempts)
+    return {
+        "status": integrity.status.value,
+        "attempt_count": len(attempts),
+        "generation_status": generation_status,
+        "generation_status_counts": generation_counts,
+        "judge_status": judge_status,
+        "judge_status_counts": judge_counts,
+        "parse_failed": has_parse_failure(attempts),
+        "attempts": [attempt_to_dict(attempt) for attempt in attempts],
+        "generation_failures": integrity.generation_failures,
+        "infrastructure_failures": integrity.infrastructure_failures,
+        "judge_failures": integrity.judge_failures,
+        "error_class": error_class,
+        "error_message": error_message,
+    }
+
+
+def scored_runs(attempts: Sequence[AttemptResult]) -> list[tuple[str, float]]:
+    """(label, score) for each attempt the judge scored, in run order."""
+    return [
+        (attempt.judge.label or "unknown", attempt.judge.score)
+        for attempt in attempts
+        if attempt.judge is not None and attempt.judge.is_scored and attempt.judge.score is not None
+    ]
+
+
 def integrity_to_dict(integrity: RunIntegrity) -> dict[str, object]:
     """Serialize run-integrity coverage and failure rates."""
     return {

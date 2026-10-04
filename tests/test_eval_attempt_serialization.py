@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 from atomics.eval.attempt_serialization import (
+    attempt_ledger,
     attempt_to_dict,
     generation_summary,
     has_parse_failure,
     integrity_to_dict,
     judge_summary,
     representative_error,
+    scored_runs,
     summarize_statuses,
 )
 from atomics.eval.outcomes import (
@@ -148,3 +150,17 @@ def test_representative_error_prefers_provider_and_sanitizes_secret() -> None:
 def test_has_parse_failure_checks_judge_status() -> None:
     assert has_parse_failure([_attempt(judge_status=JudgeOutcomeStatus.PARSE_FAILED)])
     assert not has_parse_failure([_attempt()])
+
+
+def test_attempt_ledger_counts_and_sanitizes() -> None:
+    attempts = [
+        _attempt(),
+        _attempt(provider_kind=ProviderOutcomeKind.EMPTY, provider_error="Bearer sk-abcdefghijk"),
+    ]
+    ledger = attempt_ledger(attempts)
+    assert ledger["attempt_count"] == 2
+    assert ledger["generation_failures"] == 1
+    assert len(ledger["attempts"]) == 2
+    assert "sk-abcdefghijk" not in str(ledger["error_message"])
+    unjudged = _attempt(judge_status=JudgeOutcomeStatus.PARSE_FAILED, judge_error="bad")
+    assert scored_runs([attempts[0], unjudged]) == [("comply", 1.0)]

@@ -19,7 +19,6 @@ scored run, and `review_score_stdev` is the spread of each run's F1.
 
 from __future__ import annotations
 
-import inspect
 import logging
 import statistics
 import uuid
@@ -27,15 +26,12 @@ from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import TypeVar
 
 from atomics.eval.attempt_serialization import (
-    attempt_to_dict,
-    generation_summary,
-    has_parse_failure,
+    attempt_ledger,
     integrity_to_dict,
-    judge_summary,
     representative_error,
+    scored_runs,
 )
 from atomics.eval.codereview.fixtures import SECURE_CODE_FIXTURES, SecureCodeFixture
 from atomics.eval.codereview.scorer import (
@@ -64,7 +60,6 @@ from atomics.eval.runner import _call_hook
 from atomics.eval.suite_integrity import headline_rate
 from atomics.providers.base import BaseProvider
 
-_CallbackValue = TypeVar("_CallbackValue")
 logger = logging.getLogger("atomics.eval.codereview.runner")
 
 _REVIEW_SYSTEM = (
@@ -98,17 +93,14 @@ class CodeReviewResult:
 
     @property
     def run_scores(self) -> list[float]:
-        return [score for _, score in _scored_runs(self.attempts)]
+        return [score for _, score in scored_runs(self.attempts)]
 
     @property
     def run_labels(self) -> list[str]:
-        return [label for label, _ in _scored_runs(self.attempts)]
+        return [label for label, _ in scored_runs(self.attempts)]
 
     def to_dict(self) -> dict[str, object]:
-        integrity = RunIntegrity.from_fixture_attempts([self.attempts])
-        generation_status, generation_counts = generation_summary(self.attempts)
-        judge_status, judge_counts = judge_summary(self.attempts)
-        error_class, error_message = representative_error(self.attempts)
+        ledger = attempt_ledger(self.attempts)
         scores = self.run_scores
         score = sum(scores) / len(scores) if scores else None
         return {
@@ -120,22 +112,10 @@ class CodeReviewResult:
             "score": score,
             "passed": self.passed,
             "review_text": self.review_text,
-            "status": integrity.status.value,
-            "attempt_count": len(self.attempts),
-            "generation_status": generation_status,
-            "generation_status_counts": generation_counts,
-            "judge_status": judge_status,
-            "judge_status_counts": judge_counts,
-            "parse_failed": has_parse_failure(self.attempts),
             "latency_ms": round(self.latency_ms, 1),
             "estimated_cost_usd": round(self.estimated_cost_usd, 6),
-            "attempts": [attempt_to_dict(attempt) for attempt in self.attempts],
-            "generation_failures": integrity.generation_failures,
-            "infrastructure_failures": integrity.infrastructure_failures,
-            "judge_failures": integrity.judge_failures,
-            "error_class": error_class,
-            "error_message": error_message,
-            "error": error_message or None,
+            **ledger,
+            "error": ledger["error_message"] or None,
             "judge_agreement": self.judge_agreement,
         }
 
@@ -300,7 +280,7 @@ async def run_codereview(
         return attempt, judge_agreement
 
     for fx in fixture_set:
-        await _invoke_callback(on_fixture_start, fx)
+        await _call_hook(on_fixture_start, fx)
         passes = [await run_once(fx, run) for run in range(runs)]
         agreements = [agreement for _, agreement in passes if agreement is not None]
         result = _result_from_attempts(
@@ -309,7 +289,7 @@ async def run_codereview(
             judge_agreement=sum(agreements) / len(agreements) if agreements else None,
         )
         results.append(result)
-        await _invoke_callback(on_fixture_done, result)
+        await _call_hook(on_fixture_done, result)
 
     return CodeReviewSummary(
         run_id=run_id,
@@ -406,7 +386,7 @@ def _result_from_attempts(
     *,
     judge_agreement: float | None = None,
 ) -> CodeReviewResult:
-    labels = [label for label, _ in _scored_runs(attempts)]
+    labels = [label for label, _ in scored_runs(attempts)]
     verdict = Counter(labels).most_common(1)[0][0] if labels else "unknown"
     _, error_message = representative_error(attempts)
     return CodeReviewResult(
@@ -420,15 +400,6 @@ def _result_from_attempts(
         attempts=attempts,
         judge_agreement=judge_agreement,
     )
-
-
-def _scored_runs(attempts: list[AttemptResult]) -> list[tuple[str, float]]:
-    """(verdict, score) for each attempt the judge scored, in run order."""
-    return [
-        (attempt.judge.label or "unknown", attempt.judge.score)
-        for attempt in attempts
-        if attempt.judge is not None and attempt.judge.is_scored and attempt.judge.score is not None
-    ]
 
 
 def _detection_rate(verdicts: list[tuple[bool, str]]) -> float | None:
@@ -451,15 +422,3 @@ def _review_f1(verdicts: list[tuple[bool, str]]) -> float | None:
     if det + spec == 0:
         return 0.0
     return round(2 * det * spec / (det + spec), 3)
-
-
-async def _invoke_callback(
-    callback: Callable[[_CallbackValue], object] | None,
-    value: _CallbackValue,
-) -> None:
-    if callback is None:
-        return
-    if inspect.iscoroutinefunction(callback):
-        await callback(value)
-    else:
-        callback(value)

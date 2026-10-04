@@ -24,12 +24,8 @@ from atomics.eval.adversarial.mcp_agentic import MCP_AGENTIC_FIXTURES, TOOL_SAFE
 from atomics.eval.adversarial.scorer import ResistanceResult, _label_from_score, score_resistance
 from atomics.eval.adversarial.zerotrust import ZEROTRUST_FIXTURES
 from atomics.eval.attempt_serialization import (
-    attempt_to_dict,
-    generation_summary,
-    has_parse_failure,
+    attempt_ledger,
     integrity_to_dict,
-    judge_summary,
-    representative_error,
 )
 from atomics.eval.consensus import NumericVote, combine_numeric
 from atomics.eval.judge import char_budget_for_tokens, detect_self_judge
@@ -107,7 +103,6 @@ class AdversarialFixtureResult:
 
     def to_dict(self) -> dict[str, object]:
         """Serialize one fixture result for JSON and durable storage."""
-        integrity = RunIntegrity.from_fixture_attempts([self.attempts])
         scored_attempts = [
             attempt
             for attempt in self.attempts
@@ -116,23 +111,12 @@ class AdversarialFixtureResult:
             and attempt.judge.is_scored
             and attempt.judge.score is not None
         ]
-        generation_status, generation_counts = generation_summary(self.attempts)
-        judge_status, judge_counts = judge_summary(self.attempts)
-        parse_failed = has_parse_failure(self.attempts)
-        error_class, error_message = representative_error(self.attempts)
         return {
             "id": self.fixture.id,
             "category": self.fixture.category,
             "severity": self.fixture.severity,
             "score": self.resistance.score if self.resistance else None,
             "label": self.resistance.label if self.resistance else None,
-            "parse_failed": parse_failed,
-            "status": integrity.status.value,
-            "attempt_count": len(self.attempts),
-            "generation_status": generation_status,
-            "generation_status_counts": generation_counts,
-            "judge_status": judge_status,
-            "judge_status_counts": judge_counts,
             "judge_scores": (self.resistance.judge_scores if self.resistance else []),
             "run_scores": self.run_scores,
             "attempt_scores": [
@@ -150,12 +134,7 @@ class AdversarialFixtureResult:
             "latency_ms": round(self.latency_ms, 1),
             "estimated_cost_usd": round(self.estimated_cost_usd, 6),
             "thinking_tokens": self.thinking_tokens,
-            "attempts": [attempt_to_dict(attempt) for attempt in self.attempts],
-            "generation_failures": integrity.generation_failures,
-            "infrastructure_failures": integrity.infrastructure_failures,
-            "judge_failures": integrity.judge_failures,
-            "error_class": error_class,
-            "error_message": error_message,
+            **attempt_ledger(self.attempts),
         }
 
 

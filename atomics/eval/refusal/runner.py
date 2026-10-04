@@ -20,22 +20,18 @@ over its runs and its label the majority; the rates count every scored run.
 
 from __future__ import annotations
 
-import inspect
 import logging
 import uuid
 from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import TypeVar
 
 from atomics.eval.attempt_serialization import (
-    attempt_to_dict,
-    generation_summary,
-    has_parse_failure,
+    attempt_ledger,
     integrity_to_dict,
-    judge_summary,
     representative_error,
+    scored_runs,
 )
 from atomics.eval.consensus import (
     CategoricalConsensus,
@@ -65,7 +61,6 @@ from atomics.eval.runner import _call_hook
 from atomics.eval.suite_integrity import headline_rate
 from atomics.providers.base import BaseProvider
 
-_CallbackValue = TypeVar("_CallbackValue")
 logger = logging.getLogger("atomics.eval.refusal.runner")
 
 
@@ -86,17 +81,14 @@ class RefusalResult:
 
     @property
     def run_scores(self) -> list[float]:
-        return [score for _, score in _scored_runs(self.attempts)]
+        return [score for _, score in scored_runs(self.attempts)]
 
     @property
     def run_labels(self) -> list[str]:
-        return [label for label, _ in _scored_runs(self.attempts)]
+        return [label for label, _ in scored_runs(self.attempts)]
 
     def to_dict(self) -> dict[str, object]:
-        integrity = RunIntegrity.from_fixture_attempts([self.attempts])
-        generation_status, generation_counts = generation_summary(self.attempts)
-        judge_status, judge_counts = judge_summary(self.attempts)
-        error_class, error_message = representative_error(self.attempts)
+        ledger = attempt_ledger(self.attempts)
         return {
             "id": self.fixture.id,
             "category": self.fixture.category,
@@ -106,22 +98,10 @@ class RefusalResult:
             "correct": self.correct,
             "over_refusal": self.over_refusal,
             "under_refusal": self.under_refusal,
-            "status": integrity.status.value,
-            "attempt_count": len(self.attempts),
-            "generation_status": generation_status,
-            "generation_status_counts": generation_counts,
-            "judge_status": judge_status,
-            "judge_status_counts": judge_counts,
-            "parse_failed": has_parse_failure(self.attempts),
             "latency_ms": round(self.latency_ms, 1),
             "estimated_cost_usd": round(self.estimated_cost_usd, 6),
-            "attempts": [attempt_to_dict(attempt) for attempt in self.attempts],
-            "generation_failures": integrity.generation_failures,
-            "infrastructure_failures": integrity.infrastructure_failures,
-            "judge_failures": integrity.judge_failures,
-            "error_class": error_class,
-            "error_message": error_message,
-            "error": error_message or None,
+            **ledger,
+            "error": ledger["error_message"] or None,
             "judge_agreement": self.judge_agreement,
         }
 
@@ -281,7 +261,7 @@ async def run_refusal(
         return attempt, judge_agreement
 
     for fx in fixture_set:
-        await _invoke_callback(on_fixture_start, fx)
+        await _call_hook(on_fixture_start, fx)
         passes = [await run_once(fx, run) for run in range(runs)]
         agreements = [agreement for _, agreement in passes if agreement is not None]
         result = _result_from_attempts(
@@ -290,7 +270,7 @@ async def run_refusal(
             judge_agreement=sum(agreements) / len(agreements) if agreements else None,
         )
         results.append(result)
-        await _invoke_callback(on_fixture_done, result)
+        await _call_hook(on_fixture_done, result)
 
     return RefusalSummary(
         run_id=run_id,
@@ -406,7 +386,7 @@ def _result_from_attempts(
     *,
     judge_agreement: float | None = None,
 ) -> RefusalResult:
-    runs = _scored_runs(attempts)
+    runs = scored_runs(attempts)
     scored = bool(runs)
     classification = (
         Counter(label for label, _ in runs).most_common(1)[0][0] if scored else "unknown"
@@ -429,26 +409,5 @@ def _result_from_attempts(
     )
 
 
-def _scored_runs(attempts: list[AttemptResult]) -> list[tuple[str, float]]:
-    """(label, score) for each attempt the judge scored, in run order."""
-    return [
-        (attempt.judge.label or "unknown", attempt.judge.score)
-        for attempt in attempts
-        if attempt.judge is not None and attempt.judge.is_scored and attempt.judge.score is not None
-    ]
-
-
 def _is_scored_result(result: RefusalResult) -> bool:
     return bool(result.run_scores)
-
-
-async def _invoke_callback(
-    callback: Callable[[_CallbackValue], object] | None,
-    value: _CallbackValue,
-) -> None:
-    if callback is None:
-        return
-    if inspect.iscoroutinefunction(callback):
-        await callback(value)
-    else:
-        callback(value)
