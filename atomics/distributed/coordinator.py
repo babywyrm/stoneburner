@@ -8,6 +8,7 @@ from datetime import UTC, datetime, timedelta
 from sqlite3 import Connection
 from typing import Any
 
+from atomics.api.callers import ANONYMOUS_CALLER
 from atomics.distributed.models import (
     AssignmentStatus,
     DistributedJob,
@@ -172,7 +173,9 @@ class Coordinator:
             registered_at=datetime.fromisoformat(row[7]),
         )
 
-    def _insert_job(self, request: DistributedRunRequest, mode: JobMode) -> DistributedJob:
+    def _insert_job(
+        self, request: DistributedRunRequest, mode: JobMode, owner: str
+    ) -> DistributedJob:
         """Insert the job row. Caller adds assignments, then commits."""
         parent_run_id = None
         if request.run_request:
@@ -188,11 +191,12 @@ class Coordinator:
             status=JobStatus.PENDING,
             request_json=request.model_dump_json(),
             created_at=datetime.now(UTC),
+            owner=owner,
         )
         self._conn.execute(
             "INSERT INTO distributed_jobs "
-            "(job_id, mode, parent_run_id, status, request_json, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
+            "(job_id, mode, parent_run_id, status, request_json, created_at, owner) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
             (
                 job.job_id,
                 job.mode.value,
@@ -200,6 +204,7 @@ class Coordinator:
                 job.status.value,
                 job.request_json,
                 self._now(),
+                owner,
             ),
         )
         return job
@@ -225,10 +230,14 @@ class Coordinator:
         )
 
     def create_split_job(
-        self, request: DistributedRunRequest, task_specs: list[dict[str, Any]]
+        self,
+        request: DistributedRunRequest,
+        task_specs: list[dict[str, Any]],
+        *,
+        owner: str = ANONYMOUS_CALLER,
     ) -> DistributedJob:
         """One assignment per task, claimable by whichever worker asks first."""
-        job = self._insert_job(request, JobMode.SPLIT)
+        job = self._insert_job(request, JobMode.SPLIT, owner)
         for spec in task_specs:
             self._insert_assignment(job.job_id, spec)
         self._conn.commit()
@@ -239,6 +248,8 @@ class Coordinator:
         request: DistributedRunRequest,
         task_specs: list[dict[str, Any]],
         workers: list[Worker],
+        *,
+        owner: str = ANONYMOUS_CALLER,
     ) -> DistributedJob:
         """Broadcast one task set to every worker, pinned per host.
 
@@ -247,7 +258,7 @@ class Coordinator:
         specs per worker would yield the right assignment count while quietly
         giving each host different prompts.
         """
-        job = self._insert_job(request, JobMode.FLEET)
+        job = self._insert_job(request, JobMode.FLEET, owner)
         for worker in workers:
             for spec in task_specs:
                 self._insert_assignment(job.job_id, spec, target_worker_id=worker.worker_id)
@@ -259,13 +270,15 @@ class Coordinator:
         request: DistributedRunRequest,
         workers: list[Worker],
         task_spec: dict[str, Any] | None = None,
+        *,
+        owner: str = ANONYMOUS_CALLER,
     ) -> DistributedJob:
         """Delegate an entire run to one worker as a single assignment.
 
         When `workers` is non-empty, pin to the first worker. When empty, leave
         `target_worker_id` NULL so any worker can claim.
         """
-        job = self._insert_job(request, JobMode.FULL)
+        job = self._insert_job(request, JobMode.FULL, owner)
         target = workers[0].worker_id if workers else None
         spec = (
             task_spec
@@ -281,6 +294,8 @@ class Coordinator:
         request: DistributedRunRequest,
         selector: dict[str, str] | None,
         task_spec: dict[str, Any] | None = None,
+        *,
+        owner: str = ANONYMOUS_CALLER,
     ) -> DistributedJob:
         """Resolve matching workers and create a full-mode job pinned to the first.
 
@@ -289,7 +304,7 @@ class Coordinator:
         workers = self.matching_workers(selector)
         if not workers:
             raise ValueError("no online workers match the selector")
-        return self.create_full_job(request, workers, task_spec=task_spec)
+        return self.create_full_job(request, workers, task_spec=task_spec, owner=owner)
 
     def _worker_capabilities(self, worker_id: str) -> list[str]:
         """Return the worker's capabilities, defaulting to python if empty."""
@@ -443,14 +458,15 @@ class Coordinator:
             return None
         return self._row_to_assignment(row)
 
-    def get_job(self, job_id: str) -> DistributedJob | None:
+    def get_job(self, job_id: str, *, owner: str | None = None) -> DistributedJob | None:
+        """The job, or None if it is missing or `owner` is given and differs."""
         row = self._conn.execute(
             "SELECT job_id, mode, parent_run_id, status, request_json, "
-            "summary_json, created_at, completed_at "
+            "summary_json, created_at, completed_at, owner "
             "FROM distributed_jobs WHERE job_id = ?",
             (job_id,),
         ).fetchone()
-        if not row:
+        if not row or (owner is not None and row[8] != owner):
             return None
         return DistributedJob(
             job_id=row[0],
@@ -461,15 +477,17 @@ class Coordinator:
             summary_json=row[5],
             created_at=datetime.fromisoformat(row[6]),
             completed_at=datetime.fromisoformat(row[7]) if row[7] else None,
+            owner=row[8],
         )
 
-    def list_jobs(self, limit: int = 20) -> list[DistributedJob]:
-        """Return recent distributed jobs, newest first."""
+    def list_jobs(self, limit: int = 20, *, owner: str | None = None) -> list[DistributedJob]:
+        """Return recent distributed jobs, newest first, optionally one owner's."""
         rows = self._conn.execute(
             "SELECT job_id, mode, parent_run_id, status, request_json, "
-            "summary_json, created_at, completed_at "
-            "FROM distributed_jobs ORDER BY created_at DESC LIMIT ?",
-            (limit,),
+            "summary_json, created_at, completed_at, owner "
+            "FROM distributed_jobs WHERE ? IS NULL OR owner = ? "
+            "ORDER BY created_at DESC LIMIT ?",
+            (owner, owner, limit),
         ).fetchall()
         return [
             DistributedJob(
@@ -481,6 +499,7 @@ class Coordinator:
                 summary_json=row[5],
                 created_at=datetime.fromisoformat(row[6]),
                 completed_at=datetime.fromisoformat(row[7]) if row[7] else None,
+                owner=row[8],
             )
             for row in rows
         ]

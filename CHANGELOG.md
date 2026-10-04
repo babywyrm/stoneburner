@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Security
+- `/api/v1/distributed/runs` and `/api/v1/distributed/runs/{id}` show a
+  caller only their own runs. Runs created before this release belong to
+  no key and are visible only under `--no-auth`.
+
 ## 0.25.0 (2026-10-04) — Honest sweeps, tighter API, slimmer install
 
 ### Upgrade notes

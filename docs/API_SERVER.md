@@ -42,9 +42,10 @@ because that is how local Ollama and lab boxes are evaluated. It can spend up
 to each request's budget ceiling. Give keys only to people you would let run
 the CLI on the server host.
 
-Keys are isolated from each other in two ways. `/api/v1/jobs` lists only the
-caller's own jobs, and per-caller capacity holds each key to its share.
-Distributed runs and saved reports are shared across keys. Battery `profile`
+Keys are isolated from each other in two ways. `/api/v1/jobs` and
+`/api/v1/distributed/runs` show only the caller's own jobs, and per-caller
+capacity holds each key to its share. Saved reports and the worker list are
+shared across keys. Battery `profile`
 paths must be relative and resolve under the server's `profiles/` directory.
 
 ### Separate worker keys

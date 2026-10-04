@@ -134,7 +134,7 @@ async def submit_result(
 async def start_distributed_run(
     payload: DistributedRunRequest,
     coordinator: Coordinator = Depends(get_coordinator),
-    _: None = Depends(require_auth),
+    caller: str = Depends(require_auth),
 ) -> DistributedJob:
     if payload.mode not in (JobMode.SPLIT, JobMode.FLEET, JobMode.FULL):
         raise HTTPException(
@@ -164,14 +164,14 @@ async def start_distributed_run(
         if payload.worker_selector:
             try:
                 return coordinator.create_full_job_from_selector(
-                    payload, payload.worker_selector, task_spec=task_spec
+                    payload, payload.worker_selector, task_spec=task_spec, owner=caller
                 )
             except ValueError as exc:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=str(exc),
                 ) from exc
-        return coordinator.create_full_job(payload, [], task_spec=task_spec)
+        return coordinator.create_full_job(payload, [], task_spec=task_spec, owner=caller)
     # Built once and shared across workers in fleet mode: each spec is sampled
     # randomly, so per-worker generation would give each host different prompts.
     task_specs = _build_task_specs(payload.run_request)
@@ -187,17 +187,17 @@ async def start_distributed_run(
                     "online worker."
                 ),
             )
-        return coordinator.create_fleet_job(payload, task_specs, workers)
-    return coordinator.create_split_job(payload, task_specs)
+        return coordinator.create_fleet_job(payload, task_specs, workers, owner=caller)
+    return coordinator.create_split_job(payload, task_specs, owner=caller)
 
 
 @router.get("/distributed/runs/{job_id}", response_model=DistributedJob)
 async def get_job(
     job_id: str,
     coordinator: Coordinator = Depends(get_coordinator),
-    _: None = Depends(require_auth),
+    caller: str = Depends(require_auth),
 ) -> DistributedJob:
-    job = coordinator.get_job(job_id)
+    job = coordinator.get_job(job_id, owner=caller)
     if job is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
     return job
@@ -207,10 +207,10 @@ async def get_job(
 async def list_jobs(
     limit: int = Query(default=20, ge=1, le=100),
     coordinator: Coordinator = Depends(get_coordinator),
-    _: None = Depends(require_auth),
+    caller: str = Depends(require_auth),
 ) -> dict[str, list[DistributedJob]]:
-    """List recent distributed jobs, newest first."""
-    jobs = coordinator.list_jobs(limit=limit)
+    """List the caller's recent distributed jobs, newest first."""
+    jobs = coordinator.list_jobs(limit=limit, owner=caller)
     return {"jobs": jobs}
 
 

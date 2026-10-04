@@ -365,7 +365,8 @@ CREATE TABLE IF NOT EXISTS distributed_jobs (
     request_json TEXT NOT NULL,
     summary_json TEXT,
     created_at TEXT NOT NULL,
-    completed_at TEXT
+    completed_at TEXT,
+    owner TEXT NOT NULL DEFAULT 'anonymous'
 );
 
 CREATE TABLE IF NOT EXISTS distributed_assignments (

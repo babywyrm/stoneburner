@@ -6,6 +6,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from atomics.api.callers import ANONYMOUS_CALLER
+
 
 class WorkerStatus(StrEnum):
     ONLINE = "online"
@@ -75,6 +77,8 @@ class DistributedJob(BaseModel):
     summary_json: str | None = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     completed_at: datetime | None = None
+    # Caller digest that submitted the job. Scopes reads; never serialized.
+    owner: str = Field(default=ANONYMOUS_CALLER, exclude=True)
 
 
 class TaskAssignment(BaseModel):
