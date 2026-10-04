@@ -111,6 +111,7 @@ def _parse_model_spec(spec: str, default_provider: str) -> tuple[str, str, str |
 @effort_options
 @click.option("--save/--no-save", "save_results", default=True, show_default=True)
 @click.option(
+    "-o",
     "--json-out",
     "json_out",
     type=click.Path(dir_okay=False, writable=True),

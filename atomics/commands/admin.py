@@ -400,6 +400,7 @@ def _write_generic_export(rows: list[dict], fmt: str, out_file) -> None:
     help="vLLM/OpenAI-compatible base URL (default: ATOMICS_VLLM_HOST or http://localhost:8000/v1)",
 )
 @click.option(
+    "-o",
     "--json-out",
     "json_out",
     type=click.Path(dir_okay=False, path_type=Path),
@@ -489,6 +490,7 @@ def models(
     help="Split size bands larger than this",
 )
 @click.option(
+    "-o",
     "--json-out",
     type=click.Path(dir_okay=False, path_type=Path),
     default=None,

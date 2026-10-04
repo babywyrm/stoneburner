@@ -75,6 +75,7 @@ from atomics.eval.budget import share_budget
     "--save/--no-save", "save_results", default=True, help="Persist results to the database."
 )
 @click.option(
+    "-o",
     "--json-out",
     "json_out",
     type=click.Path(dir_okay=False, writable=True),
@@ -460,6 +461,7 @@ def rag_index(
     help="Number of chunks to retrieve per query.",
 )
 @click.option(
+    "-o",
     "--json-out",
     type=click.Path(dir_okay=False, writable=True),
     default=None,
