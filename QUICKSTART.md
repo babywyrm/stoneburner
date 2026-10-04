@@ -280,7 +280,9 @@ uv run atomics sweep --models gemma4:12b,llama3.2:1b,mistral:7b,phi4:latest,deep
 
 An overnight security sweep. `--status` is rewritten after every
 model×suite, `--log` survives a closed terminal, and `--save` writes each
-job the way its suite's own command would. Run the same command with
+job the way its suite's own command would. A suite that did not score
+every fixture is not kept. If the provider is unreachable, the sweep
+stops instead of marking the rest failed. Run the same command with
 `--resume` after a stop: finished jobs are kept, the rest run again.
 
 ```bash

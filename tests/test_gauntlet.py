@@ -520,3 +520,104 @@ async def test_suite_runner_marks_toolcall_incapable_as_failure(monkeypatch) -> 
     assert result.ok is False
     assert result.tool_capable is False
     assert result.exit_code == 1
+
+
+@pytest.mark.asyncio
+async def test_partial_suite_is_not_a_headline(monkeypatch) -> None:
+    from types import SimpleNamespace
+
+    from atomics.eval.outcomes import RunIntegrity, RunStatus
+
+    partial = RunIntegrity(
+        status=RunStatus.PARTIAL,
+        fixtures_total=2,
+        fixtures_scored=1,
+        attempts_total=2,
+        attempts_scorable=1,
+        attempts_scored=1,
+        generation_failures=1,
+        infrastructure_failures=1,
+        judge_failures=0,
+    )
+
+    async def fake_refusal(*_args, **_kwargs):
+        return SimpleNamespace(calibration_score=0.9, integrity=partial, runs=1, results=[])
+
+    monkeypatch.setattr("atomics.eval.refusal.run_refusal", fake_refusal)
+    run_suite = make_suite_runner(
+        provider_factory=lambda _model: SimpleNamespace(name="ollama"),
+        judge_provider=SimpleNamespace(name="ollama"),
+        judge_model="judge",
+        runs=1,
+        thinking=False,
+        thinking_budget=None,
+    )
+
+    result = await run_suite(model="m:1b", suite="refusal", skip_incapable=False)
+
+    assert result.ok is False
+    assert result.headline is None
+    assert result.error is None
+
+
+@pytest.mark.asyncio
+async def test_dead_provider_is_unreachable(monkeypatch) -> None:
+    from types import SimpleNamespace
+
+    from atomics.eval.outcomes import RunIntegrity, RunStatus
+
+    dead = RunIntegrity(
+        status=RunStatus.INFRASTRUCTURE_INVALID,
+        fixtures_total=1,
+        fixtures_scored=0,
+        attempts_total=1,
+        attempts_scorable=0,
+        attempts_scored=0,
+        generation_failures=1,
+        infrastructure_failures=1,
+        judge_failures=0,
+    )
+
+    async def fake_redblue(*_args, **_kwargs):
+        return SimpleNamespace(overall_quality=None, integrity=dead, runs=1, results=[])
+
+    monkeypatch.setattr("atomics.eval.redblue.runner.run_redblue", fake_redblue)
+    run_suite = make_suite_runner(
+        provider_factory=lambda _model: SimpleNamespace(name="ollama"),
+        judge_provider=SimpleNamespace(name="ollama"),
+        judge_model="judge",
+        runs=1,
+        thinking=False,
+        thinking_budget=None,
+    )
+
+    result = await run_suite(model="m:1b", suite="redblue", skip_incapable=False)
+
+    assert result.ok is False
+    assert result.headline is None
+    assert result.error == "provider unreachable"
+
+
+@pytest.mark.asyncio
+async def test_unreachable_provider_stops_the_sweep() -> None:
+    seen: list[str] = []
+
+    async def run_suite(*, model: str, suite: str, skip_incapable: bool) -> SuiteJobResult:
+        seen.append(f"{model} {suite}")
+        return SuiteJobResult(
+            model=model,
+            suite=suite,
+            ok=False,
+            error="provider unreachable",
+            exit_code=1,
+        )
+
+    results = await run_gauntlet(
+        models=["a:1b", "b:1b"],
+        suites=["redblue", "refusal"],
+        run_suite=run_suite,
+    )
+
+    assert seen == ["a:1b redblue"]
+    assert len(results) == 1
+    assert results[0].error == "provider unreachable"

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed
+- A sweep headline requires every fixture scored. A dead provider stops
+  the sweep instead of recording the rest of the fleet as failures.
+
 ## 0.24.1 (2026-10-03) — Inventory, cohorts, and battery plans
 
 ### Upgrade notes
