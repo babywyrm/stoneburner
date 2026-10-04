@@ -23,6 +23,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 
+from atomics.validation import validate_endpoint_url
+
 VALID_ARTIFACT_TYPES = frozenset(
     {
         "json-security-report",
@@ -80,6 +82,11 @@ def load_probe_config(config_path: Path) -> list[ProbeTarget]:
                 f"Valid types: {sorted(VALID_ARTIFACT_TYPES)}"
             )
         source = entry.get("source", "file")
+        if source == "http":
+            try:
+                validate_endpoint_url(entry.get("url") or "", label=f"Target '{name}' url")
+            except ValueError as exc:
+                raise ProbeConfigError(str(exc)) from exc
         targets.append(
             ProbeTarget(
                 name=name,

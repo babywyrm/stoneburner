@@ -644,3 +644,22 @@ def test_build_check_unknown_artifact_type():
     check = build_check("some-unknown-type", "raw content here")
     assert check["check_id"] == "generic_analysis"
     assert "prompt" in check
+
+
+def test_load_probe_config_rejects_non_http_url(tmp_path):
+    import pytest
+
+    from atomics.probe.config import ProbeConfigError, load_probe_config
+
+    cfg = tmp_path / "probes.yaml"
+    cfg.write_text(
+        textwrap.dedent("""
+        targets:
+          - name: bad-url
+            artifact_type: api-response
+            source: http
+            url: file:///etc/passwd
+    """)
+    )
+    with pytest.raises(ProbeConfigError, match="scheme"):
+        load_probe_config(cfg)

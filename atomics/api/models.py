@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -196,6 +197,17 @@ class BatteryRequest(BaseModel):
     reasoning_mode: str | None = None
     runs: int = Field(default=1, ge=1, le=MAX_SWEEP_RUNS)
     profile: str | None = None
+
+    @field_validator("profile")
+    @classmethod
+    def _profile_under_profiles(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        root = Path("profiles").resolve()
+        path = Path(value)
+        if path.is_absolute() or not path.resolve().is_relative_to(root):
+            raise ValueError("profile must be a relative path under profiles/")
+        return value
 
     @field_validator("effort")
     @classmethod

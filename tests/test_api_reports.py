@@ -152,3 +152,7 @@ def test_trends_includes_eval_tokens_and_omits_prompts(tmp_path):
     assert body["rows"][0]["task_count"] == 1
     assert "trend-secret-prompt" not in resp.text
     assert "prompt" not in body["rows"][0]
+
+
+def test_recent_runs_limit_is_bounded(client):
+    assert client.get("/api/v1/reports/recent-runs?limit=100000").status_code == 422

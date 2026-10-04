@@ -13,6 +13,7 @@ from typing import Any
 
 from atomics.api.callers import ANONYMOUS_CALLER
 from atomics.api.request_log import current_request_id
+from atomics.validation import sanitize_error
 
 logger = logging.getLogger(__name__)
 
@@ -194,7 +195,7 @@ class JobManager:
             job.status = JobStatus.FAILED
             raise
         except Exception as exc:
-            job.error = {"type": exc.__class__.__name__, "message": str(exc)}
+            job.error = {"type": exc.__class__.__name__, "message": sanitize_error(exc)}
             job.status = JobStatus.FAILED
         finally:
             job.completed_at = time.time()

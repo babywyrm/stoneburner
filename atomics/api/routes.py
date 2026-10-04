@@ -233,20 +233,22 @@ async def start_soak(
 @router.get("/jobs", response_model=JobsListResponse)
 async def list_jobs(
     job_manager: JobManager = Depends(get_job_manager),
-    _: None = Depends(require_auth),
+    caller: str = Depends(require_auth),
 ) -> JobsListResponse:
-    """In-memory API jobs. The result payload is omitted; poll `/jobs/{id}`."""
-    return JobsListResponse(jobs=[_job_to_summary(job) for job in job_manager.list_jobs()])
+    """The caller's in-memory API jobs. The result payload is omitted; poll `/jobs/{id}`."""
+    return JobsListResponse(
+        jobs=[_job_to_summary(job) for job in job_manager.list_jobs() if job.owner == caller]
+    )
 
 
 @router.get("/jobs/{job_id}", response_model=JobResponse)
 async def get_job(
     job_id: str,
     job_manager: JobManager = Depends(get_job_manager),
-    _: None = Depends(require_auth),
+    caller: str = Depends(require_auth),
 ) -> JobResponse:
     job = job_manager.jobs.get(job_id)
-    if job is None:
+    if job is None or job.owner != caller:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Job not found",
@@ -325,7 +327,7 @@ async def compare(
 
 @router.get("/reports/recent-runs", response_model=ReportResponse)
 async def recent_runs(
-    limit: int = 10,
+    limit: int = Query(default=10, ge=1, le=100),
     _: None = Depends(require_auth),
 ) -> ReportResponse:
     settings = load_settings()

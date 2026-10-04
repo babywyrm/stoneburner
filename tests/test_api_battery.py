@@ -252,3 +252,22 @@ def test_post_batteries_without_budget_is_422():
             json={"name": "desk-pass", "provider": "ollama", "model": "x"},
         )
     assert resp.status_code == 422
+
+
+@pytest.mark.parametrize("path", ["/etc/hosts", "../secrets.yaml", "profiles/../.env", "qa/x.yaml"])
+def test_battery_profile_must_live_under_profiles(path):
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError, match="profiles/"):
+        BatteryRequest(name="desk-pass", provider="ollama", model="x", budget_usd=5, profile=path)
+
+
+def test_battery_profile_under_profiles_is_accepted():
+    req = BatteryRequest(
+        name="desk-pass",
+        provider="ollama",
+        model="x",
+        budget_usd=5,
+        profile="profiles/examples/a.yaml",
+    )
+    assert req.profile == "profiles/examples/a.yaml"

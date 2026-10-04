@@ -12,6 +12,7 @@ import httpx
 
 from atomics.distributed.models import TaskAssignment, WorkerRegisterRequest
 from atomics.distributed.worker_runner import execute_assignment, execute_full_run
+from atomics.validation import sanitize_error
 
 logger = logging.getLogger("atomics.distributed.worker_client")
 
@@ -103,7 +104,7 @@ class WorkerClient:
             logger.exception("Assignment %s failed", assignment.assignment_id)
             await self._client.post(
                 f"{self.coordinator_url}/api/v1/workers/{self._worker_id}/jobs/{assignment.assignment_id}/result",
-                json={"status": "failed", "error": str(exc)},
+                json={"status": "failed", "error": sanitize_error(exc)},
             )
         return True
 
