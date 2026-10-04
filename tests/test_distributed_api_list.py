@@ -8,6 +8,8 @@ from atomics.api.config import ServerSettings
 from atomics.api.server import create_app
 
 API_KEY = "test-coordinator-key"
+ALICE = "alice-key-0123456789"
+BOB = "bob-key-9876543210"
 
 
 def _auth() -> dict[str, str]:
@@ -64,10 +66,8 @@ def test_distributed_list_limit_is_bounded():
 
 
 def test_a_caller_sees_only_their_own_distributed_runs(tmp_path):
-    alice, bob = {"X-API-Key": "alice-key-0123456789"}, {"X-API-Key": "bob-key-9876543210"}
-    app = create_app(
-        ServerSettings(api_keys={alice["X-API-Key"], bob["X-API-Key"]}, db_path=tmp_path / "db.db")
-    )
+    alice, bob = {"X-API-Key": ALICE}, {"X-API-Key": BOB}
+    app = create_app(ServerSettings(api_keys={ALICE, BOB}, db_path=tmp_path / "db.db"))
     with TestClient(app) as tc:
         job = tc.post(
             "/api/v1/distributed/runs",

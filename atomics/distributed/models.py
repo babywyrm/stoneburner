@@ -6,7 +6,9 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from atomics.api.callers import ANONYMOUS_CALLER
+# Same value as atomics.api.callers.ANONYMOUS_CALLER. Importing it would pull
+# FastAPI into every CLI start through atomics.api.
+ANONYMOUS_OWNER = "anonymous"
 
 
 class WorkerStatus(StrEnum):
@@ -78,7 +80,7 @@ class DistributedJob(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     completed_at: datetime | None = None
     # Caller digest that submitted the job. Scopes reads; never serialized.
-    owner: str = Field(default=ANONYMOUS_CALLER, exclude=True)
+    owner: str = Field(default=ANONYMOUS_OWNER, exclude=True)
 
 
 class TaskAssignment(BaseModel):

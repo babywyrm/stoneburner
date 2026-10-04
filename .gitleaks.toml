@@ -37,12 +37,16 @@ new commits do not add more, but the strings remain in git history and cannot be
 removed without rewriting it.
 
 sk-test-1234567890 is a unit-test fixture for ApiKeyAuth in tests/test_auth.py.
+alice-key-0123456789 / bob-key-9876543210 are two-caller test keys; one
+commit wrote them inline as X-API-Key header values.
 """
 regexes = [
   '''sk-abc123''',
   '''sk-xyz789''',
   '''sk-test-1234567890''',
   '''dummy-key-for-tests-not-a-secret''',
+  '''alice-key-0123456789''',
+  '''bob-key-9876543210''',
 ]
 
 [[allowlists]]
