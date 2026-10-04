@@ -61,3 +61,44 @@ def test_distributed_list_limit_is_bounded():
     app = create_app(settings=ServerSettings(no_auth=True))
     with TestClient(app) as tc:
         assert tc.get("/api/v1/distributed/runs?limit=100000").status_code == 422
+
+
+def test_a_caller_sees_only_their_own_distributed_runs(tmp_path):
+    alice, bob = {"X-API-Key": "alice-key-0123456789"}, {"X-API-Key": "bob-key-9876543210"}
+    app = create_app(
+        ServerSettings(api_keys={alice["X-API-Key"], bob["X-API-Key"]}, db_path=tmp_path / "db.db")
+    )
+    with TestClient(app) as tc:
+        job = tc.post(
+            "/api/v1/distributed/runs",
+            json={"mode": "split", "run_request": {"iterations": 1}},
+            headers=alice,
+        ).json()
+        assert tc.get(f"/api/v1/distributed/runs/{job['job_id']}", headers=alice).status_code == 200
+        assert tc.get(f"/api/v1/distributed/runs/{job['job_id']}", headers=bob).status_code == 404
+        assert len(tc.get("/api/v1/distributed/runs", headers=alice).json()["jobs"]) == 1
+        assert tc.get("/api/v1/distributed/runs", headers=bob).json()["jobs"] == []
+        assert "owner" not in job
+
+
+def test_an_existing_distributed_jobs_table_gains_owner(tmp_path):
+    import sqlite3
+
+    from atomics.storage.schema import init_db
+
+    db = tmp_path / "old.db"
+    old = sqlite3.connect(db)
+    old.execute(
+        "CREATE TABLE distributed_jobs (job_id TEXT PRIMARY KEY, mode TEXT NOT NULL, "
+        "parent_run_id TEXT, status TEXT NOT NULL DEFAULT 'pending', request_json TEXT NOT NULL, "
+        "summary_json TEXT, created_at TEXT NOT NULL, completed_at TEXT)"
+    )
+    old.execute(
+        "INSERT INTO distributed_jobs VALUES ('j1','split',NULL,'pending','{}',NULL,'t',NULL)"
+    )
+    old.commit()
+    old.close()
+    conn = init_db(db)
+    assert conn.execute("SELECT owner FROM distributed_jobs WHERE job_id='j1'").fetchone()[0] == (
+        "anonymous"
+    )
