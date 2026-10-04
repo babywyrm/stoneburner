@@ -299,7 +299,9 @@ Absolute red/blue numbers do not. Next:
       `granite4.2:8b` 0.941 codereview, `granite4.2:3b` lowest
       dangerous-call rate (0.20). `gemma3:4b` has no tools on Ollama.
       `lfm2.5:8b` refusal and codereview are withheld: replies spent
-      the 512-token budget thinking. Ollama died three times; the
+      the 512-token budget thinking. It ignores `think: false` and
+      reasons inline in `<think>`; a `--no-thinking` rerun scored 33 of
+      36 on both, and every scored reply was capped. Ollama died three times; the
       resume and the stop-on-unreachable fix carried the run.
 - [x] Codereview has 6 vulnerable and 6 clean fixtures (0.24.0). One
       false positive moves F1 by 0.09, not 0.33. Older rows compare
