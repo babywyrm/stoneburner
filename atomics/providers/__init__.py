@@ -1,7 +1,6 @@
 """Provider adapters for LLM APIs."""
 
 from atomics.providers.base import BaseProvider, ProviderResponse
-from atomics.providers.claude import ClaudeProvider
 
 __all__ = [
     "BaseProvider",
@@ -23,6 +22,10 @@ def __getattr__(name: str):
         from atomics.providers.brain_gateway import BrainGatewayProvider
 
         return BrainGatewayProvider
+    if name == "ClaudeProvider":
+        from atomics.providers.claude import ClaudeProvider
+
+        return ClaudeProvider
     if name == "OllamaProvider":
         from atomics.providers.ollama import OllamaProvider
 

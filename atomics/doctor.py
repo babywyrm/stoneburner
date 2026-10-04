@@ -129,6 +129,13 @@ def run_doctor(settings: AtomicsSettings | None = None) -> int:
     else:
         console.print("[yellow]OPENAI_API_KEY[/yellow] not set (optional; needed for OpenAI)")
 
+    if importlib.util.find_spec("anthropic") is not None:
+        console.print("[green]anthropic[/green] SDK available (Claude)")
+    else:
+        console.print(
+            "[yellow]anthropic[/yellow] SDK not installed (optional; uv sync --extra claude)"
+        )
+
     if importlib.util.find_spec("openai") is not None:
         console.print("[green]openai[/green] SDK available (OpenAI / Codex)")
     else:

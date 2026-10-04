@@ -4,9 +4,7 @@ from __future__ import annotations
 
 import time
 from collections.abc import Sequence
-from typing import Any
-
-import anthropic
+from typing import TYPE_CHECKING, Any
 
 from atomics.providers import pricing
 from atomics.providers._tool_dialects import (
@@ -16,6 +14,9 @@ from atomics.providers._tool_dialects import (
 )
 from atomics.providers.base import BaseProvider, ProviderResponse, compute_tps
 from atomics.providers.effort import claude_request, normalize_effort
+
+if TYPE_CHECKING:
+    import anthropic
 
 # Pricing per 1M tokens (input / output). Sourced from the central pricing
 # module; re-exported here for backward compatibility.
@@ -58,7 +59,16 @@ class ClaudeProvider(BaseProvider):
         *,
         client: anthropic.AsyncAnthropic | None = None,
     ) -> None:
-        self._client = client or anthropic.AsyncAnthropic(api_key=api_key)
+        if client is None:
+            try:
+                import anthropic
+            except ImportError as exc:
+                raise ImportError(
+                    "anthropic is required for the Claude provider. "
+                    "Install with: uv sync --extra claude"
+                ) from exc
+            client = anthropic.AsyncAnthropic(api_key=api_key)
+        self._client = client
         self._default_model = default_model
 
     @property

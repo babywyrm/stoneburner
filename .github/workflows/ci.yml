@@ -37,7 +37,7 @@ jobs:
       # cleanly, so omitting it would be silently green while leaving the MCP
       # tool surface and CLI untested. It is a small, pure-Python tree.
       - name: Sync dependencies
-        run: uv sync --extra dev --extra api --extra mcp
+        run: uv sync --extra dev --extra api --extra mcp --extra claude
 
       # scripts/ included: it was outside this scope and quietly accumulated six
       # errors, and the release tooling now lives there.

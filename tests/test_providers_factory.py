@@ -153,3 +153,12 @@ def test_ollama_cli_host_wins_over_control_file(tmp_path, monkeypatch):
     provider = make_provider("ollama", None, "http://localhost:11434", AtomicsSettings())
     assert isinstance(provider, OllamaProvider)
     assert provider._host == "http://localhost:11434"
+
+
+def test_missing_sdk_is_a_config_error(monkeypatch) -> None:
+    import sys
+
+    monkeypatch.setitem(sys.modules, "anthropic", None)
+    settings = SimpleNamespace(anthropic_api_key="k", default_model="m")
+    with pytest.raises(ProviderConfigError, match="--extra claude"):
+        make_provider("claude", None, None, settings)

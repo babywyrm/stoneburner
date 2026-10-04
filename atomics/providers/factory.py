@@ -11,9 +11,15 @@ extra does not require the others.
 
 from __future__ import annotations
 
+import functools
+from collections.abc import Callable
+from typing import ParamSpec
+
 from atomics.config import AtomicsSettings
 from atomics.providers.base import BaseProvider
 from atomics.validation import validate_endpoint_url
+
+P = ParamSpec("P")
 
 PROVIDER_NAMES: tuple[str, ...] = (
     "claude",
@@ -39,6 +45,18 @@ class ProviderConfigError(Exception):
     """
 
 
+def _missing_sdk_is_config_error(fn: Callable[P, BaseProvider]) -> Callable[P, BaseProvider]:
+    @functools.wraps(fn)
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> BaseProvider:
+        try:
+            return fn(*args, **kwargs)
+        except ImportError as exc:
+            raise ProviderConfigError(str(exc)) from exc
+
+    return wrapper
+
+
+@_missing_sdk_is_config_error
 def make_provider(
     name: str,
     model: str | None,

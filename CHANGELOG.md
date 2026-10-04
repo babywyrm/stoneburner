@@ -15,6 +15,12 @@
   100.
 - `docs/API_SERVER.md` states what a key can do.
 
+### Changed
+- `anthropic` is an optional extra: `stoneburner-atomics[claude]`, like
+  `[openai]` and `[bedrock]`. The default Ollama path no longer installs
+  or imports it. A missing provider SDK is a one-line config error, not
+  a traceback, and `atomics doctor` reports it.
+
 ### Fixed
 - A sweep headline requires every fixture scored. A dead provider stops
   the sweep instead of recording the rest of the fleet as failures.

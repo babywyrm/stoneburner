@@ -148,7 +148,7 @@ results in the inventory.
 
 | Backend | Flag | Install |
 |---------|------|---------|
-| **Claude** (Anthropic) | `--provider claude` | `uv sync` (included) |
+| **Claude** (Anthropic) | `--provider claude` | `uv sync --extra claude` |
 | **OpenAI** / GPT-5.6 / o-series | `--provider openai` | `uv sync --extra openai` |
 | **Bedrock** (AWS) | `--provider bedrock --region us-east-1` | `uv sync --extra bedrock` |
 | **Groq** | `--provider groq` | `uv sync` (httpx) |
