@@ -302,19 +302,20 @@ Absolute red/blue numbers do not. Next:
       `lfm2.5:8b` refusal and codereview are withheld: replies spent
       the 512-token budget thinking. It ignores `think: false` and
       reasons inline in `<think>`; a `--no-thinking` rerun scored 33 of
-      36 on both, and every scored reply was capped. Ollama died three times; the
-      resume and the stop-on-unreachable fix carried the run.
+      36 on both, and every scored reply was capped. Ollama died three
+      times; the resume and the stop-on-unreachable fix carried the run.
 - [x] Codereview has 6 vulnerable and 6 clean fixtures (0.24.0). One
       false positive moves F1 by 0.09, not 0.33. Older rows compare
       only with `--fixtures scr-01,...,scr-06,scr-clean-01,scr-clean-02`.
 
-A unit test cannot see a live generate. Two holes stay open:
+A unit test cannot see a live generate. One hole stays open:
 
 - A second local backend (vLLM, llama.cpp, or brain-gateway) has no
   generate on record. CI proves URL rejection.
-- `gemma4:26b` blue-capability (this laptop, 2026-09-21, runs=1,
-  judge `granite4.2:8b`) is one local judge. A second judge on that
-  battery is still open. The local judge is soft.
+
+`gemma4:26b` blue-capability now has two judges: `granite4.2:8b`
+(2026-09-21) and `qwen3.8:27b` (2026-10-04) agree within 1.2 points on
+redblue and exactly on refusal. `docs/BATTERIES.md` has both.
 
 Desk-pass on `granite4.2:3b` (this laptop, 2026-09-21, three runs,
 `--no-thinking`, `num_ctx` 8192) held exit 0 and qa 6/6. The tool row
