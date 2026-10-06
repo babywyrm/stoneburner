@@ -6,6 +6,7 @@ import asyncio
 import io
 from collections.abc import Iterator
 
+import click
 import pytest
 from click.testing import CliRunner
 from rich.console import Console
@@ -69,6 +70,38 @@ def test_failed_call_is_shown_and_reraised(shown):
         asyncio.run(trace.traced(_Failing()).generate("hi", system="custom words"))
     out = shown.getvalue()
     assert "[custom]" in out and "error   TimeoutError" in out
+
+
+def test_reply_at_the_token_cap_is_called_out(shown):
+    asyncio.run(trace.traced(MockProvider()).generate("hi", max_tokens=60))
+    assert "cut off at max_tokens=60" in shown.getvalue()
+
+
+def test_reply_under_the_cap_is_not_called_out(shown):
+    asyncio.run(trace.traced(MockProvider()).generate("hi", max_tokens=1024))
+    assert "cut off" not in shown.getvalue()
+
+
+def test_estimate_is_shown_even_when_above_the_exact_count(shown):
+    asyncio.run(trace.traced(MockProvider()).generate("x" * 400))
+    assert "input=30 (≈100 text estimated)" in shown.getvalue()
+
+
+def test_show_prompt_turns_off_the_spinner():
+    seen = {}
+
+    @click.command("_probe_progress")
+    @click.pass_context
+    def probe(ctx: click.Context) -> None:
+        seen["progress"] = ctx.obj["progress"]
+
+    cli.add_command(probe)
+    try:
+        CliRunner().invoke(cli, ["--show-prompt", "_probe_progress"])
+    finally:
+        cli.commands.pop("_probe_progress")
+        trace.disable()
+    assert seen == {"progress": False}
 
 
 def test_catalog_names_are_unique_and_shared_prompts_list_both():

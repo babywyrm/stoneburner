@@ -79,7 +79,9 @@ Both are off unless you ask for them.
 | `ATOMICS_SHOW_PROMPT=1 atomics eval ...` | Same switch from the environment |
 
 `--show-prompt` goes before the command name and prints to stderr, so
-`--json` output is unaffected. Input, output, and thinking token counts come
+`--json` output is unaffected. It turns the progress spinner off, which
+would otherwise redraw over the trace. A reply that hit `max_tokens` gets
+an `outcome cut off` line: the judge saw an unfinished answer. Input, output, and thinking token counts come
 from the provider and are exact. The split between system, prompt, and tools
 is marked `≈`: it is estimated at four characters per token, and the rest of
 the exact input count is what the chat template and tool formatting added.

@@ -19,6 +19,7 @@ from rich.console import Console
 from rich.text import Text
 
 from atomics.providers.base import BaseProvider, ProviderResponse
+from atomics.providers.outcomes import ProviderOutcomeKind
 
 _console: Console | None = None
 _calls = itertools.count(1)
@@ -211,10 +212,22 @@ class TracedProvider(BaseProvider):
             out.append(f"usage   input={response.input_tokens}", style="bold")
             if response.input_tokens and overhead > 0:
                 out.append(f" (≈{estimated} text + ≈{overhead} template/formatting)")
+            elif response.input_tokens:
+                out.append(f" (≈{estimated} text estimated)")
             out.append(f"  output={response.output_tokens}")
             if response.thinking_tokens:
                 out.append(f"  thinking={response.thinking_tokens}")
             out.append("\n")
+            kind = response.outcome.kind if response.outcome else None
+            if kind == ProviderOutcomeKind.TRUNCATED or (
+                kind is None and response.output_tokens >= max_tokens
+            ):
+                out.append(
+                    f"outcome cut off at max_tokens={max_tokens}: the reply is unfinished\n",
+                    style="yellow",
+                )
+            elif kind is not None and kind != ProviderOutcomeKind.COMPLETED:
+                out.append(f"outcome {kind.value}\n", style="yellow")
             if num_ctx and response.input_tokens:
                 used = response.input_tokens + response.output_tokens
                 out.append(

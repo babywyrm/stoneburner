@@ -63,6 +63,8 @@ def cli(ctx: click.Context, verbose: bool, progress: bool, show_prompt: bool) ->
         from atomics.providers.trace import enable
 
         enable()
+        # A live spinner redraws over the trace lines.
+        ctx.obj["progress"] = False
     if verbose:
         setup_logging("DEBUG", rich_tracebacks=True)
     else:
