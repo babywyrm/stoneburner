@@ -56,7 +56,18 @@ def _missing_sdk_is_config_error(fn: Callable[P, BaseProvider]) -> Callable[P, B
     return wrapper
 
 
+def _traced_when_enabled(fn: Callable[P, BaseProvider]) -> Callable[P, BaseProvider]:
+    @functools.wraps(fn)
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> BaseProvider:
+        from atomics.providers.trace import traced
+
+        return traced(fn(*args, **kwargs))
+
+    return wrapper
+
+
 @_missing_sdk_is_config_error
+@_traced_when_enabled
 def make_provider(
     name: str,
     model: str | None,

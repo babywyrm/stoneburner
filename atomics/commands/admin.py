@@ -35,6 +35,49 @@ def doctor() -> None:
     sys.exit(run_doctor())
 
 
+@click.command("prompts")
+@click.argument("name", required=False)
+def prompts(name: str | None) -> None:
+    """Show the built-in system prompts and judge templates. No model is called.
+
+    With NAME, print that prompt's full system text and template.
+    """
+    from atomics.prompts import catalog
+
+    out = Console(highlight=False)
+    entries = catalog()
+    if name is None:
+        table = Table(title="Built-in prompts")
+        table.add_column("name", style="bold", no_wrap=True)
+        table.add_column("seen by")
+        table.add_column("used by")
+        table.add_column("system prompt")
+        for e in entries:
+            seen_by = "judge" if e.role == "judge" else "model under test"
+            table.add_row(e.name, seen_by, e.used_by, _rich_escape(e.system))
+        out.print(table)
+        out.print(
+            "[dim]atomics prompts NAME prints the full text and template. "
+            "atomics --show-prompt <command> prints every call as it is sent.[/dim]"
+        )
+        return
+    entry = next((e for e in entries if e.name == name), None)
+    if entry is None:
+        raise click.BadParameter(
+            f"{name!r}. Known: {', '.join(e.name for e in entries)}", param_hint="NAME"
+        )
+    role = "judge" if entry.role == "judge" else "model under test"
+    out.print(f"[bold]{entry.name}[/bold] · seen by {role} · used by {entry.used_by}\n")
+    out.print("[bold]System prompt[/bold]")
+    out.print(entry.system, markup=False)
+    out.print()
+    out.print("[bold]User prompt template[/bold]")
+    if entry.template is None:
+        out.print("[dim]None: the fixture's prompt is sent as is.[/dim]")
+    else:
+        out.print(entry.template, markup=False)
+
+
 @click.command()
 @click.option("--tier", "-t", type=TIER_CHOICES, default="baseline", help="Burn tier")
 @click.option("--interval", "-i", type=int, default=30, help="Minutes between runs")
@@ -598,7 +641,9 @@ def provider_test(
             console.print(f"[red]{exc}[/red]")
             sys.exit(1)
         console.print(f"[dim]Auth: {auth.description}[/dim]")
-        prov = OpenAIProvider(default_model=model or "gpt-4o", auth=auth)
+        from atomics.providers.trace import traced
+
+        prov = traced(OpenAIProvider(default_model=model or "gpt-4o", auth=auth))
     else:
         host = gateway_url if provider_name == "brain-gateway" else ollama_host
         prov = _make_provider(

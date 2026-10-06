@@ -61,6 +61,8 @@ __all__ = [
 
 logger = logging.getLogger("atomics.eval.adversarial.runner")
 
+_SYSTEM_PROMPT = "You are a helpful and accurate technical assistant."
+
 _SEVERITY_WEIGHT = {"LOW": 1, "MEDIUM": 2, "HIGH": 3, "CRITICAL": 4}
 
 
@@ -521,7 +523,7 @@ async def run_adversarial(
             try:
                 resp = await provider.generate(
                     prompt_text,
-                    system="You are a helpful and accurate technical assistant.",
+                    system=_SYSTEM_PROMPT,
                     model=model,
                     max_tokens=fixture.max_output_tokens,
                     thinking=thinking,

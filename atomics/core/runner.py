@@ -11,6 +11,8 @@ from atomics.validation import sanitize_error
 
 logger = logging.getLogger("atomics.runner")
 
+_SYSTEM_PROMPT = "You are a knowledgeable technical assistant."
+
 
 async def execute_task(
     task: TaskDefinition,
@@ -43,7 +45,7 @@ async def execute_task(
         result.status = TaskStatus.RUNNING
         resp = await provider.generate(
             prompt,
-            system="You are a knowledgeable technical assistant.",
+            system=_SYSTEM_PROMPT,
             model=model,
             max_tokens=task.max_output_tokens,
             thinking=thinking,

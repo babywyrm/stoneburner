@@ -147,7 +147,9 @@ def run(
             console.print(f"[red]{exc}[/red]")
             sys.exit(1)
         console.print(f"[dim]Auth: {auth.description}[/dim]")
-        provider = OpenAIProvider(default_model=model or "gpt-4o", auth=auth)
+        from atomics.providers.trace import traced
+
+        provider = traced(OpenAIProvider(default_model=model or "gpt-4o", auth=auth))
     else:
         # claude and brain-gateway fall back to the tier's preferred model before
         # the account default; the factory only knows the account default, so

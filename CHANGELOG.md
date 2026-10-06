@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Added
+- `atomics prompts` lists every built-in system prompt and judge template,
+  who sees it, and which commands send it. `atomics prompts NAME` prints
+  one in full. No model is called.
+- `atomics --show-prompt` (or `ATOMICS_SHOW_PROMPT=1`) prints every model
+  and judge call to stderr: the system prompt, named when built in; the
+  prompt; tools; settings; exact token usage; and context-window fill on
+  Ollama. Off by default.
+
 ## 0.25.1 (2026-10-04) — Distributed runs per key, -o everywhere
 
 ### Upgrade notes
