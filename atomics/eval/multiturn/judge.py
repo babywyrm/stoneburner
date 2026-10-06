@@ -178,6 +178,7 @@ async def score_turn(
             model=judge_model,
             max_tokens=256,
             temperature=0.0,
+            thinking=False,
         )
     except Exception:
         logger.warning("Turn judge call failed", exc_info=True)
@@ -211,6 +212,7 @@ async def score_conversation(
             model=judge_model,
             max_tokens=256,
             temperature=0.0,
+            thinking=False,
         )
     except Exception:
         logger.warning("Conversation judge call failed", exc_info=True)
