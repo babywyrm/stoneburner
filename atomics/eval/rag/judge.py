@@ -178,6 +178,7 @@ async def score_rag_response(
             model=judge_model,
             max_tokens=256,
             temperature=0.0,
+            thinking=False,
         )
     except Exception:
         logger.warning("RAG judge call failed", exc_info=True)
