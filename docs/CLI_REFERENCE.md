@@ -69,7 +69,8 @@ Recipes: [QUICKSTART.md](../QUICKSTART.md).
 
 ## Seeing the Prompt
 
-Both are off unless you ask for them.
+Both are off unless you ask for them. [PROMPT_VISIBILITY.md](PROMPT_VISIBILITY.md)
+explains each trace line with real output.
 
 | Command | Description |
 |---------|-------------|
