@@ -216,7 +216,7 @@ class TracedProvider(BaseProvider):
                 out.append(f" (≈{estimated} text estimated)")
             out.append(f"  output={response.output_tokens}")
             if response.thinking_tokens:
-                out.append(f"  thinking={response.thinking_tokens}")
+                out.append(f" ({response.thinking_tokens} of it thinking)")
             out.append("\n")
             kind = response.outcome.kind if response.outcome else None
             if kind == ProviderOutcomeKind.TRUNCATED or (
@@ -234,4 +234,5 @@ class TracedProvider(BaseProvider):
                     f"context {used}/{num_ctx} tokens ({used / num_ctx:.1%} of the window)\n"
                 )
         console.rule(Text(f"call {number} · {label}"), style="dim")
-        console.print(out, end="")
+        # Wrapping would insert line breaks that are not in the prompt.
+        console.print(out, end="", soft_wrap=True)

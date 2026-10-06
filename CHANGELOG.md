@@ -9,7 +9,14 @@
 - `atomics --show-prompt` (or `ATOMICS_SHOW_PROMPT=1`) prints every model
   and judge call to stderr: the system prompt, named when built in; the
   prompt; tools; settings; exact token usage; and context-window fill on
-  Ollama. Off by default.
+  Ollama. Off by default. A reply that hit `max_tokens` is called out.
+  Guide: `docs/PROMPT_VISIBILITY.md`.
+
+### Fixed
+- The multiturn and RAG judges now ask for thinking off, like the other
+  judges. A reasoning judge left at its default spent the 256-token cap
+  reasoning in the visible reply, so no score parsed and every multiturn
+  score came back blank.
 
 ## 0.25.1 (2026-10-04) — Distributed runs per key, -o everywhere
 

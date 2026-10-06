@@ -69,13 +69,13 @@ def prompts(name: str | None) -> None:
     role = "judge" if entry.role == "judge" else "model under test"
     out.print(f"[bold]{entry.name}[/bold] · seen by {role} · used by {entry.used_by}\n")
     out.print("[bold]System prompt[/bold]")
-    out.print(entry.system, markup=False)
+    out.print(entry.system, markup=False, soft_wrap=True)
     out.print()
     out.print("[bold]User prompt template[/bold]")
     if entry.template is None:
         out.print("[dim]None: the fixture's prompt is sent as is.[/dim]")
     else:
-        out.print(entry.template, markup=False)
+        out.print(entry.template, markup=False, soft_wrap=True)
 
 
 @click.command()
