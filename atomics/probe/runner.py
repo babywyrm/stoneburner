@@ -14,6 +14,8 @@ from atomics.providers.base import BaseProvider
 
 logger = logging.getLogger("atomics.probe.runner")
 
+_SYSTEM_PROMPT = "You are a senior security analyst. Be thorough and precise."
+
 
 @dataclass
 class ProbeResult:
@@ -128,7 +130,7 @@ async def run_probe(
         try:
             resp = await provider.generate(
                 check["prompt"],
-                system="You are a senior security analyst. Be thorough and precise.",
+                system=_SYSTEM_PROMPT,
                 model=model,
                 max_tokens=1024,
                 thinking=thinking,

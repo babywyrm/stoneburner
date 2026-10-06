@@ -33,6 +33,8 @@ from atomics.validation import sanitize_error
 
 logger = logging.getLogger("atomics.eval.redblue.runner")
 
+_SYSTEM_PROMPT = "You are a highly knowledgeable security engineering assistant."
+
 # When thinking is enabled, reasoning models spend most of their output budget on
 # hidden reasoning before the visible answer. The fixture's max_output_tokens
 # (1024) is sized for the visible answer; without headroom the answer is truncated
@@ -277,7 +279,7 @@ async def run_redblue(
                 await _call_hook(on_phase, fixture.id, "generate", generate_model)
                 resp = await provider.generate(
                     fixture.prompt,
-                    system="You are a highly knowledgeable security engineering assistant.",
+                    system=_SYSTEM_PROMPT,
                     model=model,
                     max_tokens=output_tokens,
                     thinking=thinking,

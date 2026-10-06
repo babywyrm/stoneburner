@@ -42,8 +42,16 @@ from atomics.commands.common import setup_logging
     show_default=True,
     help="Show real-time progress during long runs.",
 )
+@click.option(
+    "--show-prompt",
+    is_flag=True,
+    default=False,
+    envvar="ATOMICS_SHOW_PROMPT",
+    help="Print every model and judge call: system prompt, prompt, tools, "
+    "settings, and token usage (to stderr).",
+)
 @click.pass_context
-def cli(ctx: click.Context, verbose: bool, progress: bool) -> None:
+def cli(ctx: click.Context, verbose: bool, progress: bool, show_prompt: bool) -> None:
     """Atomics — local-first LLM eval (cost, quality, security).
 
     PyPI listing: stoneburner-atomics. The CLI name stays atomics.
@@ -51,6 +59,10 @@ def cli(ctx: click.Context, verbose: bool, progress: bool) -> None:
     ctx.ensure_object(dict)
     ctx.obj["verbose"] = verbose
     ctx.obj["progress"] = progress
+    if show_prompt:
+        from atomics.providers.trace import enable
+
+        enable()
     if verbose:
         setup_logging("DEBUG", rich_tracebacks=True)
     else:
@@ -66,6 +78,7 @@ cli.add_command(logout)
 cli.add_command(whoami)
 cli.add_command(secrets_group)
 cli.add_command(admin_commands.doctor)
+cli.add_command(admin_commands.prompts)
 cli.add_command(admin_commands.schedule)
 cli.add_command(admin_commands.schedule_status)
 cli.add_command(admin_commands.export)

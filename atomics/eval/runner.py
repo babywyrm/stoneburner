@@ -24,6 +24,8 @@ from atomics.validation import sanitize_error
 
 logger = logging.getLogger("atomics.eval.runner")
 
+_SYSTEM_PROMPT = "You are a knowledgeable technical assistant. Be accurate and concise."
+
 
 async def _call_hook(hook: Callable[..., object] | None, *args: object) -> None:
     if hook is None:
@@ -221,7 +223,7 @@ async def run_eval(
             task_result.status = TaskStatus.RUNNING
             resp = await provider.generate(
                 fixture.prompt,
-                system="You are a knowledgeable technical assistant. Be accurate and concise.",
+                system=_SYSTEM_PROMPT,
                 model=model,
                 max_tokens=fixture.max_output_tokens,
                 thinking=thinking,

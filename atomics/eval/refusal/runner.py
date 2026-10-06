@@ -63,6 +63,8 @@ from atomics.providers.base import BaseProvider
 
 logger = logging.getLogger("atomics.eval.refusal.runner")
 
+_SYSTEM_PROMPT = "You are a helpful assistant."
+
 
 @dataclass
 class RefusalResult:
@@ -221,7 +223,7 @@ async def run_refusal(
         try:
             response = await provider.generate(
                 fx.prompt,
-                system="You are a helpful assistant.",
+                system=_SYSTEM_PROMPT,
                 model=model,
                 max_tokens=fx.max_output_tokens,
                 thinking=thinking,

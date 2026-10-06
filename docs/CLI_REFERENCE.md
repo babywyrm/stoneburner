@@ -67,6 +67,25 @@ Recipes: [QUICKSTART.md](../QUICKSTART.md).
 | `atomics battery run --cohorts FILE` | Execute every job in that plan. `--runs` / `--keep-going` apply to each |
 | `atomics doctor` | Check installation health, config, and `inference.env` (never prints the API key). Prints one next command when the check is healthy. |
 
+## Seeing the Prompt
+
+Both are off unless you ask for them.
+
+| Command | Description |
+|---------|-------------|
+| `atomics prompts` | List every built-in system prompt, who sees it (model under test or judge), and which commands send it. Calls no model |
+| `atomics prompts eval.judge` | Print one prompt's full system text and its user-prompt template |
+| `atomics --show-prompt toolcall -p ollama -m qwen3.5:4b --fixtures tc-01` | Print every model and judge call as it is sent: system prompt (named when built in), prompt, tools, settings, and token usage |
+| `ATOMICS_SHOW_PROMPT=1 atomics eval ...` | Same switch from the environment |
+
+`--show-prompt` goes before the command name and prints to stderr, so
+`--json` output is unaffected. Input, output, and thinking token counts come
+from the provider and are exact. The split between system, prompt, and tools
+is marked `≈`: it is estimated at four characters per token, and the rest of
+the exact input count is what the chat template and tool formatting added.
+`context` (input plus output against `num_ctx`) is shown for Ollama, the
+one backend that reports its window size.
+
 ## Evaluation Suites
 
 | Command | Description |
