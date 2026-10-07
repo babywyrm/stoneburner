@@ -11,6 +11,11 @@
   prompt; tools; settings; exact token usage; and context-window fill on
   Ollama. Off by default. A reply that hit `max_tokens` is called out.
   Guide: `docs/PROMPT_VISIBILITY.md`.
+- Built-in prompts have fingerprints that change with any wording change.
+  `atomics prompts` and the trace show them, and every `-o` result now
+  records `provenance`: the atomics version, each prompt's fingerprint,
+  and one hash of the whole catalog. A score change between two results
+  can now be checked against a rubric change.
 
 ### Fixed
 - The multiturn and RAG judges now ask for thinking off, like the other

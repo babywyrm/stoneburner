@@ -8,7 +8,12 @@ per-fixture data, not defaults, so they are not listed.
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
+
+
+def _short_hash(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:8]
 
 
 @dataclass(frozen=True)
@@ -18,6 +23,11 @@ class PromptEntry:
     system: str
     template: str | None
     used_by: str
+
+    @property
+    def fingerprint(self) -> str:
+        """Changes whenever the system text or template wording changes."""
+        return _short_hash(self.system + "\0" + (self.template or ""))
 
 
 def catalog() -> list[PromptEntry]:
@@ -139,8 +149,25 @@ def catalog() -> list[PromptEntry]:
     ]
 
 
-def names_for_system(system: str) -> list[str]:
-    """Catalog names whose system prompt is exactly `system`."""
+def entries_for_system(system: str) -> list[PromptEntry]:
+    """Catalog entries whose system prompt is exactly `system`."""
     if not system:
         return []
-    return [e.name for e in catalog() if e.system == system]
+    return [e for e in catalog() if e.system == system]
+
+
+def provenance() -> dict[str, object]:
+    """Version and prompt fingerprints to store beside a result.
+
+    Two results whose fingerprints differ were not scored with the same
+    wording, whatever their model and fixtures.
+    """
+    from atomics import __version__
+
+    prompts = {e.name: e.fingerprint for e in catalog()}
+    joined = "\n".join(f"{name}:{fp}" for name, fp in sorted(prompts.items()))
+    return {
+        "atomics_version": __version__,
+        "prompt_catalog": _short_hash(joined),
+        "prompts": prompts,
+    }

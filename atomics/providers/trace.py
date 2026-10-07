@@ -173,15 +173,15 @@ class TracedProvider(BaseProvider):
         response: ProviderResponse | None,
         error: Exception | None,
     ) -> None:
-        from atomics.prompts import names_for_system
+        from atomics.prompts import entries_for_system
 
         console = _console
         if console is None:
             return
         system = parts["system"]
-        names = names_for_system(system)
-        if names:
-            source = "built-in " + ", ".join(names)
+        entries = entries_for_system(system)
+        if entries:
+            source = "built-in " + ", ".join(f"{e.name} @{e.fingerprint}" for e in entries)
         else:
             source = "custom" if system else "none"
         label = f"{self._inner.name} · {model or self._inner.default_model or 'default model'}"
