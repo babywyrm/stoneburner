@@ -26,6 +26,9 @@
   a reply that ran out of tokens while thinking is not graded, with the
   flags to try. The timeline marks those calls `†` and other unusable
   replies `×`, and its caption explains only the marks that appear.
+- The timeline ends with `Notes` from fixed rules: calls that ran out of
+  tokens, unusable replies, a nearly full context window, and a model
+  judging itself. A clean run prints none.
 
 ### Changed
 - On Ollama, multiturn now sends the conversation as chat messages: the
