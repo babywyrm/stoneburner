@@ -28,6 +28,14 @@
   judges. A reasoning judge left at its default spent the 256-token cap
   reasoning in the visible reply, so no score parsed and every multiturn
   score came back blank.
+- A multiturn conversation that stopped early (a reply cut off, out of
+  thinking budget, or failed) no longer reports a score from the turns
+  before it, and is no longer saved with one. The summary now reads
+  `n/a (k/n scored)`, shows turns as `ran/planned`, and lists integrity
+  and coverage like the other suites. Warnings count turns from 1.
+- The multiturn turn judge no longer reads the scored reply twice: its
+  "conversation so far" now holds only earlier turns. Turn scores can
+  shift slightly against older results.
 
 ## 0.25.1 (2026-10-04) — Distributed runs per key, -o everywhere
 
