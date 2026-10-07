@@ -6,9 +6,15 @@ from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from inspect import isawaitable
+from typing import Literal, TypedDict
 
 from atomics.providers.outcomes import ProviderOutcome
 from atomics.providers.toolcalls import ToolCall
+
+
+class ChatMessage(TypedDict):
+    role: Literal["user", "assistant"]
+    content: str
 
 
 @dataclass
@@ -114,6 +120,46 @@ class BaseProvider(ABC):
         effort: str | None = None,
         reasoning_mode: str | None = None,
     ) -> ProviderResponse: ...
+
+    async def generate_chat(
+        self,
+        messages: Sequence[ChatMessage],
+        *,
+        system: str = "",
+        model: str | None = None,
+        max_tokens: int = 1024,
+        thinking: bool | None = None,
+        thinking_budget: int | None = None,
+        temperature: float | None = None,
+        effort: str | None = None,
+        reasoning_mode: str | None = None,
+    ) -> ProviderResponse:
+        """Continue a conversation; `messages` alternate user/assistant and end on user.
+
+        Adapters with a native chat path override this. The default pastes
+        earlier turns into one prompt, which is what every adapter received
+        before this method existed.
+        """
+        # ponytail: only Ollama overrides this; OpenAI-compatible and cloud
+        # adapters still get pasted history until each grows a messages path.
+        *earlier, last = messages
+        prompt = last["content"]
+        if earlier:
+            lines = [f"[System]: {system}"]
+            lines += [f"[{m['role'].title()}]: {m['content']}" for m in earlier]
+            prompt = "\n\n".join([*lines, f"[User]: {prompt}"])
+            system = ""
+        return await self.generate(
+            prompt,
+            system=system,
+            model=model,
+            max_tokens=max_tokens,
+            thinking=thinking,
+            thinking_budget=thinking_budget,
+            temperature=temperature,
+            effort=effort,
+            reasoning_mode=reasoning_mode,
+        )
 
     @abstractmethod
     async def health_check(self) -> bool: ...

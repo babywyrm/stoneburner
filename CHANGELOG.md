@@ -23,6 +23,15 @@
   input, growth against that model's previous call, output, and window
   fill. It prints even when the command exits non-zero.
 
+### Changed
+- On Ollama, multiturn now sends the conversation as chat messages: the
+  fixture's system prompt on every turn, then alternating user and
+  assistant turns. It used to paste the history into one prompt and drop
+  the system prompt after turn 1. Ollama multiturn scores are not
+  comparable with earlier results. Other providers still receive the
+  pasted transcript. `--show-prompt` shows the history apart from the
+  new message.
+
 ### Fixed
 - The multiturn and RAG judges now ask for thinking off, like the other
   judges. A reasoning judge left at its default spent the 256-token cap

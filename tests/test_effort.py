@@ -408,7 +408,7 @@ async def test_run_multiturn_forwards_effort(monkeypatch) -> None:
     )
     provider = MagicMock()
     provider.name = "openai"
-    provider.generate = AsyncMock(
+    provider.generate_chat = AsyncMock(
         return_value=ProviderResponse(
             text="hello",
             input_tokens=2,
@@ -437,7 +437,7 @@ async def test_run_multiturn_forwards_effort(monkeypatch) -> None:
         effort="high",
         reasoning_mode="pro",
     )
-    kwargs = provider.generate.call_args.kwargs
+    kwargs = provider.generate_chat.call_args.kwargs
     assert kwargs["effort"] == "high"
     assert kwargs["reasoning_mode"] == "pro"
 

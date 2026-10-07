@@ -21,7 +21,7 @@ from rich.console import Console
 from rich.table import Table
 from rich.text import Text
 
-from atomics.providers.base import BaseProvider, ProviderResponse
+from atomics.providers.base import BaseProvider, ChatMessage, ProviderResponse
 from atomics.providers.outcomes import ProviderOutcomeKind
 
 _console: Console | None = None
@@ -210,6 +210,35 @@ class TracedProvider(BaseProvider):
         }
         return await self._shown(call, model, parts, tools, max_tokens, thinking)
 
+    async def generate_chat(
+        self,
+        messages: Sequence[ChatMessage],
+        *,
+        system: str = "",
+        model: str | None = None,
+        max_tokens: int = 1024,
+        thinking: bool | None = None,
+        thinking_budget: int | None = None,
+        temperature: float | None = None,
+        effort: str | None = None,
+        reasoning_mode: str | None = None,
+    ) -> ProviderResponse:
+        call = self._inner.generate_chat(
+            messages,
+            system=system,
+            model=model,
+            max_tokens=max_tokens,
+            thinking=thinking,
+            thinking_budget=thinking_budget,
+            temperature=temperature,
+            effort=effort,
+            reasoning_mode=reasoning_mode,
+        )
+        parts = {"system": system, "prompt": messages[-1]["content"]}
+        return await self._shown(
+            call, model, parts, None, max_tokens, thinking, history=messages[:-1]
+        )
+
     async def _shown(
         self,
         call: object,
@@ -218,14 +247,16 @@ class TracedProvider(BaseProvider):
         tools: Sequence[dict] | None,
         max_tokens: int,
         thinking: bool | None,
+        *,
+        history: Sequence[ChatMessage] = (),
     ) -> ProviderResponse:
         number = next(_calls)
         try:
             response: ProviderResponse = await call  # type: ignore[misc]
         except Exception as exc:
-            self._print(number, model, parts, tools, max_tokens, thinking, None, exc)
+            self._print(number, model, parts, tools, max_tokens, thinking, None, exc, history)
             raise
-        self._print(number, model, parts, tools, max_tokens, thinking, response, None)
+        self._print(number, model, parts, tools, max_tokens, thinking, response, None, history)
         return response
 
     def _num_ctx(self) -> int | None:
@@ -243,6 +274,7 @@ class TracedProvider(BaseProvider):
         thinking: bool | None,
         response: ProviderResponse | None,
         error: Exception | None,
+        history: Sequence[ChatMessage] = (),
     ) -> None:
         from atomics.prompts import entries_for_system
 
@@ -260,7 +292,16 @@ class TracedProvider(BaseProvider):
         out.append(f"system  [{source}]  ≈{_est(system)} tok\n", style="bold")
         if system:
             out.append(system + "\n", style="cyan")
-        out.append(f"prompt  ≈{_est(parts['prompt'])} tok\n", style="bold")
+        history_est = sum(_est(m["content"]) for m in history)
+        if history:
+            out.append(
+                f"history  {len(history)} earlier messages  ≈{history_est} tok\n", style="bold"
+            )
+            for message in history:
+                out.append(f"[{message['role']}] ", style="magenta")
+                out.append(message["content"] + "\n")
+        heading = "new message" if history else "prompt"
+        out.append(f"{heading}  ≈{_est(parts['prompt'])} tok\n", style="bold")
         out.append(parts["prompt"] + "\n")
         if tools is not None:
             out.append(f"tools   {_tool_names(tools)}  ≈{_est(parts['tools'])} tok\n", style="bold")
@@ -278,7 +319,7 @@ class TracedProvider(BaseProvider):
         if error is not None:
             out.append(f"error   {type(error).__name__}\n", style="red")
         elif response is not None:
-            estimated = sum(_est(v) for v in parts.values())
+            estimated = sum(_est(v) for v in parts.values()) + history_est
             overhead = response.input_tokens - estimated
             out.append(f"usage   input={response.input_tokens}", style="bold")
             if response.input_tokens and overhead > 0:

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 import httpx
@@ -13,7 +13,7 @@ from atomics.providers._tool_dialects import (
     openai_tool_payload,
     parse_ollama_tool_calls,
 )
-from atomics.providers.base import BaseProvider, ProviderResponse, compute_tps
+from atomics.providers.base import BaseProvider, ChatMessage, ProviderResponse, compute_tps
 from atomics.providers.effort import normalize_effort, ollama_think_value
 from atomics.providers.outcomes import ProviderOutcome, ProviderOutcomeKind
 
@@ -254,12 +254,6 @@ class OllamaProvider(BaseProvider):
         published leaderboard. A test pins generate() to /api/generate.
         """
         del reasoning_mode
-        model = model or self._default_model
-
-        auto = thinking if thinking is not None else _model_supports_thinking(model)
-        think_field = ollama_think_value(thinking=auto, effort=effort, model=model)
-        use_thinking = think_field is not False
-
         messages: list[dict[str, Any]] = []
         if system:
             messages.append({"role": "system", "content": system})
@@ -277,19 +271,75 @@ class OllamaProvider(BaseProvider):
                 }
             )
             messages.append({"role": "tool", "content": injected_tool_output})
+        return await self._chat(
+            messages,
+            tools=tools,
+            model=model,
+            max_tokens=max_tokens,
+            thinking=thinking,
+            thinking_budget=thinking_budget,
+            temperature=None,
+            effort=effort,
+        )
+
+    async def generate_chat(
+        self,
+        messages: Sequence[ChatMessage],
+        *,
+        system: str = "",
+        model: str | None = None,
+        max_tokens: int = 1024,
+        thinking: bool | None = None,
+        thinking_budget: int | None = None,
+        temperature: float | None = None,
+        effort: str | None = None,
+        reasoning_mode: str | None = None,
+    ) -> ProviderResponse:
+        del reasoning_mode
+        return await self._chat(
+            [{"role": "system", "content": system or "You are a helpful assistant."}, *messages],
+            tools=None,
+            model=model,
+            max_tokens=max_tokens,
+            thinking=thinking,
+            thinking_budget=thinking_budget,
+            temperature=temperature,
+            effort=effort,
+        )
+
+    async def _chat(
+        self,
+        messages: Sequence[Mapping[str, Any]],
+        *,
+        tools: Sequence[dict] | None,
+        model: str | None,
+        max_tokens: int,
+        thinking: bool | None,
+        thinking_budget: int | None,
+        temperature: float | None,
+        effort: str | None,
+    ) -> ProviderResponse:
+        model = model or self._default_model
+
+        auto = thinking if thinking is not None else _model_supports_thinking(model)
+        think_field = ollama_think_value(thinking=auto, effort=effort, model=model)
+        use_thinking = think_field is not False
 
         options: dict[str, Any] = {"num_predict": max_tokens, "num_ctx": self._num_ctx()}
+        if temperature is not None:
+            options["temperature"] = temperature
         if thinking_budget and use_thinking:
             options["num_predict"] = max_tokens + thinking_budget
 
         body: dict[str, Any] = {
             "model": model,
-            "messages": messages,
+            "messages": list(messages),
             "stream": False,
-            "tools": openai_tool_payload(list(tools)),
             "options": options,
             "think": think_field,
         }
+        if tools is not None:
+            body["tools"] = openai_tool_payload(list(tools))
 
         think_fallback: str | None = None
         try:

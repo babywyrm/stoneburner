@@ -34,6 +34,7 @@ def _provider() -> AsyncMock:
     provider.name = "ollama"
     provider.default_model = "cutoff"
     provider.generate = AsyncMock(return_value=_cutoff())
+    provider.generate_chat = AsyncMock(return_value=_cutoff())
     return provider
 
 

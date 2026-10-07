@@ -441,7 +441,7 @@ async def test_multiturn_extra_judges_panels_conversation_only(monkeypatch):
     )
     provider = AsyncMock()
     provider.name = "mock"
-    provider.generate = AsyncMock(
+    provider.generate_chat = AsyncMock(
         return_value=SimpleNamespace(
             text="ok",
             input_tokens=1,
@@ -505,7 +505,7 @@ async def test_turn_judge_sees_prior_turns_and_the_reply_once(monkeypatch):
 
     provider = AsyncMock()
     provider.name = "mock"
-    provider.generate = AsyncMock(side_effect=[_reply("r1"), _reply("r2"), _reply("r3")])
+    provider.generate_chat = AsyncMock(side_effect=[_reply("r1"), _reply("r2"), _reply("r3")])
     seen: list[dict] = []
 
     async def fake_turn(**kwargs):
@@ -535,7 +535,7 @@ async def test_conversation_cut_short_has_no_score(monkeypatch, caplog):
     budget = ProviderOutcome(ProviderOutcomeKind.THINKING_BUDGET, finish_reason="length")
     provider = AsyncMock()
     provider.name = "mock"
-    provider.generate = AsyncMock(side_effect=[_reply("r1"), _reply("", budget)])
+    provider.generate_chat = AsyncMock(side_effect=[_reply("r1"), _reply("", budget)])
     monkeypatch.setattr(
         "atomics.eval.multiturn.runner.score_turn",
         AsyncMock(return_value=TurnJudgeResult(4, 3, 3, 0.9, "ok")),
