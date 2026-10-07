@@ -26,6 +26,7 @@ from atomics.commands.common import (
 from atomics.commands.suite_run import finalize_task_run, suite_run
 from atomics.config import load_settings
 from atomics.eval.budget import share_budget
+from atomics.eval.suite_integrity import format_headline_rate
 
 
 @click.command("multiturn")
@@ -199,7 +200,7 @@ def multiturn(
 
             result_table.add_row(
                 cr.fixture.id,
-                str(len(cr.turn_results)),
+                f"{len(cr.turn_results)}/{len(cr.fixture.turns)}",
                 turn_avg,
                 ret,
                 con,
@@ -245,19 +246,21 @@ def multiturn(
         summary_table.add_column("Value", style="bold")
         summary_table.add_row("Provider", provider_name)
         summary_table.add_row("Model", model or "default")
-        ts = summary.avg_turn_score
-        summary_table.add_row("Avg Turn Score", f"[green]{ts * 100:.1f}%[/green]" if ts else "—")
-        cs = summary.avg_conversation_score
-        summary_table.add_row(
-            "Avg Conversation Score", f"[green]{cs * 100:.1f}%[/green]" if cs else "—"
-        )
-        ret = summary.avg_retention
-        summary_table.add_row("Avg Retention", f"{ret * 100:.1f}%" if ret else "—")
-        con = summary.avg_consistency
-        summary_table.add_row("Avg Consistency", f"{con * 100:.1f}%" if con else "—")
-        summary_table.add_row("Total Turns", str(summary.total_turns))
+        integrity = summary.integrity
+        for label, value in (
+            ("Avg Turn Score", summary.avg_turn_score),
+            ("Avg Conversation Score", summary.avg_conversation_score),
+            ("Avg Retention", summary.avg_retention),
+            ("Avg Consistency", summary.avg_consistency),
+        ):
+            summary_table.add_row(label, format_headline_rate(value, integrity))
+        summary_table.add_row("Total Turns", f"{summary.total_turns}/{total_turns}")
         summary_table.add_row("Total Tokens", f"{summary.total_tokens:,}")
         summary_table.add_row("Total Cost", f"${summary.total_cost_usd:.6f}")
+        summary_table.add_row("Integrity", integrity.status.value)
+        summary_table.add_row("Generation failures", str(integrity.generation_failures))
+        summary_table.add_row("Judge failures", str(integrity.judge_failures))
+        summary_table.add_row("Fixture coverage", f"{integrity.fixture_coverage * 100:.1f}%")
         console.print(summary_table)
 
         if json_out:

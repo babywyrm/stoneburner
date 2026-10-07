@@ -273,14 +273,26 @@ async def run_multiturn(
                 if skipped is not None:
                     conversation_failed = True
                     skipped_kind = skipped.kind.value
-                    logger.warning("Turn %d of %s not judged: %s", i, fixture.id, skipped_kind)
+                    logger.warning(
+                        "Turn %d of %d in %s not judged: %s",
+                        i + 1,
+                        len(fixture.turns),
+                        fixture.id,
+                        skipped_kind,
+                    )
             except Exception as exc:
                 response_text = ""
                 turn_latency = 0.0
                 turn_tokens = 0
                 turn_cost = 0.0
                 conversation_failed = True
-                logger.warning("Turn %d of %s failed: %s", i, fixture.id, sanitize_error(exc))
+                logger.warning(
+                    "Turn %d of %d in %s failed: %s",
+                    i + 1,
+                    len(fixture.turns),
+                    fixture.id,
+                    sanitize_error(exc),
+                )
 
             completed_turns.append((turn.user_message, response_text))
             total_tokens += turn_tokens
@@ -288,11 +300,10 @@ async def run_multiturn(
             total_latency += turn_latency
 
             if response_text and not conversation_failed:
-                full_transcript = _build_transcript(fixture.system_prompt, completed_turns)
                 judge_tag = judge_model or getattr(effective_judge, "default_model", None)
                 await _call_hook(on_phase, fixture.id, "judge", judge_tag)
                 turn_judge = await score_turn(
-                    transcript=full_transcript,
+                    transcript=transcript,
                     user_message=turn.user_message,
                     response=response_text,
                     expected_behavior=turn.expected_behavior,
@@ -363,7 +374,9 @@ async def run_multiturn(
 
         turn_scores = [t.judge.score for t in turn_results if t.judge and not t.judge.parse_failed]
         conv_score = conv_judge.score if conv_judge and not conv_judge.parse_failed else None
-        if turn_scores and conv_score is not None:
+        if conversation_failed:
+            overall = None
+        elif turn_scores and conv_score is not None:
             overall = round((sum(turn_scores) / len(turn_scores) + conv_score) / 2, 3)
         elif turn_scores:
             overall = round(sum(turn_scores) / len(turn_scores), 3)

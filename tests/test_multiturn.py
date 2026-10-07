@@ -405,6 +405,8 @@ def test_cli_multiturn_partial_integrity_exits_nonzero(monkeypatch) -> None:
     _patch_multiturn_partial(monkeypatch)
     result = CliRunner().invoke(cli, ["--no-progress", "multiturn", "--no-save"])
     assert result.exit_code == 1
+    assert "n/a (0/1 scored)" in result.output
+    assert "Fixture coverage" in result.output
 
 
 def test_cli_multiturn_allow_partial_exits_zero(monkeypatch) -> None:
@@ -476,3 +478,73 @@ async def test_multiturn_extra_judges_panels_conversation_only(monkeypatch):
     assert turn_calls["n"] == 2
     assert conv_judges == [primary, extra]
     assert summary.conversation_results[0].conversation_judge.score == 0.7
+
+
+def _three_turn_fixture() -> ConversationFixture:
+    return ConversationFixture(
+        id="mt-test-02",
+        complexity=TaskComplexity.LIGHT,
+        system_prompt="Be helpful.",
+        turns=[ConversationTurn(f"ask {n}", "answer", []) for n in (1, 2, 3)],
+    )
+
+
+def _reply(text: str, outcome: object = None) -> object:
+    from types import SimpleNamespace
+
+    return SimpleNamespace(
+        text=text, total_tokens=2, latency_ms=1.0, estimated_cost_usd=0.0, outcome=outcome
+    )
+
+
+@pytest.mark.asyncio
+async def test_turn_judge_sees_prior_turns_and_the_reply_once(monkeypatch):
+    from unittest.mock import AsyncMock
+
+    from atomics.eval.multiturn.runner import run_multiturn
+
+    provider = AsyncMock()
+    provider.name = "mock"
+    provider.generate = AsyncMock(side_effect=[_reply("r1"), _reply("r2"), _reply("r3")])
+    seen: list[dict] = []
+
+    async def fake_turn(**kwargs):
+        seen.append(kwargs)
+        return TurnJudgeResult(4, 3, 3, 1.0, "ok")
+
+    monkeypatch.setattr("atomics.eval.multiturn.runner.score_turn", fake_turn)
+    monkeypatch.setattr(
+        "atomics.eval.multiturn.runner.score_conversation",
+        AsyncMock(return_value=ConversationJudgeResult(4, 3, 3, 1.0, "ok")),
+    )
+    await run_multiturn(provider, fixtures=[_three_turn_fixture()])
+
+    second = seen[1]
+    assert "r1" in second["transcript"] and "ask 1" in second["transcript"]
+    assert "r2" not in second["transcript"] and "ask 2" not in second["transcript"]
+    assert second["response"] == "r2" and second["user_message"] == "ask 2"
+
+
+@pytest.mark.asyncio
+async def test_conversation_cut_short_has_no_score(monkeypatch, caplog):
+    from unittest.mock import AsyncMock
+
+    from atomics.eval.multiturn.runner import run_multiturn
+    from atomics.providers.outcomes import ProviderOutcome, ProviderOutcomeKind
+
+    budget = ProviderOutcome(ProviderOutcomeKind.THINKING_BUDGET, finish_reason="length")
+    provider = AsyncMock()
+    provider.name = "mock"
+    provider.generate = AsyncMock(side_effect=[_reply("r1"), _reply("", budget)])
+    monkeypatch.setattr(
+        "atomics.eval.multiturn.runner.score_turn",
+        AsyncMock(return_value=TurnJudgeResult(4, 3, 3, 0.9, "ok")),
+    )
+    summary = await run_multiturn(provider, fixtures=[_three_turn_fixture()])
+
+    cr = summary.conversation_results[0]
+    assert cr.overall_score is None
+    assert cr.task_result.accuracy_score is None
+    assert cr.task_result.status is TaskStatus.FAILED
+    assert summary.integrity.fixtures_scored == 0
+    assert "Turn 2 of 3 in mt-test-02 not judged: thinking_budget" in caplog.text
