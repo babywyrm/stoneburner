@@ -16,6 +16,9 @@
   records `provenance`: the atomics version, each prompt's fingerprint,
   and one hash of the whole catalog. A score change between two results
   can now be checked against a rubric change.
+- `--show-prompt` ends with a context timeline: one row per call with
+  input, growth against that model's previous call, output, and window
+  fill. It prints even when the command exits non-zero.
 
 ### Fixed
 - The multiturn and RAG judges now ask for thinking off, like the other

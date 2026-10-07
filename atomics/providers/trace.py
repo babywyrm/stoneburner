@@ -14,8 +14,11 @@ from __future__ import annotations
 import itertools
 import json
 from collections.abc import Sequence
+from dataclasses import dataclass
 
+from rich import box
 from rich.console import Console
+from rich.table import Table
 from rich.text import Text
 
 from atomics.providers.base import BaseProvider, ProviderResponse
@@ -25,9 +28,25 @@ _console: Console | None = None
 _calls = itertools.count(1)
 
 
+@dataclass
+class _Row:
+    number: int
+    label: str
+    judge: bool
+    prompt: str
+    input_tokens: int | None
+    output_tokens: int | None
+    num_ctx: int | None
+    note: str
+
+
+_rows: list[_Row] = []
+
+
 def enable(console: Console | None = None) -> None:
     global _console
     _console = console or Console(stderr=True, highlight=False)
+    _rows.clear()
 
 
 def disable() -> None:
@@ -40,6 +59,58 @@ def traced(provider: BaseProvider) -> BaseProvider:
     if _console is None or isinstance(provider, TracedProvider):
         return provider
     return TracedProvider(provider)
+
+
+def print_timeline() -> None:
+    """One row per traced call, so growth across a run reads at a glance."""
+    console = _console
+    if console is None or not _rows:
+        return
+    table = Table(
+        title=f"Context timeline · {len(_rows)} calls", title_justify="left", box=box.SIMPLE
+    )
+    for column in ("#", "model", "prompt", "input", "Δ", "output", "context"):
+        right = column in ("#", "input", "Δ", "output")
+        table.add_column(
+            column,
+            justify="right" if right else "left",
+            no_wrap=column != "model",
+            overflow="fold" if column == "model" else "ellipsis",
+            min_width=10 if column == "model" else None,
+        )
+    previous: dict[tuple[str, bool], int] = {}
+    peak = 0.0
+    for row in _rows:
+        delta = ""
+        key = (row.label, row.judge)
+        if row.input_tokens is not None:
+            if key in previous:
+                delta = f"{row.input_tokens - previous[key]:+d}"
+            previous[key] = row.input_tokens
+        context = "—"
+        if row.num_ctx and row.input_tokens:
+            fill = (row.input_tokens + (row.output_tokens or 0)) / row.num_ctx
+            peak = max(peak, fill)
+            context = f"{fill:5.1%} " + "█" * min(10, round(fill * 10))
+        table.add_row(
+            str(row.number),
+            Text(row.label),
+            Text(row.prompt),
+            "—" if row.input_tokens is None else str(row.input_tokens),
+            delta,
+            "—" if row.output_tokens is None else str(row.output_tokens) + row.note,
+            context,
+        )
+    total_in = sum(r.input_tokens or 0 for r in _rows)
+    total_out = sum(r.output_tokens or 0 for r in _rows)
+    table.caption = (
+        f"input {total_in} · output {total_out}"
+        + (f" · peak context {peak:.1%}" if peak else "")
+        + " · Δ is input against the same model's previous call in the same role"
+        + " · * = cut off at max_tokens"
+    )
+    table.caption_justify = "left"
+    console.print(table)
 
 
 def _est(text: str) -> int:
@@ -233,6 +304,24 @@ class TracedProvider(BaseProvider):
                 out.append(
                     f"context {used}/{num_ctx} tokens ({used / num_ctx:.1%} of the window)\n"
                 )
+        prompt_name = ", ".join(e.name for e in entries) or ("custom" if system else "none")
+        note = ""
+        if error is not None:
+            prompt_name += f" ({type(error).__name__})"
+        elif response is not None and "cut off" in out.plain:
+            note = "*"
+        _rows.append(
+            _Row(
+                number,
+                model or self._inner.default_model or "default model",
+                any(e.role == "judge" for e in entries),
+                prompt_name,
+                response.input_tokens if response else None,
+                response.output_tokens if response else None,
+                num_ctx,
+                note,
+            )
+        )
         console.rule(Text(f"call {number} · {label}"), style="dim")
         # Wrapping would insert line breaks that are not in the prompt.
         console.print(out, end="", soft_wrap=True)

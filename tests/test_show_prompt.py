@@ -169,6 +169,62 @@ def test_concurrent_calls_print_whole_blocks(shown):
     assert all(b.count("prompt-") == 1 for b in blocks)
 
 
+class _Growing(_WindowedMock):
+    async def generate(self, prompt, **kwargs):  # type: ignore[no-untyped-def]
+        response = await super().generate(prompt, **kwargs)
+        response.input_tokens = len(prompt)
+        return response
+
+
+def test_timeline_shows_each_call_and_growth(shown):
+    model = trace.traced(_Growing())
+    judge = trace.traced(MockProvider())
+    entry = next(e for e in catalog() if e.name == "refusal.judge")
+
+    async def conversation() -> None:
+        await model.generate("x" * 100)
+        await judge.generate("grade", system=entry.system)
+        await model.generate("x" * 250)
+
+    asyncio.run(conversation())
+    shown.truncate(0)
+    shown.seek(0)
+    trace.print_timeline()
+    out = shown.getvalue()
+    assert "Context timeline" in out and "3 calls" in out
+    assert "refusal.judge" in out
+    assert "+150" in out
+    assert "peak context 3.8%" in out
+
+
+def test_timeline_marks_failed_calls(shown):
+    with pytest.raises(TimeoutError):
+        asyncio.run(trace.traced(_Failing()).generate("hi"))
+    trace.print_timeline()
+    assert "none (TimeoutError)" in shown.getvalue()
+
+
+def test_timeline_is_silent_without_calls(shown):
+    trace.print_timeline()
+    assert shown.getvalue() == ""
+
+
+def test_timeline_prints_at_exit_even_on_failure():
+    @click.command("_probe_fail")
+    def probe() -> None:
+        asyncio.run(trace.traced(MockProvider()).generate("hi"))
+        raise SystemExit(1)
+
+    cli.add_command(probe)
+    try:
+        result = CliRunner().invoke(cli, ["--show-prompt", "_probe_fail"])
+    finally:
+        cli.commands.pop("_probe_fail")
+        trace.disable()
+    assert result.exit_code == 1
+    assert "Context timeline" in result.output
+
+
 def test_show_prompt_turns_off_the_spinner():
     seen = {}
 
