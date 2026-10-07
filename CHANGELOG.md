@@ -22,6 +22,10 @@
 - `--show-prompt` ends with a context timeline: one row per call with
   input, growth against that model's previous call, output, and window
   fill. It prints even when the command exits non-zero.
+- `--show-prompt` says what each unusual outcome means for scoring, e.g.
+  a reply that ran out of tokens while thinking is not graded, with the
+  flags to try. The timeline marks those calls `†` and other unusable
+  replies `×`, and its caption explains only the marks that appear.
 
 ### Changed
 - On Ollama, multiturn now sends the conversation as chat messages: the
@@ -42,6 +46,9 @@
   before it, and is no longer saved with one. The summary now reads
   `n/a (k/n scored)`, shows turns as `ran/planned`, and lists integrity
   and coverage like the other suites. Warnings count turns from 1.
+- `--show-prompt` named only `max_tokens` when a reply was cut off. With a
+  thinking budget the real limit is larger, so a 2513-token reply read as
+  cut off at 512. It now shows `max_tokens=512 + thinking_budget=2000`.
 - The multiturn turn judge no longer reads the scored reply twice: its
   "conversation so far" now holds only earlier turns. Turn scores can
   shift slightly against older results.
