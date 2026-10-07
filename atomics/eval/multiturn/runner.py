@@ -23,7 +23,7 @@ from atomics.eval.provider_attempt import recorded_outcome_kind, unscorable_outc
 from atomics.eval.runner import _call_hook
 from atomics.eval.suite_integrity import fixture_outcome, integrity_of
 from atomics.models import TaskCategory, TaskResult, TaskStatus
-from atomics.providers.base import BaseProvider
+from atomics.providers.base import BaseProvider, ChatMessage
 from atomics.validation import sanitize_error
 
 logger = logging.getLogger("atomics.eval.multiturn.runner")
@@ -242,12 +242,14 @@ async def run_multiturn(
 
         for i, turn in enumerate(fixture.turns):
             transcript = _build_transcript(fixture.system_prompt, completed_turns)
-            prompt = turn.user_message
-            if completed_turns:
-                prompt = f"{transcript}\n\n[User]: {turn.user_message}"
+            messages: list[ChatMessage] = []
+            for user_msg, assistant_msg in completed_turns:
+                messages.append({"role": "user", "content": user_msg})
+                messages.append({"role": "assistant", "content": assistant_msg})
+            messages.append({"role": "user", "content": turn.user_message})
 
             gen_kwargs: dict = {
-                "system": fixture.system_prompt if not completed_turns else "",
+                "system": fixture.system_prompt,
                 "model": model,
                 "max_tokens": fixture.max_output_tokens,
             }
@@ -264,7 +266,7 @@ async def run_multiturn(
             await _call_hook(on_phase, fixture.id, "generate", generate_model)
 
             try:
-                resp = await provider.generate(prompt, **gen_kwargs)
+                resp = await provider.generate_chat(messages, **gen_kwargs)
                 response_text = resp.text
                 turn_latency = resp.latency_ms
                 turn_tokens = resp.total_tokens

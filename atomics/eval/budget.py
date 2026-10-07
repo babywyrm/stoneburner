@@ -26,7 +26,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from atomics.core.guard import GuardConfig, RateBudgetGuard
-from atomics.providers.base import BaseProvider, ProviderResponse
+from atomics.providers.base import BaseProvider, ChatMessage, ProviderResponse
 
 logger = logging.getLogger(__name__)
 
@@ -193,6 +193,34 @@ class GuardedProvider(BaseProvider):
                 injected_tool_output=injected_tool_output,
                 thinking=thinking,
                 thinking_budget=thinking_budget,
+                effort=effort,
+                reasoning_mode=reasoning_mode,
+            )
+        )
+
+    async def generate_chat(
+        self,
+        messages: Sequence[ChatMessage],
+        *,
+        system: str = "",
+        model: str | None = None,
+        max_tokens: int = 1024,
+        thinking: bool | None = None,
+        thinking_budget: int | None = None,
+        temperature: float | None = None,
+        effort: str | None = None,
+        reasoning_mode: str | None = None,
+    ) -> ProviderResponse:
+        await self._await_capacity()
+        return await self._metered(
+            self._inner.generate_chat(
+                messages,
+                system=system,
+                model=model,
+                max_tokens=max_tokens,
+                thinking=thinking,
+                thinking_budget=thinking_budget,
+                temperature=temperature,
                 effort=effort,
                 reasoning_mode=reasoning_mode,
             )
