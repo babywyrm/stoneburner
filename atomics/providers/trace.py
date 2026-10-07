@@ -128,6 +128,48 @@ def print_timeline() -> None:
     )
     table.caption_justify = "left"
     console.print(table)
+    notes = _notes(peak)
+    if notes:
+        console.print(Text("Notes", style="bold"))
+        for note in notes:
+            console.print(Text(f"- {note}"), soft_wrap=True)
+
+
+def _count(n: int, one: str, many: str) -> str:
+    return f"{n} {one if n == 1 else many}"
+
+
+def _notes(peak: float) -> list[str]:
+    """Fixed rules over the timeline. No model is asked."""
+    notes = []
+    stalled = sum(r.note == "†" for r in _rows)
+    if stalled:
+        notes.append(
+            f"{_count(stalled, 'call ran', 'calls ran')} out of tokens while thinking and"
+            f" {'was' if stalled == 1 else 'were'} not graded. Try --no-thinking or a larger"
+            " --thinking-budget."
+        )
+    cut = sum(r.note == "*" for r in _rows)
+    if cut:
+        notes.append(
+            f"{_count(cut, 'reply', 'replies')} hit the token limit and"
+            f" {'was' if cut == 1 else 'were'} graded unfinished."
+        )
+    unusable = sum(r.note == "×" for r in _rows)
+    if unusable:
+        notes.append(
+            f"{_count(unusable, 'call', 'calls')} had no usable reply. Check the provider"
+            " before reading scores."
+        )
+    if peak >= 0.8:
+        notes.append(
+            f"The largest call used {peak:.1%} of the context window. Past 100%, Ollama"
+            " truncates the prompt and the model never sees part of it."
+        )
+    answered = {r.label for r in _rows if not r.judge}
+    for label in sorted({r.label for r in _rows if r.judge} & answered):
+        notes.append(f"{label} judged its own replies. A separate judge model is less biased.")
+    return notes
 
 
 def _est(text: str) -> int:

@@ -154,6 +154,19 @@ limit (still graded as written), `†` ran out while thinking (no reply, not
 graded), `×` no usable reply for another reason (empty, or an
 infrastructure error).
 
+Under the timeline, `Notes` lists what is worth a look, from fixed rules
+over the rows (no model is asked): calls that ran out while thinking or hit
+the limit, unusable replies, a call above 80% of the context window, and a
+model that judged its own replies:
+
+```text
+Notes
+- 1 reply hit the token limit and was graded unfinished.
+- qwen3.5:4b judged its own replies. A separate judge model is less biased.
+```
+
+A clean run prints no notes.
+
 `Δ` compares a call with the same model's previous call in the same role,
 so a model judging itself does not mix its two series. `context` needs a
 window size, which only Ollama reports; other backends show `—`.

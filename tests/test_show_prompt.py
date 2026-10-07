@@ -242,6 +242,39 @@ def test_timeline_marks_failed_calls(shown):
     assert "none (TimeoutError)" in shown.getvalue()
 
 
+class _Full(_WindowedMock):
+    async def generate(self, prompt, **kwargs):  # type: ignore[no-untyped-def]
+        response = await super().generate(prompt, **kwargs)
+        response.input_tokens = 7000
+        return response
+
+
+def test_timeline_notes_name_what_to_look_at(shown):
+    judge_system = next(e for e in catalog() if e.name == "refusal.judge").system
+
+    async def calls() -> None:
+        await trace.traced(_OutOfBudget()).generate("a", max_tokens=1024)
+        await trace.traced(_Cut()).generate("b")
+        await trace.traced(_Full()).generate("c", max_tokens=1024)
+        await trace.traced(MockProvider()).generate("grade", system=judge_system)
+
+    asyncio.run(calls())
+    shown.truncate(0)
+    shown.seek(0)
+    trace.print_timeline()
+    out = shown.getvalue()
+    assert "1 call ran out of tokens while thinking and was not graded" in out
+    assert "1 reply hit the token limit" in out
+    assert "86.2% of the context window" in out
+    assert "judged its own replies" in out
+
+
+def test_timeline_has_no_notes_for_a_clean_run(shown):
+    asyncio.run(trace.traced(MockProvider()).generate("hi", max_tokens=1024))
+    trace.print_timeline()
+    assert "Notes" not in shown.getvalue()
+
+
 def test_timeline_is_silent_without_calls(shown):
     trace.print_timeline()
     assert shown.getvalue() == ""
