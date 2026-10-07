@@ -4,17 +4,21 @@ from __future__ import annotations
 
 import asyncio
 import io
+import re
 from collections.abc import Iterator
+from dataclasses import replace
+from pathlib import Path
 
 import click
 import pytest
 from click.testing import CliRunner
 from rich.console import Console
 
+from atomics import __version__
 from atomics.cli import cli
 from atomics.config import AtomicsSettings
 from atomics.eval import runner as eval_runner
-from atomics.prompts import catalog, names_for_system
+from atomics.prompts import catalog, entries_for_system, provenance
 from atomics.providers import trace
 from atomics.providers.factory import make_provider
 from atomics.providers.ollama import OllamaProvider
@@ -58,7 +62,7 @@ def test_call_shows_named_system_prompt_and_context(shown):
     )
     out = shown.getvalue()
     assert response.text == "response #1"
-    assert "[built-in eval]" in out
+    assert "[built-in eval @" in out
     assert eval_runner._SYSTEM_PROMPT in out
     assert "What is 2+2?" in out
     assert "max_tokens=64" in out and "num_ctx=8192" in out
@@ -186,15 +190,52 @@ def test_catalog_names_are_unique_and_shared_prompts_list_both():
     names = [e.name for e in catalog()]
     assert len(names) == len(set(names))
     adversarial = next(e for e in catalog() if e.name == "adversarial")
-    assert names_for_system(adversarial.system) == ["adversarial", "toolcall"]
+    assert [e.name for e in entries_for_system(adversarial.system)] == ["adversarial", "toolcall"]
+
+
+def test_fingerprint_changes_with_any_wording_change():
+    entry = next(e for e in catalog() if e.name == "refusal.judge")
+    assert len(entry.fingerprint) == 8
+    assert replace(entry, system=entry.system + " ").fingerprint != entry.fingerprint
+    assert replace(entry, template=(entry.template or "") + "x").fingerprint != entry.fingerprint
+    assert replace(entry, used_by="elsewhere").fingerprint == entry.fingerprint
+
+
+def test_trace_names_the_prompt_version(shown):
+    entry = next(e for e in catalog() if e.name == "eval")
+    asyncio.run(trace.traced(MockProvider()).generate("q", system=entry.system))
+    assert f"[built-in eval @{entry.fingerprint}]" in shown.getvalue()
+
+
+def test_fingerprints_quoted_in_docs_are_current():
+    current = {e.name: e.fingerprint for e in catalog()}
+    current["prompt_catalog"] = str(provenance()["prompt_catalog"])
+    quoted = []
+    for doc in ("README.md", "docs/PROMPT_VISIBILITY.md"):
+        text = (Path(__file__).parent.parent / doc).read_text(encoding="utf-8")
+        quoted += re.findall(r"([\w.-]+) @([0-9a-f]{8})\b", text)
+        quoted += re.findall(r'"([\w.-]+)": "([0-9a-f]{8})"', text)
+    assert quoted
+    assert {name: fp for name, fp in quoted if current.get(name) != fp} == {}
+
+
+def test_provenance_records_version_and_every_prompt():
+    record = provenance()
+    assert record["atomics_version"] == __version__
+    assert record["prompts"] == {e.name: e.fingerprint for e in catalog()}
+    assert len(record["prompt_catalog"]) == 8
+    assert provenance() == record
 
 
 def test_prompts_command_lists_and_shows_one():
     runner = CliRunner()
+    judge = next(e for e in catalog() if e.name == "eval.judge")
     listing = runner.invoke(cli, ["prompts"])
     assert listing.exit_code == 0 and "eval.judge" in listing.output
+    assert judge.fingerprint in listing.output
     one = runner.invoke(cli, ["prompts", "eval.judge"])
     assert one.exit_code == 0 and "ACCURACY" in one.output
+    assert f"@{judge.fingerprint}" in one.output
     rubric_line = (
         "  Accuracy (0-4): Is the core content factually correct and on-target for the task?"
     )

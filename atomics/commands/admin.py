@@ -49,12 +49,13 @@ def prompts(name: str | None) -> None:
     if name is None:
         table = Table(title="Built-in prompts")
         table.add_column("name", style="bold", no_wrap=True)
+        table.add_column("version", no_wrap=True)
         table.add_column("seen by")
         table.add_column("used by")
         table.add_column("system prompt")
         for e in entries:
             seen_by = "judge" if e.role == "judge" else "model under test"
-            table.add_row(e.name, seen_by, e.used_by, _rich_escape(e.system))
+            table.add_row(e.name, e.fingerprint, seen_by, e.used_by, _rich_escape(e.system))
         out.print(table)
         out.print(
             "[dim]atomics prompts NAME prints the full text and template. "
@@ -67,7 +68,10 @@ def prompts(name: str | None) -> None:
             f"{name!r}. Known: {', '.join(e.name for e in entries)}", param_hint="NAME"
         )
     role = "judge" if entry.role == "judge" else "model under test"
-    out.print(f"[bold]{entry.name}[/bold] · seen by {role} · used by {entry.used_by}\n")
+    out.print(
+        f"[bold]{entry.name}[/bold] @{entry.fingerprint} · seen by {role} "
+        f"· used by {entry.used_by}\n"
+    )
     out.print("[bold]System prompt[/bold]")
     out.print(entry.system, markup=False, soft_wrap=True)
     out.print()

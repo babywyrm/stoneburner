@@ -539,9 +539,12 @@ def adversarial(
     if json_out:
         import json as _json
 
+        from atomics.prompts import provenance
+
         payload = {"model_a": summary.to_dict()}
         if compare_summary is not None:
             payload["model_b"] = compare_summary.to_dict()
+        payload["provenance"] = provenance()
         with open(json_out, "w", encoding="utf-8") as fh:
             _json.dump(payload, fh, indent=2)
         console.print(f"\n[dim]Wrote JSON results to {json_out}[/dim]")

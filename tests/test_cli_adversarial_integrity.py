@@ -27,6 +27,7 @@ from atomics.eval.outcomes import (
     ProviderOutcome,
     ProviderOutcomeKind,
 )
+from atomics.prompts import provenance
 from atomics.providers.base import ProviderResponse
 from atomics.storage.repository import MetricsRepository
 from atomics.storage.schema import SCHEMA_VERSION, init_db
@@ -278,9 +279,9 @@ def test_cli_writes_json_before_integrity_exit(monkeypatch, tmp_path):
     )
 
     assert result.exit_code == 1
-    assert json.loads(output_path.read_text())["model_a"]["integrity"]["status"] == (
-        "infrastructure_invalid"
-    )
+    payload = json.loads(output_path.read_text())
+    assert payload["model_a"]["integrity"]["status"] == "infrastructure_invalid"
+    assert payload["provenance"] == provenance()
 
 
 def test_cli_resilience_gate_remains_independent_with_allow_partial(monkeypatch, tmp_path):

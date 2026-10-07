@@ -76,6 +76,7 @@ explains each trace line with real output.
 |---------|-------------|
 | `atomics prompts` | List every built-in system prompt, who sees it (model under test or judge), and which commands send it. Calls no model |
 | `atomics prompts eval.judge` | Print one prompt's full system text and its user-prompt template |
+| `-o FILE` on any suite | Also records `provenance`: the atomics version and every built-in prompt's fingerprint |
 | `atomics --show-prompt toolcall -p ollama -m qwen3.5:4b --fixtures tc-01` | Print every model and judge call as it is sent: system prompt (named when built in), prompt, tools, settings, and token usage |
 | `ATOMICS_SHOW_PROMPT=1 atomics eval ...` | Same switch from the environment |
 

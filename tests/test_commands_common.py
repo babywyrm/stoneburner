@@ -26,6 +26,7 @@ from atomics.eval.outcomes import (
     ProviderOutcomeKind,
     RunIntegrity,
 )
+from atomics.prompts import provenance
 from atomics.providers.factory import PROVIDER_NAMES
 
 
@@ -87,7 +88,9 @@ def test_write_summary_json_uses_to_dict(tmp_path) -> None:
     output = tmp_path / "result.json"
     write_summary_json(_Summary(), output)
 
-    assert json.loads(output.read_text(encoding="utf-8")) == {"status": "complete"}
+    written = json.loads(output.read_text(encoding="utf-8"))
+    assert written.pop("provenance") == provenance()
+    assert written == {"status": "complete"}
 
 
 def test_write_summary_json_wraps_filesystem_error(tmp_path) -> None:
