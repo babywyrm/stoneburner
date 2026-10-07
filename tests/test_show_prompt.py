@@ -133,8 +133,45 @@ class _OutOfBudget(MockProvider):
 
 
 def test_non_completed_outcome_is_named(shown):
-    asyncio.run(trace.traced(_OutOfBudget()).generate("hi"))
-    assert "outcome thinking_budget" in shown.getvalue()
+    asyncio.run(trace.traced(_OutOfBudget()).generate("hi", max_tokens=1024))
+    out = shown.getvalue()
+    assert "outcome thinking_budget: the token limit ran out while the model was" in out
+    assert "--no-thinking" in out
+
+
+class _Cut(MockProvider):
+    async def generate(self, prompt, **kwargs):  # type: ignore[no-untyped-def]
+        response = await super().generate(prompt, **kwargs)
+        response.outcome = ProviderOutcome(ProviderOutcomeKind.TRUNCATED)
+        return response
+
+
+def test_cut_off_names_the_thinking_budget_in_the_limit(shown):
+    asyncio.run(trace.traced(_Cut()).generate("hi", max_tokens=512, thinking_budget=2000))
+    out = shown.getvalue()
+    assert "thinking_budget=2000" in out.split("usage")[0]
+    assert "cut off at max_tokens=512 + thinking_budget=2000" in out
+
+
+def test_timeline_marks_each_kind_and_explains_only_those_present(shown):
+    async def calls() -> None:
+        await trace.traced(_Cut()).generate("a")
+        await trace.traced(_OutOfBudget()).generate("b")
+
+    asyncio.run(calls())
+    shown.truncate(0)
+    shown.seek(0)
+    trace.print_timeline()
+    out = shown.getvalue()
+    assert "60*" in out and "60†" in out
+    assert "* = cut off" in out and "† = ran out while thinking" in out
+
+    shown.truncate(0)
+    shown.seek(0)
+    trace.enable(Console(file=shown, width=200))
+    asyncio.run(trace.traced(MockProvider()).generate("c"))
+    trace.print_timeline()
+    assert "* =" not in shown.getvalue() and "† =" not in shown.getvalue()
 
 
 def test_markup_in_prompts_and_model_names_prints_literally(shown):

@@ -42,6 +42,22 @@ class _Row:
 
 _rows: list[_Row] = []
 
+_NOT_THE_MODEL = "this says nothing about the model"
+_EXPLAINED = {
+    ProviderOutcomeKind.THINKING_BUDGET: (
+        "the token limit ran out while the model was still thinking, so there is no reply"
+        " to grade. Try --no-thinking or a larger --thinking-budget"
+    ),
+    ProviderOutcomeKind.EMPTY: "the model returned no text, so there is nothing to grade",
+    ProviderOutcomeKind.REFUSED: "the provider flagged the reply as a refusal",
+    ProviderOutcomeKind.SAFETY_BLOCKED: "the provider's safety filter blocked the reply",
+    ProviderOutcomeKind.RATE_LIMITED: f"the provider rate-limited the call; {_NOT_THE_MODEL}",
+    ProviderOutcomeKind.TIMEOUT: f"the call timed out; {_NOT_THE_MODEL}",
+    ProviderOutcomeKind.PROVIDER_ERROR: f"the provider returned an error; {_NOT_THE_MODEL}",
+    ProviderOutcomeKind.TRANSPORT_ERROR: f"the connection failed; {_NOT_THE_MODEL}",
+}
+_MARKS = {"*": "cut off at the token limit", "†": "ran out while thinking", "×": "no usable reply"}
+
 
 def enable(console: Console | None = None) -> None:
     global _console
@@ -103,11 +119,12 @@ def print_timeline() -> None:
         )
     total_in = sum(r.input_tokens or 0 for r in _rows)
     total_out = sum(r.output_tokens or 0 for r in _rows)
+    marks = {r.note for r in _rows}
     table.caption = (
         f"input {total_in} · output {total_out}"
         + (f" · peak context {peak:.1%}" if peak else "")
         + " · Δ is input against the same model's previous call in the same role"
-        + " · * = cut off at max_tokens"
+        + "".join(f" · {mark} = {meaning}" for mark, meaning in _MARKS.items() if mark in marks)
     )
     table.caption_justify = "left"
     console.print(table)
@@ -174,7 +191,9 @@ class TracedProvider(BaseProvider):
             reasoning_mode=reasoning_mode,
         )
         parts = {"system": system, "prompt": prompt}
-        return await self._shown(call, model, parts, None, max_tokens, thinking)
+        return await self._shown(
+            call, model, parts, None, max_tokens, thinking, budget=thinking_budget
+        )
 
     async def generate_with_tools(
         self,
@@ -208,7 +227,9 @@ class TracedProvider(BaseProvider):
             "tools": json.dumps(list(tools)),
             "tool output": injected_tool_output or "",
         }
-        return await self._shown(call, model, parts, tools, max_tokens, thinking)
+        return await self._shown(
+            call, model, parts, tools, max_tokens, thinking, budget=thinking_budget
+        )
 
     async def generate_chat(
         self,
@@ -236,7 +257,14 @@ class TracedProvider(BaseProvider):
         )
         parts = {"system": system, "prompt": messages[-1]["content"]}
         return await self._shown(
-            call, model, parts, None, max_tokens, thinking, history=messages[:-1]
+            call,
+            model,
+            parts,
+            None,
+            max_tokens,
+            thinking,
+            budget=thinking_budget,
+            history=messages[:-1],
         )
 
     async def _shown(
@@ -248,15 +276,17 @@ class TracedProvider(BaseProvider):
         max_tokens: int,
         thinking: bool | None,
         *,
+        budget: int | None = None,
         history: Sequence[ChatMessage] = (),
     ) -> ProviderResponse:
         number = next(_calls)
+        request = (max_tokens, thinking, budget)
         try:
             response: ProviderResponse = await call  # type: ignore[misc]
         except Exception as exc:
-            self._print(number, model, parts, tools, max_tokens, thinking, None, exc, history)
+            self._print(number, model, parts, tools, request, None, exc, history)
             raise
-        self._print(number, model, parts, tools, max_tokens, thinking, response, None, history)
+        self._print(number, model, parts, tools, request, response, None, history)
         return response
 
     def _num_ctx(self) -> int | None:
@@ -270,8 +300,7 @@ class TracedProvider(BaseProvider):
         model: str | None,
         parts: dict[str, str],
         tools: Sequence[dict] | None,
-        max_tokens: int,
-        thinking: bool | None,
+        request: tuple[int, bool | None, int | None],
         response: ProviderResponse | None,
         error: Exception | None,
         history: Sequence[ChatMessage] = (),
@@ -308,14 +337,18 @@ class TracedProvider(BaseProvider):
             if parts["tool output"]:
                 out.append(f"tool output  ≈{_est(parts['tool output'])} tok\n", style="bold")
                 out.append(parts["tool output"] + "\n")
+        max_tokens, thinking, budget = request
+        limit = f"max_tokens={max_tokens}" + (f" + thinking_budget={budget}" if budget else "")
         num_ctx = self._num_ctx()
         thinking_label = "provider default" if thinking is None else str(thinking).lower()
         out.append(
             f"request max_tokens={max_tokens}  thinking={thinking_label}"
+            + (f"  thinking_budget={budget}" if budget else "")
             + (f"  num_ctx={num_ctx}" if num_ctx else "")
             + "\n",
             style="dim",
         )
+        note = ""
         if error is not None:
             out.append(f"error   {type(error).__name__}\n", style="red")
         elif response is not None:
@@ -334,23 +367,22 @@ class TracedProvider(BaseProvider):
             if kind == ProviderOutcomeKind.TRUNCATED or (
                 kind is None and response.output_tokens >= max_tokens
             ):
-                out.append(
-                    f"outcome cut off at max_tokens={max_tokens}: the reply is unfinished\n",
-                    style="yellow",
-                )
+                note = "*"
+                out.append(f"outcome cut off at {limit}: the reply is unfinished\n", style="yellow")
             elif kind is not None and kind != ProviderOutcomeKind.COMPLETED:
-                out.append(f"outcome {kind.value}\n", style="yellow")
+                if kind == ProviderOutcomeKind.THINKING_BUDGET:
+                    note = "†"
+                elif not response.outcome or not response.outcome.is_scorable:
+                    note = "×"
+                out.append(f"outcome {kind.value}: {_EXPLAINED[kind]}\n", style="yellow")
             if num_ctx and response.input_tokens:
                 used = response.input_tokens + response.output_tokens
                 out.append(
                     f"context {used}/{num_ctx} tokens ({used / num_ctx:.1%} of the window)\n"
                 )
         prompt_name = ", ".join(e.name for e in entries) or ("custom" if system else "none")
-        note = ""
         if error is not None:
             prompt_name += f" ({type(error).__name__})"
-        elif response is not None and "cut off" in out.plain:
-            note = "*"
         _rows.append(
             _Row(
                 number,
