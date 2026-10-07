@@ -110,6 +110,34 @@ usage   input=388 (≈158 text + ≈230 template/formatting)  output=27
 When the estimate overshoots, which is common for long English text, the
 line reads `input=709 (≈730 text estimated)` instead.
 
+### The context timeline
+
+When the command finishes, including when it exits non-zero, the trace
+ends with one row per call. This multiturn run shows the model's input
+growing turn by turn as the transcript is resent, and the turn-2 reply
+hitting its cap just before the judge's largest input:
+
+```text
+Context timeline · 7 calls
+
+  #   model           prompt                          input       Δ   output   context
+ ───────────────────────────────────────────────────────────────────────────────────────
+  1   qwen3.5:4b      custom                             41               47    1.1%
+  2   granite4.2:3b   multiturn.judge-turn              344               63    5.0%
+  3   qwen3.5:4b      none                              117     +76     512*    7.7% █
+  4   granite4.2:3b   multiturn.judge-turn             1422   +1078       50   18.0% ██
+  5   qwen3.5:4b      none                              649    +532       16    8.1% █
+  6   granite4.2:3b   multiturn.judge-turn              924    -498       52   11.9% █
+  7   granite4.2:3b   multiturn.judge-conversation      902     -22       45   11.6% █
+
+input 4399 · output 785 · peak context 18.0% · Δ is input against the same model's
+previous call in the same role · * = cut off at max_tokens
+```
+
+`Δ` compares a call with the same model's previous call in the same role,
+so a model judging itself does not mix its two series. `context` needs a
+window size, which only Ollama reports; other backends show `—`.
+
 ## What the trace teaches
 
 **Tools cost tokens you never wrote.** The same toolcall prompt, without

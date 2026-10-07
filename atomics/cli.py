@@ -60,9 +60,10 @@ def cli(ctx: click.Context, verbose: bool, progress: bool, show_prompt: bool) ->
     ctx.obj["verbose"] = verbose
     ctx.obj["progress"] = progress
     if show_prompt:
-        from atomics.providers.trace import enable
+        from atomics.providers.trace import enable, print_timeline
 
         enable()
+        ctx.call_on_close(print_timeline)
         # A live spinner redraws over the trace lines.
         ctx.obj["progress"] = False
     if verbose:
