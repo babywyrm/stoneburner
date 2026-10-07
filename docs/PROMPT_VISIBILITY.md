@@ -61,6 +61,20 @@ score that moved between them may have moved because the rubric changed.
 `prompt_catalog` covers every built-in prompt in one hash, and it changes
 on an unreleased source checkout too, where `atomics_version` does not.
 
+### Comparing runs
+
+```bash
+atomics prompts --compare old.json             # old result vs the installed prompts
+atomics prompts --compare a.json --compare b.json
+```
+
+If every fingerprint matches, it says so in one line. Otherwise it lists
+each prompt whose wording differs as `changed`, `added`, or `removed`,
+with the fingerprint on each side. Suites that use a listed prompt did not
+send the same wording, so their scores are not like for like. Results
+written before provenance existed are rejected with a message, not
+guessed at. No model is called.
+
 ## The live trace: `--show-prompt`
 
 The flag goes before the command name:

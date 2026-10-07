@@ -16,6 +16,9 @@
   records `provenance`: the atomics version, each prompt's fingerprint,
   and one hash of the whole catalog. A score change between two results
   can now be checked against a rubric change.
+- `atomics prompts --compare FILE [--compare FILE]` lists the prompts whose
+  wording differs between a saved result and the installed prompts, or
+  between two results.
 - `--show-prompt` ends with a context timeline: one row per call with
   input, growth against that model's previous call, output, and window
   fill. It prints even when the command exits non-zero.
