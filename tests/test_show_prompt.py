@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import io
+import json
 import re
 from collections.abc import Iterator
 from dataclasses import replace
@@ -281,6 +282,50 @@ def test_provenance_records_version_and_every_prompt():
     assert record["prompts"] == {e.name: e.fingerprint for e in catalog()}
     assert len(record["prompt_catalog"]) == 8
     assert provenance() == record
+
+
+def _result_file(path: Path, prompts: dict[str, str]) -> Path:
+    record = {**provenance(), "prompts": prompts}
+    path.write_text(json.dumps({"suite": "x", "provenance": record}), encoding="utf-8")
+    return path
+
+
+def test_compare_against_installed_names_each_change(tmp_path):
+    current = {e.name: e.fingerprint for e in catalog()}
+    old = {**current, "refusal.judge": "00000000", "retired.judge": "11111111"}
+    old.pop("eval")
+    result = CliRunner().invoke(
+        cli, ["prompts", "--compare", str(_result_file(tmp_path / "a.json", old))]
+    )
+    assert result.exit_code == 0
+    lines = result.output.splitlines()
+    assert any("refusal.judge" in line and "changed" in line for line in lines)
+    assert any("retired.judge" in line and "removed" in line for line in lines)
+    assert any(re.search(r"[\s│]eval\s.*added", line) for line in lines)
+    assert "3 of" in result.output
+
+
+def test_compare_two_files_and_identical_runs(tmp_path):
+    current = {e.name: e.fingerprint for e in catalog()}
+    a = _result_file(tmp_path / "a.json", current)
+    b = _result_file(tmp_path / "b.json", current)
+    result = CliRunner().invoke(cli, ["prompts", "--compare", str(a), "--compare", str(b)])
+    assert result.exit_code == 0 and "same prompt wording" in result.output
+
+
+def test_compare_rejects_files_without_provenance(tmp_path):
+    bare = tmp_path / "old.json"
+    bare.write_text(json.dumps({"suite": "x"}), encoding="utf-8")
+    result = CliRunner().invoke(cli, ["prompts", "--compare", str(bare)])
+    assert result.exit_code != 0 and "no provenance" in result.output
+    bare.write_text("[1, 2]", encoding="utf-8")
+    result = CliRunner().invoke(cli, ["prompts", "--compare", str(bare)])
+    assert result.exit_code != 0 and "not a saved -o result" in result.output
+    bare.write_text("{not json", encoding="utf-8")
+    result = CliRunner().invoke(cli, ["prompts", "--compare", str(bare)])
+    assert result.exit_code != 0 and "not a readable JSON result" in result.output
+    result = CliRunner().invoke(cli, ["prompts", "eval", "--compare", str(bare)])
+    assert result.exit_code == 2
 
 
 def test_prompts_command_lists_and_shows_one():

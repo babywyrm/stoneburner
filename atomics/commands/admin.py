@@ -35,9 +35,78 @@ def doctor() -> None:
     sys.exit(run_doctor())
 
 
+def _recorded_prompts(path: Path) -> tuple[str, dict[str, str]]:
+    """Read the prompt fingerprints a saved `-o` result recorded."""
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, ValueError) as exc:
+        raise click.ClickException(f"{path.name}: not a readable JSON result ({exc})") from exc
+    if not isinstance(data, dict):
+        raise click.ClickException(f"{path.name}: not a saved -o result")
+    record = data.get("provenance")
+    if not isinstance(record, dict) or not isinstance(record.get("prompts"), dict):
+        raise click.ClickException(
+            f"{path.name}: no provenance. It was written before results recorded prompt "
+            "versions, so its wording cannot be checked."
+        )
+    version = record.get("atomics_version", "?")
+    return f"{path.name} ({version})", {str(k): str(v) for k, v in record["prompts"].items()}
+
+
+def _compare_prompts(out: Console, files: tuple[Path, ...]) -> None:
+    from atomics import __version__
+    from atomics.prompts import catalog
+
+    if len(files) > 2:
+        raise click.BadParameter("give one result file, or two to compare", param_hint="--compare")
+    left_label, left = _recorded_prompts(files[0])
+    if len(files) == 2:
+        right_label, right = _recorded_prompts(files[1])
+    else:
+        right_label = f"installed ({__version__})"
+        right = {e.name: e.fingerprint for e in catalog()}
+    order = [e.name for e in catalog()]
+    names = [n for n in order if n in left or n in right]
+    names += sorted((set(left) | set(right)) - set(order))
+    rows = []
+    for name in names:
+        a, b = left.get(name), right.get(name)
+        if a == b:
+            continue
+        status = "changed" if a and b else ("added" if b else "removed")
+        rows.append((name, a or "—", b or "—", status))
+    if not rows:
+        out.print(
+            f"{_rich_escape(left_label)} and {_rich_escape(right_label)} used the same "
+            f"prompt wording ({len(names)} prompts)."
+        )
+        return
+    table = Table(title="Prompt wording that differs")
+    table.add_column("name", style="bold", no_wrap=True)
+    table.add_column(_rich_escape(left_label), no_wrap=True)
+    table.add_column(_rich_escape(right_label), no_wrap=True)
+    table.add_column("status")
+    for row in rows:
+        table.add_row(*row)
+    out.print(table)
+    out.print(
+        f"{len(rows)} of {len(names)} prompts differ. Suites that use them did not send "
+        "the same wording, so their scores are not like for like. "
+        "atomics prompts NAME shows the current text."
+    )
+
+
 @click.command("prompts")
 @click.argument("name", required=False)
-def prompts(name: str | None) -> None:
+@click.option(
+    "--compare",
+    "compare_files",
+    multiple=True,
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    help="A saved -o result: list prompts whose wording differs from this install. "
+    "Give it twice to compare two results.",
+)
+def prompts(name: str | None, compare_files: tuple[Path, ...]) -> None:
     """Show the built-in system prompts and judge templates. No model is called.
 
     With NAME, print that prompt's full system text and template.
@@ -45,6 +114,11 @@ def prompts(name: str | None) -> None:
     from atomics.prompts import catalog
 
     out = Console(highlight=False)
+    if compare_files:
+        if name is not None:
+            raise click.UsageError("use NAME or --compare, not both")
+        _compare_prompts(out, compare_files)
+        return
     entries = catalog()
     if name is None:
         table = Table(title="Built-in prompts")
