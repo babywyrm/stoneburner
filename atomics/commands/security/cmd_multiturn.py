@@ -176,6 +176,7 @@ def multiturn(
         result_table = Table(title="Multi-Turn Eval Results", show_lines=True)
         result_table.add_column("ID", style="dim")
         result_table.add_column("Turns", justify="right")
+        result_table.add_column("Input", justify="right")
         result_table.add_column("Turn Avg", justify="right", style="green")
         result_table.add_column("Retain", justify="right")
         result_table.add_column("Consist", justify="right")
@@ -197,10 +198,13 @@ def multiturn(
             else:
                 ret = con = ins = "—"
             overall = f"{cr.overall_score * 100:.0f}%" if cr.overall_score is not None else "—"
+            inputs = [t.input_tokens for t in cr.turn_results]
+            growth = f"{inputs[0]}→{inputs[-1]}" if len(inputs) > 1 else str(sum(inputs))
 
             result_table.add_row(
                 cr.fixture.id,
                 f"{len(cr.turn_results)}/{len(cr.fixture.turns)}",
+                growth,
                 turn_avg,
                 ret,
                 con,

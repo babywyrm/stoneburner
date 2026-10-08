@@ -446,6 +446,7 @@ async def test_multiturn_extra_judges_panels_conversation_only(monkeypatch):
             text="ok",
             input_tokens=1,
             output_tokens=1,
+            thinking_tokens=0,
             total_tokens=2,
             latency_ms=1.0,
             estimated_cost_usd=0.0,
@@ -493,7 +494,14 @@ def _reply(text: str, outcome: object = None) -> object:
     from types import SimpleNamespace
 
     return SimpleNamespace(
-        text=text, total_tokens=2, latency_ms=1.0, estimated_cost_usd=0.0, outcome=outcome
+        text=text,
+        input_tokens=1,
+        output_tokens=1,
+        thinking_tokens=0,
+        total_tokens=2,
+        latency_ms=1.0,
+        estimated_cost_usd=0.0,
+        outcome=outcome,
     )
 
 
@@ -523,6 +531,45 @@ async def test_turn_judge_sees_prior_turns_and_the_reply_once(monkeypatch):
     assert "r1" in second["transcript"] and "ask 1" in second["transcript"]
     assert "r2" not in second["transcript"] and "ask 2" not in second["transcript"]
     assert second["response"] == "r2" and second["user_message"] == "ask 2"
+
+
+@pytest.mark.asyncio
+async def test_each_turn_records_its_context_size(monkeypatch):
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+
+    from atomics.eval.multiturn.runner import run_multiturn
+
+    def reply(inp: int) -> object:
+        return SimpleNamespace(
+            text="r",
+            input_tokens=inp,
+            output_tokens=5,
+            thinking_tokens=2,
+            total_tokens=inp + 5,
+            latency_ms=1.0,
+            estimated_cost_usd=0.0,
+            outcome=None,
+        )
+
+    provider = AsyncMock()
+    provider.name = "mock"
+    provider.generate_chat = AsyncMock(side_effect=[reply(40), reply(200), reply(700)])
+    monkeypatch.setattr(
+        "atomics.eval.multiturn.runner.score_turn",
+        AsyncMock(return_value=TurnJudgeResult(4, 3, 3, 1.0, "ok")),
+    )
+    monkeypatch.setattr(
+        "atomics.eval.multiturn.runner.score_conversation",
+        AsyncMock(return_value=ConversationJudgeResult(4, 3, 3, 1.0, "ok")),
+    )
+    summary = await run_multiturn(provider, fixtures=[_three_turn_fixture()])
+
+    turns = summary.to_dict()["conversations"][0]["turns"]
+    assert [t["input_tokens"] for t in turns] == [40, 200, 700]
+    assert turns[0]["output_tokens"] == 5 and turns[0]["thinking_tokens"] == 2
+    task = summary.conversation_results[0].task_result
+    assert (task.input_tokens, task.output_tokens, task.thinking_tokens) == (940, 15, 6)
 
 
 @pytest.mark.asyncio
