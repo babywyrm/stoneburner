@@ -38,6 +38,9 @@ class TurnResult:
     tokens: int
     cost: float
     judge: TurnJudgeResult | None
+    input_tokens: int = 0
+    output_tokens: int = 0
+    thinking_tokens: int = 0
 
 
 @dataclass
@@ -185,6 +188,9 @@ class MultiturnRunSummary:
                             "score": t.judge.score if t.judge else None,
                             "latency_ms": t.latency_ms,
                             "tokens": t.tokens,
+                            "input_tokens": t.input_tokens,
+                            "output_tokens": t.output_tokens,
+                            "thinking_tokens": t.thinking_tokens,
                         }
                         for t in cr.turn_results
                     ],
@@ -271,6 +277,7 @@ async def run_multiturn(
                 turn_latency = resp.latency_ms
                 turn_tokens = resp.total_tokens
                 turn_cost = resp.estimated_cost_usd
+                usage = (resp.input_tokens, resp.output_tokens, resp.thinking_tokens)
                 skipped = unscorable_outcome(resp)
                 if skipped is not None:
                     conversation_failed = True
@@ -287,6 +294,7 @@ async def run_multiturn(
                 turn_latency = 0.0
                 turn_tokens = 0
                 turn_cost = 0.0
+                usage = (0, 0, 0)
                 conversation_failed = True
                 logger.warning(
                     "Turn %d of %d in %s failed: %s",
@@ -324,6 +332,9 @@ async def run_multiturn(
                     tokens=turn_tokens,
                     cost=turn_cost,
                     judge=turn_judge,
+                    input_tokens=usage[0],
+                    output_tokens=usage[1],
+                    thinking_tokens=usage[2],
                 )
             )
 
@@ -398,6 +409,9 @@ async def run_multiturn(
             prompt=full_transcript,
             response="\n---\n".join(t.response for t in turn_results),
             total_tokens=total_tokens,
+            input_tokens=sum(t.input_tokens for t in turn_results),
+            output_tokens=sum(t.output_tokens for t in turn_results),
+            thinking_tokens=sum(t.thinking_tokens for t in turn_results),
             latency_ms=total_latency,
             estimated_cost_usd=total_cost,
             accuracy_score=overall,

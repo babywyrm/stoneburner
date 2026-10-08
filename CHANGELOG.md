@@ -52,6 +52,11 @@
 - `--show-prompt` named only `max_tokens` when a reply was cut off. With a
   thinking budget the real limit is larger, so a 2513-token reply read as
   cut off at 512. It now shows `max_tokens=512 + thinking_budget=2000`.
+- Multiturn saved every conversation with zero input, output and thinking
+  tokens; only the total was set. Each turn's counts are now recorded in
+  `-o` JSON and summed on the saved result, so context growth across a
+  conversation survives the run. The results table shows it as `Input`,
+  first turn → last.
 - The multiturn turn judge no longer reads the scored reply twice: its
   "conversation so far" now holds only earlier turns. Turn scores can
   shift slightly against older results.
