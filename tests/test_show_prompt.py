@@ -313,6 +313,16 @@ def test_show_prompt_turns_off_the_spinner():
     assert seen == {"progress": False}
 
 
+def test_fixture_progress_stays_quiet_when_progress_is_off():
+    from atomics.commands.common import FixtureProgress
+
+    with click.Context(cli, obj={"progress": False}):
+        progress = FixtureProgress(1, Console(file=io.StringIO()))
+        progress.on_start(0, "tc-01", "direct")
+        assert progress._status is None
+        progress.on_done(0)
+
+
 def test_catalog_names_are_unique_and_shared_prompts_list_both():
     names = [e.name for e in catalog()]
     assert len(names) == len(set(names))
