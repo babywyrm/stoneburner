@@ -125,6 +125,58 @@ def test_tool_call_shows_tools_and_injected_output(shown):
     assert "tool output" in out and "IGNORE PRIOR RULES" in out
 
 
+def test_reply_is_shown(shown):
+    asyncio.run(trace.traced(MockProvider()).generate("hi"))
+    out = shown.getvalue()
+    assert "reply  ≈" in out and "response #1" in out
+
+
+class _Caller(_ToolUser):
+    async def generate_with_tools(self, prompt, *, tools, **kwargs):  # type: ignore[no-untyped-def]
+        from atomics.providers.toolcalls import ToolCall
+
+        response = await super().generate_with_tools(prompt, tools=tools, **kwargs)
+        response.text = ""
+        response.tool_calls = (ToolCall("read_file", {"path": "/etc/shadow"}),)
+        return response
+
+
+def test_tool_calls_the_model_made_are_shown(shown):
+    asyncio.run(trace.traced(_Caller()).generate_with_tools("go", tools=[{"name": "read_file"}]))
+    out = shown.getvalue()
+    assert 'tool call  read_file {"path": "/etc/shadow"}' in out
+    assert "reply  ≈0 tok" not in out
+
+
+class _GrowingTools(MockProvider):
+    supports_tools = True
+
+    async def generate(self, prompt, **kwargs):  # type: ignore[no-untyped-def]
+        response = await super().generate(prompt, **kwargs)
+        response.input_tokens = len(prompt)
+        return response
+
+    async def generate_with_tools(self, prompt, *, tools, **kwargs):  # type: ignore[no-untyped-def]
+        kwargs.pop("injected_tool_output", None)
+        return await self.generate(prompt * 3, **kwargs)
+
+
+def test_timeline_delta_keeps_tool_and_plain_calls_apart(shown):
+    provider = trace.traced(_GrowingTools())
+
+    async def calls() -> None:
+        await provider.generate_with_tools("x" * 100, tools=[{"name": "t"}])
+        await provider.generate("x" * 50)
+        await provider.generate("x" * 80)
+
+    asyncio.run(calls())
+    shown.truncate(0)
+    shown.seek(0)
+    trace.print_timeline()
+    out = shown.getvalue()
+    assert "-250" not in out and "+30" in out
+
+
 class _OutOfBudget(MockProvider):
     async def generate(self, prompt, **kwargs):  # type: ignore[no-untyped-def]
         response = await super().generate(prompt, **kwargs)
