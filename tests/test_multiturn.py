@@ -572,6 +572,16 @@ async def test_each_turn_records_its_context_size(monkeypatch):
     assert (task.input_tokens, task.output_tokens, task.thinking_tokens) == (940, 15, 6)
 
 
+def test_unparsed_turn_judge_is_saved_without_a_score():
+    from datetime import UTC, datetime
+
+    cr = _make_conversation_result(turn_scores=[0.9], conv_score=0.8)
+    cr.turn_results[0].judge = TurnJudgeResult(0, 0, 0, 0.5, "parse failed", parse_failed=True)
+    now = datetime.now(UTC)
+    summary = MultiturnRunSummary("r", "p", "m", "j", "jm", now, now, [cr])
+    assert summary.to_dict()["conversations"][0]["turns"][0]["score"] is None
+
+
 @pytest.mark.asyncio
 async def test_conversation_cut_short_has_no_score(monkeypatch, caplog):
     from unittest.mock import AsyncMock
