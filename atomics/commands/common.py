@@ -212,6 +212,9 @@ class FixtureProgress:
 
     def on_start(self, index: int, fixture_id: str, category: str) -> None:
         self._current_start = time.monotonic()
+        ctx = click.get_current_context(silent=True)
+        if ctx is not None and not (ctx.find_root().obj or {}).get("progress", True):
+            return
         eta = self._estimate_remaining(index)
         eta_str = f" | ETA remaining: {self._fmt_duration(eta)}" if eta is not None else ""
         status_msg = (

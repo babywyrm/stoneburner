@@ -49,6 +49,9 @@
   before it, and is no longer saved with one. The summary now reads
   `n/a (k/n scored)`, shows turns as `ran/planned`, and lists integrity
   and coverage like the other suites. Warnings count turns from 1.
+- `toolcall` drew its progress spinner over the `--show-prompt` trace,
+  because it ignored the progress setting the flag turns off. The spinner
+  now checks that setting itself, so no command can miss it.
 - `--show-prompt` named only `max_tokens` when a reply was cut off. With a
   thinking budget the real limit is larger, so a 2513-token reply read as
   cut off at 512. It now shows `max_tokens=512 + thinking_budget=2000`.
