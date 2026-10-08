@@ -171,7 +171,7 @@ class RAGRunSummary:
                     "grounding": r.judge.grounding if r.judge else None,
                     "faithfulness": r.judge.faithfulness if r.judge else None,
                     "abstention": r.judge.abstention if r.judge else None,
-                    "score": r.judge.score if r.judge else None,
+                    "score": r.judge.score if r.judge and not r.judge.parse_failed else None,
                     "score_stdev": r.judge.score_stdev if r.judge else None,
                     "rationale": r.judge.rationale if r.judge else None,
                     "latency_ms": r.task_result.latency_ms,

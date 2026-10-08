@@ -126,7 +126,7 @@ class EvalRunSummary:
                     "effort": r.effort,
                     "reasoning_mode": r.reasoning_mode,
                     "reasoning_request": r.reasoning_request,
-                    "score": r.judge.score if r.judge else None,
+                    "score": r.judge.score if r.judge and not r.judge.parse_failed else None,
                     "accuracy": r.judge.accuracy if r.judge else None,
                     "completeness": r.judge.completeness if r.judge else None,
                     "format_score": r.judge.format_score if r.judge else None,

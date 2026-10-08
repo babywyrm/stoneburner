@@ -633,6 +633,7 @@ async def test_run_rag_judge_parse_failure_handled():
     assert fr.judge is not None
     assert fr.judge.parse_failed
     assert summary.parse_failure_rate == 1.0
+    assert summary.to_dict()["fixtures"][0]["score"] is None
 
 
 @pytest.mark.asyncio

@@ -173,7 +173,7 @@ class RedBlueSummary:
                     "category": r.fixture.category,
                     "complexity": getattr(r.fixture, "complexity", None),
                     "status": r.task_result.status.value,
-                    "score": r.judge.score if r.judge else None,
+                    "score": r.judge.score if r.judge and not r.judge.parse_failed else None,
                     "parse_failed": r.judge.parse_failed if r.judge else True,
                     "run_scores": r.run_scores,
                     "rationale": r.judge.rationale if r.judge else "",

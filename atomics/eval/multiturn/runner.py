@@ -185,7 +185,9 @@ class MultiturnRunSummary:
                     "turns": [
                         {
                             "turn": t.turn_index,
-                            "score": t.judge.score if t.judge else None,
+                            "score": (
+                                t.judge.score if t.judge and not t.judge.parse_failed else None
+                            ),
                             "latency_ms": t.latency_ms,
                             "tokens": t.tokens,
                             "input_tokens": t.input_tokens,
