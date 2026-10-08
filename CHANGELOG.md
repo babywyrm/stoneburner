@@ -26,6 +26,9 @@
   a reply that ran out of tokens while thinking is not graded, with the
   flags to try. The timeline marks those calls `†` and other unusable
   replies `×`, and its caption explains only the marks that appear.
+- `--show-prompt` shows what came back: each call's visible reply, which
+  for a judge is its verdict, and every tool call with its arguments.
+  Calls with tools attached get their own `Δ` series.
 - The timeline ends with `Notes` from fixed rules: calls that ran out of
   tokens, unusable replies, a nearly full context window, and a model
   judging itself. A clean run prints none.
@@ -49,6 +52,10 @@
   before it, and is no longer saved with one. The summary now reads
   `n/a (k/n scored)`, shows turns as `ran/planned`, and lists integrity
   and coverage like the other suites. Warnings count turns from 1.
+- A judge reply that could not be parsed was written to `-o` JSON as a
+  score of 0.5, the internal placeholder, in eval, RAG, redblue, and
+  multiturn turns. Averages already skipped it; the per-item `score` is
+  now `null`.
 - `toolcall` drew its progress spinner over the `--show-prompt` trace,
   because it ignored the progress setting the flag turns off. The spinner
   now checks that setting itself, so no command can miss it.

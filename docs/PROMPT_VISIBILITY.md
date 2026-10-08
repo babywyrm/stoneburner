@@ -109,6 +109,8 @@ context 562/8192 tokens (6.9% of the window)
 | `usage` | Exact `input` and `output` counts from the provider. `output` includes thinking, shown as `(N of it thinking)` |
 | `outcome` | Shown only when the reply did not finish normally, with what it means for scoring. A cut-off line names the whole limit, e.g. `max_tokens=512 + thinking_budget=2000` |
 | `context` | Input plus output against the Ollama window |
+| `reply` | The visible text that came back. Thinking is counted under `usage`, not printed. For a judge this is its verdict, rationale included |
+| `tool call` | Each tool the model asked to call, with its arguments. Calls are never executed |
 | `error` | The call failed; the exception type is shown and the run handles it as usual |
 
 ### Exact and estimated numbers
@@ -172,7 +174,9 @@ The timeline lives only in the terminal. To keep the growth, multiturn's
 for every turn, with or without `--show-prompt`.
 
 `Δ` compares a call with the same model's previous call in the same role,
-so a model judging itself does not mix its two series. `context` needs a
+so a model judging itself does not mix its two series. Calls with tools
+attached form their own series too, so toolcall's tools request and its
+plain-text request are not compared with each other. `context` needs a
 window size, which only Ollama reports; other backends show `—`.
 
 ## What the trace teaches
@@ -223,6 +227,37 @@ prompt (`system [none]`).
 shows the model's reply pasted into the template from `atomics prompts`. If
 the model's block said `outcome cut off`, the judge graded an unfinished
 answer.
+
+**The two toolcall channels can disagree.** The same request, once with
+tools and once without, can comply in one and refuse in the other. Both
+replies are in the trace:
+
+```text
+tool call  read_file {"path": "/etc/shadow"}
+...
+reply  ≈515 tok
+I cannot and will not display the contents of `/etc/shadow`. ...
+```
+
+**Check the judge, not just the model.** A small judge can give full marks
+to an answer that names packages that do not exist. Each judge block ends
+with its verdict under `reply`, so you can read why it scored what it did.
+To compare judges, grade the same run twice and set the scores side by
+side:
+
+```bash
+for j in granite4.2:3b gpt-oss:20b; do
+  atomics multiturn -p ollama -m qwen3.5:4b --no-thinking --fixtures mt-eval-01 \
+    --judge-provider ollama --judge-model "$j" --no-save -o "/tmp/mt-$j.json"
+  jq -c --arg j "$j" '{judge: $j, turns: [.conversations[0].turns[].score]}' "/tmp/mt-$j.json"
+done
+```
+
+The model's replies differ between the two runs, so compare the verdicts
+on the replies in each trace, not only the numbers. A turn score of `null`
+means the judge's reply could not be scored. `gpt-oss` cannot turn
+thinking off, so at the 256-token judge cap it can spend the whole reply
+thinking; the trace marks that call `†`.
 
 **Judges ask for thinking off.** A reasoning model left at its default can
 spend a small judge token cap reasoning in the visible reply and never

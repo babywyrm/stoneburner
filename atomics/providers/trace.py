@@ -38,6 +38,7 @@ class _Row:
     output_tokens: int | None
     num_ctx: int | None
     note: str
+    tools: bool
 
 
 _rows: list[_Row] = []
@@ -94,11 +95,11 @@ def print_timeline() -> None:
             overflow="fold" if column == "model" else "ellipsis",
             min_width=10 if column == "model" else None,
         )
-    previous: dict[tuple[str, bool], int] = {}
+    previous: dict[tuple[str, bool, bool], int] = {}
     peak = 0.0
     for row in _rows:
         delta = ""
-        key = (row.label, row.judge)
+        key = (row.label, row.judge, row.tools)
         if row.input_tokens is not None:
             if key in previous:
                 delta = f"{row.input_tokens - previous[key]:+d}"
@@ -422,6 +423,12 @@ class TracedProvider(BaseProvider):
                 out.append(
                     f"context {used}/{num_ctx} tokens ({used / num_ctx:.1%} of the window)\n"
                 )
+            if response.text:
+                out.append(f"reply  ≈{_est(response.text)} tok\n", style="bold")
+                out.append(response.text + "\n", style="green")
+            for tool_call in response.tool_calls:
+                out.append(f"tool call  {tool_call.name} ", style="bold")
+                out.append(json.dumps(tool_call.arguments) + "\n", style="green")
         prompt_name = ", ".join(e.name for e in entries) or ("custom" if system else "none")
         if error is not None:
             prompt_name += f" ({type(error).__name__})"
@@ -435,6 +442,7 @@ class TracedProvider(BaseProvider):
                 response.output_tokens if response else None,
                 num_ctx,
                 note,
+                tools is not None,
             )
         )
         console.rule(Text(f"call {number} · {label}"), style="dim")
