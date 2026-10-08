@@ -167,6 +167,10 @@ Notes
 
 A clean run prints no notes.
 
+The timeline lives only in the terminal. To keep the growth, multiturn's
+`-o` JSON records `input_tokens`, `output_tokens`, and `thinking_tokens`
+for every turn, with or without `--show-prompt`.
+
 `Δ` compares a call with the same model's previous call in the same role,
 so a model judging itself does not mix its two series. `context` needs a
 window size, which only Ollama reports; other backends show `—`.
