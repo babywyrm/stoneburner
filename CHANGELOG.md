@@ -76,6 +76,11 @@
   it "provider unreachable". Its integrity status is now `unscored`.
   `infrastructure_invalid` now means a model or judge call failed. Both
   still exit nonzero.
+- Judges capped their first reply at 128 to 512 tokens. `gpt-oss` thinks
+  even with thinking off, so as a multiturn judge it ran out mid-thought
+  (it needed 939 tokens) and the conversation came back unscored. Every
+  judge's first call now allows 2048 tokens. Judges that don't think stop
+  early, so they are unaffected.
 
 ## 0.25.1 (2026-10-04) — Distributed runs per key, -o everywhere
 

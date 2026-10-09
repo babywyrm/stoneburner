@@ -17,6 +17,7 @@ import logging
 import re
 from dataclasses import dataclass
 
+from atomics.eval.judge import JUDGE_MAX_TOKENS
 from atomics.providers.base import BaseProvider
 
 logger = logging.getLogger("atomics.eval.multiturn.judge")
@@ -176,7 +177,7 @@ async def score_turn(
             prompt,
             system=_TURN_JUDGE_SYSTEM,
             model=judge_model,
-            max_tokens=256,
+            max_tokens=JUDGE_MAX_TOKENS,
             temperature=0.0,
             thinking=False,
         )
@@ -210,7 +211,7 @@ async def score_conversation(
             prompt,
             system=_CONV_JUDGE_SYSTEM,
             model=judge_model,
-            max_tokens=256,
+            max_tokens=JUDGE_MAX_TOKENS,
             temperature=0.0,
             thinking=False,
         )

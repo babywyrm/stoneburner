@@ -25,6 +25,10 @@ from atomics.providers.base import BaseProvider
 
 logger = logging.getLogger("atomics.eval.judge")
 
+# Reply cap for a judge's first call. Some reasoning models (gpt-oss) think
+# even with thinking off, and that thinking counts against this cap.
+JUDGE_MAX_TOKENS = 2048
+
 _JUDGE_SYSTEM = (
     "You are a strict technical reviewer. "
     "Score responses objectively — do not reward verbosity or penalise brevity "
@@ -300,7 +304,7 @@ async def score_response(
             text,
             system=system,
             model=judge_model,
-            max_tokens=128,
+            max_tokens=JUDGE_MAX_TOKENS,
             temperature=0.0,
             thinking=False,
         )

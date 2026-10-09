@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from atomics.eval.consensus import NumericVote, combine_numeric
+from atomics.eval.judge import JUDGE_MAX_TOKENS
 from atomics.providers.base import BaseProvider
 
 if TYPE_CHECKING:
@@ -176,7 +177,7 @@ async def score_rag_response(
             prompt,
             system=_RAG_JUDGE_SYSTEM,
             model=judge_model,
-            max_tokens=256,
+            max_tokens=JUDGE_MAX_TOKENS,
             temperature=0.0,
             thinking=False,
         )
