@@ -107,9 +107,8 @@ in a sweep reads as a pass.
       generation failure.** After the native-`thinking` parse, those attempts
       are `thinking_budget` — not scorable, not infrastructure-invalid.
       Fixture rows print `THINK`; JSON writes `generation_status:
-      thinking_budget`. An all-unscored run still becomes
-      `infrastructure_invalid` because `fixtures_scored == 0`; the row
-      itself no longer looks like Ollama died.
+      thinking_budget`. An all-unscored run with no outage
+      is `unscored`, not `infrastructure_invalid`.
 - [x] **`atomics sweep` grows into a multi-suite overnight driver.** Today's
       sweep is one eval family. The night was a shell script in `/tmp` that
       died twice to SIGPIPE because stdout was still the chat. A first-class

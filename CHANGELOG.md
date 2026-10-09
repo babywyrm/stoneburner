@@ -70,6 +70,12 @@
 - The multiturn turn judge no longer reads the scored reply twice: its
   "conversation so far" now holds only earlier turns. Turn scores can
   shift slightly against older results.
+- A run where nothing scored but the model and judge were both reachable
+  (every reply empty or out of thinking budget, or every judge reply
+  unparsable) was labelled `infrastructure_invalid`, and gauntlet called
+  it "provider unreachable". Its integrity status is now `unscored`.
+  `infrastructure_invalid` now means a model or judge call failed. Both
+  still exit nonzero.
 
 ## 0.25.1 (2026-10-04) — Distributed runs per key, -o everywhere
 

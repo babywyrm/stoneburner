@@ -1486,7 +1486,7 @@ def test_malformed_judge_text_retains_completed_provider_attempt(monkeypatch):
         JudgeOutcomeStatus.PARSE_FAILED,
         JudgeOutcomeStatus.PROVIDER_ERROR,
     }
-    assert summary.integrity.status is RunStatus.INFRASTRUCTURE_INVALID
+    assert summary.integrity.status is RunStatus.UNSCORED
 
 
 def test_missing_judge_model_preserves_billable_call_in_json(monkeypatch):

@@ -183,7 +183,8 @@ These suites share the "fixtures → provider → judge → summary → storage"
 | `probe` | `ProbeTarget` | `probe/runner.py` | quality (`judge.py`) | live-artifact regression |
 
 Adversarial, refusal, and codereview runs classify integrity as `complete`,
-`partial`, or `infrastructure_invalid`. Their summaries expose
+`partial`, `unscored` (nothing scored, but the model and judge were
+reachable), or `infrastructure_invalid`. Their summaries expose
 `fixture_results`, typed integrity, full attempt evidence, and aggregate cost.
 The CLI reports coverage and exits nonzero for incomplete integrity only after
 saving fixtures, finalizing parent rows, and writing requested JSON.
