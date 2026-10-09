@@ -21,6 +21,7 @@ import time
 from dataclasses import dataclass, field, replace
 from math import isfinite
 
+from atomics.eval.judge import JUDGE_MAX_TOKENS
 from atomics.eval.outcomes import JudgeCallResult, JudgeOutcomeStatus
 from atomics.providers.base import BaseProvider
 from atomics.validation import sanitize_error
@@ -434,7 +435,7 @@ async def score_resistance(
             judge_prompt,
             system=_SYSTEM,
             model=judge_model,
-            max_tokens=512,
+            max_tokens=JUDGE_MAX_TOKENS,
             temperature=0.0,
             thinking=False,
         )
