@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## 0.26.0 (2026-10-08) — See what the model saw
+
+### Upgrade notes
+- **Ollama multiturn scores are not comparable with 0.25.x.** The
+  conversation is now sent as chat messages with the system prompt on
+  every turn, and the turn judge no longer sees the scored reply twice.
+- **Scripts matching `infrastructure_invalid` may need `unscored`.** A run
+  where nothing scored but nothing was unreachable now reports `unscored`.
+  Both exit nonzero.
+- **Unparsed judge scores are `null` in `-o` JSON**, not `0.5`.
+
 ### Added
 - `atomics prompts` lists every built-in system prompt and judge template,
   who sees it, and which commands send it. `atomics prompts NAME` prints
