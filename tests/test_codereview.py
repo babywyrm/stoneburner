@@ -279,7 +279,7 @@ async def test_empty_review_is_indeterminate():
     )
 
     assert summary.review_score is None
-    assert summary.integrity.status is RunStatus.INFRASTRUCTURE_INVALID
+    assert summary.integrity.status is RunStatus.UNSCORED
     assert summary.results[0].verdict == "unknown"
 
 

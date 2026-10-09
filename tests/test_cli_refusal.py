@@ -248,7 +248,7 @@ def test_refusal_partial_run_exits_nonzero(monkeypatch) -> None:
     )
 
     assert result.exit_code == 1
-    assert "infrastructure_invalid" in result.output
+    assert "unscored" in result.output
     assert "ERROR" in result.output
     assert "MISS" not in result.output
     assert "Judge failures" in result.output
@@ -283,9 +283,7 @@ def test_refusal_allow_partial_writes_json(monkeypatch, tmp_path) -> None:
     )
 
     assert result.exit_code == 0
-    assert json.loads(output.read_text(encoding="utf-8"))["integrity"]["status"] == (
-        "infrastructure_invalid"
-    )
+    assert json.loads(output.read_text(encoding="utf-8"))["integrity"]["status"] == "unscored"
 
 
 def test_refusal_save_persists_and_finalizes_parent(monkeypatch, tmp_path) -> None:

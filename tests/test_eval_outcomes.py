@@ -833,20 +833,14 @@ def test_run_integrity_empty_fixture_list_has_zero_rates() -> None:
     assert integrity.should_exit_nonzero
 
 
-def test_run_integrity_empty_generation_counts_failure_without_infrastructure() -> None:
+@pytest.mark.parametrize("kind", [ProviderOutcomeKind.EMPTY, ProviderOutcomeKind.THINKING_BUDGET])
+def test_run_integrity_empty_generation_counts_failure_without_infrastructure(kind) -> None:
     integrity = RunIntegrity.from_fixture_attempts(
-        [
-            [
-                _attempt(
-                    0,
-                    provider_kind=ProviderOutcomeKind.EMPTY,
-                    judge_status=None,
-                )
-            ]
-        ]
+        [[_attempt(0, provider_kind=kind, judge_status=None)]]
     )
 
-    assert integrity.status is RunStatus.INFRASTRUCTURE_INVALID
+    assert integrity.status is RunStatus.UNSCORED
+    assert integrity.should_exit_nonzero
     assert integrity.generation_failures == 1
     assert integrity.infrastructure_failures == 0
     assert integrity.judge_failures == 0

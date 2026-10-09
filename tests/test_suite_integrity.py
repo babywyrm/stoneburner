@@ -109,10 +109,10 @@ class TestIntegrityCounting:
         assert integrity.judge_failure_rate == 0.9
         assert integrity.should_exit_nonzero is True
 
-    def test_a_total_judge_outage_is_infrastructure_invalid(self):
+    def test_a_total_judge_failure_is_unscored_not_an_outage(self):
         integrity = integrity_of(outcomes(*([(True, False)] * 5)))
 
-        assert integrity.status is RunStatus.INFRASTRUCTURE_INVALID
+        assert integrity.status is RunStatus.UNSCORED
         assert integrity.fixtures_scored == 0
         assert integrity.should_exit_nonzero is True
 
@@ -285,7 +285,7 @@ class TestDegradedRunsAreVisible:
         assert summary.avg_retention is None
         assert summary.avg_consistency is None
 
-        assert summary.integrity.status.value == "infrastructure_invalid"
+        assert summary.integrity.status.value == "unscored"
         assert summary.integrity.judge_failures == 4
         assert summary.integrity.should_exit_nonzero is True
 

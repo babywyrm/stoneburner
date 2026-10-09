@@ -268,9 +268,7 @@ def test_codereview_partial_json_is_written_before_nonzero_exit(
     assert "Judge failures" in result.output
     assert "n/a (0/1 scored)" in result.output
     assert "100.0%" not in result.output
-    assert json.loads(output.read_text(encoding="utf-8"))["integrity"]["status"] == (
-        "infrastructure_invalid"
-    )
+    assert json.loads(output.read_text(encoding="utf-8"))["integrity"]["status"] == "unscored"
 
 
 def test_codereview_thinking_budget_is_not_an_error(monkeypatch) -> None:

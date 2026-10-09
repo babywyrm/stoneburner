@@ -186,6 +186,9 @@ class RunStatus(StrEnum):
     COMPLETE = "complete"
     PARTIAL = "partial"
     INFRASTRUCTURE_INVALID = "infrastructure_invalid"
+    # Nothing scored, and neither the model nor the judge was unreachable: the
+    # replies were empty or ran out of budget, or the judges' replies did not parse.
+    UNSCORED = "unscored"
 
 
 @dataclass(frozen=True)
@@ -342,6 +345,7 @@ class _AttemptView:
     infrastructure_invalid: bool
     scored: bool
     judge_failed: bool
+    judge_unreachable: bool = False
 
 
 def _view_of_attempt(attempt: AttemptResult) -> _AttemptView:
@@ -359,6 +363,7 @@ def _view_of_attempt(attempt: AttemptResult) -> _AttemptView:
             or judge.status in {JudgeOutcomeStatus.PARSE_FAILED, JudgeOutcomeStatus.PROVIDER_ERROR}
             or not judge.panel_complete
         ),
+        judge_unreachable=judge is not None and judge.status is JudgeOutcomeStatus.PROVIDER_ERROR,
     )
 
 
@@ -370,6 +375,7 @@ def _view_of_outcome(outcome: FixtureOutcome) -> _AttemptView:
         scored=provider.is_scorable and outcome.judge is JudgeOutcomeStatus.SCORED,
         judge_failed=provider.is_scorable
         and outcome.judge in {JudgeOutcomeStatus.PARSE_FAILED, JudgeOutcomeStatus.PROVIDER_ERROR},
+        judge_unreachable=outcome.judge is JudgeOutcomeStatus.PROVIDER_ERROR,
     )
 
 
@@ -393,6 +399,8 @@ def _count_integrity(
         status = RunStatus.COMPLETE
     elif fixtures_scored > 0:
         status = RunStatus.PARTIAL
+    elif views and not any(view.infrastructure_invalid or view.judge_unreachable for view in views):
+        status = RunStatus.UNSCORED
     else:
         status = RunStatus.INFRASTRUCTURE_INVALID
 
