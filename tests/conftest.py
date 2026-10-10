@@ -7,8 +7,12 @@ import time
 from collections.abc import Callable, Iterator
 from pathlib import Path
 from types import ModuleType
+from typing import TYPE_CHECKING
 
 import pytest
+
+if TYPE_CHECKING:
+    from fastapi.testclient import TestClient
 
 # Track and close all sqlite3 connections opened during tests so we don't leak
 # them and trigger ResourceWarnings.
@@ -91,6 +95,18 @@ def _isolated_operator_state(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) ->
     monkeypatch.setattr("atomics.paths.default_data_dir", lambda: tmp_path / "data")
     monkeypatch.setenv("ATOMICS_DB_PATH", str(tmp_path / "data" / "atomics.db"))
     monkeypatch.setenv("PYTHON_KEYRING_BACKEND", "keyring.backends.null.Keyring")
+
+
+@pytest.fixture
+def client() -> Iterator[TestClient]:
+    """A --no-auth API server on loopback, lifespan started."""
+    from fastapi.testclient import TestClient
+
+    from atomics.api.config import ServerSettings
+    from atomics.api.server import create_app
+
+    with TestClient(create_app(ServerSettings(no_auth=True)), base_url="http://127.0.0.1") as tc:
+        yield tc
 
 
 @pytest.fixture(autouse=True)
