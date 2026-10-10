@@ -7,7 +7,7 @@ and runners call them while mutating an in-memory `Job`.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any, Literal, TypedDict, cast
+from typing import Any, Literal, TypedDict
 
 from atomics.api.jobs import Job
 from atomics.api.models import (
@@ -22,7 +22,7 @@ from atomics.config import AtomicsSettings
 from atomics.eval.adversarial import ALL_FIXTURES as ADVERSARIAL_FIXTURES
 from atomics.eval.codegen.fixtures import ALL_CODEGEN_FIXTURES
 from atomics.eval.codereview.fixtures import SECURE_CODE_FIXTURES
-from atomics.eval.fixtures import EVAL_FIXTURES, EvalFixture
+from atomics.eval.fixtures import EVAL_FIXTURES
 from atomics.eval.multiturn.fixtures import ALL_MULTITURN_FIXTURES
 from atomics.eval.rag.fixtures import ALL_RAG_FIXTURES
 from atomics.eval.redblue.fixtures import ALL_FIXTURES as REDBLUE_FIXTURES
@@ -133,13 +133,6 @@ def select_catalog_fixtures(
         if ident:
             by_id[str(ident)] = item
     return [by_id[item] for item in ids if item in by_id]
-
-
-def select_eval_fixtures(ids: list[str] | None) -> list[EvalFixture] | None:
-    selected = select_catalog_fixtures(EVAL_FIXTURES, ids)
-    if selected is None:
-        return None
-    return cast(list[EvalFixture], selected)
 
 
 def fixtures_for_request(payload: EvalRequest) -> list[Any]:

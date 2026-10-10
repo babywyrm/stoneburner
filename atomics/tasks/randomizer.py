@@ -12,16 +12,6 @@ from __future__ import annotations
 import hashlib
 import random
 from collections import deque
-from dataclasses import dataclass, field
-
-
-@dataclass
-class PromptModifier:
-    audience: list[str] = field(default_factory=list)
-    constraints: list[str] = field(default_factory=list)
-    formats: list[str] = field(default_factory=list)
-    perspectives: list[str] = field(default_factory=list)
-
 
 AUDIENCES = [
     "for a senior security engineer",
