@@ -369,6 +369,18 @@ def test_get_run_uses_run_id_in_path():
     assert requests[0].url.path == "/api/v1/runs/run-99"
 
 
+@pytest.mark.parametrize("call", ["get_job", "get_run"])
+def test_an_id_cannot_leave_its_path_segment(call):
+    """Ids come from tool arguments, which a prompt-injected agent controls."""
+    requests: list[httpx.Request] = []
+    with client_recording(requests) as client:
+        getattr(client, call)("../reports/trends?hours=1")
+
+    raw = requests[0].url.raw_path.decode()
+    assert raw.endswith("/..%2Freports%2Ftrends%3Fhours%3D1")
+    assert not requests[0].url.query
+
+
 def test_trends_passes_hours():
     requests: list[httpx.Request] = []
     with client_recording(requests) as client:

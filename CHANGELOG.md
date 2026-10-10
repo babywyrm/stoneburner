@@ -7,6 +7,9 @@
   loopback address. A web page could rebind its own name to `127.0.0.1`,
   become same-origin with the server, and submit evals or read results.
   Keyed servers are unchanged: a rebinding page has no key.
+- The MCP proxy and REPL percent-encode job and run ids. An id such as
+  `../reports/trends` from a prompt-injected agent used to reach a
+  different API route.
 
 ## 0.26.0 (2026-10-08) — See what the model saw
 
