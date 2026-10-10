@@ -6,13 +6,9 @@ Endpoint: https://api.groq.com/openai/v1/chat/completions
 
 from __future__ import annotations
 
-import time
-
 import httpx
 
-from atomics.providers._openai_compat import OpenAICompatibleTools
-from atomics.providers.base import BaseProvider, ProviderResponse, compute_tps
-from atomics.providers.effort import apply_chat_effort, normalize_effort
+from atomics.providers._openai_compat import HostedChatProvider
 
 MODEL_PRICING: dict[str, tuple[float, float]] = {
     "llama-3.3-70b-versatile": (0.59, 0.79),
@@ -37,11 +33,8 @@ def _estimate_cost(model: str, input_tokens: int, output_tokens: int) -> float:
     return (input_tokens * inp_price + output_tokens * out_price) / 1_000_000
 
 
-class GroqProvider(OpenAICompatibleTools, BaseProvider):
+class GroqProvider(HostedChatProvider):
     """Groq cloud inference via OpenAI-compatible Chat Completions API."""
-
-    def _tool_cost(self, model: str, input_tokens: int, output_tokens: int) -> float:
-        return _estimate_cost(model, input_tokens, output_tokens)
 
     def __init__(
         self,
@@ -51,95 +44,14 @@ class GroqProvider(OpenAICompatibleTools, BaseProvider):
         timeout: float = 60.0,
         client: httpx.AsyncClient | None = None,
     ) -> None:
-        self._api_key = api_key
-        self._default_model = default_model
-        self._timeout = timeout
-        self._client = client or httpx.AsyncClient()
-        self._base_url = "https://api.groq.com/openai/v1"
-
-    @property
-    def name(self) -> str:
-        return "groq"
-
-    @property
-    def default_model(self) -> str:
-        return self._default_model
-
-    def _headers(self) -> dict[str, str]:
-        return {
-            "Authorization": f"Bearer {self._api_key}",
-            "Content-Type": "application/json",
-        }
-
-    async def generate(
-        self,
-        prompt: str,
-        *,
-        system: str = "",
-        model: str | None = None,
-        max_tokens: int = 1024,
-        thinking: bool | None = None,
-        thinking_budget: int | None = None,
-        temperature: float | None = None,
-        effort: str | None = None,
-        reasoning_mode: str | None = None,
-    ) -> ProviderResponse:
-        model = model or self._default_model
-        _ = reasoning_mode
-
-        messages = [
-            {"role": "system", "content": system or "You are a helpful assistant."},
-            {"role": "user", "content": prompt},
-        ]
-
-        body: dict = {
-            "model": model,
-            "messages": messages,
-            "max_tokens": max_tokens,
-            "stream": False,
-        }
-        if temperature is not None:
-            body["temperature"] = temperature
-        reasoning_request = apply_chat_effort(body, effort)
-
-        t0 = time.monotonic()
-        response = await self._client.post(
-            f"{self._base_url}/chat/completions",
-            json=body,
-            headers=self._headers(),
-            timeout=self._timeout,
-        )
-        response.raise_for_status()
-        latency_ms = round((time.monotonic() - t0) * 1000, 2)
-
-        data = response.json()
-        choice = data["choices"][0] if data.get("choices") else {}
-        text = choice.get("message", {}).get("content", "") or ""
-        usage = data.get("usage", {})
-        inp = usage.get("prompt_tokens", 0)
-        out = usage.get("completion_tokens", 0)
-        total = usage.get("total_tokens", inp + out)
-
-        tps = compute_tps(out, latency_ms / 1000)
-
-        return ProviderResponse(
-            text=text,
-            input_tokens=inp,
-            output_tokens=out,
-            total_tokens=total,
-            model=model,
-            latency_ms=latency_ms,
-            estimated_cost_usd=round(_estimate_cost(model, inp, out), 6),
-            tokens_per_second=tps,
-            tps_basis="wall_clock",
-            raw=data,
-            effort=normalize_effort(effort),
-            reasoning_request=reasoning_request,
+        super().__init__(
+            name="groq",
+            base_url="https://api.groq.com/openai/v1",
+            api_key=api_key,
+            default_model=default_model,
+            timeout=timeout,
+            client=client,
         )
 
-    async def health_check(self) -> bool:
-        try:
-            resp = await self.generate("Say OK.", max_tokens=8)
-            return len(resp.text) > 0
-        except Exception:
-            return False
+    def _tool_cost(self, model: str, input_tokens: int, output_tokens: int) -> float:
+        return _estimate_cost(model, input_tokens, output_tokens)
