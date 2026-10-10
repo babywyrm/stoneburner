@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Fixed
+- A schema migration that rebuilds a table other rows point at (for
+  example `workers`, referenced by distributed assignments) no longer
+  fails with `FOREIGN KEY constraint failed`. Foreign keys were meant to
+  be off during the rebuild, but SQLite ignores that switch inside the
+  migration transaction.
+
 ## 0.26.1 (2026-10-10) — Rebinding-proof no-auth, contained MCP ids
 
 ### Upgrade notes

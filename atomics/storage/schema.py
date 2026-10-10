@@ -527,7 +527,6 @@ def _rebuild_table(
     if not common:
         raise sqlite3.OperationalError(f"cannot rebuild {table}: no shared columns")
     tmp = f"{table}__new"
-    conn.execute("PRAGMA foreign_keys=OFF")
     conn.execute(_rename_create_table(create_sql, table, tmp))
     cols = ", ".join(_ident(name) for name in common)
     # Table and column names come from the schema, and _ident quotes them.
@@ -535,7 +534,6 @@ def _rebuild_table(
     conn.execute(copy)
     conn.execute(f"DROP TABLE {_ident(table)}")
     conn.execute(f"ALTER TABLE {_ident(tmp)} RENAME TO {_ident(table)}")
-    conn.execute("PRAGMA foreign_keys=ON")
 
 
 def _add_missing_columns(
@@ -633,7 +631,9 @@ def init_db(db_path: Path) -> sqlite3.Connection:
     try:
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA journal_mode=WAL")
-        conn.execute("PRAGMA foreign_keys=ON")
+        # SQLite ignores this pragma inside a transaction, so it is off for the
+        # whole migration: rebuilding a table other rows reference drops it first.
+        conn.execute("PRAGMA foreign_keys=OFF")
 
         current = _get_schema_version(conn)
         migration_candidate = current != 0 and current < SCHEMA_VERSION
@@ -660,6 +660,7 @@ def init_db(db_path: Path) -> sqlite3.Connection:
             (SCHEMA_VERSION,),
         )
         conn.commit()
+        conn.execute("PRAGMA foreign_keys=ON")
         return conn
     except Exception:
         conn.rollback()
