@@ -19,33 +19,52 @@ never imports eval; providers never import storage.
 
 ```
 CLI / entry          cli.py, commands/, __main__.py
-API / server         api/                # FastAPI, async jobs, optional auth
-MCP / agent          mcp/                # stdio proxy over a running API server
-Orchestration        benchmark/ (sweep, qa_runner, labcompare, advisor)
+API / server         api/, distributed/      # FastAPI, async jobs, fleet
+HTTP clients         mcp/, repl/, workers/   # talk to a running API server
+Orchestration        benchmark/ (sweep, qa_runner, labcompare, advisor),
+                     eval/batteries, inventory/
 Burn loop            core/, tasks/, benchmark/tiers, reporting/hooks
 Eval / security      eval/, probe/, archreview/
-Load testing         load/ (stress, soak, contention, capacity, profiles)
+Load testing         load/ (stress, soak, scenario, contention, capacity)
 Providers            providers/, auth/, benchmark/model_classes
-Storage              storage/
-Support / infra      config, paths, secrets, doctor, reporting/,
-                     scheduler, inference
+Storage              storage/ (schema, repository/ mixins)
+Support / infra      config, paths, secrets, validation, inference,
+                     doctor, reporting/, scheduler/
 ```
+
+The 19 one-screen modules at the package root (`atomics/sweep.py`,
+`atomics/soak.py`, `atomics/stats.py`, …) are compatibility shims that
+re-export the implementation named in their docstring. Import the real
+module in new code; the shims stay for external callers.
+
+Solid arrows are imports; the CLI and API also build providers and open the
+repository directly. Dashed arrows are HTTP: the MCP server, the REPL, and
+workers hold no provider, storage, or budget logic of their own.
 
 ```mermaid
 flowchart TB
-    CLI["CLI / entry\ncli.py, commands/"] --> Commands["commands/\nauth, admin, benchmark, eval, security, load, api, mcp, rag, codegen, probe, archreview, qa"]
-    API["API / server\natomics/api/"] --> Commands
-    MCP["MCP / agent\natomics/mcp/"] --> API
-    Commands --> Orchestration["Orchestration\nbenchmark/sweep, load/scenario"]
-    Commands --> Burn["Burn loop\ncore/ engine, runner, guard"]
-    Commands --> Eval["Eval / security\neval/, probe/, archreview/"]
-    Commands --> Load["Load testing\nload/stress, soak, capacity"]
-    Orchestration --> Providers
-    Burn --> Providers
-    Eval --> Providers
-    Load --> Providers
-    Providers["Providers\nproviders/, auth/"] --> Storage["Storage\nstorage/"]
-    Providers --> Support["Support / infra\nconfig, secrets, scheduler, reporting"]
+    Clients["HTTP clients\nmcp/, repl/, workers/"]
+    CLI["CLI\ncli.py, commands/"]
+    API["API server\napi/, distributed/"]
+    subgraph Work["Workloads"]
+        direction LR
+        Orch["Orchestration\nbenchmark/, eval/batteries, inventory/"]
+        Eval["Eval / security\neval/, probe/, archreview/"]
+        Burn["Burn loop\ncore/, tasks/"]
+        Load["Load testing\nload/"]
+        Orch --> Eval
+    end
+    Providers["Providers\nproviders/, auth/"]
+    Storage["Storage\nstorage/"]
+    Support["Support\nconfig, secrets, validation, inference, reporting/"]
+
+    Clients -. HTTP .-> API
+    CLI --> Work
+    API --> Work
+    Work --> Providers
+    Work --> Storage
+    Providers --> Support
+    Storage --> Support
 ```
 
 ### Layer responsibilities
@@ -53,14 +72,14 @@ flowchart TB
 | Layer | Owns | Key modules |
 |-------|------|-------------|
 | CLI | Thin Click registration in `cli.py`; command modules in `commands/` handle argument parsing, wiring, and Rich output. No business logic that can't be reached another way. | `cli.py`, `commands/` |
-| API / server | FastAPI HTTP surface for runs, evals, reports, and async jobs; optional auth. | `api/` |
-| MCP / agent | Stdio MCP server that proxies a running API. Holds no provider, storage, or budget logic of its own — an agent inherits the API's authentication and spend ceilings. Tool surface is bounded by the API, not the CLI. | `mcp/`, `commands/mcp.py` |
-| Orchestration | Multi-run/multi-model coordination over the lower layers. | `benchmark/sweep.py`, `load/scenario.py`, `benchmark/qa_runner.py` |
+| API / server | FastAPI HTTP surface for runs, evals, reports, and async jobs; optional auth; the distributed coordinator. Never imports `commands/`. | `api/`, `distributed/` |
+| HTTP clients | The stdio MCP server, the REPL, and npm workers. They share `mcp/client.AtomicsApiClient` and inherit the API's authentication and spend ceilings. Tool surface is bounded by the API, not the CLI. | `mcp/`, `repl/`, `workers/` |
+| Orchestration | Multi-run/multi-model coordination over the lower layers; named batteries; model inventory and cohorts. | `benchmark/sweep.py`, `benchmark/qa_runner.py`, `eval/batteries.py`, `inventory/` |
 | Burn loop | The continuous token-burn benchmark. | `core/engine.py`, `core/runner.py`, `core/guard.py`, `tasks/` |
 | Eval / security | LLM quality and security evaluation suites. | `eval/`, `probe/`, `archreview/` |
 | Load testing | Throughput/latency/stability under concurrency. | `load/stress.py`, `load/soak.py`, `load/contention.py`, `load/capacity.py` |
 | Providers | One uniform async interface to every LLM backend. | `providers/base.py` + adapters, `auth/` |
-| Storage | SQLite persistence and queries. | `storage/repository.py`, `storage/schema.py` |
+| Storage | SQLite persistence and queries. | `storage/repository/`, `storage/schema.py` |
 | Support | Config, secrets, paths, diagnostics, reporting. | `config.py`, `secrets.py`, `paths.py`, ... |
 
 ---
@@ -120,9 +139,10 @@ directly testable and reusable.
 Pydantic models for the burn/eval domain: `TaskResult`, `RunSummary`,
 `TaskCategory`, `TaskStatus`, `BurnTier`. Persisted rows map to `TaskResult`.
 
-### `storage/repository.py` — persistence hub
+### `storage/repository/` — persistence hub
 
-`MetricsRepository` wraps SQLite. The run lifecycle contract is:
+`MetricsRepository` wraps SQLite. It is composed from one mixin per domain
+(runs, evaluation, tasks, security, analytics, schedules, load). The run lifecycle contract is:
 
 ```
 create_run(run_id, tier=..., provider=..., model=...)   # once, before saving items
@@ -163,6 +183,9 @@ longer drops run history.
 `detect_self_judge()` (warn when the model under test is also the judge),
 `char_budget_for_tokens()`, `compute_criteria_coverage()`. Adversarial resistance
 scoring (`eval/adversarial/scorer.py`) is a parallel judge with an inverted rubric.
+Every judge reply is capped by the one `JUDGE_MAX_TOKENS`; do not add a
+per-suite cap. Refusal and codereview record calls through
+`JudgeCallResult.from_response()` / `.from_error()` in `eval/outcomes.py`.
 
 ---
 
@@ -245,7 +268,8 @@ New code should follow the target column, not copy whichever suite you opened fi
 | Stats helpers | one shared `stats` module | done — `atomics/stats.py` |
 | Provider build | `providers.factory.make_provider()` | done — single factory, CLI wraps it |
 | CLI modules | one module per command under `commands/` | done for the oversized ones — `rag.py` split into `rag` / `codegen` / `probe` / `archreview` / `qa`; `soak`, `scenario`, `compare`, `sweep`, and `labcompare` are their own modules. `load.py` (stress / capacity / baselines) and `benchmark.py` (run / report / tiers) keep a cohesive family each. `admin.py` and `rag.py` are still over 500 lines; do not reopen the split to chase the number |
-| Repository modules | persistence grouped by domain | generic records extracted; `storage/repository.py` remains a split candidate |
+| Repository modules | persistence grouped by domain | done — `storage/repository/` mixins |
+| Hosted chat providers | `providers/_openai_compat.HostedChatProvider` | done — Groq and Together are config plus a cost function |
 
 ---
 
@@ -273,6 +297,14 @@ handles API keys and can send data to LLM providers. Rules for contributors:
   API, not the CLI. It must not grow a second copy of auth or spend ceilings;
   new MCP tools mean new API endpoints first. Stdio only — an HTTP MCP
   transport would expose a spend-authorized API key with no MCP-layer credential.
+  Path ids are encoded with `quote(id, safe="")` so an id cannot leave its
+  URL segment.
+- **The API server is the remote boundary.** It binds loopback by default.
+  `--no-auth` additionally rejects any non-loopback `Host` header (421) so a
+  browser page cannot reach it through DNS rebinding. With auth on, jobs are
+  scoped to their owner, error text is sanitized, and file paths in requests
+  are confined. An API key can still make the server read local files through
+  `codegen`; [API_SERVER](docs/API_SERVER.md) states the full trust model.
 
 ---
 
@@ -282,14 +314,15 @@ handles API keys and can send data to LLM providers. Rules for contributors:
   default. The one live test (`test_calibration.py`) is gated behind
   `ATOMICS_LIVE_JUDGE=1`. The dashboard page script is executed by
   `tests/test_dashboard_script.py` (skipped if `node` is missing).
-- CI (`.github/workflows/ci.yml`) runs ruff + pytest on Linux/macOS across
+- An autouse fixture in `tests/conftest.py` points the database, the data
+  directory, and the keyring at temp or null backends, so no test touches the
+  operator's `data/atomics.db` or keychain. `tests/test_isolation.py` guards it.
+- API tests use the `client` fixture or
+  `TestClient(app, base_url="http://127.0.0.1")`; the default `testserver`
+  host is rejected under `--no-auth`.
+- CI (`.github/workflows/ci.yml`) runs `ruff check`, `ruff format --check`,
+  `mypy atomics/`, and pytest (coverage floor 85%) on Linux/macOS across
   Python 3.11–3.13, with `--extra dev --extra api --extra mcp`. The `api` extra
   is required for collection; the `mcp` extra is required for the MCP tests to
-  *run* rather than skip.
-- Run the suite before every commit: `uv run pytest -q`.
-
----
-
-## Module split candidates (tech debt, tracked)
-
-`storage/repository/` is mixins per domain (runs, evaluation, tasks, security, analytics, schedules, load). `inference.py` is consumed by `doctor` and `make_provider`. The unused `workers/bridge.py` scaffold was removed; npm workers go through `atomics worker-npm`.
+  *run* rather than skip. `security.yml` runs pip-audit, bandit, and gitleaks.
+- Before every commit, run the checks in [CONTRIBUTING](CONTRIBUTING.md#the-checks).

@@ -88,9 +88,23 @@ Record only sanitized evidence:
 Do not record secrets, private IPs, customer endpoints, flags, raw tokens,
 unreleased exploit payloads, or full logs that expose private target details.
 
+## Run Integrity
+
+Check integrity before reading any score. Suites report `complete`,
+`partial`, `unscored` (nothing scored, model and judge reachable), or
+`infrastructure_invalid` (model or judge outage). Only `complete` runs
+are promotion evidence. A headline of `n/a (scored/total scored)` means
+the score is withheld, not zero. `--allow-partial` only changes the exit
+code.
+
+Use a judge that is not the model under test. `atomics prompts` and
+`atomics --show-prompt <command>` show what the model and judge were sent.
+
 ## Interpretation Rules
 
 - Passing `provider-test` means runtime health only.
+- `infrastructure_invalid` or `unscored` is `BROKEN_RUNTIME` evidence at
+  most, never a compatibility verdict.
 - Passing `atomics qa` for individual prompts may mean `FUNCTION_COMPATIBLE`.
 - Full application or challenge promotion requires the actual end-to-end
   workflow to pass.

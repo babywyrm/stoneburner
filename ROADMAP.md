@@ -267,8 +267,7 @@ Package version is **0.23.1**.
 
 ## Next
 
-Current package is **0.25.0** — honest sweeps, tighter API, slimmer
-install. Do not retag `v0.24.1`, `v0.22.5`, `v0.21.0`, or `v0.20.0`. Do
+Current package is **0.26.0** — see what the model saw. Do not retag `v0.24.1`, `v0.22.5`, `v0.21.0`, or `v0.20.0`. Do
 not mix a feature into a tag commit. `RELEASING.md`. `v0` is the floating major tag the publish
 workflow moves; it is not stray.
 
