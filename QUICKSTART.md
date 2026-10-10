@@ -398,14 +398,14 @@ uv run atomics qa --file qa/examples/ai-gate-regression.yaml \
 
 ---
 
-## 3b. Safety & adversarial resilience
+## 3b. More security recipes
 
 ```bash
-# Test how well a model resists manipulation (local, free)
-uv run atomics adversarial -p ollama --ollama-host http://bb:11434 -m qwen2.5:3b --runs 3
+# Repeated rounds (local, free)
+uv run atomics adversarial -p ollama -m qwen2.5:3b --runs 3
 
 # Use Claude as a calibrated judge (paid, ~$0.03/run)
-uv run atomics adversarial -p ollama --ollama-host http://bb:11434 -m qwen3.5:4b \
+uv run atomics adversarial -p ollama -m qwen3.5:4b \
   --judge-provider claude --judge-model claude-haiku-4-5-20251001 --runs 3
 
 # Test only one suite/group: mcp, tool_safety, zerotrust, agentic,
@@ -424,12 +424,6 @@ uv run atomics adversarial -p ollama -m qwen2.5:7b --fail-on-resilience 60
 # Run red/blue capability eval (variance-aware + JSON export)
 uv run atomics redblue -p ollama -m qwen3.5:4b --runs 3 --no-thinking --json-out redblue.json
 
-# Tool-call divergence. Live lines print each pass; a judge is required
-# or prose stays unjudged and channel divergence is not measured.
-uv run atomics -v toolcall -p ollama -m qwen3.8:27b \
-  --judge-provider ollama --judge-model qwen2.5:14b \
-  --runs 3 --no-thinking --no-skip-incapable --json-out toolcall.json
-
 # Measure over- and under-refusal; fixture rows are saved as they complete
 uv run atomics refusal -p ollama -m qwen3.5:4b \
   --judge-model qwen2.5:14b --no-thinking --json-out refusal.json
@@ -446,8 +440,8 @@ uv run atomics archreview -p ollama -m qwen2.5:7b --pack camazotz
 ```
 
 Evaluation commands show per-fixture progress and total judge cost. Refusal and
-code-review runs exit nonzero on partial or infrastructure-invalid integrity by
-default, after requested JSON is written and saved fixture rows are finalized.
+code-review runs exit nonzero on partial, unscored, or infrastructure-invalid
+integrity by default, after requested JSON is written and saved fixture rows are finalized.
 Their schema-v20 `evaluation_results.result_json` data includes raw model and
 judge evidence, so protect exports and the metrics database.
 
