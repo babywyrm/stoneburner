@@ -9,7 +9,7 @@ from pathlib import Path
 
 logger = logging.getLogger("atomics.schema")
 
-SCHEMA_VERSION = 21
+SCHEMA_VERSION = 22
 
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -351,7 +351,6 @@ CREATE TABLE IF NOT EXISTS workers (
     labels TEXT NOT NULL,
     capabilities TEXT,
     endpoint TEXT,
-    api_key_hint TEXT,
     status TEXT NOT NULL DEFAULT 'online',
     last_seen_at TEXT,
     registered_at TEXT NOT NULL

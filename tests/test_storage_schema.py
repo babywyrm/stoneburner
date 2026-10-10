@@ -186,6 +186,9 @@ def test_a_pre_fleet_database_gains_target_worker_id_without_losing_work(
     upgraded = init_db(db_path)
     try:
         assert "target_worker_id" in _column_names(upgraded, "distributed_assignments")
+        assert "api_key_hint" not in _column_names(upgraded, "workers")
+        workers = upgraded.execute("SELECT worker_id FROM workers").fetchall()
+        assert [row[0] for row in workers] == ["worker-1"]
 
         # The pending assignment survived and is still claimable, with no pin.
         claimed = Coordinator(upgraded).claim_assignment("worker-1")

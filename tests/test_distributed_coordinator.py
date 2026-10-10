@@ -24,9 +24,8 @@ def coordinator(tmp_path):
 
 def test_register_worker(coordinator):
     req = WorkerRegisterRequest(labels={"provider": "ollama"})
-    w = coordinator.register_worker(req, api_key_hint="1234")
+    w = coordinator.register_worker(req)
     assert w.labels["provider"] == "ollama"
-    assert w.api_key_hint == "1234"
     assert w.status.value == "online"
 
 
