@@ -86,6 +86,14 @@ def metrics_repo(tmp_db_path: Path) -> MetricsRepository:
 
 
 @pytest.fixture(autouse=True)
+def _isolated_operator_state(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Settings must not open the operator's database or read their keychain."""
+    monkeypatch.setattr("atomics.paths.default_data_dir", lambda: tmp_path / "data")
+    monkeypatch.setenv("ATOMICS_DB_PATH", str(tmp_path / "data" / "atomics.db"))
+    monkeypatch.setenv("PYTHON_KEYRING_BACKEND", "keyring.backends.null.Keyring")
+
+
+@pytest.fixture(autouse=True)
 def _close_sqlite_connections() -> Iterator[None]:
     """Close any sqlite3 connections opened during a test."""
     yield
