@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Changed
+- Worker records no longer carry `api_key_hint`. Nothing ever set it, so
+  the API always returned `null`. Schema v22 drops the column in place;
+  the usual `.bak` is written first and worker rows are kept.
+
 ### Fixed
 - A schema migration that rebuilds a table other rows point at (for
   example `workers`, referenced by distributed assignments) no longer

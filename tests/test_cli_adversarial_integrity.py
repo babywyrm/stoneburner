@@ -455,7 +455,7 @@ def test_compare_save_creates_and_completes_both_parent_rows(monkeypatch, tmp_pa
 def test_schema_v19_has_adversarial_attempt_ledger_and_foreign_key(tmp_path):
     conn = init_db(tmp_path / "schema.db")
     try:
-        assert SCHEMA_VERSION == 21
+        assert SCHEMA_VERSION == 22
         column_info = {
             row["name"]: row for row in conn.execute("PRAGMA table_info(adversarial_results)")
         }

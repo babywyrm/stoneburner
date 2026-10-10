@@ -43,7 +43,6 @@ class Worker(BaseModel):
     labels: dict[str, str] = Field(default_factory=dict)
     capabilities: list[str] = Field(default_factory=list)
     endpoint: str | None = None
-    api_key_hint: str | None = None
     status: WorkerStatus = WorkerStatus.ONLINE
     last_seen_at: datetime | None = None
     registered_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

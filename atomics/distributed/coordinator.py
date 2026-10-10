@@ -68,9 +68,7 @@ class Coordinator:
             return f"{type(exc).__name__}: {exc}"
         return None
 
-    def register_worker(
-        self, req: WorkerRegisterRequest, *, api_key_hint: str | None = None
-    ) -> Worker:
+    def register_worker(self, req: WorkerRegisterRequest) -> Worker:
         worker_id = uuid.uuid4().hex[:12]
         now = self._now()
         now_dt = datetime.now(UTC)
@@ -79,22 +77,20 @@ class Coordinator:
             labels=req.labels,
             capabilities=req.capabilities,
             endpoint=req.endpoint,
-            api_key_hint=api_key_hint,
             status=WorkerStatus.ONLINE,
             last_seen_at=now_dt,
             registered_at=now_dt,
         )
         self._conn.execute(
             "INSERT INTO workers "
-            "(worker_id, labels, capabilities, endpoint, api_key_hint, "
+            "(worker_id, labels, capabilities, endpoint, "
             "status, last_seen_at, registered_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
             (
                 worker.worker_id,
                 json.dumps(worker.labels),
                 json.dumps(worker.capabilities),
                 worker.endpoint,
-                worker.api_key_hint,
                 worker.status.value,
                 now,
                 now,
@@ -115,8 +111,7 @@ class Coordinator:
     # Interpolated into SELECTs below. A literal column list, never caller input,
     # which is why those reads are annotated as audited.
     WORKER_COLUMNS = (
-        "worker_id, labels, capabilities, endpoint, api_key_hint, status, "
-        "last_seen_at, registered_at"
+        "worker_id, labels, capabilities, endpoint, status, last_seen_at, registered_at"
     )
 
     def get_worker(self, worker_id: str) -> Worker | None:
@@ -167,10 +162,9 @@ class Coordinator:
             labels=json.loads(row[1]),
             capabilities=json.loads(row[2]) if row[2] else [],
             endpoint=row[3],
-            api_key_hint=row[4],
-            status=WorkerStatus(row[5]),
-            last_seen_at=datetime.fromisoformat(row[6]) if row[6] else None,
-            registered_at=datetime.fromisoformat(row[7]),
+            status=WorkerStatus(row[4]),
+            last_seen_at=datetime.fromisoformat(row[5]) if row[5] else None,
+            registered_at=datetime.fromisoformat(row[6]),
         )
 
     def _insert_job(

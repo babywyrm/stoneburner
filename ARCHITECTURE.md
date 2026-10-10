@@ -174,7 +174,8 @@ rollups without reparsing that evidence.
 Schema v21 still writes a timestamped, WAL-safe `.bak` on a version bump, then
 migrates in place: missing columns are added, and a type or constraint change
 rebuilds only that table while copying rows. Opening an older database no
-longer drops run history.
+longer drops run history. Schema v22 drops the never-written
+`workers.api_key_hint` column that way.
 
 ### `eval/judge.py` — LLM-as-judge
 
