@@ -175,9 +175,7 @@ def codereview(
 
     show_progress = bool((ctx.obj or {}).get("progress", True))
     progress = (
-        FixtureProgress(len(selected), console, label="codereview")
-        if show_progress
-        else None
+        FixtureProgress(len(selected), console, label="codereview") if show_progress else None
     )
     current_index = -1
     run_id = uuid.uuid4().hex[:12]

@@ -83,9 +83,7 @@ def _inv(*models, hosts=("laptop",)):
     return {
         "schema": 1,
         "taken_at": "t",
-        "hosts": [
-            {"label": h, "provider": "ollama", "url": f"http://{h}:11434"} for h in hosts
-        ],
+        "hosts": [{"label": h, "provider": "ollama", "url": f"http://{h}:11434"} for h in hosts],
         "models": list(models),
     }
 

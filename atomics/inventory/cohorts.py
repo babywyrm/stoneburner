@@ -177,9 +177,7 @@ def to_dict(result: Cohorts) -> dict[str, object]:
                 "host": job.host,
                 "provider": job.provider,
                 "thinking": job.thinking,
-                "judge": (
-                    {"name": job.judge, "host": job.judge_host} if job.judge else None
-                ),
+                "judge": ({"name": job.judge, "host": job.judge_host} if job.judge else None),
                 "band": job.band,
             }
             for job in plan_jobs(result)

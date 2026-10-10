@@ -186,9 +186,7 @@ class TestOllamaProviderThinking:
         mock_response.raise_for_status = MagicMock()
         mock_response.json.return_value = {
             "response": (
-                "The user wants just the number.\n"
-                "So my response should be 4.\n"
-                "</think>\n\n4"
+                "The user wants just the number.\nSo my response should be 4.\n</think>\n\n4"
             ),
             "eval_count": 40,
             "prompt_eval_count": 10,

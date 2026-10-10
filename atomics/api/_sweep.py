@@ -20,9 +20,7 @@ from atomics.eval.budget import BudgetMeter, EvalBudget, EvalBudgetExceededError
 from atomics.eval.gauntlet import SuiteJobResult, make_suite_runner, run_gauntlet
 
 
-async def run_sweep_from_request(
-    payload: SweepRequest, job: Job | None = None
-) -> dict[str, Any]:
+async def run_sweep_from_request(payload: SweepRequest, job: Job | None = None) -> dict[str, Any]:
     """Run models × suites under one shared dollar ceiling."""
     meter = BudgetMeter(EvalBudget(budget_limit_usd=payload.budget_usd))
     reporter = None
@@ -55,9 +53,7 @@ async def run_sweep_from_request(
         reasoning_mode=payload.reasoning_mode,
     )
 
-    async def run_suite(
-        *, model: str, suite: str, skip_incapable: bool
-    ) -> SuiteJobResult:
+    async def run_suite(*, model: str, suite: str, skip_incapable: bool) -> SuiteJobResult:
         if reporter is not None:
             reporter.start(model, suite)
         result = await inner(model=model, suite=suite, skip_incapable=skip_incapable)

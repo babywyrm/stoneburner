@@ -300,9 +300,7 @@ def test_cli_eval_verbose_skips_truncated_table(monkeypatch, tmp_path):
         "What is a supply chain attack? Give a concise 2-3 sentence definition "
         "suitable for a technical audience."
     )
-    response = (
-        "A supply chain attack compromises a trusted third party such as a software vendor."
-    )
+    response = "A supply chain attack compromises a trusted third party such as a software vendor."
     rationale = (
         "The definition is factually correct and well-explained, but lacks a "
         "concrete real-world example."
@@ -483,9 +481,7 @@ def test_format_eval_verbose_block_failed_generation():
         prompt=fixture.prompt,
         error_message="ReadTimeout: the judge host never answered",
     )
-    text = format_eval_verbose_block(
-        FixtureResult(fixture=fixture, task_result=task, judge=None)
-    )
+    text = format_eval_verbose_block(FixtureResult(fixture=fixture, task_result=task, judge=None))
     assert fixture.prompt in text
     assert "ReadTimeout: the judge host never answered" in text
 

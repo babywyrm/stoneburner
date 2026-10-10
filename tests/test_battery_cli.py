@@ -28,9 +28,7 @@ def test_battery_list_names_all_five():
 
 
 def test_battery_show_desk_pass_prints_commands():
-    result = CliRunner().invoke(
-        cli, ["battery", "show", "desk-pass", "-m", "lfm2.5:8b"]
-    )
+    result = CliRunner().invoke(cli, ["battery", "show", "desk-pass", "-m", "lfm2.5:8b"])
     assert result.exit_code == 0
     assert "provider-test" in result.output
     assert "qa/examples/app-gate-guardrails.yaml" in result.output
@@ -146,9 +144,7 @@ def test_battery_run_unknown_exits_nonzero():
 
 
 def test_battery_run_judged_requires_judge_model():
-    result = CliRunner().invoke(
-        cli, ["battery", "run", "blue-capability", "-m", "x"]
-    )
+    result = CliRunner().invoke(cli, ["battery", "run", "blue-capability", "-m", "x"])
     assert result.exit_code == 2
     assert "judge" in result.output.lower()
 
@@ -178,9 +174,7 @@ def test_battery_run_desk_pass_invokes_steps(monkeypatch):
         return 0
 
     monkeypatch.setattr("atomics.commands.battery.invoke_atomics", fake_invoke)
-    result = CliRunner().invoke(
-        cli, ["battery", "run", "desk-pass", "-m", "lfm2.5:8b"]
-    )
+    result = CliRunner().invoke(cli, ["battery", "run", "desk-pass", "-m", "lfm2.5:8b"])
     assert result.exit_code == 0
     assert [args[0] for args in seen] == ["provider-test", "qa", "toolcall"]
     assert "lfm2.5:8b" in seen[0]
@@ -195,9 +189,7 @@ def test_battery_run_stops_on_first_failure(monkeypatch):
         return 1 if args[0] == "qa" else 0
 
     monkeypatch.setattr("atomics.commands.battery.invoke_atomics", fake_invoke)
-    result = CliRunner().invoke(
-        cli, ["battery", "run", "desk-pass", "-m", "lfm2.5:8b"]
-    )
+    result = CliRunner().invoke(cli, ["battery", "run", "desk-pass", "-m", "lfm2.5:8b"])
     assert result.exit_code != 0
     assert seen == ["provider-test", "qa"]
 
@@ -326,9 +318,7 @@ def test_battery_run_nonnumeric_budget_does_not_invoke(monkeypatch):
         return 0
 
     monkeypatch.setattr("atomics.commands.battery.invoke_atomics", fake_invoke)
-    result = CliRunner().invoke(
-        cli, ["battery", "run", "desk-pass", "-m", "x", "--budget", "nope"]
-    )
+    result = CliRunner().invoke(cli, ["battery", "run", "desk-pass", "-m", "x", "--budget", "nope"])
     assert result.exit_code == 2
     assert "budget" in result.output.lower()
     assert seen == []

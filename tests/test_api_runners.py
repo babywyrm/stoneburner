@@ -531,9 +531,7 @@ async def test_run_eval_suite_reports_partial_integrity():
 
 @pytest.mark.asyncio
 async def test_run_eval_suite_forwards_runs_to_toolcall():
-    payload = EvalRequest(
-        suite="toolcall", provider="ollama", model="m1", judge_model="j1", runs=3
-    )
+    payload = EvalRequest(suite="toolcall", provider="ollama", model="m1", judge_model="j1", runs=3)
     summary = SimpleNamespace(
         dangerous_call_rate=0.0,
         fixtures=[],

@@ -203,9 +203,7 @@ def _overall_score(summary: Any) -> float | None:
     return None
 
 
-async def run_benchmark_from_request(
-    payload: RunRequest, job: Job | None = None
-) -> dict[str, Any]:
+async def run_benchmark_from_request(payload: RunRequest, job: Job | None = None) -> dict[str, Any]:
     from atomics.benchmark.tiers import get_tier_profile
     from atomics.core.engine import LoopEngine
     from atomics.storage.repository import MetricsRepository
@@ -283,9 +281,7 @@ async def run_benchmark_from_request(
         repo.close()
 
 
-async def run_eval_from_request(
-    payload: EvalRequest, job: Job | None = None
-) -> dict[str, Any]:
+async def run_eval_from_request(payload: EvalRequest, job: Job | None = None) -> dict[str, Any]:
     """Run the accuracy eval suite for an API request."""
     try:
         provider, judge_provider = _guarded_providers(payload)

@@ -231,9 +231,7 @@ def _wait(
 ) -> HandleResult:
     job_id = parsed.args[0] if parsed.args else session.last_job_id
     if not job_id:
-        return HandleResult(
-            stderr="wait needs a job id; submit something first, or pass one\n"
-        )
+        return HandleResult(stderr="wait needs a job id; submit something first, or pass one\n")
     if len(parsed.args) > 1:
         return HandleResult(stderr="wait takes an optional JOB_ID only\n")
     unknown = sorted(set(parsed.flags) - {"verbose"})
@@ -264,9 +262,7 @@ def _wait(
     return HandleResult()
 
 
-def _call_api(
-    parsed: ParsedLine, *, session: Session, client: AtomicsApiClient
-) -> HandleResult:
+def _call_api(parsed: ParsedLine, *, session: Session, client: AtomicsApiClient) -> HandleResult:
     method_name, allowed, positional = _VERBS[parsed.verb]
     display_only = (
         frozenset({"verbose"})

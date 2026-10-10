@@ -190,9 +190,7 @@ def test_supported_eval_suites_cover_the_security_set():
         ("toolcall", "run_toolcall_suite", "fixtures"),
     ],
 )
-async def test_run_eval_suite_forwards_effort_to_security_runners(
-    suite, runner_attr, result_attr
-):
+async def test_run_eval_suite_forwards_effort_to_security_runners(suite, runner_attr, result_attr):
     """EvalRequest already accepts effort. Dropping it here is a silent no-op
     on a billed knob — the HTTP/MCP caller gets 200 and default reasoning."""
     from unittest.mock import MagicMock

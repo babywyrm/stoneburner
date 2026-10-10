@@ -45,7 +45,6 @@ def _recording_ollama(built: list):
     return _FakeOllamaProvider
 
 
-
 def _verbose_results():
     from atomics.archreview.models import Finding
 

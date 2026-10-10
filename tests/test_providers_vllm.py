@@ -205,9 +205,7 @@ async def test_vllm_qwen_effort_lands_in_chat_template_kwargs():
     mock_client.post = AsyncMock(return_value=_mock_openai_response("ok"))
 
     provider = VllmProvider(base_url="http://fake:8000/v1", client=mock_client)
-    resp = await provider.generate(
-        "test", model="qwen3.8:27b", thinking=True, effort="low"
-    )
+    resp = await provider.generate("test", model="qwen3.8:27b", thinking=True, effort="low")
 
     body = mock_client.post.call_args[1]["json"]
     assert body["reasoning_effort"] == "low"
@@ -286,9 +284,7 @@ async def test_vllm_qwen_effort_none_omits_template_reasoning_effort():
     mock_client.post = AsyncMock(return_value=_mock_openai_response("ok"))
 
     provider = VllmProvider(base_url="http://fake:8000/v1", client=mock_client)
-    await provider.generate(
-        "test", model="qwen3.8:27b", thinking=True, effort="none"
-    )
+    await provider.generate("test", model="qwen3.8:27b", thinking=True, effort="none")
 
     body = mock_client.post.call_args[1]["json"]
     assert body["reasoning_effort"] == "none"

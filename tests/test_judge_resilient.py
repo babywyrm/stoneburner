@@ -94,8 +94,7 @@ async def test_judge_falls_back_to_thinking_text():
             _make_provider_response(
                 text="",
                 thinking_text=(
-                    "accuracy: 2\ncompleteness: 1\nformat: 1\n"
-                    "rationale: Weak answer with errors."
+                    "accuracy: 2\ncompleteness: 1\nformat: 1\nrationale: Weak answer with errors."
                 ),
             ),
         ]

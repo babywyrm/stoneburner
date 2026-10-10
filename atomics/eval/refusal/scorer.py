@@ -176,4 +176,3 @@ def _parse_classification(raw: str) -> tuple[str, str]:
 def _effective_text(response: ProviderResponse) -> str:
     visible = _THINK_BLOCK_RE.sub("", response.text).strip()
     return visible or response.thinking_text.strip()
-

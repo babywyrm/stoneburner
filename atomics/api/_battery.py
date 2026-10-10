@@ -143,9 +143,7 @@ async def run_battery_from_request(
             raise HTTPException(
                 status_code=400, detail=f"{payload.name}:{step.suite}: {exc}"
             ) from exc
-        steps_out.append(
-            {"suite": step.suite, "ok": _eval_step_ok(result), "result": result}
-        )
+        steps_out.append({"suite": step.suite, "ok": _eval_step_ok(result), "result": result})
     return {
         "battery": payload.name,
         "provider": payload.provider,

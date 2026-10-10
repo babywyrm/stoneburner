@@ -239,9 +239,7 @@ async def test_ollama_effort_low_sends_think_level():
     mock_client.post = AsyncMock(return_value=mock_response)
 
     provider = OllamaProvider(host="http://fake:11434", client=mock_client)
-    resp = await provider.generate(
-        "hi", model="qwen3:4b", thinking=True, effort="low"
-    )
+    resp = await provider.generate("hi", model="qwen3:4b", thinking=True, effort="low")
 
     body = mock_client.post.call_args.kwargs["json"]
     assert body["think"] == "low"
@@ -468,9 +466,7 @@ async def test_ollama_generate_retries_think_false_on_think_400() -> None:
 async def test_ollama_tools_retries_think_false_on_think_400() -> None:
     mock_client = _think_400_then_ok_client(chat=True)
     provider = OllamaProvider(host="http://fake:11434", client=mock_client)
-    resp = await provider.generate_with_tools(
-        "hi", tools=[], model="granite4.2:3b", thinking=True
-    )
+    resp = await provider.generate_with_tools("hi", tools=[], model="granite4.2:3b", thinking=True)
 
     bodies = mock_client._bodies
     assert len(bodies) == 2
@@ -492,9 +488,7 @@ async def test_ollama_granite_auto_think_when_unset() -> None:
 async def test_ollama_tools_effort_low_without_thinking_flag() -> None:
     mock_client = _ok_chat_client()
     provider = OllamaProvider(host="http://fake:11434", client=mock_client)
-    await provider.generate_with_tools(
-        "hi", tools=[], model="granite4.2:8b", effort="low"
-    )
+    await provider.generate_with_tools("hi", tools=[], model="granite4.2:8b", effort="low")
 
     body = mock_client.post.call_args.kwargs["json"]
     assert body["think"] == "low"
@@ -544,9 +538,7 @@ async def test_ollama_generate_with_tools_strips_leaked_cot():
     mock_client.post = AsyncMock(return_value=mock_response)
 
     provider = OllamaProvider(host="http://fake:11434", client=mock_client)
-    resp = await provider.generate_with_tools(
-        "hi", tools=[], model="qwen3:4b", thinking=False
-    )
+    resp = await provider.generate_with_tools("hi", tools=[], model="qwen3:4b", thinking=False)
 
     assert resp.text == ""
     assert "Okay I will call the tool." in resp.thinking_text

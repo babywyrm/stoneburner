@@ -12,15 +12,14 @@ from atomics.repl.display import (
 
 
 def test_sweep_in_flight_line() -> None:
-    assert format_in_flight({"model": "qwen3:14b", "suite": "eval"}) == (
-        "  qwen3:14b  eval"
-    )
+    assert format_in_flight({"model": "qwen3:14b", "suite": "eval"}) == ("  qwen3:14b  eval")
 
 
 def test_in_flight_line() -> None:
-    assert format_in_flight(
-        {"fixture_id": "ev-25", "phase": "judge", "model": "llama3.2:1b"}
-    ) == "  ev-25  judge     llama3.2:1b"
+    assert (
+        format_in_flight({"fixture_id": "ev-25", "phase": "judge", "model": "llama3.2:1b"})
+        == "  ev-25  judge     llama3.2:1b"
+    )
 
 
 def test_fixture_row_verbose_includes_reply() -> None:
@@ -41,9 +40,7 @@ def test_fixture_row_verbose_includes_reply() -> None:
 
 def test_fixture_row_line() -> None:
     assert (
-        format_fixture_row(
-            {"id": "ev-18", "score": 0.0, "status": "success", "tokens": 166}
-        )
+        format_fixture_row({"id": "ev-18", "score": 0.0, "status": "success", "tokens": 166})
         == "  ev-18  0.00  success  166 tok"
     )
 
@@ -61,10 +58,7 @@ def test_submitted_headline() -> None:
             },
         }
     )
-    assert text == (
-        "eval  toolcall  llama3.2:1b  http://192.168.1.79:11434\n"
-        "abc  pending\n"
-    )
+    assert text == ("eval  toolcall  llama3.2:1b  http://192.168.1.79:11434\nabc  pending\n")
     assert '"job_id"' not in text
 
 
@@ -95,9 +89,7 @@ def test_completed_headline() -> None:
 
 
 def test_run_in_flight_line() -> None:
-    assert format_in_flight({"task": "web_summary", "model": "llama3"}) == (
-        "  web_summary  llama3"
-    )
+    assert format_in_flight({"task": "web_summary", "model": "llama3"}) == ("  web_summary  llama3")
 
 
 def test_run_completed_headline() -> None:
@@ -157,9 +149,7 @@ def test_quiet_wait_emits_phase_then_row_then_headline() -> None:
                 "fixtures_run": 1,
                 "total_tokens": 153,
                 "total_cost_usd": 0.0,
-                "fixtures": [
-                    {"id": "ev-01", "score": 0.6, "status": "success", "tokens": 153}
-                ],
+                "fixtures": [{"id": "ev-01", "score": 0.6, "status": "success", "tokens": 153}],
             },
         }
     )
@@ -192,9 +182,7 @@ def test_quiet_wait_prints_trail_then_score_in_one_poll() -> None:
                 "fixtures_run": 1,
                 "total_tokens": 190,
                 "total_cost_usd": 0.0,
-                "fixtures": [
-                    {"id": "ev-01", "score": 1.0, "status": "success", "tokens": 190}
-                ],
+                "fixtures": [{"id": "ev-01", "score": 1.0, "status": "success", "tokens": 190}],
             },
         }
     )

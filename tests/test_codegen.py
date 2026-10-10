@@ -368,7 +368,5 @@ def test_codegen_cli_allow_partial_exits_zero(monkeypatch) -> None:
         lambda *_args, **_kwargs: provider,
     )
     monkeypatch.setattr("atomics.eval.codegen.runner.run_codegen", fake_run)
-    result = CliRunner().invoke(
-        cli, ["--no-progress", "codegen", "--no-save", "--allow-partial"]
-    )
+    result = CliRunner().invoke(cli, ["--no-progress", "codegen", "--no-save", "--allow-partial"])
     assert result.exit_code == 0, result.output

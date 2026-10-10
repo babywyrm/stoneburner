@@ -29,6 +29,7 @@ def _short_baseline(monkeypatch):
     """The real 5 s solo baseline only makes the fake requests repeat."""
     monkeypatch.setattr("atomics.load.scenario.BASELINE_DURATION_SECONDS", 0.05)
 
+
 # ── WorkloadSpec ──────────────────────────────────────────────────────────────
 
 
@@ -164,10 +165,7 @@ class TestLoadScenarioYaml:
         assert specs[1].sla_ms is None
 
     def test_example_file_loads(self) -> None:
-        path = (
-            Path(__file__).resolve().parents[1]
-            / "profiles/examples/scenario-gate-and-eval.yaml"
-        )
+        path = Path(__file__).resolve().parents[1] / "profiles/examples/scenario-gate-and-eval.yaml"
         specs = load_scenario_yaml(str(path))
         assert [s.type for s in specs] == ["gate", "eval"]
         assert specs[0].concurrency == 2

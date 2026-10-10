@@ -177,9 +177,7 @@ def gaps(installed: dict[str, set[str]], remotes: list[Remote]) -> list[Gap]:
         sizes = remote.sizes or ("",)
         for size in sizes:
             missing = tuple(
-                host
-                for host, tags in installed.items()
-                if not host_has(tags, remote.name, size)
+                host for host, tags in installed.items() if not host_has(tags, remote.name, size)
             )
             if not missing:
                 continue
