@@ -44,6 +44,9 @@ jobs:
       - name: Lint
         run: uv run ruff check atomics/ tests/ scripts/
 
+      - name: Format
+        run: uv run ruff format --check atomics/ tests/ scripts/
+
       - name: Type check
         run: uv run mypy atomics/
 
