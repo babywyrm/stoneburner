@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.26.1 (2026-10-10) — Rebinding-proof no-auth, contained MCP ids
+
+### Upgrade notes
+- **A `--no-auth` server answers only `localhost` or a loopback IP.** A
+  custom hostname that resolves to `127.0.0.1` now gets `421`; use
+  `localhost` or `127.0.0.1` in the URL. Keyed servers are unaffected.
+
 ### Security
 - A `--no-auth` server now refuses requests whose `Host` header is not a
   loopback address. A web page could rebind its own name to `127.0.0.1`,
