@@ -66,6 +66,7 @@ dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.24.0",
     "pytest-cov>=5.0.0",
+    "pytest-timeout>=2.3",
     "ruff>=0.8.0",
     "mypy>=1.13.0",
 ]
@@ -133,6 +134,8 @@ follow_imports_for_stubs = true
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+# The slowest test takes ~3 s; a hang fails here, named, instead of stalling CI.
+timeout = 60
 markers = [
     "unit: isolated tests without network or external services",
     "integration: tests that span multiple subsystems (still local)",
