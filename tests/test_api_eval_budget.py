@@ -44,7 +44,7 @@ class TestEvalRequestBudget:
 
     def test_the_api_rejects_an_uncapped_eval_with_422(self, tmp_path):
         app = create_app(ServerSettings(no_auth=True, db_path=tmp_path / "b.db"))
-        with TestClient(app) as client:
+        with TestClient(app, base_url="http://127.0.0.1") as client:
             res = client.post(
                 "/api/v1/evals",
                 json={"suite": "accuracy", "provider": "ollama", "budget_usd": 0},

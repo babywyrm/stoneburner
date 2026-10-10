@@ -282,7 +282,7 @@ async def test_post_stress_returns_a_job():
             new_callable=AsyncMock,
             return_value={"verdict": None, "peak_tps": 1.0},
         ),
-        TestClient(app) as client,
+        TestClient(app, base_url="http://127.0.0.1") as client,
     ):
         resp = client.post(
             "/api/v1/stress",
@@ -305,7 +305,7 @@ async def test_post_stress_202_progress_total_is_ladder_length():
             new_callable=AsyncMock,
             return_value={"peak_tps": 1.0},
         ),
-        TestClient(app) as client,
+        TestClient(app, base_url="http://127.0.0.1") as client,
     ):
         resp = client.post(
             "/api/v1/stress",
@@ -328,7 +328,7 @@ async def test_post_stress_202_progress_total_is_ladder_length():
 
 def test_post_stress_without_budget_is_422():
     app = create_app(settings=ServerSettings(no_auth=True))
-    with TestClient(app) as client:
+    with TestClient(app, base_url="http://127.0.0.1") as client:
         resp = client.post(
             "/api/v1/stress",
             json={"provider": "ollama", "model": "qwen3:14b"},
@@ -345,7 +345,7 @@ async def test_post_soak_returns_a_job():
             new_callable=AsyncMock,
             return_value={"verdict": "STABLE"},
         ),
-        TestClient(app) as client,
+        TestClient(app, base_url="http://127.0.0.1") as client,
     ):
         resp = client.post(
             "/api/v1/soak",
@@ -369,7 +369,7 @@ async def test_post_soak_202_progress_total_matches_actual_samples():
             new_callable=AsyncMock,
             return_value={"verdict": "STABLE"},
         ),
-        TestClient(app) as client,
+        TestClient(app, base_url="http://127.0.0.1") as client,
     ):
         resp = client.post(
             "/api/v1/soak",
@@ -392,7 +392,7 @@ async def test_post_soak_202_progress_total_matches_actual_samples():
 
 def test_post_soak_hour_long_duration_is_422():
     app = create_app(settings=ServerSettings(no_auth=True))
-    with TestClient(app) as client:
+    with TestClient(app, base_url="http://127.0.0.1") as client:
         resp = client.post(
             "/api/v1/soak",
             json={

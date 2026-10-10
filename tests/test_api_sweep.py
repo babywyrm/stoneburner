@@ -289,7 +289,7 @@ async def test_post_sweeps_includes_progress_total():
             new_callable=AsyncMock,
             return_value={"ok": 1, "fail": 0, "jobs": []},
         ),
-        TestClient(app) as client,
+        TestClient(app, base_url="http://127.0.0.1") as client,
     ):
         resp = client.post(
             "/api/v1/sweeps",
@@ -313,7 +313,7 @@ async def test_post_sweeps_includes_progress_total():
 
 def test_post_sweeps_without_budget_is_422():
     app = create_app(settings=ServerSettings(no_auth=True))
-    with TestClient(app) as client:
+    with TestClient(app, base_url="http://127.0.0.1") as client:
         resp = client.post(
             "/api/v1/sweeps",
             json={"provider": "ollama", "models": ["a"], "suites": ["eval"]},

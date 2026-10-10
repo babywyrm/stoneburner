@@ -14,7 +14,7 @@ from atomics import __version__
 from atomics.api.auth import ApiKeyAuth, NoAuth
 from atomics.api.config import ServerSettings
 from atomics.api.dashboard import router as dashboard_router
-from atomics.api.headers import security_headers_middleware
+from atomics.api.headers import loopback_host_middleware, security_headers_middleware
 from atomics.api.jobs import JobManager
 from atomics.api.request_log import request_log_middleware
 from atomics.api.routes import router
@@ -86,6 +86,8 @@ def create_app(
     # Registration order is inverted at runtime: the last registered runs
     # outermost. Request logging goes last so it wraps everything, timing the
     # full request and tagging even responses that other middleware produced.
+    if settings.no_auth:
+        app.middleware("http")(loopback_host_middleware)
     app.middleware("http")(security_headers_middleware)
     app.middleware("http")(request_log_middleware)
     app.include_router(router)

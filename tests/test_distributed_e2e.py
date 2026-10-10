@@ -17,7 +17,7 @@ from atomics.providers.base import BaseProvider, ProviderResponse
 @pytest.fixture
 def client(tmp_path):
     app = create_app(no_auth=True, db_path=tmp_path / "distributed_e2e.db")
-    with TestClient(app) as tc:
+    with TestClient(app, base_url="http://127.0.0.1") as tc:
         yield tc
 
 

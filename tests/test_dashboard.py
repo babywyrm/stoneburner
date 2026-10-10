@@ -12,7 +12,7 @@ from atomics.api.server import create_app
 @pytest.fixture
 def client_without_dashboard():
     app = create_app(ServerSettings(no_auth=True, with_dashboard=False))
-    with TestClient(app) as tc:
+    with TestClient(app, base_url="http://127.0.0.1") as tc:
         yield tc
 
 
@@ -21,7 +21,7 @@ def client_with_dashboard(tmp_path):
     app = create_app(
         ServerSettings(no_auth=True, with_dashboard=True, db_path=tmp_path / "dash.db")
     )
-    with TestClient(app) as tc:
+    with TestClient(app, base_url="http://127.0.0.1") as tc:
         yield tc
 
 
@@ -85,7 +85,7 @@ def test_dashboard_run_detail_omits_result_json(tmp_path):
     repo.close()
 
     app = create_app(ServerSettings(no_auth=True, with_dashboard=True, db_path=db))
-    with TestClient(app) as tc:
+    with TestClient(app, base_url="http://127.0.0.1") as tc:
         page = tc.get("/dashboard")
         assert "selectRun" in page.text
         detail = tc.get("/api/v1/runs/dash-run")
@@ -127,7 +127,7 @@ def test_dashboard_trends_use_the_server_database(tmp_path):
     repo.close()
 
     app = create_app(ServerSettings(no_auth=True, with_dashboard=True, db_path=db))
-    with TestClient(app) as tc:
+    with TestClient(app, base_url="http://127.0.0.1") as tc:
         resp = tc.get("/api/v1/reports/trends?hours=24")
     assert resp.status_code == 200
     assert resp.json()["rows"][0]["total_tokens"] == 5
@@ -140,7 +140,7 @@ def test_dashboard_trends_use_the_server_database(tmp_path):
 )
 def test_dashboard_data_endpoints_require_auth_when_not_no_auth(path):
     app = create_app(ServerSettings(no_auth=False, api_keys={"secret"}, with_dashboard=True))
-    with TestClient(app) as tc:
+    with TestClient(app, base_url="http://127.0.0.1") as tc:
         res = tc.get(path)
         assert res.status_code == 401
 

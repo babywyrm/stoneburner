@@ -16,13 +16,13 @@ from atomics.providers.factory import ProviderConfigError
 @pytest.fixture
 def client():
     app = create_app(settings=ServerSettings(no_auth=True))
-    with TestClient(app) as tc:
+    with TestClient(app, base_url="http://127.0.0.1") as tc:
         yield tc
 
 
 def test_get_models_requires_auth():
     app = create_app(settings=ServerSettings(api_keys={"secret"}))
-    with TestClient(app) as tc:
+    with TestClient(app, base_url="http://127.0.0.1") as tc:
         resp = tc.get("/api/v1/models", params={"provider": "ollama"})
         assert resp.status_code == 401
 
@@ -75,7 +75,7 @@ def test_get_models_connection_failure_is_502(client):
 
 def test_provider_test_requires_auth():
     app = create_app(settings=ServerSettings(api_keys={"secret"}))
-    with TestClient(app) as tc:
+    with TestClient(app, base_url="http://127.0.0.1") as tc:
         resp = tc.post("/api/v1/provider-test", json={"provider": "ollama"})
         assert resp.status_code == 401
 

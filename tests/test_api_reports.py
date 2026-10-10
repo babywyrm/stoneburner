@@ -10,7 +10,7 @@ from atomics.api.server import create_app
 @pytest.fixture
 def client():
     app = create_app(settings=ServerSettings(no_auth=True))
-    with TestClient(app) as tc:
+    with TestClient(app, base_url="http://127.0.0.1") as tc:
         yield tc
 
 
@@ -40,14 +40,14 @@ def test_compare_invalid_by(client):
 
 def test_get_run_requires_auth():
     app = create_app(settings=ServerSettings(api_keys={"secret"}))
-    with TestClient(app) as tc:
+    with TestClient(app, base_url="http://127.0.0.1") as tc:
         resp = tc.get("/api/v1/runs/abc")
         assert resp.status_code == 401
 
 
 def test_get_run_missing_is_404(tmp_path):
     app = create_app(settings=ServerSettings(no_auth=True, db_path=tmp_path / "empty.db"))
-    with TestClient(app) as tc:
+    with TestClient(app, base_url="http://127.0.0.1") as tc:
         resp = tc.get("/api/v1/runs/no-such-run")
     assert resp.status_code == 404
 
@@ -80,7 +80,7 @@ def test_get_run_returns_sanitized_detail(tmp_path):
     repo.close()
 
     app = create_app(settings=ServerSettings(no_auth=True, db_path=db))
-    with TestClient(app) as tc:
+    with TestClient(app, base_url="http://127.0.0.1") as tc:
         resp = tc.get("/api/v1/runs/run-detail")
     assert resp.status_code == 200
     body = resp.json()
@@ -93,14 +93,14 @@ def test_get_run_returns_sanitized_detail(tmp_path):
 
 def test_trends_requires_auth():
     app = create_app(settings=ServerSettings(api_keys={"secret"}))
-    with TestClient(app) as tc:
+    with TestClient(app, base_url="http://127.0.0.1") as tc:
         resp = tc.get("/api/v1/reports/trends")
         assert resp.status_code == 401
 
 
 def test_trends_empty(tmp_path):
     app = create_app(settings=ServerSettings(no_auth=True, db_path=tmp_path / "empty-trends.db"))
-    with TestClient(app) as tc:
+    with TestClient(app, base_url="http://127.0.0.1") as tc:
         resp = tc.get("/api/v1/reports/trends")
     assert resp.status_code == 200
     assert resp.json() == {"hours": 24, "rows": []}
@@ -109,7 +109,7 @@ def test_trends_empty(tmp_path):
 @pytest.mark.parametrize("hours", [0, 169, -1])
 def test_trends_rejects_hours_outside_1_to_168(tmp_path, hours):
     app = create_app(settings=ServerSettings(no_auth=True, db_path=tmp_path / "bound.db"))
-    with TestClient(app) as tc:
+    with TestClient(app, base_url="http://127.0.0.1") as tc:
         resp = tc.get(f"/api/v1/reports/trends?hours={hours}")
     assert resp.status_code == 422
 
@@ -142,7 +142,7 @@ def test_trends_includes_eval_tokens_and_omits_prompts(tmp_path):
     repo.close()
 
     app = create_app(settings=ServerSettings(no_auth=True, db_path=db))
-    with TestClient(app) as tc:
+    with TestClient(app, base_url="http://127.0.0.1") as tc:
         resp = tc.get("/api/v1/reports/trends?hours=24")
     assert resp.status_code == 200
     body = resp.json()

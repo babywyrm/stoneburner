@@ -8,7 +8,7 @@ from atomics.api.server import create_app
 @pytest.fixture
 def client():
     app = create_app(settings=ServerSettings(no_auth=True))
-    with TestClient(app) as tc:
+    with TestClient(app, base_url="http://127.0.0.1") as tc:
         yield tc
 
 
@@ -20,14 +20,14 @@ def test_health(client):
 
 def test_post_runs_unauth():
     app = create_app(settings=ServerSettings(api_keys={"secret"}))
-    with TestClient(app) as tc:
+    with TestClient(app, base_url="http://127.0.0.1") as tc:
         resp = tc.post("/api/v1/runs", json={"provider": "ollama"})
         assert resp.status_code == 401
 
 
 def test_post_runs_with_auth():
     app = create_app(settings=ServerSettings(api_keys={"secret"}))
-    with TestClient(app) as tc:
+    with TestClient(app, base_url="http://127.0.0.1") as tc:
         resp = tc.post(
             "/api/v1/runs",
             json={"provider": "ollama"},
@@ -100,7 +100,7 @@ def test_get_job_returns_running_while_in_progress(client):
 
 def test_list_jobs_requires_auth():
     app = create_app(settings=ServerSettings(api_keys={"secret"}))
-    with TestClient(app) as tc:
+    with TestClient(app, base_url="http://127.0.0.1") as tc:
         resp = tc.get("/api/v1/jobs")
         assert resp.status_code == 401
 

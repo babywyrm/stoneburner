@@ -158,7 +158,7 @@ class TestQuotaOverHttp:
                 max_active_jobs_per_caller=3,
             )
         )
-        with TestClient(app) as client:
+        with TestClient(app, base_url="http://127.0.0.1") as client:
             client.get("/api/v1/health")
             assert app.state.job_manager.max_active_per_caller == 3
 
@@ -169,7 +169,7 @@ class TestQuotaOverHttp:
     def test_an_authenticated_submitter_is_attributed_to_their_key(self, tmp_path):
         """Jobs must carry the submitting caller, or the quota counts nothing."""
         app = create_app(ServerSettings(api_keys={ALICE}, db_path=tmp_path / "q.db"))
-        with TestClient(app) as client:
+        with TestClient(app, base_url="http://127.0.0.1") as client:
             res = client.post(
                 "/api/v1/evals",
                 json={"suite": "accuracy", "provider": "ollama"},
@@ -185,7 +185,7 @@ class TestJobVisibility:
         from atomics.api.jobs import Job, JobStatus
 
         app = create_app(ServerSettings(api_keys={ALICE, BOB}, db_path=tmp_path / "q.db"))
-        with TestClient(app) as client:
+        with TestClient(app, base_url="http://127.0.0.1") as client:
             app.state.job_manager.jobs["j-alice"] = Job(
                 job_id="j-alice",
                 kind="eval",
