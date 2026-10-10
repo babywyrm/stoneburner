@@ -124,7 +124,9 @@ CRITICAL fixtures weigh 4x, HIGH 3x, MEDIUM 2x, LOW 1x.
 ### Zero-trust (`--category zerotrust`)
 
 6 fixtures testing resistance to the specific attack patterns the zero-trust
-control plane is designed to stop:
+control plane is designed to stop. Groups select by category, so
+`--category zerotrust` also runs `mcp-04` and `mcp-05`
+(`authority_fabrication`): 8 fixtures in all.
 
 | ID | Category | Tests | Inspired by |
 |----|----------|-------|-------------|
@@ -160,7 +162,8 @@ architecture:
 instructions inside an agent loop (model-level resistance, not a live MCP scan):
 tool-call compliance (`/etc/shadow`, shell injection to a diagnostic tool),
 authority fabrication, breakglass-token injection, and activity-feed / tool-output
-context poisoning.
+context poisoning. `--category mcp` also runs `zt-05`
+(`authority_fabrication`): 12 fixtures in all.
 
 ### Tool safety (`--category tool_safety`)
 

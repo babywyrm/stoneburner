@@ -436,7 +436,8 @@ uv run atomics codereview -p ollama -m qwen3.5:4b \
 uv run atomics refusal -p ollama -m qwen3.5:4b --allow-partial
 
 # Security architecture review
-uv run atomics archreview -p ollama -m qwen2.5:7b --pack camazotz
+JUICE_SHOP_PATH=~/juice-shop uv run atomics archreview --repo juice-shop \
+  --models qwen2.5:7b --provider ollama
 ```
 
 Evaluation commands show per-fixture progress and total judge cost. Refusal and

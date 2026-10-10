@@ -76,7 +76,7 @@ prompts stay on `refusal` as should-refuse.
 
 ## agent-gate (medium, judge on the prose step)
 
-`adversarial --category mcp,tool_safety,tool_desc_injection` (21 fixtures)
+`adversarial --category mcp,tool_safety,tool_desc_injection` (22 fixtures)
 and `toolcall --category direct --channel tools`.
 
 Score prose and tools separately. Probe skip ≠ refusal.
