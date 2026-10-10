@@ -8,6 +8,11 @@
   the usual `.bak` is written first and worker rows are kept.
 
 ### Fixed
+- HTTP profile bodies JSON-escape `{{ prompt }}`, `{{ model }}`, and
+  `{{ num_predict }}` when the template starts with `{` or `[`. A prompt
+  with a quote or newline used to produce invalid JSON, and a crafted one
+  could add its own fields to the gate request. Other templates are
+  substituted verbatim, as before.
 - A schema migration that rebuilds a table other rows point at (for
   example `workers`, referenced by distributed assignments) no longer
   fails with `FOREIGN KEY constraint failed`. Foreign keys were meant to

@@ -317,6 +317,23 @@ class TestRenderBody:
         assert parsed["prompt"] == "test prompt"
         assert parsed["model"] == "qwen2.5:3b"
 
+    def test_a_quoted_prompt_stays_one_json_string(self):
+        p = TargetProfile(
+            name="t",
+            type="http",
+            http_url="http://h",
+            http_body_template='{"prompt": "{{ prompt }}", "admin": false}',
+        )
+        prompt = 'say "hi"\\n", "admin": true, "x": "\nline two'
+        parsed = json.loads(render_body(p, prompt))
+        assert parsed == {"prompt": prompt, "admin": False}
+
+    def test_a_non_json_template_is_left_verbatim(self):
+        p = TargetProfile(
+            name="t", type="http", http_url="http://h", http_body_template="q={{ prompt }}"
+        )
+        assert render_body(p, 'a "b"') == 'q=a "b"'
+
     def test_model_override(self):
         p = TargetProfile(
             name="t",

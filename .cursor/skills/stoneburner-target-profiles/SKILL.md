@@ -46,7 +46,7 @@ uv run atomics stress --profile profiles/local/<target>.yaml
 Mixed workload scenario:
 
 ```bash
-uv run atomics scenario --file scenario.yaml
+uv run atomics scenario --file profiles/examples/scenario-gate-and-eval.yaml
 ```
 
 ## HTTP Profile Checklist
@@ -78,7 +78,9 @@ response:
 - `http.method`: usually `POST`
 - `http.headers`: include auth only in local profiles
 - `http.body_template`: request template using `{{ prompt }}`, `{{ model }}`,
-  `{{ num_predict }}` — double braces, single braces are not substituted
+  `{{ num_predict }}` — double braces, single braces are not substituted.
+  A template starting with `{` or `[` gets JSON-escaped values, so put the
+  placeholder inside quotes: `"{{ prompt }}"`
 - `response.text_field`: top-level key holding the response text. Nested
   dot-paths are not supported; leave empty to auto-detect
   `response`/`text`/`result`/`output`/`decision`/`message`, which falls back to
