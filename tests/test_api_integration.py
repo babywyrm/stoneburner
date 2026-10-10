@@ -1,17 +1,6 @@
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from fastapi.testclient import TestClient
-
-from atomics.api.config import ServerSettings
-from atomics.api.server import create_app
-
-
-@pytest.fixture
-def client():
-    app = create_app(settings=ServerSettings(no_auth=True))
-    with TestClient(app, base_url="http://127.0.0.1") as tc:
-        yield tc
 
 
 @pytest.mark.asyncio

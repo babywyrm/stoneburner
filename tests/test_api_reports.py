@@ -7,13 +7,6 @@ from atomics.api.config import ServerSettings
 from atomics.api.server import create_app
 
 
-@pytest.fixture
-def client():
-    app = create_app(settings=ServerSettings(no_auth=True))
-    with TestClient(app, base_url="http://127.0.0.1") as tc:
-        yield tc
-
-
 def test_compare_empty(client):
     with patch("atomics.api.routes.MetricsRepository") as mock_repo:
         mock_repo.return_value.compare_providers.return_value = []
