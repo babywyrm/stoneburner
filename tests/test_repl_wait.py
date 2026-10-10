@@ -5,11 +5,18 @@ from __future__ import annotations
 import io
 
 import httpx
+import pytest
 
 from atomics.mcp.client import AtomicsApiClient
 from atomics.repl.dispatch import handle_line
 from atomics.repl.session import Session
 from atomics.repl.wait import WAIT_INTERVAL_SECONDS, wait_for_job
+
+
+@pytest.fixture(autouse=True)
+def _no_real_sleep(monkeypatch):
+    """`wait` in the REPL polls with time.sleep; tests should not wait 2 s a poll."""
+    monkeypatch.setattr("atomics.repl.dispatch.time.sleep", lambda _seconds: None)
 
 
 def _client(bodies: list[dict]) -> AtomicsApiClient:

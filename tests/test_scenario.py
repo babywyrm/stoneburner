@@ -23,6 +23,12 @@ from atomics.scenario_prompts import (
     resolve_prompts,
 )
 
+
+@pytest.fixture(autouse=True)
+def _short_baseline(monkeypatch):
+    """The real 5 s solo baseline only makes the fake requests repeat."""
+    monkeypatch.setattr("atomics.load.scenario.BASELINE_DURATION_SECONDS", 0.05)
+
 # ── WorkloadSpec ──────────────────────────────────────────────────────────────
 
 
@@ -268,7 +274,7 @@ class TestRunner:
                 run_scenario(
                     host="http://fake:11434",
                     specs=[spec],
-                    duration_seconds=1.0,
+                    duration_seconds=0.1,
                     skip_baseline=True,
                 )
             )
@@ -288,7 +294,7 @@ class TestRunner:
                 run_scenario(
                     host="http://fake:11434",
                     specs=specs,
-                    duration_seconds=1.0,
+                    duration_seconds=0.1,
                     skip_baseline=True,
                 )
             )
@@ -308,7 +314,7 @@ class TestRunner:
                 run_scenario(
                     host="http://fake:11434",
                     specs=[spec],
-                    duration_seconds=1.0,
+                    duration_seconds=0.1,
                     skip_baseline=False,
                 )
             )
@@ -329,7 +335,7 @@ class TestRunner:
                 run_scenario(
                     host="http://fake:11434",
                     specs=[spec],
-                    duration_seconds=1.0,
+                    duration_seconds=0.1,
                     skip_baseline=True,
                 )
             )
@@ -353,7 +359,7 @@ class TestRunner:
                 run_scenario(
                     host="http://fake:11434",
                     specs=[spec],
-                    duration_seconds=1.0,
+                    duration_seconds=0.1,
                     skip_baseline=False,
                     on_baseline_done=on_bl,
                     on_workload_done=on_wr,
@@ -497,12 +503,12 @@ class TestRamp:
                     host="http://fake:11434",
                     specs=[spec],
                     duration_seconds=0.05,
-                    ramp_seconds=5.0,
+                    ramp_seconds=0.02,
                     skip_baseline=True,
                 )
             )
 
-        assert result.ramp_seconds == 5.0
+        assert result.ramp_seconds == 0.02
 
     def test_scenario_cli_ramp_flag(self):
         from click.testing import CliRunner
@@ -598,7 +604,7 @@ class TestScenarioProfileBranch:
                 run_scenario(
                     host="http://fake:11434",
                     specs=[spec],
-                    duration_seconds=1.0,
+                    duration_seconds=0.1,
                     skip_baseline=True,
                 )
             )
@@ -634,7 +640,7 @@ class TestScenarioProfileBranch:
                 run_scenario(
                     host="http://fake:11434",
                     specs=[spec],
-                    duration_seconds=1.0,
+                    duration_seconds=0.1,
                     skip_baseline=True,
                 )
             )
@@ -668,7 +674,7 @@ class TestScenarioProfileBranch:
                 run_scenario(
                     host="http://fake:11434",
                     specs=[spec],
-                    duration_seconds=1.0,
+                    duration_seconds=0.1,
                     skip_baseline=False,
                     on_baseline_done=on_bl,
                 )

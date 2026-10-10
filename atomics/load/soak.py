@@ -103,7 +103,7 @@ class SoakResult:
     concurrency: int = 4
     duration_seconds: float = 0.0
     actual_duration_seconds: float = 0.0
-    sample_interval: int = 30
+    sample_interval: float = 30
     total_requests: int = 0
     total_failed: int = 0
     total_tokens: int = 0
@@ -129,7 +129,7 @@ async def run_soak(
     model: str,
     concurrency: int = 4,
     duration_seconds: float = 1800,
-    sample_interval: int = 30,
+    sample_interval: float = 30,
     num_predict: int = 2048,
     think_time_seconds: float = 0.0,
     on_sample: Callable[[SoakSample], None] | None = None,
@@ -268,7 +268,7 @@ async def run_soak_provider(
     model: str = "",
     concurrency: int = 4,
     duration_seconds: float = 1800,
-    sample_interval: int = 30,
+    sample_interval: float = 30,
     num_predict: int = 2048,
     think_time_seconds: float = 0.0,
     on_sample: Callable[[SoakSample], None] | None = None,
@@ -403,7 +403,7 @@ async def run_soak_profile(
     profile: TargetProfile,
     concurrency: int = 4,
     duration_seconds: float = 1800,
-    sample_interval: int = 30,
+    sample_interval: float = 30,
     think_time_seconds: float = 0.0,
     on_sample: Callable[[SoakSample], None] | None = None,
 ) -> SoakResult:
