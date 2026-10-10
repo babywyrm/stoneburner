@@ -12,12 +12,14 @@ from dataclasses import dataclass
 from enum import StrEnum
 from math import isfinite
 
+from atomics.providers.base import ProviderResponse
 from atomics.providers.outcomes import (
     ProviderOutcome,
     ProviderOutcomeKind,
     policy_block_reason,
     provider_outcome_from_exception,
 )
+from atomics.validation import sanitize_error
 
 __all__ = [
     "AttemptResult",
@@ -65,6 +67,51 @@ class JudgeCallResult:
     rationale: str = ""
     thinking_text: str = ""
     effective_text: str = ""
+
+    @classmethod
+    def from_response(
+        cls,
+        response: ProviderResponse,
+        *,
+        status: JudgeOutcomeStatus,
+        judge_model: str,
+        effective_text: str,
+        score: float | None,
+        label: str | None,
+        rationale: str,
+    ) -> JudgeCallResult:
+        return cls(
+            status=status,
+            judge_model=judge_model,
+            response_text=response.text,
+            error_class=None,
+            error_message=None,
+            input_tokens=response.input_tokens,
+            output_tokens=response.output_tokens,
+            thinking_tokens=response.thinking_tokens,
+            latency_ms=response.latency_ms,
+            estimated_cost_usd=response.estimated_cost_usd,
+            score=score,
+            label=label,
+            rationale=rationale,
+            thinking_text=response.thinking_text,
+            effective_text=effective_text,
+        )
+
+    @classmethod
+    def from_error(cls, exc: Exception, judge_model: str) -> JudgeCallResult:
+        return cls(
+            status=JudgeOutcomeStatus.PROVIDER_ERROR,
+            judge_model=judge_model,
+            response_text="",
+            error_class=type(exc).__name__,
+            error_message=sanitize_error(exc),
+            input_tokens=0,
+            output_tokens=0,
+            thinking_tokens=0,
+            latency_ms=0.0,
+            estimated_cost_usd=0.0,
+        )
 
     def __post_init__(self) -> None:
         counts = {

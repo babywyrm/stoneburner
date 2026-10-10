@@ -12,7 +12,6 @@ from atomics.eval.outcomes import (
     JudgeOutcomeStatus,
 )
 from atomics.providers.base import BaseProvider, ProviderResponse
-from atomics.validation import sanitize_error
 
 _SYSTEM = "You are grading a security code review against ground truth. Be strict and objective."
 _VULNERABLE_TEMPLATE = """\
@@ -100,7 +99,7 @@ async def judge_review(
                 thinking_budget=200 if thinking else None,
             )
         except Exception as exc:
-            calls.append(_error_call(exc, judge_model or judge_provider.name))
+            calls.append(JudgeCallResult.from_error(exc, judge_model or judge_provider.name))
             return ReviewVerdictResult(
                 verdict="unknown",
                 rationale="Judge provider call failed.",
@@ -116,7 +115,7 @@ async def judge_review(
         )
         score = _score_for_verdict(verdict) if verdict != "unknown" else None
         calls.append(
-            _response_call(
+            JudgeCallResult.from_response(
                 response,
                 status=status,
                 judge_model=judge_model or response.model,
@@ -181,46 +180,3 @@ def _effective_text(response: ProviderResponse) -> str:
     visible = _THINK_BLOCK_RE.sub("", response.text).strip()
     return visible or response.thinking_text.strip()
 
-
-def _response_call(
-    response: ProviderResponse,
-    *,
-    status: JudgeOutcomeStatus,
-    judge_model: str,
-    effective_text: str,
-    score: float | None,
-    label: str | None,
-    rationale: str,
-) -> JudgeCallResult:
-    return JudgeCallResult(
-        status=status,
-        judge_model=judge_model,
-        response_text=response.text,
-        error_class=None,
-        error_message=None,
-        input_tokens=response.input_tokens,
-        output_tokens=response.output_tokens,
-        thinking_tokens=response.thinking_tokens,
-        latency_ms=response.latency_ms,
-        estimated_cost_usd=response.estimated_cost_usd,
-        score=score,
-        label=label,
-        rationale=rationale,
-        thinking_text=response.thinking_text,
-        effective_text=effective_text,
-    )
-
-
-def _error_call(exc: Exception, judge_model: str) -> JudgeCallResult:
-    return JudgeCallResult(
-        status=JudgeOutcomeStatus.PROVIDER_ERROR,
-        judge_model=judge_model,
-        response_text="",
-        error_class=type(exc).__name__,
-        error_message=sanitize_error(exc),
-        input_tokens=0,
-        output_tokens=0,
-        thinking_tokens=0,
-        latency_ms=0.0,
-        estimated_cost_usd=0.0,
-    )
