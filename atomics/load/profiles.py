@@ -155,9 +155,15 @@ def render_body(
         "num_predict": str(num_predict or profile.num_predict),
     }
 
+    # ponytail: "looks like JSON" is the leading brace; a JSON template that
+    # starts otherwise gets raw values. Upgrade: a response.format-style flag.
+    as_json = template.lstrip().startswith(("{", "["))
+
     def _replace(m: re.Match) -> str:
         key = m.group(1)
-        return values.get(key, m.group(0))
+        if key not in values:
+            return m.group(0)
+        return json.dumps(values[key])[1:-1] if as_json else values[key]
 
     return _TEMPLATE_RE.sub(_replace, template)
 
