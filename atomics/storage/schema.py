@@ -466,11 +466,6 @@ def _scratch_schema() -> tuple[dict[str, list[tuple]], dict[str, str]]:
         scratch.close()
 
 
-def _expected_table_columns() -> dict[str, list[tuple]]:
-    columns, _ddl = _scratch_schema()
-    return columns
-
-
 def _ident(name: str) -> str:
     return '"' + name.replace('"', '""') + '"'
 
@@ -600,11 +595,6 @@ def _reconcile_schema(conn: sqlite3.Connection) -> list[str]:
     if added_names:
         logger.info("Added missing columns in place: %s", ", ".join(added_names))
     return actions
-
-
-def _reconcile_added_columns(conn: sqlite3.Connection) -> list[str]:
-    """Backward-compatible name for the add-or-rebuild path."""
-    return _reconcile_schema(conn)
 
 
 def _any_rebuild_needed(conn: sqlite3.Connection) -> bool:

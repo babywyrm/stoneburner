@@ -360,10 +360,6 @@ class JobsListResponse(BaseModel):
     jobs: list[JobSummary]
 
 
-class ReportSummaryResponse(BaseModel):
-    providers: list[dict]
-
-
 class ModelsResponse(BaseModel):
     provider: str
     models: list[dict]

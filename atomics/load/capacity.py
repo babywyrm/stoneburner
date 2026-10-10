@@ -128,19 +128,6 @@ def _verdict(p50_ms: float, peak_tps: float, concurrent: float) -> str:
     return "OVERLOAD"
 
 
-def _estimate_response_time_s(
-    response_tokens: int,
-    peak_tps: float,
-    phases: list[dict],
-    concurrent: float,
-) -> float:
-    """Estimate per-request response time at a given concurrency level."""
-    if not phases:
-        return response_tokens / max(peak_tps, 1) if peak_tps else 10.0
-    base_lat_ms = interpolate_latency(concurrent, phases)
-    return base_lat_ms / 1000.0
-
-
 def project_capacity(
     *,
     profile: LoadProfile,

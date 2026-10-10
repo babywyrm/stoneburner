@@ -88,11 +88,6 @@ def list_secrets() -> list[str]:
     return stored
 
 
-def has_secrets() -> bool:
-    """Return True if any secrets are stored in the keychain."""
-    return len(list_secrets()) > 0
-
-
 def keychain_available() -> bool:
     """Return True if the OS keychain backend is functional."""
     try:

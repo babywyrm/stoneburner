@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import time
 from collections.abc import Sequence
-from typing import Any, Protocol
+from typing import Any
 
 import httpx
 
@@ -29,15 +29,6 @@ from atomics.providers.effort import apply_chat_effort, normalize_effort
 # See _INJECTED_CALL_ID in providers/openai.py: a tool message's tool_call_id has
 # to match a preceding assistant call, so both sides need the same constant.
 _INJECTED_CALL_ID = "call_injected"
-
-
-class _CompatProvider(Protocol):
-    """The attributes this mixin relies on, all defined by every provider using it."""
-
-    _client: Any
-    _base_url: str
-    _default_model: str
-    _timeout: float
 
 
 class OpenAICompatibleTools:
