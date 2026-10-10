@@ -20,6 +20,19 @@ from atomics.qa_runner import (
 # ── Fixtures / helpers ────────────────────────────────────────────────────────
 
 
+def _ollama_reply(text: str):
+    """An httpx.AsyncClient.post stand-in that answers like Ollama /api/generate."""
+
+    async def _post(*args, **kwargs):
+        m = MagicMock()
+        m.raise_for_status = MagicMock()
+        m.json.return_value = {"response": text}
+        return m
+
+    return _post
+
+
+
 def _yaml_file(content: str) -> str:
     f = tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False)
     f.write(content)
@@ -262,11 +275,7 @@ class TestRunQASuite:
             pass_patterns=["expected"],
         )
 
-        async def _mock_post(*args, **kwargs):
-            m = MagicMock()
-            m.raise_for_status = MagicMock()
-            m.json.return_value = {"response": "this is expected output"}
-            return m
+        _mock_post = _ollama_reply("this is expected output")
 
         with patch("httpx.AsyncClient.post", side_effect=_mock_post):
             suite = await run_qa_suite("model", "http://h", [fixture])
@@ -284,11 +293,7 @@ class TestRunQASuite:
             pass_patterns=["special-token-xyz"],
         )
 
-        async def _mock_post(*args, **kwargs):
-            m = MagicMock()
-            m.raise_for_status = MagicMock()
-            m.json.return_value = {"response": "generic response"}
-            return m
+        _mock_post = _ollama_reply("generic response")
 
         with patch("httpx.AsyncClient.post", side_effect=_mock_post):
             suite = await run_qa_suite("model", "http://h", [fixture])
@@ -314,11 +319,7 @@ class TestRunQASuite:
         fixture = QAFixture(id="t", prompt="q")
         called: list[QAResult] = []
 
-        async def _mock_post(*args, **kwargs):
-            m = MagicMock()
-            m.raise_for_status = MagicMock()
-            m.json.return_value = {"response": "ok"}
-            return m
+        _mock_post = _ollama_reply("ok")
 
         with patch("httpx.AsyncClient.post", side_effect=_mock_post):
             await run_qa_suite("model", "http://h", [fixture], on_result=called.append)
@@ -330,11 +331,7 @@ class TestRunQASuite:
     async def test_duration_recorded(self):
         fixture = QAFixture(id="t", prompt="q")
 
-        async def _mock_post(*args, **kwargs):
-            m = MagicMock()
-            m.raise_for_status = MagicMock()
-            m.json.return_value = {"response": "ok"}
-            return m
+        _mock_post = _ollama_reply("ok")
 
         with patch("httpx.AsyncClient.post", side_effect=_mock_post):
             suite = await run_qa_suite("model", "http://h", [fixture])
@@ -345,11 +342,7 @@ class TestRunQASuite:
     async def test_multiple_fixtures_sequential(self):
         fixtures = [QAFixture(id=f"t{i}", prompt=f"q{i}", must_match="any") for i in range(3)]
 
-        async def _mock_post(*args, **kwargs):
-            m = MagicMock()
-            m.raise_for_status = MagicMock()
-            m.json.return_value = {"response": "ok"}
-            return m
+        _mock_post = _ollama_reply("ok")
 
         with patch("httpx.AsyncClient.post", side_effect=_mock_post):
             suite = await run_qa_suite("model", "http://h", fixtures)
@@ -385,11 +378,7 @@ class TestRunQASuite:
     async def test_raw_ollama_missing_counts_leave_tokens_unset(self):
         fixture = QAFixture(id="t", prompt="q", must_match="any")
 
-        async def _mock_post(*args, **kwargs):
-            m = MagicMock()
-            m.raise_for_status = MagicMock()
-            m.json.return_value = {"response": "ok"}
-            return m
+        _mock_post = _ollama_reply("ok")
 
         with patch("httpx.AsyncClient.post", side_effect=_mock_post):
             suite = await run_qa_suite("model", "http://h", [fixture])
@@ -543,11 +532,7 @@ class TestQARunnerProfileMode:
         """When profile=None, _query_ollama is used (existing behaviour)."""
         fixture = QAFixture(id="t", prompt="q", must_match="any")
 
-        async def _mock_post(*args, **kwargs):
-            m = MagicMock()
-            m.raise_for_status = MagicMock()
-            m.json.return_value = {"response": "ollama response"}
-            return m
+        _mock_post = _ollama_reply("ollama response")
 
         with patch("httpx.AsyncClient.post", side_effect=_mock_post):
             suite = await run_qa_suite(
