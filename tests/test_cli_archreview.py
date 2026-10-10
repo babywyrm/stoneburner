@@ -1,5 +1,6 @@
 from unittest.mock import patch
 
+import pytest
 from click.testing import CliRunner
 
 from atomics.archreview.models import ArchReviewResult
@@ -23,6 +24,26 @@ def _fake_results():
             matched_categories=["injection"],
         ),
     ]
+
+
+def _recording_ollama(built: list):
+    """An OllamaProvider stand-in that records each instance it builds."""
+
+    class _FakeOllamaProvider:
+        name = "ollama"
+
+        def __init__(self, *, host, default_model, timeout, context_tokens=None):
+            self._default_model = default_model
+            self._context_tokens = context_tokens
+            self._timeout = timeout
+            built.append(self)
+
+        @property
+        def default_model(self):
+            return self._default_model
+
+    return _FakeOllamaProvider
+
 
 
 def _verbose_results():
@@ -120,209 +141,55 @@ def test_archreview_cli_verbose_streams_findings(tmp_path, monkeypatch):
     assert "routes/search.ts" in result.output  # per-finding detail printed
 
 
-def test_archreview_cli_passes_larger_ollama_context(tmp_path, monkeypatch):
+@pytest.mark.parametrize(
+    ("model", "tier", "contexts", "shown"),
+    [
+        ("qwen2.5:14b", "floor", [8192, 22144], ["context=22144", "reserve=2048"]),
+        ("qwen3.5:4b", "expanded", [134144], ["context=134144", "reserve=2048"]),
+        ("qwen3.5:4b", "wide", [54144], ["tier=wide", "context=54144"]),
+        ("qwen3.5:4b", "local", [38144], ["tier=local", "context=38144"]),
+    ],
+)
+def test_archreview_cli_sizes_ollama_context_per_tier(
+    tmp_path, monkeypatch, model, tier, contexts, shown
+):
     monkeypatch.setenv("JUICE_SHOP_PATH", str(tmp_path))
     (tmp_path / "server.ts").write_text("// app\n")
 
     built = []
 
-    class _FakeOllamaProvider:
-        name = "ollama"
+    _FakeOllamaProvider = _recording_ollama(built)
 
-        def __init__(self, *, host, default_model, timeout, context_tokens=None):
-            self._host = host
-            self._default_model = default_model
-            self._context_tokens = context_tokens
-            built.append(self)
+    async def _shim(**kwargs):
+        return _fake_results()
 
-        @property
-        def default_model(self):
-            return self._default_model
-
-    runner = CliRunner()
-    with patch("atomics.providers.ollama.OllamaProvider", _FakeOllamaProvider):
-        with patch("atomics.archreview.runner.run_archreview") as m:
-
-            async def _shim(**kwargs):
-                return _fake_results()
-
-            m.side_effect = _shim
-            result = runner.invoke(
-                cli,
-                [
-                    "archreview",
-                    "--repo",
-                    "juice-shop",
-                    "--models",
-                    "qwen2.5:14b",
-                    "--provider",
-                    "ollama",
-                    "--judge-provider",
-                    "ollama",
-                    "--judge-model",
-                    "deepseek-r1:7b",
-                    "--tier",
-                    "floor",
-                    "--no-save",
-                ],
-            )
+    with (
+        patch("atomics.providers.ollama.OllamaProvider", _FakeOllamaProvider),
+        patch("atomics.archreview.runner.run_archreview", side_effect=_shim),
+    ):
+        result = CliRunner().invoke(
+            cli,
+            [
+                "archreview",
+                "--repo",
+                "juice-shop",
+                "--models",
+                model,
+                "--provider",
+                "ollama",
+                "--judge-provider",
+                "ollama",
+                "--judge-model",
+                "deepseek-r1:7b",
+                "--tier",
+                tier,
+                "--no-save",
+            ],
+        )
     assert result.exit_code == 0, result.output
-    assert [p._context_tokens for p in built] == [8192, 22144]
-    assert "context=22144" in result.output
-    assert "reserve=2048" in result.output
-
-
-def test_archreview_cli_expanded_context_reserves_output_room(tmp_path, monkeypatch):
-    monkeypatch.setenv("JUICE_SHOP_PATH", str(tmp_path))
-    (tmp_path / "server.ts").write_text("// app\n")
-
-    built = []
-
-    class _FakeOllamaProvider:
-        name = "ollama"
-
-        def __init__(self, *, host, default_model, timeout, context_tokens=None):
-            self._default_model = default_model
-            self._context_tokens = context_tokens
-            built.append(self)
-
-        @property
-        def default_model(self):
-            return self._default_model
-
-    runner = CliRunner()
-    with patch("atomics.providers.ollama.OllamaProvider", _FakeOllamaProvider):
-        with patch("atomics.archreview.runner.run_archreview") as m:
-
-            async def _shim(**kwargs):
-                return _fake_results()
-
-            m.side_effect = _shim
-            result = runner.invoke(
-                cli,
-                [
-                    "archreview",
-                    "--repo",
-                    "juice-shop",
-                    "--models",
-                    "qwen3.5:4b",
-                    "--provider",
-                    "ollama",
-                    "--judge-provider",
-                    "ollama",
-                    "--judge-model",
-                    "deepseek-r1:7b",
-                    "--tier",
-                    "expanded",
-                    "--no-save",
-                ],
-            )
-    assert result.exit_code == 0, result.output
-    assert built[-1]._context_tokens == 134144
-    assert "context=134144" in result.output
-    assert "reserve=2048" in result.output
-
-
-def test_archreview_cli_accepts_wide_tier_for_local_models(tmp_path, monkeypatch):
-    monkeypatch.setenv("JUICE_SHOP_PATH", str(tmp_path))
-    (tmp_path / "server.ts").write_text("// app\n")
-
-    built = []
-
-    class _FakeOllamaProvider:
-        name = "ollama"
-
-        def __init__(self, *, host, default_model, timeout, context_tokens=None):
-            self._default_model = default_model
-            self._context_tokens = context_tokens
-            built.append(self)
-
-        @property
-        def default_model(self):
-            return self._default_model
-
-    runner = CliRunner()
-    with patch("atomics.providers.ollama.OllamaProvider", _FakeOllamaProvider):
-        with patch("atomics.archreview.runner.run_archreview") as m:
-
-            async def _shim(**kwargs):
-                return _fake_results()
-
-            m.side_effect = _shim
-            result = runner.invoke(
-                cli,
-                [
-                    "archreview",
-                    "--repo",
-                    "juice-shop",
-                    "--models",
-                    "qwen3.5:4b",
-                    "--provider",
-                    "ollama",
-                    "--judge-provider",
-                    "ollama",
-                    "--judge-model",
-                    "deepseek-r1:7b",
-                    "--tier",
-                    "wide",
-                    "--no-save",
-                ],
-            )
-    assert result.exit_code == 0, result.output
-    assert built[-1]._context_tokens == 54144
-    assert "tier=wide" in result.output
-    assert "context=54144" in result.output
-
-
-def test_archreview_cli_accepts_local_tier_for_brainbox_models(tmp_path, monkeypatch):
-    monkeypatch.setenv("JUICE_SHOP_PATH", str(tmp_path))
-    (tmp_path / "server.ts").write_text("// app\n")
-
-    built = []
-
-    class _FakeOllamaProvider:
-        name = "ollama"
-
-        def __init__(self, *, host, default_model, timeout, context_tokens=None):
-            self._default_model = default_model
-            self._context_tokens = context_tokens
-            built.append(self)
-
-        @property
-        def default_model(self):
-            return self._default_model
-
-    runner = CliRunner()
-    with patch("atomics.providers.ollama.OllamaProvider", _FakeOllamaProvider):
-        with patch("atomics.archreview.runner.run_archreview") as m:
-
-            async def _shim(**kwargs):
-                return _fake_results()
-
-            m.side_effect = _shim
-            result = runner.invoke(
-                cli,
-                [
-                    "archreview",
-                    "--repo",
-                    "juice-shop",
-                    "--models",
-                    "qwen3.5:4b",
-                    "--provider",
-                    "ollama",
-                    "--judge-provider",
-                    "ollama",
-                    "--judge-model",
-                    "deepseek-r1:7b",
-                    "--tier",
-                    "local",
-                    "--no-save",
-                ],
-            )
-    assert result.exit_code == 0, result.output
-    assert built[-1]._context_tokens == 38144
-    assert "tier=local" in result.output
-    assert "context=38144" in result.output
+    assert [p._context_tokens for p in built][-len(contexts) :] == contexts
+    for text in shown:
+        assert text in result.output
 
 
 def test_archreview_cli_max_output_tokens_adjusts_reserve_and_runner_arg(tmp_path, monkeypatch):
@@ -332,17 +199,7 @@ def test_archreview_cli_max_output_tokens_adjusts_reserve_and_runner_arg(tmp_pat
     built = []
     calls = []
 
-    class _FakeOllamaProvider:
-        name = "ollama"
-
-        def __init__(self, *, host, default_model, timeout, context_tokens=None):
-            self._default_model = default_model
-            self._context_tokens = context_tokens
-            built.append(self)
-
-        @property
-        def default_model(self):
-            return self._default_model
+    _FakeOllamaProvider = _recording_ollama(built)
 
     runner = CliRunner()
     with patch("atomics.providers.ollama.OllamaProvider", _FakeOllamaProvider):
@@ -387,17 +244,7 @@ def test_archreview_cli_inference_timeout_overrides_ollama_timeout(tmp_path, mon
 
     built = []
 
-    class _FakeOllamaProvider:
-        name = "ollama"
-
-        def __init__(self, *, host, default_model, timeout, context_tokens=None):
-            self._default_model = default_model
-            self._timeout = timeout
-            built.append(self)
-
-        @property
-        def default_model(self):
-            return self._default_model
+    _FakeOllamaProvider = _recording_ollama(built)
 
     runner = CliRunner()
     with patch("atomics.providers.ollama.OllamaProvider", _FakeOllamaProvider):
