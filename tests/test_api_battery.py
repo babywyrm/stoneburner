@@ -207,7 +207,7 @@ def test_post_batteries_returns_202_and_kind():
             new_callable=AsyncMock,
             return_value={"battery": "desk-pass", "steps": []},
         ),
-        TestClient(app) as client,
+        TestClient(app, base_url="http://127.0.0.1") as client,
     ):
         resp = client.post(
             "/api/v1/batteries",
@@ -231,7 +231,7 @@ def test_post_batteries_unknown_name_is_422():
     from atomics.api.server import create_app
 
     app = create_app(settings=ServerSettings(no_auth=True))
-    with TestClient(app) as client:
+    with TestClient(app, base_url="http://127.0.0.1") as client:
         resp = client.post(
             "/api/v1/batteries",
             json={"name": "nope", "provider": "ollama", "model": "x", "budget_usd": 5},
@@ -246,7 +246,7 @@ def test_post_batteries_without_budget_is_422():
     from atomics.api.server import create_app
 
     app = create_app(settings=ServerSettings(no_auth=True))
-    with TestClient(app) as client:
+    with TestClient(app, base_url="http://127.0.0.1") as client:
         resp = client.post(
             "/api/v1/batteries",
             json={"name": "desk-pass", "provider": "ollama", "model": "x"},

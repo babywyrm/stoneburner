@@ -22,7 +22,7 @@ def app(tmp_path):
 
 class TestLiveness:
     def test_health_reports_ok(self, app):
-        with TestClient(app) as client:
+        with TestClient(app, base_url="http://127.0.0.1") as client:
             res = client.get("/api/v1/health")
             assert res.status_code == 200
             assert res.json()["status"] == "ok"
@@ -33,7 +33,7 @@ class TestLiveness:
         Restarting the API server does not repair a database outage; it just
         removes the endpoint that could have reported one.
         """
-        with TestClient(app) as client:
+        with TestClient(app, base_url="http://127.0.0.1") as client:
             app.state.coordinator._conn.close()
             res = client.get("/api/v1/health")
             assert res.status_code == 200
@@ -41,26 +41,26 @@ class TestLiveness:
 
     def test_health_needs_no_credentials(self, tmp_path):
         keyed = create_app(ServerSettings(api_keys={"k"}, db_path=tmp_path / "h.db"))
-        with TestClient(keyed) as client:
+        with TestClient(keyed, base_url="http://127.0.0.1") as client:
             assert client.get("/api/v1/health").status_code == 200
 
 
 class TestReadiness:
     def test_a_healthy_server_is_ready(self, app):
-        with TestClient(app) as client:
+        with TestClient(app, base_url="http://127.0.0.1") as client:
             res = client.get("/api/v1/ready")
             assert res.status_code == 200
             assert res.json()["status"] == "ready"
 
     def test_the_database_check_is_reported_by_name(self, app):
-        with TestClient(app) as client:
+        with TestClient(app, base_url="http://127.0.0.1") as client:
             checks = client.get("/api/v1/ready").json()["checks"]
             assert [c["name"] for c in checks] == ["database"]
             assert checks[0]["ok"] is True
             assert checks[0]["detail"] is None
 
     def test_an_unreachable_database_makes_the_server_unready(self, app):
-        with TestClient(app) as client:
+        with TestClient(app, base_url="http://127.0.0.1") as client:
             app.state.coordinator._conn.close()
             res = client.get("/api/v1/ready")
 
@@ -69,7 +69,7 @@ class TestReadiness:
 
     def test_the_failure_explains_itself(self, app):
         """A 503 with no reason sends someone reading source at 3am."""
-        with TestClient(app) as client:
+        with TestClient(app, base_url="http://127.0.0.1") as client:
             app.state.coordinator._conn.close()
             check = client.get("/api/v1/ready").json()["checks"][0]
 
@@ -81,7 +81,7 @@ class TestReadiness:
         """Readiness must be live state, not a flag latched at startup."""
         from atomics.storage.schema import init_db
 
-        with TestClient(app) as client:
+        with TestClient(app, base_url="http://127.0.0.1") as client:
             app.state.coordinator._conn.close()
             assert client.get("/api/v1/ready").status_code == 503
 
@@ -91,12 +91,12 @@ class TestReadiness:
     def test_readiness_needs_no_credentials(self, tmp_path):
         """A probe should not need a key; it reveals no run data."""
         keyed = create_app(ServerSettings(api_keys={"k"}, db_path=tmp_path / "r.db"))
-        with TestClient(keyed) as client:
+        with TestClient(keyed, base_url="http://127.0.0.1") as client:
             assert client.get("/api/v1/ready").status_code == 200
 
     def test_readiness_before_startup_is_not_ready(self, app):
         """Reached before lifespan runs, there is no coordinator to check."""
-        client = TestClient(app)  # no context manager, so no lifespan
+        client = TestClient(app, base_url="http://127.0.0.1")  # no context manager, so no lifespan
         res = client.get("/api/v1/ready")
 
         assert res.status_code == 503

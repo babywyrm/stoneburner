@@ -18,7 +18,7 @@ def _auth() -> dict[str, str]:
 
 def test_list_jobs_returns_empty_by_default(tmp_path):
     app = create_app(ServerSettings(no_auth=False, api_keys={API_KEY}, db_path=tmp_path / "db.db"))
-    with TestClient(app) as tc:
+    with TestClient(app, base_url="http://127.0.0.1") as tc:
         res = tc.get("/api/v1/distributed/runs", headers=_auth())
         assert res.status_code == 200
         assert res.json() == {"jobs": []}
@@ -26,7 +26,7 @@ def test_list_jobs_returns_empty_by_default(tmp_path):
 
 def test_list_workers_returns_empty_by_default(tmp_path):
     app = create_app(ServerSettings(no_auth=False, api_keys={API_KEY}, db_path=tmp_path / "db.db"))
-    with TestClient(app) as tc:
+    with TestClient(app, base_url="http://127.0.0.1") as tc:
         res = tc.get("/api/v1/workers", headers=_auth())
         assert res.status_code == 200
         assert res.json() == {"workers": []}
@@ -34,7 +34,7 @@ def test_list_workers_returns_empty_by_default(tmp_path):
 
 def test_list_jobs_after_creating_run(tmp_path):
     app = create_app(ServerSettings(no_auth=True, db_path=tmp_path / "db.db"))
-    with TestClient(app) as tc:
+    with TestClient(app, base_url="http://127.0.0.1") as tc:
         tc.post(
             "/api/v1/distributed/runs", json={"mode": "split", "run_request": {"iterations": 1}}
         )
@@ -46,7 +46,7 @@ def test_list_jobs_after_creating_run(tmp_path):
 
 def test_list_workers_after_registration(tmp_path):
     app = create_app(ServerSettings(no_auth=True, db_path=tmp_path / "db.db"))
-    with TestClient(app) as tc:
+    with TestClient(app, base_url="http://127.0.0.1") as tc:
         tc.post("/api/v1/workers/register", json={})
         res = tc.get("/api/v1/workers")
         data = res.json()
@@ -61,14 +61,14 @@ def test_distributed_list_limit_is_bounded():
     from atomics.api.server import create_app
 
     app = create_app(settings=ServerSettings(no_auth=True))
-    with TestClient(app) as tc:
+    with TestClient(app, base_url="http://127.0.0.1") as tc:
         assert tc.get("/api/v1/distributed/runs?limit=100000").status_code == 422
 
 
 def test_a_caller_sees_only_their_own_distributed_runs(tmp_path):
     alice, bob = {"X-API-Key": ALICE}, {"X-API-Key": BOB}
     app = create_app(ServerSettings(api_keys={ALICE, BOB}, db_path=tmp_path / "db.db"))
-    with TestClient(app) as tc:
+    with TestClient(app, base_url="http://127.0.0.1") as tc:
         job = tc.post(
             "/api/v1/distributed/runs",
             json={"mode": "split", "run_request": {"iterations": 1}},

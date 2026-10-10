@@ -12,7 +12,7 @@ from atomics.api.server import create_app
 @pytest.fixture
 def client():
     app = create_app(settings=ServerSettings(no_auth=True))
-    with TestClient(app) as tc:
+    with TestClient(app, base_url="http://127.0.0.1") as tc:
         yield tc
 
 

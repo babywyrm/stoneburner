@@ -40,6 +40,29 @@ class TestNoAuthRequiresLoopback:
         assert settings.host == "0.0.0.0"
 
 
+class TestNoAuthRejectsForeignHostHeader:
+    """A page that DNS-rebinds its own name to 127.0.0.1 is same-origin with a
+    --no-auth server, and could submit evals and read the results back."""
+
+    @staticmethod
+    def _status(settings: ServerSettings, host: str, **headers: str) -> int:
+        with TestClient(create_app(settings)) as client:
+            return client.get("/api/v1/jobs", headers={"host": host, **headers}).status_code
+
+    @pytest.mark.parametrize("host", ["127.0.0.1:8000", "localhost", "[::1]:8000"])
+    def test_loopback_host_header_is_served(self, host, tmp_path):
+        settings = ServerSettings(no_auth=True, db_path=tmp_path / "a.db")
+        assert self._status(settings, host) == 200
+
+    def test_rebound_host_header_is_refused(self, tmp_path):
+        settings = ServerSettings(no_auth=True, db_path=tmp_path / "a.db")
+        assert self._status(settings, "attacker.example:8000") == 421
+
+    def test_keyed_server_does_not_check_host(self, tmp_path):
+        settings = ServerSettings(api_keys={"k"}, db_path=tmp_path / "a.db")
+        assert self._status(settings, "atomics.lab", **{"X-API-Key": "k"}) == 200
+
+
 class TestWorkerKeysAreSeparable:
     """A worker credential must not also authorize run and eval submission."""
 
@@ -59,7 +82,7 @@ class TestWorkerKeysAreSeparable:
                 db_path=tmp_path / "sec.db",
             )
         )
-        with TestClient(app) as client:
+        with TestClient(app, base_url="http://127.0.0.1") as client:
             registered = client.post(
                 "/api/v1/workers/register",
                 json={},
@@ -82,7 +105,7 @@ class TestWorkerKeysAreSeparable:
                 db_path=tmp_path / "sec.db",
             )
         )
-        with TestClient(app) as client:
+        with TestClient(app, base_url="http://127.0.0.1") as client:
             res = client.post(
                 "/api/v1/workers/register",
                 json={},
@@ -141,7 +164,7 @@ class TestAssignmentOwnership:
 
     def test_the_route_rejects_a_mismatched_worker_with_409(self, tmp_path):
         app = create_app(ServerSettings(no_auth=True, db_path=tmp_path / "route.db"))
-        with TestClient(app) as client:
+        with TestClient(app, base_url="http://127.0.0.1") as client:
             owner = client.post("/api/v1/workers/register", json={}).json()
             attacker = client.post("/api/v1/workers/register", json={}).json()
             client.post(
@@ -159,7 +182,7 @@ class TestAssignmentOwnership:
 
     def test_the_rightful_worker_still_succeeds_over_http(self, tmp_path):
         app = create_app(ServerSettings(no_auth=True, db_path=tmp_path / "route.db"))
-        with TestClient(app) as client:
+        with TestClient(app, base_url="http://127.0.0.1") as client:
             owner = client.post("/api/v1/workers/register", json={}).json()
             client.post(
                 "/api/v1/distributed/runs",
@@ -200,7 +223,7 @@ class TestDashboardEscaping:
             ServerSettings(no_auth=True, with_dashboard=True, db_path=tmp_path / "xss.db")
         )
         payload = "<script>alert(1)</script>"
-        with TestClient(app) as client:
+        with TestClient(app, base_url="http://127.0.0.1") as client:
             client.post("/api/v1/workers/register", json={"labels": {"gpu": payload}})
             listed = client.get("/api/v1/workers").json()
             assert listed["workers"][0]["labels"]["gpu"] == payload

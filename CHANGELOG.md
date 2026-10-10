@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Security
+- A `--no-auth` server now refuses requests whose `Host` header is not a
+  loopback address. A web page could rebind its own name to `127.0.0.1`,
+  become same-origin with the server, and submit evals or read results.
+  Keyed servers are unchanged: a rebinding page has no key.
+
 ## 0.26.0 (2026-10-08) — See what the model saw
 
 ### Upgrade notes

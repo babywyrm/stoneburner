@@ -41,7 +41,7 @@ def access_lines(caplog) -> list[str]:
 @pytest.fixture
 def client(tmp_path):
     app = create_app(ServerSettings(api_keys={ALICE}, db_path=tmp_path / "log.db"))
-    with TestClient(app) as test_client:
+    with TestClient(app, base_url="http://127.0.0.1") as test_client:
         yield test_client
 
 

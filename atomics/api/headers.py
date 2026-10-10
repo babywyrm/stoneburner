@@ -9,9 +9,12 @@ from __future__ import annotations
 
 import secrets
 from collections.abc import Awaitable, Callable
+from urllib.parse import urlsplit
 
 from starlette.requests import Request
-from starlette.responses import Response
+from starlette.responses import PlainTextResponse, Response
+
+from atomics.api.config import is_loopback_host
 
 # Applies to every response. `default-src 'none'` is safe for JSON endpoints and
 # is overridden for the dashboard, which is the only route that renders.
@@ -59,3 +62,19 @@ async def security_headers_middleware(
     # The dashboard sets its own nonce-based policy; do not clobber it.
     response.headers.setdefault("Content-Security-Policy", _JSON_CSP)
     return response
+
+
+async def loopback_host_middleware(
+    request: Request,
+    call_next: Callable[[Request], Awaitable[Response]],
+) -> Response:
+    """Refuse a Host header that does not name this machine.
+
+    Installed only under --no-auth. A page that DNS-rebinds its own name to
+    127.0.0.1 is same-origin with the server, so without this it could submit
+    evals and read the results back.
+    """
+    host = urlsplit(f"//{request.headers.get('host', '')}").hostname or ""
+    if not is_loopback_host(host):
+        return PlainTextResponse("Host header must name a loopback address", status_code=421)
+    return await call_next(request)

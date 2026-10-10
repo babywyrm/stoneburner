@@ -39,8 +39,15 @@ curl -H "X-API-Key: $ATOMICS_API_KEY" http://127.0.0.1:8000/api/v1/runs \
 A submitter key is operator-equivalent. It can point inference and judges at
 any `host` the server can reach, private and loopback addresses included,
 because that is how local Ollama and lab boxes are evaluated. It can spend up
-to each request's budget ceiling. Give keys only to people you would let run
-the CLI on the server host.
+to each request's budget ceiling. A codegen eval runs the model's code on the
+server; it cannot see API keys or the network, but it can read files the
+server's user can, and its return values come back in the result. Give keys
+only to people you would let run the CLI on the server host.
+
+`--no-auth` binds to loopback only, and answers only requests whose `Host`
+header names a loopback address (`127.0.0.1`, `localhost`, `[::1]`). Anything
+else gets `421`, so a web page that rebinds its own name to `127.0.0.1` cannot
+use the server.
 
 Keys are isolated from each other in two ways. `/api/v1/jobs` and
 `/api/v1/distributed/runs` show only the caller's own jobs, and per-caller

@@ -9,14 +9,14 @@ from atomics.api.server import create_app
 
 def test_create_app_no_auth():
     app = create_app(settings=ServerSettings(no_auth=True))
-    with TestClient(app) as client:
+    with TestClient(app, base_url="http://127.0.0.1") as client:
         resp = client.get("/api/v1/health")
         assert resp.status_code == 200
 
 
 def test_create_app_api_key():
     app = create_app(settings=ServerSettings(api_keys={"secret"}))
-    with TestClient(app) as client:
+    with TestClient(app, base_url="http://127.0.0.1") as client:
         assert isinstance(app.state.auth, ApiKeyAuth)
         # Health is public; protected routes require the API key.
         assert client.get("/api/v1/health").status_code == 200

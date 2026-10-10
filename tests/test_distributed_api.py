@@ -13,7 +13,7 @@ API_KEY = "test-coordinator-key"
 @pytest.fixture
 def client(tmp_path):
     app = create_app(no_auth=True, db_path=tmp_path / "distributed.db")
-    with TestClient(app) as tc:
+    with TestClient(app, base_url="http://127.0.0.1") as tc:
         yield tc
 
 
@@ -27,7 +27,7 @@ def secured_client(tmp_path):
             db_path=tmp_path / "secured.db",
         )
     )
-    with TestClient(app) as tc:
+    with TestClient(app, base_url="http://127.0.0.1") as tc:
         yield tc
 
 
