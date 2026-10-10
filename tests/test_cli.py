@@ -48,6 +48,17 @@ def _mock_adversarial_cli(monkeypatch, summaries):
     )
 
 
+class _NullRepo:
+    """A MetricsRepository stand-in for commands whose storage is not under test."""
+
+    def __init__(self, _path):
+        pass
+
+    def close(self):
+        pass
+
+
+
 def test_cli_adversarial_fixtures_option_is_documented():
     result = CliRunner().invoke(cli, ["adversarial", "--help"])
     assert result.exit_code == 0
@@ -371,13 +382,6 @@ def test_cli_run_with_mocked_claude(monkeypatch, tmp_path):
             calls["ran"] = True
             calls["max_iterations"] = max_iterations
 
-    class DummyRepo:
-        def __init__(self, _):
-            pass
-
-        def close(self):
-            pass
-
     class DummyClaude:
         def __init__(self, api_key, default_model):
             self.api_key = api_key
@@ -385,7 +389,7 @@ def test_cli_run_with_mocked_claude(monkeypatch, tmp_path):
             self.name = "claude"
 
     monkeypatch.setattr("atomics.core.engine.LoopEngine", DummyEngine)
-    monkeypatch.setattr("atomics.storage.repository.MetricsRepository", DummyRepo)
+    monkeypatch.setattr("atomics.storage.repository.MetricsRepository", _NullRepo)
     monkeypatch.setattr("atomics.providers.claude.ClaudeProvider", DummyClaude)
 
     result = runner.invoke(
@@ -408,13 +412,6 @@ def test_cli_run_with_mocked_bedrock(monkeypatch, tmp_path):
         async def run(self, max_iterations=None):
             calls["ran"] = True
 
-    class DummyRepo:
-        def __init__(self, _):
-            pass
-
-        def close(self):
-            pass
-
     class DummyBedrock:
         name = "bedrock"
 
@@ -423,7 +420,7 @@ def test_cli_run_with_mocked_bedrock(monkeypatch, tmp_path):
             self.model_id = model_id
 
     monkeypatch.setattr("atomics.core.engine.LoopEngine", DummyEngine)
-    monkeypatch.setattr("atomics.storage.repository.MetricsRepository", DummyRepo)
+    monkeypatch.setattr("atomics.storage.repository.MetricsRepository", _NullRepo)
     monkeypatch.setattr("atomics.providers.bedrock.BedrockProvider", DummyBedrock)
 
     result = runner.invoke(
@@ -460,13 +457,6 @@ def test_cli_run_keyboard_interrupt(monkeypatch, tmp_path):
         async def run(self, max_iterations=None):
             raise KeyboardInterrupt
 
-    class DummyRepo:
-        def __init__(self, _):
-            pass
-
-        def close(self):
-            pass
-
     class DummyClaude:
         name = "claude"
 
@@ -475,7 +465,7 @@ def test_cli_run_keyboard_interrupt(monkeypatch, tmp_path):
             self.default_model = default_model
 
     monkeypatch.setattr("atomics.core.engine.LoopEngine", InterruptEngine)
-    monkeypatch.setattr("atomics.storage.repository.MetricsRepository", DummyRepo)
+    monkeypatch.setattr("atomics.storage.repository.MetricsRepository", _NullRepo)
     monkeypatch.setattr("atomics.providers.claude.ClaudeProvider", DummyClaude)
 
     result = runner.invoke(cli, ["run", "-n", "1"])
@@ -543,13 +533,6 @@ def test_cli_run_with_mocked_openai(monkeypatch, tmp_path):
             calls["ran"] = True
             calls["max_iterations"] = max_iterations
 
-    class DummyRepo:
-        def __init__(self, _):
-            pass
-
-        def close(self):
-            pass
-
     class DummyOpenAI:
         name = "openai"
 
@@ -558,7 +541,7 @@ def test_cli_run_with_mocked_openai(monkeypatch, tmp_path):
             self.default_model = default_model
 
     monkeypatch.setattr("atomics.core.engine.LoopEngine", DummyEngine)
-    monkeypatch.setattr("atomics.storage.repository.MetricsRepository", DummyRepo)
+    monkeypatch.setattr("atomics.storage.repository.MetricsRepository", _NullRepo)
     monkeypatch.setattr("atomics.providers.openai.OpenAIProvider", DummyOpenAI)
 
     result = runner.invoke(
@@ -596,19 +579,7 @@ def test_cli_provider_test_bedrock_success(monkeypatch):
             return True
 
         async def generate(self, *_args, **_kwargs):
-            return SimpleNamespace(
-                text="4",
-                input_tokens=1,
-                output_tokens=1,
-                total_tokens=2,
-                latency_ms=1.0,
-                estimated_cost_usd=0.0,
-                tokens_per_second=None,
-                tps_basis="wall_clock",
-                thinking_tokens=0,
-                cache_read_tokens=0,
-                cache_write_tokens=0,
-            )
+            return _provider_test_response()
 
     monkeypatch.setattr("atomics.providers.bedrock.BedrockProvider", DummyProvider)
     result = runner.invoke(cli, ["provider-test", "--provider", "bedrock"])
@@ -629,19 +600,7 @@ def test_cli_provider_test_openai_success(monkeypatch):
             return True
 
         async def generate(self, *_args, **_kwargs):
-            return SimpleNamespace(
-                text="4",
-                input_tokens=1,
-                output_tokens=1,
-                total_tokens=2,
-                latency_ms=1.0,
-                estimated_cost_usd=0.0,
-                tokens_per_second=None,
-                tps_basis="wall_clock",
-                thinking_tokens=0,
-                cache_read_tokens=0,
-                cache_write_tokens=0,
-            )
+            return _provider_test_response()
 
     monkeypatch.setattr("atomics.providers.openai.OpenAIProvider", DummyProvider)
     result = runner.invoke(cli, ["provider-test", "--provider", "openai"])
@@ -874,13 +833,6 @@ def test_cli_run_post_hook(monkeypatch, tmp_path):
                 total_cost_usd=0.0,
             )
 
-    class DummyRepo:
-        def __init__(self, _):
-            pass
-
-        def close(self):
-            pass
-
     class DummyClaude:
         name = "claude"
 
@@ -888,7 +840,7 @@ def test_cli_run_post_hook(monkeypatch, tmp_path):
             pass
 
     monkeypatch.setattr("atomics.core.engine.LoopEngine", DummyEngine)
-    monkeypatch.setattr("atomics.storage.repository.MetricsRepository", DummyRepo)
+    monkeypatch.setattr("atomics.storage.repository.MetricsRepository", _NullRepo)
     monkeypatch.setattr("atomics.providers.claude.ClaudeProvider", DummyClaude)
     monkeypatch.setattr("atomics.hooks.run_post_hook", capture_hook)
     monkeypatch.setattr("atomics.hooks.notify_run_complete", lambda *_a, **_k: None)
@@ -917,19 +869,7 @@ def test_cli_provider_test_success(monkeypatch):
             return True
 
         async def generate(self, *_args, **_kwargs):
-            return SimpleNamespace(
-                text="4",
-                input_tokens=1,
-                output_tokens=1,
-                total_tokens=2,
-                latency_ms=1.0,
-                estimated_cost_usd=0.0,
-                tokens_per_second=None,
-                tps_basis="wall_clock",
-                thinking_tokens=0,
-                cache_read_tokens=0,
-                cache_write_tokens=0,
-            )
+            return _provider_test_response()
 
     monkeypatch.setattr("atomics.providers.claude.ClaudeProvider", DummyProvider)
     result = runner.invoke(cli, ["provider-test"])
@@ -1590,19 +1530,7 @@ def test_cli_provider_test_brain_gateway_default_label(monkeypatch):
             return True
 
         async def generate(self, *_args, **_kwargs):
-            return SimpleNamespace(
-                text="4",
-                input_tokens=1,
-                output_tokens=1,
-                total_tokens=2,
-                latency_ms=1.0,
-                estimated_cost_usd=0.0,
-                tokens_per_second=None,
-                tps_basis="wall_clock",
-                thinking_tokens=0,
-                cache_read_tokens=0,
-                cache_write_tokens=0,
-            )
+            return _provider_test_response()
 
     monkeypatch.setattr("atomics.providers.brain_gateway.BrainGatewayProvider", FakeGateway)
     result = CliRunner().invoke(
