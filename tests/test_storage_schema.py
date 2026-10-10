@@ -283,6 +283,41 @@ def test_dropped_column_rebuilds_and_keeps_other_values(tmp_path: Path, monkeypa
         conn.close()
 
 
+def test_rebuilding_a_referenced_table_keeps_its_children(tmp_path: Path, monkeypatch) -> None:
+    """A worker that assignments point at must survive its table being rebuilt."""
+    from atomics.storage import schema
+
+    db_path = tmp_path / "referenced.db"
+    first = init_db(db_path)
+    first.execute(
+        "INSERT INTO workers (worker_id, labels, registered_at) VALUES ('w1', '{}', '2026-01-01')"
+    )
+    first.execute(
+        "INSERT INTO distributed_jobs (job_id, mode, request_json, created_at) "
+        "VALUES ('j1', 'split', '{}', '2026-01-01')"
+    )
+    first.execute(
+        "INSERT INTO distributed_assignments (assignment_id, job_id, worker_id, task_spec) "
+        "VALUES ('a1', 'j1', 'w1', '{}')"
+    )
+    first.commit()
+    first.close()
+
+    patched = schema.SCHEMA_SQL.replace("    endpoint TEXT,\n", "", 1)
+    assert patched != schema.SCHEMA_SQL
+    monkeypatch.setattr(schema, "SCHEMA_SQL", patched)
+    monkeypatch.setattr(schema, "SCHEMA_VERSION", schema.SCHEMA_VERSION + 1)
+
+    conn = init_db(db_path)
+    try:
+        assert "endpoint" not in _column_names(conn, "workers")
+        row = conn.execute("SELECT worker_id FROM distributed_assignments").fetchone()
+        assert row[0] == "w1"
+        assert conn.execute("PRAGMA foreign_keys").fetchone()[0] == 1
+    finally:
+        conn.close()
+
+
 def test_not_null_column_with_default_is_added_without_wipe(tmp_path: Path, monkeypatch) -> None:
     from atomics.storage import schema
 
