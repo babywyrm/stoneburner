@@ -6,9 +6,9 @@ auth headers, and cost table. Implementing `generate_with_tools` five times woul
 mean five places for the request body to drift; this mixin implements it once
 against the attributes all five already define.
 
-It deliberately does not touch `generate()`. Those implementations differ in ways
-that matter — vLLM's reasoning-content accounting, per-provider cost tables — and
-unifying them is a separate change with its own regression surface.
+`HostedChatProvider` adds the one `generate()` that groq and together share
+byte for byte. vllm, llamacpp and gemini keep their own: vLLM's reasoning-content
+accounting and Gemini's request shape differ in ways that matter.
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ from atomics.providers._tool_dialects import (
     openai_tool_payload,
     parse_openai_tool_calls,
 )
-from atomics.providers.base import ProviderResponse, compute_tps
+from atomics.providers.base import BaseProvider, ProviderResponse, compute_tps
 from atomics.providers.effort import apply_chat_effort, normalize_effort
 
 # See _INJECTED_CALL_ID in providers/openai.py: a tool message's tool_call_id has
@@ -175,3 +175,111 @@ class OpenAICompatibleTools:
             effort=normalize_effort(effort),
             reasoning_request=reasoning_request,
         )
+
+
+class HostedChatProvider(OpenAICompatibleTools, BaseProvider):
+    """A bearer-token cloud API that speaks plain Chat Completions."""
+
+    def __init__(
+        self,
+        *,
+        name: str,
+        base_url: str,
+        api_key: str,
+        default_model: str,
+        timeout: float,
+        client: httpx.AsyncClient | None,
+    ) -> None:
+        self._name = name
+        self._base_url = base_url
+        self._api_key = api_key
+        self._default_model = default_model
+        self._timeout = timeout
+        self._client = client or httpx.AsyncClient()
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def default_model(self) -> str:
+        return self._default_model
+
+    def _headers(self) -> dict[str, str]:
+        return {
+            "Authorization": f"Bearer {self._api_key}",
+            "Content-Type": "application/json",
+        }
+
+    async def generate(
+        self,
+        prompt: str,
+        *,
+        system: str = "",
+        model: str | None = None,
+        max_tokens: int = 1024,
+        thinking: bool | None = None,
+        thinking_budget: int | None = None,
+        temperature: float | None = None,
+        effort: str | None = None,
+        reasoning_mode: str | None = None,
+    ) -> ProviderResponse:
+        model = model or self._default_model
+        _ = reasoning_mode
+
+        messages = [
+            {"role": "system", "content": system or "You are a helpful assistant."},
+            {"role": "user", "content": prompt},
+        ]
+
+        body: dict = {
+            "model": model,
+            "messages": messages,
+            "max_tokens": max_tokens,
+            "stream": False,
+        }
+        if temperature is not None:
+            body["temperature"] = temperature
+        reasoning_request = apply_chat_effort(body, effort)
+
+        t0 = time.monotonic()
+        response = await self._client.post(
+            f"{self._base_url}/chat/completions",
+            json=body,
+            headers=self._headers(),
+            timeout=self._timeout,
+        )
+        response.raise_for_status()
+        latency_ms = round((time.monotonic() - t0) * 1000, 2)
+
+        data = response.json()
+        choice = data["choices"][0] if data.get("choices") else {}
+        text = choice.get("message", {}).get("content", "") or ""
+        usage = data.get("usage", {})
+        inp = usage.get("prompt_tokens", 0)
+        out = usage.get("completion_tokens", 0)
+        total = usage.get("total_tokens", inp + out)
+
+        tps = compute_tps(out, latency_ms / 1000)
+
+        return ProviderResponse(
+            text=text,
+            input_tokens=inp,
+            output_tokens=out,
+            total_tokens=total,
+            model=model,
+            latency_ms=latency_ms,
+            estimated_cost_usd=round(self._tool_cost(model, inp, out), 6),
+            tokens_per_second=tps,
+            tps_basis="wall_clock",
+            raw=data,
+            effort=normalize_effort(effort),
+            reasoning_request=reasoning_request,
+        )
+
+    async def health_check(self) -> bool:
+        try:
+            resp = await self.generate("Say OK.", max_tokens=8)
+            return len(resp.text) > 0
+        except Exception:
+            return False
