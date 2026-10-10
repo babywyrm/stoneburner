@@ -2,7 +2,15 @@
 
 from pathlib import Path
 
+import pytest
+
 from atomics.paths import default_data_dir, default_db_path
+
+
+@pytest.fixture(autouse=True)
+def _real_default_data_dir(monkeypatch):
+    """Undo conftest's isolation: these tests are about the real defaults."""
+    monkeypatch.setattr("atomics.paths.default_data_dir", default_data_dir)
 
 
 def test_default_paths_non_linux(monkeypatch):
