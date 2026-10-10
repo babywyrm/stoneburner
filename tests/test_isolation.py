@@ -23,3 +23,8 @@ def test_default_database_is_a_temp_file(tmp_path_factory) -> None:
 
 def test_keychain_is_the_null_backend() -> None:
     assert type(keyring.get_keyring()).__module__ == "keyring.backends.null"
+
+
+def test_a_hung_test_times_out(request) -> None:
+    assert request.config.pluginmanager.hasplugin("timeout")
+    assert float(request.config.getini("timeout")) > 0
