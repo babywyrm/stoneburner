@@ -276,10 +276,7 @@ def eval(
                 console.print(
                     Panel(
                         _rich_escape(format_eval_verbose_block(fr, heading=False).rstrip()),
-                        title=(
-                            f"[bold]{fr.fixture.id}[/bold] "
-                            f"({fr.fixture.complexity.value})"
-                        ),
+                        title=(f"[bold]{fr.fixture.id}[/bold] ({fr.fixture.complexity.value})"),
                         expand=True,
                     )
                 )

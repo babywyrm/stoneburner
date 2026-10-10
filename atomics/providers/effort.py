@@ -150,11 +150,7 @@ def ollama_think_value(
         value = "high"
     else:
         value = "max"
-    if (
-        isinstance(value, str)
-        and model is not None
-        and not supports_ollama_think_levels(model)
-    ):
+    if isinstance(value, str) and model is not None and not supports_ollama_think_levels(model):
         return True
     return value
 

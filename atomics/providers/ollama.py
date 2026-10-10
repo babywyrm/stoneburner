@@ -399,9 +399,7 @@ class OllamaProvider(BaseProvider):
             thinking_text=thinking_text,
             raw=data,
             outcome=(
-                None
-                if tool_calls
-                else _capped_outcome(done_reason, text, out, thinking_tokens)
+                None if tool_calls else _capped_outcome(done_reason, text, out, thinking_tokens)
             ),
             finish_reason=done_reason if isinstance(done_reason, str) else None,
             tool_calls=tool_calls,

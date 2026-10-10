@@ -58,7 +58,6 @@ class _NullRepo:
         pass
 
 
-
 def test_cli_adversarial_fixtures_option_is_documented():
     result = CliRunner().invoke(cli, ["adversarial", "--help"])
     assert result.exit_code == 0

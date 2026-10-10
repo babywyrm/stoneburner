@@ -85,9 +85,7 @@ def test_openai_chat_effort_is_scalar() -> None:
         ("ultra", "xhigh"),
     ],
 )
-def test_qwen_template_effort_maps_to_template_keys(
-    raw: str | None, expected: str | None
-) -> None:
+def test_qwen_template_effort_maps_to_template_keys(raw: str | None, expected: str | None) -> None:
     assert qwen_template_effort(raw) == expected
 
 
@@ -125,30 +123,18 @@ def test_ollama_think_value_maps_to_native_field(
 def test_ollama_think_value_collapses_levels_without_native_dial() -> None:
     """phi4-mini-reasoning 400s on the think field. Never send true or a level."""
     assert (
-        ollama_think_value(
-            thinking=True, effort="low", model="phi4-mini-reasoning:3.8b"
-        )
-        is False
+        ollama_think_value(thinking=True, effort="low", model="phi4-mini-reasoning:3.8b") is False
     )
-    assert (
-        ollama_think_value(thinking=True, effort=None, model="phi4-mini-reasoning:3.8b")
-        is False
-    )
+    assert ollama_think_value(thinking=True, effort=None, model="phi4-mini-reasoning:3.8b") is False
     assert ollama_think_value(thinking=True, effort="low", model="deepseek-r1:14b") is True
     assert ollama_think_value(thinking=True, effort="low", model="gpt-oss:20b") == "low"
     assert ollama_think_value(thinking=True, effort="low", model="lfm2.5:8b") == "low"
+    assert ollama_think_value(thinking=True, effort="low", model="muse-glimmer:30b") == "low"
     assert (
-        ollama_think_value(thinking=True, effort="low", model="muse-glimmer:30b") == "low"
+        ollama_think_value(thinking=True, effort="low", model="nemotron-3.5-lightning:30b") == "low"
     )
     assert (
-        ollama_think_value(
-            thinking=True, effort="low", model="nemotron-3.5-lightning:30b"
-        )
-        == "low"
-    )
-    assert (
-        ollama_think_value(thinking=True, effort="low", model="north-mini-code-1.0:latest")
-        == "low"
+        ollama_think_value(thinking=True, effort="low", model="north-mini-code-1.0:latest") == "low"
     )
 
 

@@ -179,4 +179,3 @@ def _score_for_verdict(verdict: str) -> float:
 def _effective_text(response: ProviderResponse) -> str:
     visible = _THINK_BLOCK_RE.sub("", response.text).strip()
     return visible or response.thinking_text.strip()
-

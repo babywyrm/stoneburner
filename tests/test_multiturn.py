@@ -415,9 +415,7 @@ def test_cli_multiturn_allow_partial_exits_zero(monkeypatch) -> None:
     from atomics.cli import cli
 
     _patch_multiturn_partial(monkeypatch)
-    result = CliRunner().invoke(
-        cli, ["--no-progress", "multiturn", "--no-save", "--allow-partial"]
-    )
+    result = CliRunner().invoke(cli, ["--no-progress", "multiturn", "--no-save", "--allow-partial"])
     assert result.exit_code == 0
 
 

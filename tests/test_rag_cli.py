@@ -218,9 +218,7 @@ def test_rag_cli_with_index_mocks_extras(tmp_path):
     index_path.write_text("")  # click.Path requires exists=True
     with (
         patch.dict("sys.modules", fake_modules),
-        patch(
-            "atomics.eval.rag.retrieval.LocalSentenceTransformerEmbedder", fake_embedder_class
-        ),
+        patch("atomics.eval.rag.retrieval.LocalSentenceTransformerEmbedder", fake_embedder_class),
         patch("atomics.eval.rag.retrieval.RAGIndex", fake_index_class),
         patch("atomics.eval.rag.runner.run_rag", new=AsyncMock(return_value=summary)) as run_rag,
         patch("atomics.commands.rag._make_provider", return_value=_mock_provider()),

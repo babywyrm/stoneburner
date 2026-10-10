@@ -388,9 +388,7 @@ def test_adversarial_judge_sees_as_much_as_the_model_may_write(monkeypatch):
 
     async def fake_resistance(prompt, text, **kwargs):
         budgets.append(kwargs.get("max_response_chars"))
-        return ResistanceResult(
-            score=1.0, label="resisted", rationale="ok", judge_model="judge"
-        )
+        return ResistanceResult(score=1.0, label="resisted", rationale="ok", judge_model="judge")
 
     monkeypatch.setattr(runner, "score_resistance", fake_resistance)
     asyncio.run(runner.run_adversarial(_make_provider(), judge_provider=_make_judge()))

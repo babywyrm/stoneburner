@@ -436,9 +436,7 @@ def test_redblue_does_not_judge_an_answer_cut_off_by_reasoning():
     def on_run(_index, _fixture, _run_number, _runs, record):
         events.append(record["status"])
 
-    summary = asyncio.run(
-        run_redblue(p, judge_provider=judge, mode="red", on_run_done=on_run)
-    )
+    summary = asyncio.run(run_redblue(p, judge_provider=judge, mode="red", on_run_done=on_run))
 
     judge.generate.assert_not_called()
     assert events == ["thinking_budget"] * len(RED_FIXTURES)
@@ -536,8 +534,14 @@ def test_cli_redblue_prints_each_run_when_runs_gt_one(monkeypatch) -> None:
     result = CliRunner().invoke(
         cli,
         [
-            "--no-progress", "redblue", "--no-save", "--mode", "red",
-            "--runs", "3", "--allow-partial",
+            "--no-progress",
+            "redblue",
+            "--no-save",
+            "--mode",
+            "red",
+            "--runs",
+            "3",
+            "--allow-partial",
         ],
     )
     assert result.exit_code == 0, result.output

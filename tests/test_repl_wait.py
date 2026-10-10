@@ -62,9 +62,7 @@ def test_wait_default_polls_past_thirty_until_completed() -> None:
 
 def test_wait_stops_on_failed() -> None:
     sleeps: list[float] = []
-    client = _client(
-        [{"job_id": "abc", "status": "failed", "error": {"message": "budget"}}]
-    )
+    client = _client([{"job_id": "abc", "status": "failed", "error": {"message": "budget"}}])
     body = wait_for_job(client, "abc", sleep=sleeps.append)
     assert body["status"] == "failed"
     assert sleeps == []
@@ -201,9 +199,7 @@ def test_wait_prints_new_trail_entries_on_same_in_flight() -> None:
                     "overall_accuracy": 1.0,
                     "fixtures_run": 1,
                     "total_tokens": 10,
-                    "fixtures": [
-                        {"id": "ev-01", "score": 1.0, "status": "success", "tokens": 10}
-                    ],
+                    "fixtures": [{"id": "ev-01", "score": 1.0, "status": "success", "tokens": 10}],
                 },
             },
         ]

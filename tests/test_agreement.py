@@ -376,9 +376,11 @@ async def test_resistance_studies_judge_the_suites_budget(monkeypatch):
         suite="adversarial", provider=_Named("m"), judges=judges, fixture_ids=[ADV[0].id]
     )
 
-    assert budgets == [char_budget_for_tokens(_MAX_TOKENS)] * 2 + [
-        char_budget_for_tokens(ADV[0].max_output_tokens)
-    ] * 2
+    assert (
+        budgets
+        == [char_budget_for_tokens(_MAX_TOKENS)] * 2
+        + [char_budget_for_tokens(ADV[0].max_output_tokens)] * 2
+    )
 
 
 @pytest.mark.asyncio

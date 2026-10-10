@@ -150,9 +150,7 @@ def qa(
         }.get(r.status, "?")
         tokens = format_qa_tokens(r)
         suffix = f"  {tokens}" if tokens else ""
-        console.print(
-            f"  {icon} [{r.status}] {r.fixture.id}  ({r.latency_ms / 1000:.1f}s){suffix}"
-        )
+        console.print(f"  {icon} [{r.status}] {r.fixture.id}  ({r.latency_ms / 1000:.1f}s){suffix}")
         results.append(r)
         if fail_fast and r.status in ("FAIL", "ERROR"):
             raise KeyboardInterrupt("fail-fast triggered")

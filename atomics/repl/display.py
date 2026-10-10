@@ -113,9 +113,7 @@ def format_sample_row(row: dict[str, Any], *, color: bool = False) -> str:
     return f"  {elapsed}  {tps} tps  {reqs} req"
 
 
-def format_fixture_row(
-    row: dict[str, Any], *, color: bool = False, verbose: bool = False
-) -> str:
+def format_fixture_row(row: dict[str, Any], *, color: bool = False, verbose: bool = False) -> str:
     fixture = str(row.get("id") or "?")
     status = str(row.get("status") or "")
     failed = status == "failed"
@@ -376,10 +374,7 @@ def format_completed(body: dict[str, Any], *, color: bool = False) -> str:
         peak = result.get("peak_tps")
         sat = result.get("saturation_concurrency")
         peak_txt = _tps_label(peak)
-        return (
-            f"stress  {model}{host_txt}\n"
-            f"{peak_txt} tps  sat={sat}  {len(phases)} phases\n"
-        )
+        return f"stress  {model}{host_txt}\n{peak_txt} tps  sat={sat}  {len(phases)} phases\n"
     samples = result.get("samples")
     verdict = result.get("verdict")
     if isinstance(samples, list) and samples and verdict:
@@ -391,27 +386,18 @@ def format_completed(body: dict[str, Any], *, color: bool = False) -> str:
         if latency is not None:
             extras.append(f"{latency}% p95")
         drift_txt = f"  {' / '.join(extras)}" if extras else ""
-        return (
-            f"soak  {model}{host_txt}\n"
-            f"{verdict}{drift_txt}  {len(samples)} samples\n"
-        )
+        return f"soak  {model}{host_txt}\n{verdict}{drift_txt}  {len(samples)} samples\n"
     if body.get("kind") == "run" or isinstance(result.get("task_rows"), list):
         ok = int(result.get("success") or 0)
         fail = int(result.get("failed") or 0)
         cost_txt = "" if cost is None else f"  ${float(cost):.2f}"
-        return (
-            f"run  {model}{host_txt}\n"
-            f"{ok} ok  {fail} fail  {tokens} tok{cost_txt}\n"
-        )
+        return f"run  {model}{host_txt}\n{ok} ok  {fail} fail  {tokens} tok{cost_txt}\n"
     score_txt = "-" if score is None else f"{score:.3f}"
     score_txt = _paint(score_txt, _score_color(score, failed=False), color=color)
     count = f"{current}/{total}" if total is not None else str(current or 0)
     cost_txt = "" if cost is None else f"  ${float(cost):.2f}"
     host_txt = f"  {host}" if host else ""
-    return (
-        f"{suite}  {model}{host_txt}\n"
-        f"{score_txt}  {count}  {tokens} tok{cost_txt}\n"
-    )
+    return f"{suite}  {model}{host_txt}\n{score_txt}  {count}  {tokens} tok{cost_txt}\n"
 
 
 def format_still_running(body: dict[str, Any], *, color: bool = False) -> str:
@@ -495,9 +481,7 @@ def _live_rows(
         return fixtures, lambda row, **kwargs: format_fixture_row(row, **kwargs)
     phases = result.get("phases") or []
     if phases:
-        return phases, lambda row, **kwargs: format_phase_row(
-            row, color=kwargs.get("color", False)
-        )
+        return phases, lambda row, **kwargs: format_phase_row(row, color=kwargs.get("color", False))
     samples = result.get("samples") or []
     if samples:
         return samples, lambda row, **kwargs: format_sample_row(

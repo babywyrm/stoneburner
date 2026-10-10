@@ -30,17 +30,13 @@ def test_eval_request_defaults():
 
 
 def test_eval_request_accepts_runs_on_toolcall() -> None:
-    req = EvalRequest.model_validate(
-        {"suite": "toolcall", "provider": "ollama", "runs": 3}
-    )
+    req = EvalRequest.model_validate({"suite": "toolcall", "provider": "ollama", "runs": 3})
     assert req.runs == 3
 
 
 def test_eval_request_rejects_runs_on_accuracy() -> None:
     with pytest.raises(ValidationError, match="runs"):
-        EvalRequest.model_validate(
-            {"suite": "accuracy", "provider": "ollama", "runs": 3}
-        )
+        EvalRequest.model_validate({"suite": "accuracy", "provider": "ollama", "runs": 3})
 
 
 def test_eval_request_accepts_channel_on_toolcall() -> None:
@@ -52,16 +48,12 @@ def test_eval_request_accepts_channel_on_toolcall() -> None:
 
 def test_eval_request_rejects_channel_on_accuracy() -> None:
     with pytest.raises(ValidationError, match="channel"):
-        EvalRequest.model_validate(
-            {"suite": "accuracy", "provider": "ollama", "channel": "tools"}
-        )
+        EvalRequest.model_validate({"suite": "accuracy", "provider": "ollama", "channel": "tools"})
 
 
 def test_eval_request_rejects_unknown_channel() -> None:
     with pytest.raises(ValidationError, match="channel"):
-        EvalRequest.model_validate(
-            {"suite": "toolcall", "provider": "ollama", "channel": "voice"}
-        )
+        EvalRequest.model_validate({"suite": "toolcall", "provider": "ollama", "channel": "voice"})
 
 
 def test_eval_request_accepts_judge_host() -> None:
@@ -78,9 +70,7 @@ def test_eval_request_accepts_judge_host() -> None:
 
 def test_eval_request_rejects_unknown_fields() -> None:
     with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
-        EvalRequest.model_validate(
-            {"suite": "accuracy", "provider": "ollama", "run": 3}
-        )
+        EvalRequest.model_validate({"suite": "accuracy", "provider": "ollama", "run": 3})
 
 
 def test_eval_request_normalizes_effort_aliases():

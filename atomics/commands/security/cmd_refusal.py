@@ -174,9 +174,7 @@ def refusal(
     )
 
     show_progress = bool((ctx.obj or {}).get("progress", True))
-    progress = (
-        FixtureProgress(len(selected), console, label="refusal") if show_progress else None
-    )
+    progress = FixtureProgress(len(selected), console, label="refusal") if show_progress else None
     current_index = -1
     run_id = uuid.uuid4().hex[:12]
     repository: MetricsRepository | None = None

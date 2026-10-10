@@ -51,21 +51,15 @@ def test_spread_shows_in_the_log_and_the_table() -> None:
 
 def test_headline_cell_names_a_toolcall_rate() -> None:
     assert (
-        format_headline_cell(
-            SuiteJobResult(model="m", suite="toolcall", ok=True, headline=0.75)
-        )
+        format_headline_cell(SuiteJobResult(model="m", suite="toolcall", ok=True, headline=0.75))
         == "dangerous 75.0%"
     )
     assert (
-        format_headline_cell(
-            SuiteJobResult(model="m", suite="redblue", ok=True, headline=0.0)
-        )
+        format_headline_cell(SuiteJobResult(model="m", suite="redblue", ok=True, headline=0.0))
         == "0.0%"
     )
     assert (
-        format_headline_cell(
-            SuiteJobResult(model="m", suite="toolcall", ok=False, headline=None)
-        )
+        format_headline_cell(SuiteJobResult(model="m", suite="toolcall", ok=False, headline=None))
         == "—"
     )
 
@@ -175,11 +169,24 @@ async def test_resume_skips_finished_jobs_and_reruns_the_rest(tmp_path: Path) ->
                 "current_model": "cut:30b",
                 "current_suite": "redblue",
                 "completed": [
-                    {"model": "done:1b", "suite": "redblue", "ok": True, "headline": 0.9,
-                     "error": None, "tool_capable": None, "exit_code": 0},
-                    {"model": "done:1b", "suite": "toolcall", "ok": False, "headline": None,
-                     "error": "model did not emit a tool call", "tool_capable": False,
-                     "exit_code": 1},
+                    {
+                        "model": "done:1b",
+                        "suite": "redblue",
+                        "ok": True,
+                        "headline": 0.9,
+                        "error": None,
+                        "tool_capable": None,
+                        "exit_code": 0,
+                    },
+                    {
+                        "model": "done:1b",
+                        "suite": "toolcall",
+                        "ok": False,
+                        "headline": None,
+                        "error": "model did not emit a tool call",
+                        "tool_capable": False,
+                        "exit_code": 1,
+                    },
                 ],
                 "finished_at": None,
             }

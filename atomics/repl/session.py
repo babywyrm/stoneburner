@@ -22,9 +22,7 @@ class Session:
 
     def set(self, key: str, value: str | None) -> None:
         if key not in SESSION_KEYS:
-            raise SessionError(
-                f"unknown session key {key!r}; expected {', '.join(SESSION_KEYS)}"
-            )
+            raise SessionError(f"unknown session key {key!r}; expected {', '.join(SESSION_KEYS)}")
         setattr(self, key, value)
 
     def as_dict(self) -> dict[str, str | None]:

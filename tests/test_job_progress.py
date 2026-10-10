@@ -88,9 +88,12 @@ def test_resolve_eval_request_keeps_channel() -> None:
 
 
 def test_short_request_keeps_judge_host() -> None:
-    assert short_request(
-        {"suite": "toolcall", "model": "m", "host": "h", "judge_host": "j"}
-    ) == {"suite": "toolcall", "model": "m", "host": "h", "judge_host": "j"}
+    assert short_request({"suite": "toolcall", "model": "m", "host": "h", "judge_host": "j"}) == {
+        "suite": "toolcall",
+        "model": "m",
+        "host": "h",
+        "judge_host": "j",
+    }
     assert short_request(
         {"suite": "accuracy", "provider": "ollama", "model": "m", "host": "h", "budget_usd": 1}
     ) == {"suite": "accuracy", "model": "m", "host": "h"}

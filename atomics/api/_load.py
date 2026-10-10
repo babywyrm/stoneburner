@@ -97,9 +97,7 @@ def _soak_payload(payload: SoakRequest, result: SoakResult) -> dict[str, Any]:
     }
 
 
-def _stress_hooks(
-    payload: StressRequest, job: Job | None
-) -> dict[str, Any]:
+def _stress_hooks(payload: StressRequest, job: Job | None) -> dict[str, Any]:
     if job is None:
         return {}
     reporter = LoadJobReporter(
@@ -117,9 +115,7 @@ def _stress_hooks(
     )
 
     def on_phase_start(concurrency: int) -> None:
-        reporter.start(
-            {"concurrency": concurrency, "phase_seconds": payload.phase_seconds}
-        )
+        reporter.start({"concurrency": concurrency, "phase_seconds": payload.phase_seconds})
 
     def on_phase(phase: ConcurrencyResult) -> None:
         reporter.done(_phase_row(phase))
@@ -146,9 +142,7 @@ def _soak_hooks(payload: SoakRequest, job: Job | None) -> dict[str, Any]:
     )
 
     def on_sample_start(elapsed: float) -> None:
-        reporter.start(
-            {"elapsed_seconds": elapsed, "concurrency": payload.concurrency}
-        )
+        reporter.start({"elapsed_seconds": elapsed, "concurrency": payload.concurrency})
 
     def on_sample(sample: SoakSample) -> None:
         reporter.done(_sample_row(sample))
@@ -156,12 +150,8 @@ def _soak_hooks(payload: SoakRequest, job: Job | None) -> dict[str, Any]:
     return {"on_sample_start": on_sample_start, "on_sample": on_sample}
 
 
-async def run_stress_from_request(
-    payload: StressRequest, job: Job | None = None
-) -> dict[str, Any]:
-    provider = _metered(
-        payload.provider, payload.model, payload.budget_usd, payload.host
-    )
+async def run_stress_from_request(payload: StressRequest, job: Job | None = None) -> dict[str, Any]:
+    provider = _metered(payload.provider, payload.model, payload.budget_usd, payload.host)
     try:
         result = await run_stress_provider(
             provider,
@@ -180,12 +170,8 @@ async def run_stress_from_request(
     return _stress_payload(payload, result)
 
 
-async def run_soak_from_request(
-    payload: SoakRequest, job: Job | None = None
-) -> dict[str, Any]:
-    provider = _metered(
-        payload.provider, payload.model, payload.budget_usd, payload.host
-    )
+async def run_soak_from_request(payload: SoakRequest, job: Job | None = None) -> dict[str, Any]:
+    provider = _metered(payload.provider, payload.model, payload.budget_usd, payload.host)
     try:
         result = await run_soak_provider(
             provider,

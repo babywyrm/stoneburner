@@ -86,8 +86,7 @@ def _warn_env_shadows_keychain(console: Console) -> None:
         stored = get_secret(name) or ""
         if env_val and stored and env_val != stored:
             console.print(
-                f"[yellow]{name}[/yellow] in the environment shadows the keychain "
-                "(env wins)"
+                f"[yellow]{name}[/yellow] in the environment shadows the keychain (env wins)"
             )
 
 

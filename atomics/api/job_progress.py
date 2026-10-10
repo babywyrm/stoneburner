@@ -122,9 +122,7 @@ def short_request(request: dict[str, Any] | None) -> dict[str, Any] | None:
     return out or None
 
 
-def select_catalog_fixtures(
-    catalog: SuiteCatalog, ids: list[str] | None
-) -> list[Any] | None:
+def select_catalog_fixtures(catalog: SuiteCatalog, ids: list[str] | None) -> list[Any] | None:
     if ids is None:
         return None
     by_id: dict[str, Any] = {}
@@ -404,9 +402,7 @@ def payload_request(payload: Any, settings: AtomicsSettings) -> dict[str, Any]:
     data = payload.model_dump(exclude_none=True)
     provider = getattr(payload, "provider", None)
     if provider:
-        host = resolve_inference_host(
-            str(provider), getattr(payload, "host", None), settings
-        )
+        host = resolve_inference_host(str(provider), getattr(payload, "host", None), settings)
         if host:
             data["host"] = host
     return data

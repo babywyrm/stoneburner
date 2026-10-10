@@ -122,9 +122,7 @@ class EvalRequest(BaseModel):
             return self
         channel = self.channel.strip().lower()
         if channel not in EVAL_CHANNELS:
-            raise ValueError(
-                f"channel must be one of {sorted(EVAL_CHANNELS)}"
-            )
+            raise ValueError(f"channel must be one of {sorted(EVAL_CHANNELS)}")
         if self.suite != "toolcall":
             raise ValueError("channel is only valid for toolcall")
         self.channel = channel

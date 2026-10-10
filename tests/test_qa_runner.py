@@ -32,7 +32,6 @@ def _ollama_reply(text: str):
     return _post
 
 
-
 def _yaml_file(content: str) -> str:
     f = tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False)
     f.write(content)
@@ -388,7 +387,6 @@ class TestRunQASuite:
         assert result.output_tokens is None
         assert result.thinking_tokens is None
 
-
     @pytest.mark.asyncio
     async def test_raw_ollama_sends_think_false_when_thinking_off(self):
         fixture = QAFixture(id="t", prompt="q", must_match="any")
@@ -402,12 +400,9 @@ class TestRunQASuite:
             return m
 
         with patch("httpx.AsyncClient.post", side_effect=_mock_post):
-            await run_qa_suite(
-                "qwen3.8:27b", "http://h", [fixture], thinking=False
-            )
+            await run_qa_suite("qwen3.8:27b", "http://h", [fixture], thinking=False)
 
         assert captured[0]["think"] is False
-
 
     @pytest.mark.asyncio
     async def test_raw_ollama_effort_low_sends_think_level(self):
@@ -455,7 +450,6 @@ class TestRunQASuite:
 
         assert captured[0]["think"] is False
 
-
     @pytest.mark.asyncio
     async def test_raw_ollama_auto_think_on_for_qwen38(self):
         fixture = QAFixture(id="t", prompt="q", must_match="any")
@@ -472,7 +466,6 @@ class TestRunQASuite:
             await run_qa_suite("qwen3.8:27b", "http://h", [fixture])
 
         assert captured[0]["think"] is True
-
 
     @pytest.mark.asyncio
     async def test_raw_ollama_strips_think_tags_before_scoring(self):
@@ -493,9 +486,7 @@ class TestRunQASuite:
             return m
 
         with patch("httpx.AsyncClient.post", side_effect=_mock_post):
-            suite = await run_qa_suite(
-                "qwen3.8:27b", "http://h", [fixture], thinking=True
-            )
+            suite = await run_qa_suite("qwen3.8:27b", "http://h", [fixture], thinking=True)
 
         assert suite.results[0].status == "PASS"
         assert "plan to leak" not in suite.results[0].response
@@ -780,7 +771,7 @@ def test_qa_profile_fail_fast_reports_the_stop() -> None:
         "http:\n"
         "  url: http://gate-host:8080/api/ask\n"
         "  method: POST\n"
-        "  body: '{\"query\": \"{prompt}\"}'\n"
+        '  body: \'{"query": "{prompt}"}\'\n'
         "  response_field: response\n"
     )
 
