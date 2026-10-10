@@ -19,6 +19,7 @@ from __future__ import annotations
 import os
 from types import TracebackType
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 
@@ -347,7 +348,7 @@ class AtomicsApiClient:
         return self._request("POST", "/soak", json=payload)
 
     def get_job(self, job_id: str) -> Any:
-        return self._request("GET", f"/jobs/{job_id}")
+        return self._request("GET", f"/jobs/{quote(job_id, safe='')}")
 
     def list_jobs(self) -> Any:
         """In-memory API jobs. The list omits `result`; poll `get_job` for that."""
@@ -355,7 +356,7 @@ class AtomicsApiClient:
 
     def get_run(self, run_id: str) -> Any:
         """One persisted run and its fixtures. Prompts and raw JSON are omitted."""
-        return self._request("GET", f"/runs/{run_id}")
+        return self._request("GET", f"/runs/{quote(run_id, safe='')}")
 
     def trends(self, *, hours: int = 24) -> Any:
         return self._request("GET", "/reports/trends", params={"hours": hours})
