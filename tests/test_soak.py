@@ -225,13 +225,13 @@ class TestRunSoak:
                 host="http://localhost:11434",
                 model="test-model",
                 concurrency=2,
-                duration_seconds=3,
-                sample_interval=1,
+                duration_seconds=0.55,
+                sample_interval=0.1,
             )
             assert result.model == "test-model"
             assert result.concurrency == 2
             assert result.total_requests > 0
-            assert result.actual_duration_seconds >= 2.5
+            assert result.actual_duration_seconds >= 0.5
             assert len(result.samples) >= 2
             assert result.verdict in ("STABLE", "DEGRADED", "UNSTABLE")
 
@@ -247,8 +247,8 @@ class TestRunSoak:
                 host="http://localhost:11434",
                 model="test-model",
                 concurrency=1,
-                duration_seconds=2.5,
-                sample_interval=1,
+                duration_seconds=0.55,
+                sample_interval=0.1,
             )
             for sample in result.samples:
                 assert sample.requests > 0
@@ -271,8 +271,8 @@ class TestRunSoak:
                 host="http://localhost:11434",
                 model="test-model",
                 concurrency=1,
-                duration_seconds=2.5,
-                sample_interval=1,
+                duration_seconds=0.55,
+                sample_interval=0.1,
                 on_sample=on_sample,
             )
             assert len(samples_received) >= 2
@@ -299,8 +299,8 @@ class TestRunSoak:
                 host="http://localhost:11434",
                 model="test-model",
                 concurrency=1,
-                duration_seconds=2.5,
-                sample_interval=1,
+                duration_seconds=0.55,
+                sample_interval=0.1,
             )
             assert result.total_failed > 0
             assert result.error_rate > 0

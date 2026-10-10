@@ -7,15 +7,23 @@ import pytest
 from click.testing import CliRunner
 
 try:
-    import sentence_transformers
     import sqlite_vec
 except ImportError:
     sqlite_vec = None
-    sentence_transformers = None
 
-_RAG_EXTRAS_MISSING = sqlite_vec is None or sentence_transformers is None
+_RAG_EXTRAS_MISSING = sqlite_vec is None
 
 from atomics.cli import cli
+from atomics.eval.rag.retrieval import MockEmbedder
+
+
+@pytest.fixture(autouse=True)
+def _mock_embedder(monkeypatch):
+    """These test the CLI and index, not embeddings; the real model loads in ~30 s."""
+    monkeypatch.setattr(
+        "atomics.eval.rag.retrieval.LocalSentenceTransformerEmbedder",
+        lambda model="mock": MockEmbedder(),
+    )
 
 
 def test_rag_cli_has_index_options():
