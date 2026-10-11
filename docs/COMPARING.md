@@ -55,3 +55,16 @@ ATOMICS_LIVE_JUDGE=1 uv run pytest tests/test_calibration.py::test_live_judge_is
 ```
 
 All judge fields persist to `task_results` and surface in `atomics compare`.
+
+### Which judge
+
+A judge can rank models correctly and still score all of them high. A blind
+human grade of the red/blue answers the local judges disagreed on most
+(2026-10-03) measured mean absolute error against the grade: `gemma4:26b`
+0.09, `qwen3.8:27b` 0.18, `granite4.2:8b` 0.22. Granite scored about 0.22
+high on every item, yet all three ranked the models the same way.
+
+- **Rankings** from any of the three hold.
+- **Absolute numbers** need the reference judge, `gemma4:26b`, or a cloud
+  judge. Re-check the reference when a new local judge appears.
+- Name the judge next to every published score.
