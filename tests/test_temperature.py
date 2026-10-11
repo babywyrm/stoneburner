@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from atomics.providers.base import ProviderResponse
+from atomics.providers.base import BaseProvider, ProviderResponse
 
 
 # ── Ollama ──────────────────────────────────────────────────────────────────
@@ -295,6 +295,100 @@ async def test_bedrock_omits_temperature_when_none():
     provider = BedrockProvider(client=client)
     await provider.generate("hi")
     assert "temperature" not in client.kwargs["inferenceConfig"]
+
+
+# ── Tool-calling path ───────────────────────────────────────────────────────
+_TOOLS = [{"name": "read_file", "description": "d", "parameters": {"type": "object"}}]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("temperature", [0.0, None])
+async def test_ollama_tools_forward_temperature(temperature):
+    from atomics.providers.ollama import OllamaProvider
+
+    reply = MagicMock()
+    reply.raise_for_status = MagicMock()
+    reply.json.return_value = {"message": {"content": "ok"}, "eval_count": 1}
+    client = AsyncMock()
+    client.post = AsyncMock(return_value=reply)
+    provider = OllamaProvider(host="http://fake:11434", client=client)
+    await provider.generate_with_tools("hi", tools=_TOOLS, temperature=temperature)
+    assert client.post.call_args.kwargs["json"]["options"].get("temperature") == temperature
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("temperature", [0.0, None])
+async def test_openai_compatible_tools_forward_temperature(temperature):
+    from atomics.providers.vllm import VllmProvider
+
+    client = AsyncMock()
+    client.post = AsyncMock(return_value=_vllm_response())
+    provider = VllmProvider(base_url="http://fake:8000/v1", client=client)
+    await provider.generate_with_tools("hi", tools=_TOOLS, temperature=temperature)
+    assert client.post.call_args.kwargs["json"].get("temperature") == temperature
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("model", "sent"), [("gpt-4o", 0.0), ("o4-mini", None)])
+async def test_openai_tools_forward_temperature_except_reasoning(model, sent):
+    provider, comps = _openai_provider()
+    await provider.generate_with_tools("hi", tools=_TOOLS, model=model, temperature=0.0)
+    assert comps.kwargs.get("temperature") == sent
+
+
+@pytest.mark.asyncio
+async def test_claude_tools_forward_temperature():
+    provider, msgs = _claude_provider()
+    await provider.generate_with_tools(
+        "hi", tools=_TOOLS, model="claude-sonnet-4-6", temperature=0.0
+    )
+    assert msgs.kwargs["temperature"] == 0.0
+
+
+class _ToolRecorder(BaseProvider):
+    supports_tools = True
+
+    def __init__(self) -> None:
+        self.kwargs: dict = {}
+
+    @property
+    def name(self) -> str:
+        return "rec"
+
+    async def generate(self, prompt: str, **kwargs: object) -> ProviderResponse:  # type: ignore[override]
+        raise AssertionError("tools path expected")
+
+    async def generate_with_tools(self, prompt: str, **kwargs: object) -> ProviderResponse:  # type: ignore[override]
+        self.kwargs = kwargs
+        return ProviderResponse(
+            text="",
+            input_tokens=1,
+            output_tokens=1,
+            total_tokens=2,
+            model="m",
+            latency_ms=1.0,
+            estimated_cost_usd=0.0,
+        )
+
+    async def health_check(self) -> bool:
+        return True
+
+
+@pytest.mark.asyncio
+async def test_budget_and_trace_wrappers_pass_tool_temperature_through() -> None:
+    from rich.console import Console
+
+    from atomics.eval.budget import EvalBudget, GuardedProvider
+    from atomics.providers import trace
+
+    rec = _ToolRecorder()
+    guarded = GuardedProvider(rec, EvalBudget(budget_limit_usd=1.0).new_guard())
+    trace.enable(Console(record=True, width=120))
+    try:
+        await trace.traced(guarded).generate_with_tools("hi", tools=_TOOLS, temperature=0.0)
+    finally:
+        trace.disable()
+    assert rec.kwargs["temperature"] == 0.0
 
 
 # ── Judge passes temperature=0.0 ────────────────────────────────────────────

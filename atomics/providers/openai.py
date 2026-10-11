@@ -320,6 +320,7 @@ class OpenAIProvider(BaseProvider):
         injected_tool_output: str | None = None,
         thinking: bool | None = None,
         thinking_budget: int | None = None,
+        temperature: float | None = None,
         effort: str | None = None,
         reasoning_mode: str | None = None,
     ) -> ProviderResponse:
@@ -372,6 +373,8 @@ class OpenAIProvider(BaseProvider):
             }
         else:
             token_param = {"max_tokens": max_tokens}
+        if temperature is not None and not is_reasoning:
+            token_param["temperature"] = temperature
         if effort is not None or reasoning_mode is not None:
             reasoning = openai_reasoning(effort, reasoning_mode, thinking=thinking)
         elif is_reasoning and thinking is False:
