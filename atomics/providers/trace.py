@@ -249,6 +249,7 @@ class TracedProvider(BaseProvider):
         injected_tool_output: str | None = None,
         thinking: bool | None = None,
         thinking_budget: int | None = None,
+        temperature: float | None = None,
         effort: str | None = None,
         reasoning_mode: str | None = None,
     ) -> ProviderResponse:
@@ -261,6 +262,7 @@ class TracedProvider(BaseProvider):
             injected_tool_output=injected_tool_output,
             thinking=thinking,
             thinking_budget=thinking_budget,
+            temperature=temperature,
             effort=effort,
             reasoning_mode=reasoning_mode,
         )

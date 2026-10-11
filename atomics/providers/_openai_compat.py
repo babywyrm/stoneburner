@@ -79,6 +79,7 @@ class OpenAICompatibleTools:
         injected_tool_output: str | None = None,
         thinking: bool | None = None,
         thinking_budget: int | None = None,
+        temperature: float | None = None,
         effort: str | None = None,
         reasoning_mode: str | None = None,
     ) -> ProviderResponse:
@@ -123,6 +124,8 @@ class OpenAICompatibleTools:
             "stream": False,
             "tools": openai_tool_payload(list(tools)),
         }
+        if temperature is not None:
+            body["temperature"] = temperature
         reasoning_request = apply_chat_effort(body, effort)
         extra = self._augment_tool_body(
             body,

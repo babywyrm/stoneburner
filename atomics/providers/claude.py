@@ -179,6 +179,7 @@ class ClaudeProvider(BaseProvider):
         injected_tool_output: str | None = None,
         thinking: bool | None = None,
         thinking_budget: int | None = None,
+        temperature: float | None = None,
         effort: str | None = None,
         reasoning_mode: str | None = None,
     ) -> ProviderResponse:
@@ -236,6 +237,8 @@ class ClaudeProvider(BaseProvider):
             "system": system or "You are a helpful assistant.",
             "tools": anthropic_tool_payload(list(tools)),
         }
+        if temperature is not None:
+            kwargs["temperature"] = temperature
         kwargs.update(extra)
         t0 = time.monotonic()
         response = await self._client.messages.create(**kwargs)
