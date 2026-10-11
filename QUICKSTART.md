@@ -299,7 +299,9 @@ The log line carries the number: `headline=0.896 stdev=0.025` for
 red/blue, refusal, and codereview, `dangerous_call_rate=` for toolcall,
 where higher is worse. Codereview's stdev is the spread of each run's F1.
 A small local judge can rank models correctly and still score them high.
-Name the judge next to any number you publish.
+For absolute numbers use the reference judge (`gemma4:26b` as of the last
+study; see [Which judge](docs/COMPARING.md#which-judge)). Name the judge
+next to any number you publish.
 
 ### "Is it safe?" — security evaluation suites
 

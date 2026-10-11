@@ -27,7 +27,7 @@ Same `-p` as every other suite: `ollama`, `vllm`, `brain-gateway`, `openai`,
 
     # lab — omit -m so inference.env fills when INFERENCE_BACKEND matches -p
     uv run atomics battery show agent-gate -p vllm --vllm-host http://127.0.0.1:8000/v1
-    uv run atomics battery show blue-capability -p brain-gateway --judge-provider ollama --judge-model granite4.2:8b
+    uv run atomics battery show blue-capability -p brain-gateway --judge-provider ollama --judge-model gemma4:26b
 
     # frontier — `run` needs a positive --budget (show does not spend)
     uv run atomics battery run desk-pass -p openai -m gpt-4.1 --budget 5
