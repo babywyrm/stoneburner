@@ -183,6 +183,7 @@ async def _query_ollama(
     *,
     thinking: bool | None = None,
     thinking_budget: int | None = None,
+    temperature: float | None = None,
     effort: str | None = None,
 ) -> tuple[str, float, int | None, int | None, int | None]:
     """Fire a single prompt at Ollama. Returns text, latency, token counts."""
@@ -196,9 +197,11 @@ async def _query_ollama(
     auto = thinking if thinking is not None else supports_thinking(model)
     think_field = ollama_think_value(thinking=auto, effort=effort, model=model)
     use_thinking = think_field is not False
-    options: dict[str, int] = {"num_predict": num_predict, "num_ctx": DEFAULT_NUM_CTX}
+    options: dict[str, float] = {"num_predict": num_predict, "num_ctx": DEFAULT_NUM_CTX}
     if thinking_budget and use_thinking:
         options["num_predict"] = num_predict + thinking_budget
+    if temperature is not None:
+        options["temperature"] = temperature
     t0 = time.monotonic()
     resp = await client.post(
         f"{host}/api/generate",
@@ -247,6 +250,7 @@ async def run_qa_suite(
     profile: TargetProfile | None = None,
     thinking: bool | None = None,
     thinking_budget: int | None = None,
+    temperature: float | None = None,
     effort: str | None = None,
 ) -> QASuiteResult:
     """Run all fixtures sequentially and evaluate each response.
@@ -278,6 +282,7 @@ async def run_qa_suite(
                         num_predict,
                         thinking=thinking,
                         thinking_budget=thinking_budget,
+                        temperature=temperature,
                         effort=effort,
                     )
                 status, mp, mf = evaluate_fixture(fixture, text)

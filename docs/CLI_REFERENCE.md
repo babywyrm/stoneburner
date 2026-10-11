@@ -104,6 +104,7 @@ one backend that reports its window size.
 | `atomics battery list` | Named security jobs (desk-pass, blue/red, agent-gate, threat-model) |
 | `atomics battery show desk-pass -m qwen3.5:4b` | Purpose, labels, copy-pasteable commands. `-p ollama\|vllm\|openai\|claude\|…` |
 | `atomics battery run desk-pass -m qwen3.5:4b` | Execute those steps. Stops on first failure unless `--keep-going`. Paid `-p` or `--judge-provider` needs a positive `--budget`. Default `--no-thinking`; pass `--thinking` / `--effort` for tags that skip the tool probe with think off. `--cohorts FILE` runs a plan from `atomics cohorts --json-out` |
+| `atomics battery run desk-pass -m qwen3.5:4b --temperature 0` | Pin raw `qa` and `toolcall` steps for like-for-like comparison. Unset keeps the model's own temperature |
 | `atomics adversarial` | Adversarial resilience eval — resistance to manipulation (72 fixtures) |
 | `atomics adversarial --category tool_desc_injection` | Run one suite/group |
 | `atomics adversarial --fixtures adv-01` | One fixture. Unknown ids fail before a request |
@@ -119,6 +120,7 @@ one backend that reports its window size.
 | `atomics toolcall --channel tools --runs 3` | One-box first run. No judge. Divergence not measured. |
 | `atomics toolcall --runs 3` | Three passes per fixture, modal outcome reported. Live `run 2/3` lines print each pass so a 1/3 leak is visible |
 | `atomics -v toolcall --judge-provider ollama --judge-model qwen2.5:14b` | Required for channel divergence. Live lines show `prose=resisted` + `DANGEROUS` when the model refused in chat and still called the tool |
+| `atomics toolcall --temperature 0 --runs 3` | Pin the model under test (probe, tool, and prose calls; 0–2). Recorded as `temperature` in the JSON. Unset is the model's own, which shows how often it makes a dangerous call |
 | `atomics toolcall --no-skip-incapable` | Non-zero exit if the model cannot emit tool calls (for sweeps) |
 | `atomics toolcall --no-thinking` | Force thinking off on the prose channel (same grammar as red/blue) |
 | `atomics toolcall --thinking --effort low --fixtures tc-01 --channel tools` | Some tags only emit tools with thinking on. Probe 500 with thinking off is not refusal |
@@ -226,6 +228,7 @@ runs such as a local model judged by a paid one.
 |---------|-------------|
 | `atomics qa --file suite.yaml` | Fire fixture prompts, check pass/fail patterns. Raw Ollama prints `in=` / `out=` / `think=`. Exit 1 on FAIL or ERROR |
 | `atomics qa --file suite.yaml -m qwen3.8:27b --no-thinking` | Raw Ollama; force `think: false` so short fixtures stay visible |
+| `atomics qa --file suite.yaml -m qwen3.8:27b --temperature 0` | Raw Ollama at a fixed temperature (0–2). Rejected with `--profile`, which sets its own |
 | `atomics qa --file suite.yaml --profile profiles/local/gate.yaml` | Test app-level AI gate |
 | `atomics qa --fail-fast` | Stop at first FAIL or ERROR, then exit 1 |
 

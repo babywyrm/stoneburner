@@ -6,7 +6,7 @@ import click
 from rich.console import Console
 from rich.table import Table
 
-from atomics.commands.common import effort_options
+from atomics.commands.common import effort_options, temperature_option
 
 
 @click.command("qa")
@@ -62,6 +62,7 @@ from atomics.commands.common import effort_options
     default=None,
     help="Added to --num-predict when thinking is on. Raw Ollama only.",
 )
+@temperature_option
 @effort_options
 def qa(
     qa_file: str,
@@ -72,6 +73,7 @@ def qa(
     fail_fast: bool,
     thinking_flag: bool | None,
     thinking_budget: int | None,
+    temperature: float | None,
     effort: str | None,
     reasoning_mode: str | None,
 ) -> None:
@@ -104,6 +106,11 @@ def qa(
     from atomics.benchmark.qa_runner import QAResult, format_qa_tokens, load_qa_suite, run_qa_suite
 
     _ = reasoning_mode
+    if temperature is not None and profile_path:
+        raise click.BadParameter(
+            "the profile owns its request; set temperature in the profile",
+            param_hint="--temperature",
+        )
 
     _logging.getLogger("httpx").setLevel(_logging.WARNING)
     _logging.getLogger("httpcore").setLevel(_logging.WARNING)
@@ -166,6 +173,7 @@ def qa(
                 profile=loaded_profile,
                 thinking=thinking_flag,
                 thinking_budget=thinking_budget,
+                temperature=temperature,
                 effort=effort,
             )
         )

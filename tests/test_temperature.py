@@ -476,3 +476,174 @@ async def test_resistance_judge_requests_greedy_decoding():
     )
     assert judge.temperature == 0.0
     assert result.label == "resisted"
+
+
+# ── Suites: an opt-in --temperature on qa, toolcall, and battery ────────────
+class _ToolcallRecorder:
+    supports_tools = True
+    name = "rec"
+
+    def __init__(self) -> None:
+        self.temperatures: list[object] = []
+
+    @staticmethod
+    def _resp(calls=()):
+        return ProviderResponse(
+            text="no",
+            input_tokens=1,
+            output_tokens=1,
+            total_tokens=2,
+            model="m",
+            latency_ms=1.0,
+            estimated_cost_usd=0.0,
+            tool_calls=calls,
+        )
+
+    async def generate(self, prompt, **kwargs):
+        self.temperatures.append(kwargs.get("temperature"))
+        return self._resp()
+
+    async def generate_with_tools(self, prompt, *, tools, **kwargs):
+        from atomics.eval.toolcall.catalog import PROBE_PROMPT
+        from atomics.providers.toolcalls import ToolCall
+
+        self.temperatures.append(kwargs.get("temperature"))
+        if prompt == PROBE_PROMPT:
+            return self._resp((ToolCall(name="get_weather", arguments={"city": "Paris"}),))
+        return self._resp()
+
+
+@pytest.mark.asyncio
+async def test_toolcall_suite_pins_probe_tools_and_prose_to_one_temperature():
+    from atomics.eval.toolcall.fixtures import select_fixtures
+    from atomics.eval.toolcall.runner import run_toolcall_suite
+
+    provider = _ToolcallRecorder()
+    summary = await run_toolcall_suite(
+        provider=provider,  # type: ignore[arg-type]
+        model="m",
+        judge_provider=None,
+        fixtures=select_fixtures(ids=["tc-01"]),
+        temperature=0.0,
+    )
+    assert provider.temperatures == [0.0, 0.0, 0.0]
+    assert summary.to_dict()["temperature"] == 0.0
+
+
+def test_toolcall_cli_forwards_temperature(monkeypatch):
+    from types import SimpleNamespace
+
+    from click.testing import CliRunner
+
+    from atomics.cli import cli
+    from atomics.eval.toolcall.runner import ToolCallSummary
+
+    seen: dict = {}
+
+    async def fake_run(**kwargs):
+        seen.update(kwargs)
+        return ToolCallSummary(
+            run_id="r",
+            provider="ollama",
+            model="x",
+            started_at="2026-01-01T00:00:00+00:00",
+            completed_at="2026-01-01T00:00:01+00:00",
+            tool_capable=False,
+        )
+
+    monkeypatch.setattr(
+        "atomics.commands.toolcall._make_provider",
+        lambda *_a, **_k: SimpleNamespace(name="ollama", default_model="x"),
+    )
+    monkeypatch.setattr("atomics.commands.toolcall.run_toolcall_suite", fake_run)
+    result = CliRunner().invoke(
+        cli, ["toolcall", "-p", "ollama", "-m", "x", "--no-save", "--temperature", "0"]
+    )
+    assert result.exit_code == 0, result.output
+    assert seen["temperature"] == 0.0
+
+
+@pytest.mark.parametrize("command", ["toolcall", "qa", "battery"])
+def test_temperature_outside_zero_to_two_is_rejected(command):
+    from click.testing import CliRunner
+
+    from atomics.cli import cli
+
+    argv = {
+        "toolcall": ["toolcall", "-p", "ollama", "-m", "x", "--no-save"],
+        "qa": ["qa", "--file", "qa/examples/ctf-solvability.yaml", "-m", "x"],
+        "battery": ["battery", "run", "desk-pass", "-m", "x"],
+    }[command]
+    result = CliRunner().invoke(cli, [*argv, "--temperature", "2.5"])
+    assert result.exit_code == 2
+    assert "not in the range" in result.output
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("temperature", [0.0, None])
+async def test_raw_qa_sends_temperature_only_when_set(temperature):
+    from unittest.mock import patch
+
+    from atomics.benchmark.qa_runner import QAFixture, run_qa_suite
+
+    reply = MagicMock()
+    reply.raise_for_status = MagicMock()
+    reply.json.return_value = {"response": "ok"}
+    post = AsyncMock(return_value=reply)
+    with patch("httpx.AsyncClient.post", post):
+        await run_qa_suite(
+            "m", "http://h", [QAFixture(id="t", prompt="q")], temperature=temperature
+        )
+    assert post.call_args.kwargs["json"]["options"].get("temperature") == temperature
+
+
+def test_qa_rejects_temperature_with_a_profile():
+    from click.testing import CliRunner
+
+    from atomics.cli import cli
+
+    result = CliRunner().invoke(
+        cli,
+        [
+            "qa",
+            "--file",
+            "qa/examples/app-gate-guardrails.yaml",
+            "--profile",
+            "profiles/examples/ollama-with-system-prompt.yaml",
+            "--temperature",
+            "0",
+        ],
+    )
+    assert result.exit_code == 2
+    assert "profile" in result.output
+
+
+def test_battery_passes_temperature_to_qa_and_toolcall_only():
+    from atomics.eval.batteries import BatteryStep, step_args
+
+    def args(suite: str, **kwargs) -> list[str]:
+        step = BatteryStep(suite=suite, purpose="p", qa_file="qa/x.yaml")
+        return step_args(step, model="m", temperature=0.0, **kwargs)
+
+    assert args("qa")[-2:] == ["--temperature", "0.0"]
+    assert args("toolcall")[-2:] == ["--temperature", "0.0"]
+    assert "--temperature" not in args("adversarial")
+    assert "--temperature" not in args("qa", profile="profiles/local/gate.yaml")
+    assert "--temperature" not in step_args(BatteryStep(suite="toolcall", purpose="p"), model="m")
+
+
+def test_battery_run_forwards_temperature(monkeypatch):
+    from click.testing import CliRunner
+
+    from atomics.cli import cli
+
+    seen: list[list[str]] = []
+    monkeypatch.setattr(
+        "atomics.commands.battery.invoke_atomics", lambda args: seen.append(args) or 0
+    )
+    result = CliRunner().invoke(
+        cli, ["battery", "run", "desk-pass", "-m", "x", "--temperature", "0"]
+    )
+    assert result.exit_code == 0, result.output
+    pinned = [args[0] for args in seen if "--temperature" in args]
+    assert pinned == ["qa", "toolcall"]
