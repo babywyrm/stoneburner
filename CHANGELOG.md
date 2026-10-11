@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 0.26.2 (2026-10-11) — Safe worker migration, escaped gate bodies
+
+### Upgrade notes
+- **Opening the database migrates it to schema v22.** A `.bak` is written
+  first; worker rows and distributed history are kept.
+- **JSON profile templates now receive escaped values.** Put
+  `{{ prompt }}` inside quotes (`"{{ prompt }}"`). A template that relied
+  on inserting raw JSON through a placeholder no longer can.
+
 ### Changed
 - Worker records no longer carry `api_key_hint`. Nothing ever set it, so
   the API always returned `null`. Schema v22 drops the column in place;
