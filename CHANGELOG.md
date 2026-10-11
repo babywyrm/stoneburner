@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Added
+- `--temperature` on `qa`, `toolcall`, and `battery` pins the model under
+  test so repeat runs compare like for like. Unset keeps the model's own
+  temperature, which is the realistic dangerous-call rate. `battery`
+  forwards it to raw `qa` and `toolcall` steps; `qa --profile` rejects it
+  because the profile sets its own. Toolcall JSON records `temperature`.
+
 ## 0.26.2 (2026-10-11) — Safe worker migration, escaped gate bodies
 
 ### Upgrade notes

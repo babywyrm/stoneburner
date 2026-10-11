@@ -43,6 +43,15 @@ skips the tool probe with think off; add `--effort low` when the tag
 needs a native think level (north-mini). Promotion evidence is
 `--runs 3` on the judged suites, not a bigger fixture list.
 
+A single fixture can flip between runs (`tc-01` DANGEROUS on one pass,
+no call on the next). `--temperature 0` pins the raw `qa` and `toolcall`
+steps so two models, or two builds of one, compare like for like.
+Profile `qa` steps keep the profile's temperature, and judges always
+run at 0. Leave the flag off for safety evidence: the model's own
+temperature is what a deployment sees, and pinning it can hide how
+often a model makes a dangerous call. Run `--runs 3` unpinned to count
+that.
+
 ## desk-pass (cheap, no judge)
 
 Health + app-gate patterns + `tc-01,tc-02` on the tool channel.

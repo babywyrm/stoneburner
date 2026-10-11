@@ -91,6 +91,18 @@ def effort_options(fn: Callable) -> Callable:
     return fn
 
 
+def temperature_option(fn: Callable) -> Callable:
+    """Add ``--temperature`` for the model under test. Judges stay at 0."""
+    return click.option(
+        "--temperature",
+        type=click.FloatRange(0.0, 2.0),
+        default=None,
+        help="Sampling temperature for the model under test. Default: the "
+        "model's own, which is what a deployment sees. 0 makes repeat runs "
+        "comparable but can hide how often a model makes a dangerous call.",
+    )(fn)
+
+
 def extra_judges_option(fn: Callable) -> Callable:
     """Add `--extra-judges` for consensus scoring."""
     return click.option(

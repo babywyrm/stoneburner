@@ -9,7 +9,7 @@ import click
 from rich.console import Console
 from rich.table import Table
 
-from atomics.commands.common import PROVIDER_CHOICES, effort_options
+from atomics.commands.common import PROVIDER_CHOICES, effort_options, temperature_option
 from atomics.eval.batteries import BATTERIES, Battery, get_battery, step_args, visible_steps
 
 
@@ -83,6 +83,7 @@ def battery_list() -> None:
     help="Default --no-thinking so short fixtures stay visible. "
     "Pass --thinking for tags that 500 or skip the tool probe with think off.",
 )
+@temperature_option
 @effort_options
 def battery_show(
     name: str,
@@ -98,6 +99,7 @@ def battery_show(
     thinking: bool,
     effort: str | None,
     reasoning_mode: str | None,
+    temperature: float | None,
 ) -> None:
     """Print purpose, what a pass is not, and commands for NAME."""
     console = Console()
@@ -129,6 +131,7 @@ def battery_show(
             profile=profile,
             effort=effort,
             reasoning_mode=reasoning_mode,
+            temperature=temperature,
         )
         console.print(f"# {step.purpose}")
         console.print(_format_command(args))
@@ -149,6 +152,7 @@ def battery_show(
                 profile=profile,
                 effort=effort,
                 reasoning_mode=reasoning_mode,
+                temperature=temperature,
             )
             console.print(f"# {step.purpose}")
             console.print("# " + _format_command(args))
@@ -222,6 +226,7 @@ def _run_battery(
     thinking: bool,
     effort: str | None,
     reasoning_mode: str | None,
+    temperature: float | None,
     console: Console,
 ) -> int:
     if item.needs_judge and not judge_model:
@@ -258,6 +263,7 @@ def _run_battery(
             profile=profile,
             effort=effort,
             reasoning_mode=reasoning_mode,
+            temperature=temperature,
         )
         if runs is not None and step.suite in _RUNS_SUITES:
             args.extend(["--runs", str(runs)])
@@ -322,6 +328,7 @@ def _run_battery(
     help="Default --no-thinking so short fixtures stay visible. "
     "Pass --thinking for tags that 500 or skip the tool probe with think off.",
 )
+@temperature_option
 @effort_options
 def battery_run(
     name: str | None,
@@ -340,6 +347,7 @@ def battery_run(
     thinking: bool,
     effort: str | None,
     reasoning_mode: str | None,
+    temperature: float | None,
 ) -> None:
     """Execute the named battery. Stops on the first nonzero step unless --keep-going.
 
@@ -392,6 +400,7 @@ def battery_run(
             thinking=thinking,
             effort=effort,
             reasoning_mode=reasoning_mode,
+            temperature=temperature,
             console=console,
         )
     for job in work:
@@ -413,6 +422,7 @@ def battery_run(
             thinking=job.thinking,
             effort=effort,
             reasoning_mode=reasoning_mode,
+            temperature=temperature,
             console=console,
         )
         if code != 0:

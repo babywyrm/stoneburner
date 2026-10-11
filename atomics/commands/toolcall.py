@@ -25,6 +25,7 @@ from atomics.commands.common import (
     integrity_exit_code,
     parse_extra_judges,
     run_async,
+    temperature_option,
     write_summary_json,
 )
 from atomics.commands.suite_run import finalize_evaluation_run, suite_run
@@ -161,6 +162,7 @@ def _rate(rate: float | None, numerator: int, denominator: int) -> str:
 )
 @click.option("--thinking/--no-thinking", "thinking_flag", default=None)
 @click.option("--thinking-budget", type=int, default=8000, show_default=True)
+@temperature_option
 @effort_options
 @click.option(
     "--allow-partial",
@@ -187,6 +189,7 @@ def toolcall(
     verbose: bool,
     thinking_flag: bool | None,
     thinking_budget: int,
+    temperature: float | None,
     effort: str | None,
     reasoning_mode: str | None,
     allow_partial: bool,
@@ -249,8 +252,9 @@ def toolcall(
 
     resolved_model = effective_model(model, provider)
     console.print(f"\n[bold]Tool-call divergence[/bold] — {provider_name}/{resolved_model}")
+    pinned = "" if temperature is None else f" · temperature={temperature}"
     console.print(
-        f"[dim]{len(fixtures)} fixtures · channel={channel} · runs={runs} · "
+        f"[dim]{len(fixtures)} fixtures · channel={channel} · runs={runs}{pinned} · "
         f"judge={judge_provider_name or 'none'} · calls are never executed[/dim]\n"
     )
     if judge is None and channel != "tools":
@@ -306,6 +310,7 @@ def toolcall(
             channel=channel,
             thinking=thinking_flag,
             thinking_budget=thinking_budget,
+            temperature=temperature,
             effort=effort,
             reasoning_mode=reasoning_mode,
             on_fixture_start=on_start,

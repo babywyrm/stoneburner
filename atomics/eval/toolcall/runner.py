@@ -69,6 +69,7 @@ async def probe_tool_capability(
     model: str | None = None,
     thinking: bool | None = None,
     thinking_budget: int | None = None,
+    temperature: float | None = None,
     effort: str | None = None,
     reasoning_mode: str | None = None,
 ) -> bool:
@@ -95,6 +96,7 @@ async def probe_tool_capability(
             max_tokens=_MAX_TOKENS,
             thinking=thinking,
             thinking_budget=thinking_budget,
+            temperature=temperature,
             effort=effort,
             reasoning_mode=reasoning_mode,
         )
@@ -168,6 +170,7 @@ class ToolCallSummary:
     fixtures: list[dict[str, Any]] = field(default_factory=list)
     judge_model: str | None = None
     runs: int = 1
+    temperature: float | None = None
     total_cost_usd: float = 0.0
     judge_parse_failures: int = 0
     probe_error: str | None = None
@@ -229,6 +232,7 @@ class ToolCallSummary:
             "started_at": self.started_at,
             "completed_at": self.completed_at,
             "runs": self.runs,
+            "temperature": self.temperature,
             "tool_capable": self.tool_capable,
             "probe_error": self.probe_error,
             "fixture_count": len(self.fixtures),
@@ -376,6 +380,7 @@ async def run_toolcall_suite(
     channel: str = "both",
     thinking: bool | None = None,
     thinking_budget: int | None = None,
+    temperature: float | None = None,
     effort: str | None = None,
     reasoning_mode: str | None = None,
     run_id: str | None = None,
@@ -418,6 +423,7 @@ async def run_toolcall_suite(
         tool_capable=False,
         judge_model=judge_model if judge_provider is not None else None,
         runs=runs,
+        temperature=temperature,
     )
 
     # The probe gates everything. A model that cannot emit tool calls would
@@ -429,6 +435,7 @@ async def run_toolcall_suite(
                 model=model,
                 thinking=thinking,
                 thinking_budget=thinking_budget,
+                temperature=temperature,
                 effort=effort,
                 reasoning_mode=reasoning_mode,
             )
@@ -475,6 +482,7 @@ async def run_toolcall_suite(
                 channel=channel,
                 thinking=thinking,
                 thinking_budget=thinking_budget,
+                temperature=temperature,
                 effort=effort,
                 reasoning_mode=reasoning_mode,
                 run_number=run_number,
@@ -511,6 +519,7 @@ async def _run_once(
     channel: str,
     thinking: bool | None,
     thinking_budget: int | None,
+    temperature: float | None,
     effort: str | None,
     reasoning_mode: str | None,
     run_number: int,
@@ -549,6 +558,7 @@ async def _run_once(
                 injected_tool_output=fixture.injected_tool_output,
                 thinking=thinking,
                 thinking_budget=thinking_budget,
+                temperature=temperature,
                 effort=effort,
                 reasoning_mode=reasoning_mode,
             )
@@ -597,6 +607,7 @@ async def _run_once(
                 max_tokens=_MAX_TOKENS,
                 thinking=thinking,
                 thinking_budget=thinking_budget,
+                temperature=temperature,
                 effort=effort,
                 reasoning_mode=reasoning_mode,
             )

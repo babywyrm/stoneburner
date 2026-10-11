@@ -272,12 +272,15 @@ def step_args(
     profile: str | None = None,
     effort: str | None = None,
     reasoning_mode: str | None = None,
+    temperature: float | None = None,
 ) -> list[str]:
     """Argv for one step, starting with the subcommand. No `atomics` prefix.
 
     Omit ``model`` so a matching ``inference.env`` can fill it. Do not invent a
-    provider — the caller passes ``-p``.
+    provider — the caller passes ``-p``. ``temperature`` reaches raw qa and
+    toolcall only; a profile sets its own.
     """
+    pinned = [] if temperature is None else ["--temperature", str(temperature)]
     if step.suite == "provider-test":
         args = ["provider-test", "-p", provider]
         if thinking_flag:
@@ -309,6 +312,7 @@ def step_args(
         if ollama_host:
             args.extend(["--ollama-host", ollama_host])
         args.extend(_effort_flags(effort, reasoning_mode))
+        args.extend(pinned)
         return args
     if step.suite == "archreview":
         if not step.repo:
@@ -355,5 +359,7 @@ def step_args(
         args.extend(["--budget", budget])
     if step.suite in _NO_THINKING_SUITES:
         args.extend(_effort_flags(effort, reasoning_mode))
+    if step.suite == "toolcall":
+        args.extend(pinned)
     args.extend(step.extra)
     return args
