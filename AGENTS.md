@@ -7,6 +7,13 @@ measure capacity, and track regressions.
 This guide is intentionally general-purpose. Do not assume a specific lab,
 customer, box, cloud, or model family.
 
+stoneburner and [mcpnuke](https://github.com/babywyrm/mcpnuke) meet at the
+agent. stoneburner grades the model — whether the model will ask for the
+dangerous thing. mcpnuke scans the MCP server — whether the tools will do it.
+stoneburner's `adversarial` / `toolcall` suites measure the model half;
+mcpnuke's `--chain-replay` proves the server half. An endpoint-scanning idea
+belongs in mcpnuke, not in a new stoneburner suite.
+
 ## Development Basics
 
 - Package manager: `uv` (`uv sync --all-extras` from a clone)
