@@ -135,6 +135,16 @@ Links are absolute so they work on PyPI as well as GitHub.
 | Human REPL | [REPL](https://github.com/babywyrm/stoneburner/blob/main/docs/REPL.md) |
 | Contribute | [CONTRIBUTING](https://github.com/babywyrm/stoneburner/blob/main/CONTRIBUTING.md) · [ARCHITECTURE](https://github.com/babywyrm/stoneburner/blob/main/ARCHITECTURE.md) |
 
+## Ecosystem
+
+**stoneburner and [mcpnuke](https://github.com/babywyrm/mcpnuke) meet at the
+agent.** stoneburner grades the model — whether the model will ask for the
+dangerous thing. mcpnuke scans the MCP server — whether the tools will do it.
+An attack chain needs both halves, so the tools complement rather than
+overlap: stoneburner's `adversarial` / `toolcall` suites measure the model
+half, mcpnuke's `--chain-replay` proves the server half. Neither scans the
+other's layer.
+
 ## License
 
 MIT — see [LICENSE](https://github.com/babywyrm/stoneburner/blob/main/LICENSE).

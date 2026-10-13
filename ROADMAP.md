@@ -3,6 +3,10 @@
 Where Stoneburner / Atomics is going next. Shipped work lives in
 [CHANGELOG.md](CHANGELOG.md); this file is only about what is not done yet.
 
+stoneburner and [mcpnuke](https://github.com/babywyrm/mcpnuke) meet at the
+agent: stoneburner grades the model, mcpnuke scans the MCP server. An
+endpoint-scanning idea belongs in mcpnuke, not here.
+
 The 2026-08-02 project audit found no critical architectural problems and one
 critical security finding, since fixed in v0.15.2. What it did surface was
 concentration: a few modules doing too much, and a server whose authorization
