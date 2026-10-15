@@ -313,7 +313,7 @@ class TestSoakStorage:
     def test_save_and_retrieve(self):
         from atomics.storage.repository import MetricsRepository
 
-        tmp = tempfile.mktemp(suffix=".db")
+        tmp = str(Path(tempfile.mkdtemp()) / "test.db")
         repo = MetricsRepository(Path(tmp))
 
         sr = SoakResult(
@@ -369,7 +369,7 @@ class TestSoakStorage:
     def test_filter_by_model(self):
         from atomics.storage.repository import MetricsRepository
 
-        tmp = tempfile.mktemp(suffix=".db")
+        tmp = str(Path(tempfile.mkdtemp()) / "test.db")
         repo = MetricsRepository(Path(tmp))
 
         for model in ["qwen2.5:7b", "mistral:7b", "qwen2.5:7b"]:
@@ -427,7 +427,7 @@ class TestSchemaVersion:
     def test_soak_table_exists(self):
         from atomics.storage.schema import init_db
 
-        tmp = tempfile.mktemp(suffix=".db")
+        tmp = str(Path(tempfile.mkdtemp()) / "test.db")
         conn = init_db(Path(tmp))
         conn.execute(
             "INSERT INTO soak_results "

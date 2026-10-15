@@ -13,7 +13,7 @@ from atomics.storage.schema import SCHEMA_VERSION, init_db
 
 
 def _tmp_repo() -> MetricsRepository:
-    tmp = tempfile.mktemp(suffix=".db")
+    tmp = str(Path(tempfile.mkdtemp()) / "test.db")
     return MetricsRepository(Path(tmp))
 
 

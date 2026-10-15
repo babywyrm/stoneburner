@@ -14,7 +14,7 @@ from atomics.storage.schema import init_db
 
 def _seeded_db() -> tuple[Path, MetricsRepository]:
     """Create a DB with multi-model eval data for advisor testing."""
-    db_path = Path(tempfile.mktemp(suffix=".db"))
+    db_path = Path(tempfile.mkdtemp()) / "test.db"
     repo = MetricsRepository(db_path)
 
     models = [
@@ -77,7 +77,7 @@ def test_advisor_respects_quality_threshold():
 
 
 def test_advisor_no_data():
-    db_path = Path(tempfile.mktemp(suffix=".db"))
+    db_path = Path(tempfile.mkdtemp()) / "test.db"
     conn = init_db(db_path)
     try:
         summary = analyze_cost_optimization(conn, min_quality=0.8)
@@ -88,7 +88,7 @@ def test_advisor_no_data():
 
 
 def test_advisor_single_model_no_recommendations():
-    db_path = Path(tempfile.mktemp(suffix=".db"))
+    db_path = Path(tempfile.mkdtemp()) / "test.db"
     repo = MetricsRepository(db_path)
     repo.create_run("r1", provider="test", model="only-model")
     for i in range(3):

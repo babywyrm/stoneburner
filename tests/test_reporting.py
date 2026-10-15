@@ -15,7 +15,7 @@ from atomics.storage.repository import MetricsRepository
 
 
 def _seeded_repo() -> MetricsRepository:
-    repo = MetricsRepository(Path(tempfile.mktemp(suffix=".db")))
+    repo = MetricsRepository(Path(tempfile.mkdtemp()) / "test.db")
     repo.create_run(
         "rpt-001", tier="ez", provider="bedrock", model="us.anthropic.claude-sonnet-4-6"
     )
@@ -53,7 +53,7 @@ def test_print_recent_runs(capsys):
 
 
 def test_print_recent_runs_empty(capsys):
-    repo = MetricsRepository(Path(tempfile.mktemp(suffix=".db")))
+    repo = MetricsRepository(Path(tempfile.mkdtemp()) / "test.db")
     print_recent_runs(repo)
     captured = capsys.readouterr()
     assert "No runs" in captured.out
@@ -69,7 +69,7 @@ def test_print_hourly_usage(capsys):
 
 
 def test_print_hourly_usage_empty(capsys):
-    repo = MetricsRepository(Path(tempfile.mktemp(suffix=".db")))
+    repo = MetricsRepository(Path(tempfile.mkdtemp()) / "test.db")
     print_hourly_usage(repo)
     captured = capsys.readouterr()
     assert "No hourly" in captured.out
@@ -86,7 +86,7 @@ def test_print_category_breakdown(capsys):
 
 
 def test_print_category_breakdown_empty(capsys):
-    repo = MetricsRepository(Path(tempfile.mktemp(suffix=".db")))
+    repo = MetricsRepository(Path(tempfile.mkdtemp()) / "test.db")
     print_category_breakdown(repo)
     captured = capsys.readouterr()
     assert "No category" in captured.out
@@ -103,7 +103,7 @@ def test_print_provider_summary(capsys):
 
 
 def test_print_provider_summary_empty(capsys):
-    repo = MetricsRepository(Path(tempfile.mktemp(suffix=".db")))
+    repo = MetricsRepository(Path(tempfile.mkdtemp()) / "test.db")
     print_provider_summary(repo)
     captured = capsys.readouterr()
     assert "No provider" in captured.out
