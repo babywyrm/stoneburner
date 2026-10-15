@@ -276,6 +276,9 @@ uv run atomics sweep --all-local --ollama-host http://localhost:11434
 # (use tags that are actually pulled on the host — a missing tag shows
 #  as FAIL with a "404 Not Found" reason in the summary)
 uv run atomics sweep --models gemma4:12b,llama3.2:1b,mistral:7b,phi4:latest,deepseek-r1:14b --fixtures ev-01,ev-02,ev-03
+
+# Pin every model so the ranking is not run-to-run noise (judges are always 0)
+uv run atomics sweep --models gemma4:12b,mistral:7b --temperature 0
 ```
 
 An overnight security sweep. `--status` is rewritten after every

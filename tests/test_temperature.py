@@ -755,3 +755,112 @@ def test_judged_commands_forward_temperature(monkeypatch, suite):
         cli, [suite, "-m", "x", "--judge-model", "j", "--no-save", "--temperature", "0.5"]
     )
     assert seen.get("temperature") == 0.5
+
+
+# ── sweep: the eval suite, the gauntlet, and the command ────────────────────
+@pytest.mark.asyncio
+async def test_eval_suite_pins_the_model_and_keeps_the_judge_at_zero():
+    from atomics.eval.fixtures import EVAL_FIXTURES
+    from atomics.eval.runner import run_eval
+
+    target = _TemperatureRecorder()
+    judge = _TemperatureRecorder(text="{}")
+    summary = await run_eval(
+        target, judge_provider=judge, model="m", fixtures=EVAL_FIXTURES[:1], temperature=0.7
+    )
+    assert target.temperatures and set(target.temperatures) == {0.7}
+    assert set(judge.temperatures) <= {0.0}
+    assert summary.to_dict()["temperature"] == 0.7
+
+
+_SWEEP_RUNNERS = {
+    "eval": "atomics.eval.runner.run_eval",
+    "redblue": "atomics.eval.redblue.runner.run_redblue",
+    "refusal": "atomics.eval.refusal.run_refusal",
+    "toolcall": "atomics.eval.toolcall.runner.run_toolcall_suite",
+    "codereview": "atomics.eval.codereview.run_codereview",
+}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("suite", sorted(_SWEEP_RUNNERS))
+async def test_gauntlet_forwards_temperature_to_every_suite(monkeypatch, suite):
+    from atomics.eval.gauntlet import make_suite_runner
+
+    seen: dict = {}
+
+    async def fake_run(*_args, **kwargs):
+        seen.update(kwargs)
+        raise RuntimeError("stop after capture")
+
+    monkeypatch.setattr(_SWEEP_RUNNERS[suite], fake_run)
+    run_suite = make_suite_runner(
+        provider_factory=lambda _model: _TemperatureRecorder(),
+        judge_provider=_TemperatureRecorder(),
+        judge_model=None,
+        runs=1,
+        thinking=None,
+        thinking_budget=None,
+        temperature=0.3,
+    )
+    result = await run_suite(model="m", suite=suite, skip_incapable=False)
+    assert not result.ok
+    assert seen.get("temperature") == 0.3
+
+
+@pytest.mark.asyncio
+async def test_model_sweep_forwards_temperature(monkeypatch):
+    from atomics.benchmark.sweep import run_model_sweep
+
+    seen: dict = {}
+
+    async def fake_run_eval(*_args, **kwargs):
+        seen.update(kwargs)
+        raise RuntimeError("stop after capture")
+
+    monkeypatch.setattr("atomics.benchmark.sweep.run_eval", fake_run_eval)
+    await run_model_sweep(
+        provider_factory=lambda _model: _TemperatureRecorder(),
+        judge_provider=_TemperatureRecorder(),
+        models=["m"],
+        temperature=0.3,
+    )
+    assert seen.get("temperature") == 0.3
+
+
+@pytest.mark.parametrize(
+    ("suites", "target"),
+    [
+        ("eval", "atomics.benchmark.sweep.run_model_sweep"),
+        ("redblue,toolcall", "atomics.eval.gauntlet.make_suite_runner"),
+    ],
+)
+def test_sweep_cli_forwards_temperature(monkeypatch, suites, target):
+    from click.testing import CliRunner
+
+    from atomics.cli import cli
+
+    seen: dict = {}
+
+    def capture(**kwargs):
+        seen.update(kwargs)
+        raise RuntimeError("stop after capture")
+
+    monkeypatch.setattr(
+        "atomics.commands.sweep._make_provider", lambda *_a, **_k: _TemperatureRecorder()
+    )
+    monkeypatch.setattr(target, capture)
+    CliRunner().invoke(
+        cli, ["sweep", "--models", "a,b", "--suites", suites, "--temperature", "0.3"]
+    )
+    assert seen.get("temperature") == 0.3
+
+
+def test_sweep_rejects_temperature_outside_zero_to_two():
+    from click.testing import CliRunner
+
+    from atomics.cli import cli
+
+    result = CliRunner().invoke(cli, ["sweep", "--models", "a", "--temperature", "2.5"])
+    assert result.exit_code == 2
+    assert "not in the range" in result.output

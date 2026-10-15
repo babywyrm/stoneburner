@@ -170,6 +170,7 @@ one backend that reports its window size.
 | `atomics rag --json-out rag.json` | Write results as JSON |
 | `atomics sweep` | Multi-model eval sweep with ranked comparison |
 | `atomics sweep --verbose` | Print the full prompt, model reply, thinking, and judge rationale per fixture |
+| `atomics sweep --models a,b,c --temperature 0` | Pin every model under test (0–2) so the ranking is not run-to-run noise. Judges stay at 0. Applies to `eval` and every `--suites` entry |
 | `atomics sweep --suites redblue,refusal,toolcall,codereview --runs 3 --no-thinking --models-from ollama --status sweep.status.json --log sweep.log` | Overnight multi-suite driver: status file + detachable log. Toolcall uses `--no-skip-incapable`. |
 | `atomics sweep ... --status sweep.status.json --resume` | Same command after a stop. Keeps jobs the status file records as ok; re-runs failed, crashed, and unfinished ones. A partial suite is not ok. A dead provider stops the sweep. |
 

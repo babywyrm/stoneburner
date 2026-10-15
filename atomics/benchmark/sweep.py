@@ -66,6 +66,7 @@ async def run_model_sweep(
     judge_model: str | None = None,
     thinking: bool | None = None,
     thinking_budget: int | None = None,
+    temperature: float | None = None,
     effort: str | None = None,
     reasoning_mode: str | None = None,
     on_model_done: Callable[[ModelSweepResult], None] | None = None,
@@ -81,6 +82,7 @@ async def run_model_sweep(
         judge_model: Model override for the judge.
         thinking: Force thinking on/off for capable models.
         thinking_budget: Max thinking tokens.
+        temperature: Sampling temperature for each model; None keeps its own.
         on_model_done: Optional callback after each model completes.
         on_fixture_done: Optional callback after each fixture completes (for live verbose output).
     """
@@ -99,6 +101,7 @@ async def run_model_sweep(
                 judge_model=judge_model,
                 thinking=thinking,
                 thinking_budget=thinking_budget,
+                temperature=temperature,
                 effort=effort,
                 reasoning_mode=reasoning_mode,
                 fixtures=fixtures,
