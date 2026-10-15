@@ -13,7 +13,7 @@ from atomics.benchmark.labcompare import (
     run_labcompare,
     speedup_ratio,
 )
-from atomics.commands.common import _make_provider, run_async
+from atomics.commands.common import _make_provider, run_async, temperature_option
 from atomics.config import load_settings
 
 if TYPE_CHECKING:
@@ -100,6 +100,7 @@ def _render_labcompare(console, cells, hosts, dims) -> None:
 @click.option("--judge-host", default=None)
 @click.option("--judge-model", default=None)
 @click.option("--prompts", type=int, default=3, show_default=True)
+@temperature_option
 @click.option("--save/--no-save", "save_results", default=True, show_default=True)
 @click.option("-o", "--json-out", "json_out", type=click.Path(), default=None)
 def labcompare(
@@ -110,6 +111,7 @@ def labcompare(
     judge_host,
     judge_model,
     prompts,
+    temperature: float | None,
     save_results,
     json_out,
 ):
@@ -152,6 +154,7 @@ def labcompare(
                 judge_provider=judge,
                 model=model,
                 judge_model=jmodel,
+                temperature=temperature,
             )
             return summary.overall_quality
         summary = await run_eval(
@@ -159,6 +162,7 @@ def labcompare(
             judge_provider=judge,
             model=model,
             judge_model=jmodel,
+            temperature=temperature,
         )
         return summary.overall_accuracy
 

@@ -7,6 +7,9 @@
   `eval` suite and every `--suites` entry, so a ranking is not
   run-to-run noise. Judges stay at 0; unset keeps each model's own. The
   eval summary's JSON now records `temperature` like the other suites.
+- `eval --temperature` pins the model under test; `labcompare
+  --temperature` pins the quality suite on every host, so a parity gap
+  is the host and not sampling. Throughput probes are unchanged.
 
 ## 0.27.0 (2026-10-14) — Pinned temperature, host-checked webhooks
 
