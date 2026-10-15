@@ -68,3 +68,15 @@ high on every item, yet all three ranked the models the same way.
 - **Absolute numbers** need the reference judge, `gemma4:26b`, or a cloud
   judge. Re-check the reference when a new local judge appears.
 - Name the judge next to every published score.
+
+### Model temperature
+
+Judges always run at 0. The model under test runs at its own temperature
+unless you pass `--temperature` (on `qa`, `toolcall`, `adversarial`,
+`redblue`, `refusal`, `codereview`, and `battery`).
+
+- **Comparing models or builds:** `--temperature 0`, so a fixture that
+  flips between runs is not read as a difference between models.
+- **Safety and promotion evidence:** leave it off and use `--runs 3` or
+  more. Pinning can hide how often a model makes a dangerous call.
+- Each suite's JSON records `temperature`; `null` means the model's own.

@@ -314,6 +314,8 @@ uv run atomics battery run desk-pass -p ollama -m MODEL
 uv run atomics battery run desk-pass -p openai -m gpt-4.1 --budget 5
 uv run atomics battery run blue-capability -p ollama -m MODEL \
   --judge-provider claude --judge-model claude-sonnet-4-6 --budget 5
+# Like-for-like comparison between two models or builds: pin the model
+uv run atomics battery run desk-pass -p ollama -m MODEL --temperature 0
 ```
 
 See [`docs/BATTERIES.md`](docs/BATTERIES.md). Then, if you mean to:
@@ -416,6 +418,12 @@ uv run atomics adversarial -p ollama -m qwen2.5:7b --category tool_desc_injectio
 
 # Compare two models on the same fixtures (per-fixture diff + overall delta)
 uv run atomics adversarial -p ollama -m mistral-nemo:12b --compare mistral-small:24b --runs 3
+
+# Same comparison with both models pinned, so a flip between runs is not
+# mistaken for a difference between models. Leave it off for safety
+# evidence: the model's own temperature is what a deployment sees.
+uv run atomics adversarial -p ollama -m mistral-nemo:12b --compare mistral-small:24b \
+  --runs 3 --temperature 0
 
 # Export the full run as JSON for a dashboard / notebook
 uv run atomics adversarial -p ollama -m qwen2.5:7b --json-out run.json
