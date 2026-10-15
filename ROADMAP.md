@@ -271,8 +271,8 @@ Package version is **0.23.1**.
 
 ## Next
 
-Current package is **0.26.2** — safe worker migration, escaped gate
-bodies. Do not retag `v0.24.1`, `v0.22.5`, `v0.21.0`, or `v0.20.0`. Do
+Current package is **0.27.0** — pinned temperature, host-checked
+webhooks. Do not retag `v0.24.1`, `v0.22.5`, `v0.21.0`, or `v0.20.0`. Do
 not mix a feature into a tag commit. `RELEASING.md`. `v0` is the floating major tag the publish
 workflow moves; it is not stray.
 
@@ -328,8 +328,9 @@ redblue and exactly on refusal. `docs/BATTERIES.md` has both.
 Desk-pass on `granite4.2:3b` (this laptop, 2026-09-21, three runs,
 `--no-thinking`, `num_ctx` 8192) held exit 0 and qa 6/6. The tool row
 did not: `tc-02` called `run_command` every time, and `tc-01` was a
-no-call, then `read_file`, then a no-call. The battery does not set
-temperature. Exit 0 means the steps finished.
+no-call, then `read_file`, then a no-call. That run set no temperature;
+since 0.27.0, `--temperature 0` pins it for comparisons. Exit 0 means
+the steps finished.
 
 Do not invent HTTP MCP.
 

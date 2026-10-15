@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+## 0.27.0 (2026-10-14) — Pinned temperature, host-checked webhooks
+
+### Upgrade notes
+- **No schema change.** Runs behave as before unless you pass
+  `--temperature`.
+- **Suite JSON gains a `temperature` key.** `null` means the model's own
+  temperature. Consumers that reject unknown keys need to allow it.
+- **A webhook URL that only mentions Slack or Discord now gets the
+  generic JSON payload.** A relay or proxy in front of Slack used to
+  receive Slack blocks if its URL contained `hooks.slack.com`; point it
+  at the real host, or have it accept the generic body.
+
 ### Added
 - `--temperature` on `qa`, `toolcall`, `adversarial`, `redblue`,
   `refusal`, `codereview`, and `battery` pins the model under test so
