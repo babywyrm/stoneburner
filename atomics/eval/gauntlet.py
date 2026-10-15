@@ -243,6 +243,7 @@ def make_suite_runner(
     runs: int,
     thinking: bool | None,
     thinking_budget: int | None,
+    temperature: float | None = None,
     fixture_ids: list[str] | None = None,
     effort: str | None = None,
     reasoning_mode: str | None = None,
@@ -272,6 +273,7 @@ def make_suite_runner(
                 runs=runs,
                 thinking=thinking,
                 thinking_budget=thinking_budget,
+                temperature=temperature,
                 fixture_ids=fixture_ids,
                 effort=effort,
                 reasoning_mode=reasoning_mode,
@@ -347,6 +349,7 @@ async def _dispatch_suite(
     thinking_budget: int | None,
     fixture_ids: list[str] | None,
     skip_incapable: bool,
+    temperature: float | None = None,
     effort: str | None = None,
     reasoning_mode: str | None = None,
 ) -> tuple[SuiteJobResult, object | None]:
@@ -361,6 +364,7 @@ async def _dispatch_suite(
             judge_model=judge_model,
             thinking=thinking,
             thinking_budget=thinking_budget,
+            temperature=temperature,
             effort=effort,
             reasoning_mode=reasoning_mode,
             fixtures=_filter_fixtures(fixture_ids),
@@ -382,6 +386,7 @@ async def _dispatch_suite(
             runs=runs,
             thinking=thinking,
             thinking_budget=thinking_budget,
+            temperature=temperature,
             effort=effort,
             reasoning_mode=reasoning_mode,
         )
@@ -403,6 +408,7 @@ async def _dispatch_suite(
             runs=runs,
             thinking=thinking,
             thinking_budget=thinking_budget,
+            temperature=temperature,
             effort=effort,
             reasoning_mode=reasoning_mode,
         )
@@ -426,6 +432,7 @@ async def _dispatch_suite(
             runs=runs,
             thinking=thinking,
             thinking_budget=thinking_budget,
+            temperature=temperature,
             effort=effort,
             reasoning_mode=reasoning_mode,
         )
@@ -461,6 +468,7 @@ async def _dispatch_suite(
             runs=runs,
             thinking=thinking,
             thinking_budget=thinking_budget,
+            temperature=temperature,
             effort=effort,
             reasoning_mode=reasoning_mode,
         )

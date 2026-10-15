@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Added
+- `sweep --temperature` pins every model under test, on the default
+  `eval` suite and every `--suites` entry, so a ranking is not
+  run-to-run noise. Judges stay at 0; unset keeps each model's own. The
+  eval summary's JSON now records `temperature` like the other suites.
+
 ## 0.27.0 (2026-10-14) — Pinned temperature, host-checked webhooks
 
 ### Upgrade notes

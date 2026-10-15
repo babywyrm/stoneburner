@@ -59,6 +59,7 @@ class EvalRunSummary:
     started_at: datetime
     completed_at: datetime
     fixture_results: list[FixtureResult]
+    temperature: float | None = None
 
     @property
     def overall_accuracy(self) -> float | None:
@@ -109,6 +110,7 @@ class EvalRunSummary:
             "judge_model": self.judge_model,
             "started_at": self.started_at.isoformat(),
             "completed_at": self.completed_at.isoformat(),
+            "temperature": self.temperature,
             "overall_accuracy": self.overall_accuracy,
             "parse_failure_rate": self.parse_failure_rate,
             "value_score": self.value_score,
@@ -155,6 +157,7 @@ async def run_eval(
     on_phase: Callable[..., object] | None = None,
     thinking: bool | None = None,
     thinking_budget: int | None = None,
+    temperature: float | None = None,
     effort: str | None = None,
     reasoning_mode: str | None = None,
     fixtures: list[EvalFixture] | None = None,
@@ -228,6 +231,7 @@ async def run_eval(
                 max_tokens=fixture.max_output_tokens,
                 thinking=thinking,
                 thinking_budget=thinking_budget,
+                temperature=temperature,
                 effort=effort,
                 reasoning_mode=reasoning_mode,
             )
@@ -337,4 +341,5 @@ async def run_eval(
         started_at=started_at,
         completed_at=datetime.now(UTC),
         fixture_results=fixture_results,
+        temperature=temperature,
     )

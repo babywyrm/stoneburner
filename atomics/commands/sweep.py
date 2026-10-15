@@ -17,6 +17,7 @@ from atomics.commands.common import (
     eval_budget_from,
     run_async,
     setup_logging,
+    temperature_option,
 )
 from atomics.config import load_settings
 from atomics.eval.budget import BudgetMeter
@@ -145,6 +146,7 @@ def suite_persister(db_path: Path) -> Callable[[str, str, str, object], None]:
 )
 @click.option("--thinking/--no-thinking", "thinking_flag", default=None)
 @click.option("--thinking-budget", type=int, default=None)
+@temperature_option
 @effort_options
 @click.option(
     "--verbose",
@@ -215,6 +217,7 @@ def sweep(
     fixtures: str | None,
     thinking_flag: bool | None,
     thinking_budget: int | None,
+    temperature: float | None,
     effort: str | None,
     reasoning_mode: str | None,
     verbose: bool,
@@ -290,6 +293,8 @@ def sweep(
         raise SystemExit(1)
 
     fixture_ids = [f.strip() for f in fixtures.split(",") if f.strip()] if fixtures else None
+    if temperature is not None:
+        console.print(f"[dim]temperature={temperature} for every model; judges at 0[/dim]")
 
     # A sweep builds one provider per model as it goes, so the ceiling has to
     # outlive any single provider. Metering each model separately would make an
@@ -335,6 +340,7 @@ def sweep(
                         runs=runs,
                         thinking=thinking_flag,
                         thinking_budget=thinking_budget,
+                        temperature=temperature,
                         fixture_ids=fixture_ids,
                         effort=effort,
                         reasoning_mode=reasoning_mode,
@@ -417,6 +423,7 @@ def sweep(
                 judge_model=judge_model,
                 thinking=thinking_flag,
                 thinking_budget=thinking_budget,
+                temperature=temperature,
                 effort=effort,
                 reasoning_mode=reasoning_mode,
                 on_model_done=on_model_done,

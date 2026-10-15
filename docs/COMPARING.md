@@ -73,7 +73,7 @@ high on every item, yet all three ranked the models the same way.
 
 Judges always run at 0. The model under test runs at its own temperature
 unless you pass `--temperature` (on `qa`, `toolcall`, `adversarial`,
-`redblue`, `refusal`, `codereview`, and `battery`).
+`redblue`, `refusal`, `codereview`, `battery`, and `sweep`).
 
 - **Comparing models or builds:** `--temperature 0`, so a fixture that
   flips between runs is not read as a difference between models.
