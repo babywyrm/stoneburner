@@ -79,6 +79,7 @@ class RedBlueSummary:
     started_at: datetime
     completed_at: datetime
     runs: int = 1
+    temperature: float | None = None
     results: list[RedBlueFixtureResult] = field(default_factory=list)
 
     @property
@@ -157,6 +158,7 @@ class RedBlueSummary:
             "model": self.model,
             "mode": self.mode,
             "runs": self.runs,
+            "temperature": self.temperature,
             "started_at": self.started_at.isoformat(),
             "completed_at": self.completed_at.isoformat(),
             "overall_quality": headline_rate(self.overall_quality, self.integrity),
@@ -202,6 +204,7 @@ async def run_redblue(
     run_id: str | None = None,
     thinking: bool | None = None,
     thinking_budget: int | None = None,
+    temperature: float | None = None,
     effort: str | None = None,
     reasoning_mode: str | None = None,
     min_output_tokens: int | None = None,
@@ -284,6 +287,7 @@ async def run_redblue(
                     max_tokens=output_tokens,
                     thinking=thinking,
                     thinking_budget=thinking_budget,
+                    temperature=temperature,
                     effort=effort,
                     reasoning_mode=reasoning_mode,
                 )
@@ -415,6 +419,7 @@ async def run_redblue(
         started_at=started_at,
         completed_at=datetime.now(UTC),
         runs=runs,
+        temperature=temperature,
         results=results,
     )
 

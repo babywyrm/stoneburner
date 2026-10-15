@@ -130,6 +130,7 @@ class CodeReviewSummary:
     completed_at: datetime
     results: list[CodeReviewResult] = field(default_factory=list)
     runs: int = 1
+    temperature: float | None = None
 
     @property
     def fixture_results(self) -> list[CodeReviewResult]:
@@ -184,6 +185,7 @@ class CodeReviewSummary:
             "started_at": self.started_at.isoformat(),
             "completed_at": self.completed_at.isoformat(),
             "runs": self.runs,
+            "temperature": self.temperature,
             "detection_rate": headline_rate(self.detection_rate, integrity),
             "false_positive_rate": headline_rate(self.false_positive_rate, integrity),
             "review_score": headline_rate(self.review_score, integrity),
@@ -203,6 +205,7 @@ async def run_codereview(
     extra_judges: list[tuple[BaseProvider, str | None]] | None = None,
     thinking: bool | None = None,
     thinking_budget: int | None = None,
+    temperature: float | None = None,
     effort: str | None = None,
     reasoning_mode: str | None = None,
     run_id: str | None = None,
@@ -251,6 +254,7 @@ async def run_codereview(
                 max_tokens=fx.max_output_tokens,
                 thinking=thinking,
                 thinking_budget=thinking_budget,
+                temperature=temperature,
                 effort=effort,
                 reasoning_mode=reasoning_mode,
             )
@@ -300,6 +304,7 @@ async def run_codereview(
         completed_at=datetime.now(UTC),
         results=results,
         runs=runs,
+        temperature=temperature,
     )
 
 

@@ -44,10 +44,11 @@ needs a native think level (north-mini). Promotion evidence is
 `--runs 3` on the judged suites, not a bigger fixture list.
 
 A single fixture can flip between runs (`tc-01` DANGEROUS on one pass,
-no call on the next). `--temperature 0` pins the raw `qa` and `toolcall`
-steps so two models, or two builds of one, compare like for like.
-Profile `qa` steps keep the profile's temperature, and judges always
-run at 0. Leave the flag off for safety evidence: the model's own
+no call on the next). `--temperature 0` pins every step that samples
+the model — raw `qa`, `toolcall`, `adversarial`, `redblue`, `refusal`,
+`codereview` — so two models, or two builds of one, compare like for
+like. Profile `qa` steps keep the profile's temperature, and judges
+always run at 0. Leave the flag off for safety evidence: the model's own
 temperature is what a deployment sees, and pinning it can hide how
 often a model makes a dangerous call. Run `--runs 3` unpinned to count
 that.
@@ -60,7 +61,7 @@ Label hint: `FUNCTION_COMPATIBLE` if health and qa hold. Tool-capable
 must be honest: a skipped probe is not resistance. Battery `toolcall`
 steps pass `--no-skip-incapable` so a silent skip is a failed job, not
 a green desk-pass. Exit 0 means the steps finished. The tool row is one
-sample; the battery does not set temperature.
+sample; the battery sets no temperature unless you pass one.
 
 Not a pass: walkthrough, overnight, or a resilience percentage.
 

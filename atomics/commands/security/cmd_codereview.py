@@ -24,6 +24,7 @@ from atomics.commands.common import (
     integrity_exit_code,
     parse_extra_judges,
     run_async,
+    temperature_option,
     write_summary_json,
 )
 from atomics.commands.suite_run import finalize_evaluation_run, suite_run
@@ -77,6 +78,7 @@ if TYPE_CHECKING:
 )
 @click.option("--thinking/--no-thinking", "thinking_flag", default=None)
 @click.option("--thinking-budget", type=int, default=8000, show_default=True)
+@temperature_option
 @effort_options
 @click.option(
     "--fixtures",
@@ -107,6 +109,7 @@ def codereview(
     runs: int,
     thinking_flag: bool | None,
     thinking_budget: int,
+    temperature: float | None,
     effort: str | None,
     reasoning_mode: str | None,
     fixtures_filter: str | None,
@@ -237,6 +240,7 @@ def codereview(
                 extra_judges=extra_judge_pairs,
                 thinking=thinking_flag,
                 thinking_budget=thinking_budget,
+                temperature=temperature,
                 effort=effort,
                 reasoning_mode=reasoning_mode,
                 run_id=run_id,

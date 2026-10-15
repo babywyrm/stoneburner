@@ -563,7 +563,10 @@ def test_toolcall_cli_forwards_temperature(monkeypatch):
     assert seen["temperature"] == 0.0
 
 
-@pytest.mark.parametrize("command", ["toolcall", "qa", "battery"])
+@pytest.mark.parametrize(
+    "command",
+    ["toolcall", "qa", "battery", "adversarial", "redblue", "refusal", "codereview"],
+)
 def test_temperature_outside_zero_to_two_is_rejected(command):
     from click.testing import CliRunner
 
@@ -573,7 +576,7 @@ def test_temperature_outside_zero_to_two_is_rejected(command):
         "toolcall": ["toolcall", "-p", "ollama", "-m", "x", "--no-save"],
         "qa": ["qa", "--file", "qa/examples/ctf-solvability.yaml", "-m", "x"],
         "battery": ["battery", "run", "desk-pass", "-m", "x"],
-    }[command]
+    }.get(command, [command, "-m", "x", "--no-save"])
     result = CliRunner().invoke(cli, [*argv, "--temperature", "2.5"])
     assert result.exit_code == 2
     assert "not in the range" in result.output
@@ -618,21 +621,31 @@ def test_qa_rejects_temperature_with_a_profile():
     assert "profile" in result.output
 
 
-def test_battery_passes_temperature_to_qa_and_toolcall_only():
+@pytest.mark.parametrize(
+    "suite", ["qa", "toolcall", "adversarial", "redblue", "refusal", "codereview"]
+)
+def test_battery_pins_every_suite_that_samples_the_model(suite):
+    from atomics.eval.batteries import BatteryStep, step_args
+
+    step = BatteryStep(suite=suite, purpose="p", qa_file="qa/x.yaml")
+    assert step_args(step, model="m", temperature=0.0)[-2:] == ["--temperature", "0.0"]
+
+
+def test_battery_leaves_temperature_off_where_it_does_not_apply():
     from atomics.eval.batteries import BatteryStep, step_args
 
     def args(suite: str, **kwargs) -> list[str]:
-        step = BatteryStep(suite=suite, purpose="p", qa_file="qa/x.yaml")
+        step = BatteryStep(suite=suite, purpose="p", qa_file="qa/x.yaml", repo="r")
         return step_args(step, model="m", temperature=0.0, **kwargs)
 
-    assert args("qa")[-2:] == ["--temperature", "0.0"]
-    assert args("toolcall")[-2:] == ["--temperature", "0.0"]
-    assert "--temperature" not in args("adversarial")
+    assert "--temperature" not in args("provider-test")
+    assert "--temperature" not in args("archreview")
     assert "--temperature" not in args("qa", profile="profiles/local/gate.yaml")
     assert "--temperature" not in step_args(BatteryStep(suite="toolcall", purpose="p"), model="m")
 
 
-def test_battery_run_forwards_temperature(monkeypatch):
+@pytest.mark.parametrize("battery", ["desk-pass", "blue-capability", "threat-model"])
+def test_battery_run_forwards_temperature(monkeypatch, battery):
     from click.testing import CliRunner
 
     from atomics.cli import cli
@@ -642,8 +655,103 @@ def test_battery_run_forwards_temperature(monkeypatch):
         "atomics.commands.battery.invoke_atomics", lambda args: seen.append(args) or 0
     )
     result = CliRunner().invoke(
-        cli, ["battery", "run", "desk-pass", "-m", "x", "--temperature", "0"]
+        cli,
+        ["battery", "run", battery, "-m", "x", "--judge-model", "j", "--temperature", "0"],
     )
     assert result.exit_code == 0, result.output
-    pinned = [args[0] for args in seen if "--temperature" in args]
-    assert pinned == ["qa", "toolcall"]
+    sampling = {"qa", "toolcall", "adversarial", "redblue", "refusal", "codereview"}
+    assert any(args[0] in sampling for args in seen)
+    for args in seen:
+        assert ("--temperature" in args) == (args[0] in sampling), args
+
+
+class _TemperatureRecorder(BaseProvider):
+    def __init__(self, text: str = "I can't help with that.") -> None:
+        self.text = text
+        self.temperatures: list[object] = []
+
+    @property
+    def name(self) -> str:
+        return "rec"
+
+    async def generate(self, prompt: str, **kwargs: object) -> ProviderResponse:  # type: ignore[override]
+        self.temperatures.append(kwargs.get("temperature"))
+        return ProviderResponse(
+            text=self.text,
+            input_tokens=1,
+            output_tokens=1,
+            total_tokens=2,
+            model="m",
+            latency_ms=1.0,
+            estimated_cost_usd=0.0,
+        )
+
+    async def health_check(self) -> bool:
+        return True
+
+
+def _judged_suite(suite: str):
+    if suite == "adversarial":
+        from atomics.eval.adversarial import ALL_FIXTURES
+        from atomics.eval.adversarial.runner import run_adversarial
+
+        return run_adversarial, ALL_FIXTURES[:1]
+    if suite == "redblue":
+        from atomics.eval.redblue.fixtures import ALL_FIXTURES
+        from atomics.eval.redblue.runner import run_redblue
+
+        return run_redblue, ALL_FIXTURES[:1]
+    if suite == "refusal":
+        from atomics.eval.refusal.fixtures import REFUSAL_FIXTURES
+        from atomics.eval.refusal.runner import run_refusal
+
+        return run_refusal, REFUSAL_FIXTURES[:1]
+    from atomics.eval.codereview.fixtures import SECURE_CODE_FIXTURES
+    from atomics.eval.codereview.runner import run_codereview
+
+    return run_codereview, SECURE_CODE_FIXTURES[:1]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("suite", ["adversarial", "redblue", "refusal", "codereview"])
+async def test_judged_suites_pin_the_model_and_keep_the_judge_at_zero(suite):
+    run, fixtures = _judged_suite(suite)
+    target = _TemperatureRecorder()
+    judge = _TemperatureRecorder(text="{}")
+    summary = await run(
+        target, judge_provider=judge, model="m", fixtures=list(fixtures), temperature=0.7
+    )
+    assert target.temperatures and set(target.temperatures) == {0.7}
+    assert set(judge.temperatures) <= {0.0}
+    assert summary.to_dict()["temperature"] == 0.7
+
+
+_RUNNER_PATHS = {
+    "adversarial": "atomics.eval.adversarial.runner.run_adversarial",
+    "redblue": "atomics.eval.redblue.runner.run_redblue",
+    "refusal": "atomics.eval.refusal.run_refusal",
+    "codereview": "atomics.eval.codereview.run_codereview",
+}
+
+
+@pytest.mark.parametrize("suite", sorted(_RUNNER_PATHS))
+def test_judged_commands_forward_temperature(monkeypatch, suite):
+    from click.testing import CliRunner
+
+    from atomics.cli import cli
+
+    seen: dict = {}
+
+    async def fake_run(*_args, **kwargs):
+        seen.update(kwargs)
+        raise RuntimeError("stop after capture")
+
+    monkeypatch.setattr(
+        f"atomics.commands.security.cmd_{suite}._make_provider",
+        lambda *_a, **_k: _TemperatureRecorder(),
+    )
+    monkeypatch.setattr(_RUNNER_PATHS[suite], fake_run)
+    CliRunner().invoke(
+        cli, [suite, "-m", "x", "--judge-model", "j", "--no-save", "--temperature", "0.5"]
+    )
+    assert seen.get("temperature") == 0.5
