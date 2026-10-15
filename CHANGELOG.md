@@ -12,6 +12,12 @@
   suite's JSON records `temperature`.
 - CI runs CodeQL over Python, the npm worker, and the workflow files.
 
+### Fixed
+- Webhooks pick the Slack or Discord payload by the URL's host, not a
+  substring anywhere in it. `https://example.com/?next=hooks.slack.com`
+  was formatted as Slack. Delivery always went to the configured URL;
+  only the payload shape was wrong.
+
 ## 0.26.2 (2026-10-11) — Safe worker migration, escaped gate bodies
 
 ### Upgrade notes

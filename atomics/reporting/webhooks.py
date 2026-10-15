@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import logging
 from typing import Any
+from urllib.parse import urlsplit
 
 import httpx
 
@@ -23,11 +24,14 @@ logger = logging.getLogger("atomics.webhooks")
 
 
 def _is_slack_url(url: str) -> bool:
-    return "hooks.slack.com" in url
+    return urlsplit(url).hostname == "hooks.slack.com"
 
 
 def _is_discord_url(url: str) -> bool:
-    return "discord.com/api/webhooks" in url
+    parts = urlsplit(url)
+    host = parts.hostname or ""
+    on_discord = host == "discord.com" or host.endswith(".discord.com")
+    return on_discord and parts.path.startswith("/api/webhooks")
 
 
 def _build_slack_payload(

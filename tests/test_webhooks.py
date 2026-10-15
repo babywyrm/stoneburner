@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 import httpx
+import pytest
 
 from atomics.models import RunSummary
 from atomics.webhooks import (
@@ -50,7 +51,22 @@ def test_is_slack_url():
 
 def test_is_discord_url():
     assert _is_discord_url("https://discord.com/api/webhooks/123/abc") is True
+    assert _is_discord_url("https://canary.discord.com/api/webhooks/123/abc") is True
     assert _is_discord_url("https://example.com/webhook") is False
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://example.com/?next=hooks.slack.com",
+        "https://hooks.slack.com.example.com/services/T00",
+        "https://example.com/discord.com/api/webhooks/1",
+        "https://notdiscord.com/api/webhooks/1",
+    ],
+)
+def test_a_service_name_outside_the_host_is_not_that_service(url):
+    assert _is_slack_url(url) is False
+    assert _is_discord_url(url) is False
 
 
 # ── Payload builders ─────────────────────────────────────────────────────────
