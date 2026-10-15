@@ -325,5 +325,5 @@ handles API keys and can send data to LLM providers. Rules for contributors:
   `mypy atomics/`, and pytest (coverage floor 85%) on Linux/macOS across
   Python 3.11–3.13, with `--extra dev --extra api --extra mcp`. The `api` extra
   is required for collection; the `mcp` extra is required for the MCP tests to
-  *run* rather than skip. `security.yml` runs pip-audit, bandit, and gitleaks.
+  *run* rather than skip. `security.yml` runs pip-audit, bandit, and gitleaks; `codeql.yml` runs CodeQL.
 - Before every commit, run the checks in [CONTRIBUTING](CONTRIBUTING.md#the-checks).

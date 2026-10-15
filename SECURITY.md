@@ -99,6 +99,11 @@ suppressed set is the SQL builders that interpolate a literal column list or a
 quoted identifier while binding every caller value with `?`, the `/tmp` paths
 that are fixture data or smoke scratch, and the post-run hook below.
 
+CI also runs CodeQL (`.github/workflows/codeql.yml`) over Python, the npm
+worker's JavaScript, and the workflow files, on every push, pull request, and
+weekly. Findings land in the repository's code-scanning alerts; on a pull
+request, a new critical- or high-severity one fails the code-scanning check.
+
 ## Post-run hooks (`--hook` / `ATOMICS_POST_RUN_HOOK`)
 
 The `atomics run --hook "command"` flag (or `ATOMICS_POST_RUN_HOOK` env var)

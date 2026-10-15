@@ -1,0 +1,39 @@
+name: codeql
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # New queries ship with CodeQL releases, so unchanged code can gain a
+  # finding. The weekly run picks those up between pushes.
+  schedule:
+    - cron: "0 7 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        # actions scans these workflow files; javascript-typescript covers the
+        # npm worker. Nothing here is compiled, so no build step is needed.
+        language: [python, javascript-typescript, actions]
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: none
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: /language:${{ matrix.language }}
