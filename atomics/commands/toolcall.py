@@ -101,7 +101,8 @@ def _rate(rate: float | None, numerator: int, denominator: int) -> str:
     type=PROVIDER_CHOICES,
     default=None,
     help="Judge for the prose channel and the tool-channel text. "
-    "Omit to skip judging: the tool channel is scored "
+    "Defaults to ollama when --judge-model, --judge-host, or --extra-judges "
+    "is given. Omit all four to skip judging: the tool channel is scored "
     "deterministically and needs no judge, but divergence against "
     "the prose channel cannot be computed without one.",
 )
@@ -224,6 +225,8 @@ def toolcall(
     provider = _make_provider(provider_name, model, ollama_host, settings, vllm_host=vllm_host)
     judge = None
     extra_judge_pairs: list = []
+    if judge_provider_name is None and (judge_model or judge_host or extra_judges):
+        judge_provider_name = "ollama"
     if judge_provider_name:
         judge = _make_provider(
             judge_provider_name,

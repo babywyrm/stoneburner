@@ -11,6 +11,14 @@
   --temperature` pins the quality suite on every host, so a parity gap
   is the host and not sampling. Throughput probes are unchanged.
 
+### Fixed
+- `toolcall --judge-model`, `--judge-host`, or `--extra-judges` without
+  `--judge-provider` silently ran unjudged, so channel divergence was
+  never measured. Any of them now defaults the judge to `ollama`, as on
+  every other judged suite. The tool-channel-only example in
+  `docs/SECURITY_SUITES.md` passed `--judge-provider ""`, which the CLI
+  rejects; it now omits the flag.
+
 ## 0.27.0 (2026-10-14) — Pinned temperature, host-checked webhooks
 
 ### Upgrade notes
