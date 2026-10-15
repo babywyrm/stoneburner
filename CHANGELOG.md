@@ -3,11 +3,14 @@
 ## Unreleased
 
 ### Added
-- `--temperature` on `qa`, `toolcall`, and `battery` pins the model under
-  test so repeat runs compare like for like. Unset keeps the model's own
-  temperature, which is the realistic dangerous-call rate. `battery`
-  forwards it to raw `qa` and `toolcall` steps; `qa --profile` rejects it
-  because the profile sets its own. Toolcall JSON records `temperature`.
+- `--temperature` on `qa`, `toolcall`, `adversarial`, `redblue`,
+  `refusal`, `codereview`, and `battery` pins the model under test so
+  repeat runs compare like for like. Judges stay at 0. Unset keeps the
+  model's own temperature, which is the realistic dangerous-call rate.
+  `battery` forwards it to every step that samples the model;
+  `qa --profile` rejects it because the profile sets its own. Each
+  suite's JSON records `temperature`.
+- CI runs CodeQL over Python, the npm worker, and the workflow files.
 
 ## 0.26.2 (2026-10-11) — Safe worker migration, escaped gate bodies
 

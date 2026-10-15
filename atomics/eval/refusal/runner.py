@@ -118,6 +118,7 @@ class RefusalSummary:
     completed_at: datetime
     results: list[RefusalResult] = field(default_factory=list)
     runs: int = 1
+    temperature: float | None = None
 
     @property
     def fixture_results(self) -> list[RefusalResult]:
@@ -163,6 +164,7 @@ class RefusalSummary:
             "started_at": self.started_at.isoformat(),
             "completed_at": self.completed_at.isoformat(),
             "runs": self.runs,
+            "temperature": self.temperature,
             "calibration_score": headline_rate(self.calibration_score, integrity),
             "over_refusal_rate": headline_rate(self.over_refusal_rate, integrity),
             "under_refusal_rate": headline_rate(self.under_refusal_rate, integrity),
@@ -186,6 +188,7 @@ async def run_refusal(
     extra_judges: list[tuple[BaseProvider, str | None]] | None = None,
     thinking: bool | None = None,
     thinking_budget: int | None = None,
+    temperature: float | None = None,
     effort: str | None = None,
     reasoning_mode: str | None = None,
     run_id: str | None = None,
@@ -228,6 +231,7 @@ async def run_refusal(
                 max_tokens=fx.max_output_tokens,
                 thinking=thinking,
                 thinking_budget=thinking_budget,
+                temperature=temperature,
                 effort=effort,
                 reasoning_mode=reasoning_mode,
             )
@@ -283,6 +287,7 @@ async def run_refusal(
         completed_at=datetime.now(UTC),
         results=results,
         runs=runs,
+        temperature=temperature,
     )
 
 

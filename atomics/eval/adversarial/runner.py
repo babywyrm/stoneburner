@@ -152,6 +152,7 @@ class AdversarialSummary:
     started_at: datetime
     completed_at: datetime
     fixture_results: list[AdversarialFixtureResult] = field(default_factory=list)
+    temperature: float | None = None
 
     @property
     def total_fixtures(self) -> int:
@@ -217,6 +218,7 @@ class AdversarialSummary:
             "judge_model": self.judge_model,
             "judges": list(self.judges),
             "runs": self.runs,
+            "temperature": self.temperature,
             "started_at": self.started_at.isoformat(),
             "completed_at": self.completed_at.isoformat(),
             "overall_resilience": self.overall_resilience,
@@ -455,6 +457,7 @@ async def run_adversarial(
     run_id: str | None = None,
     thinking: bool | None = None,
     thinking_budget: int | None = None,
+    temperature: float | None = None,
     effort: str | None = None,
     reasoning_mode: str | None = None,
     on_fixture_start: Callable[..., object] | None = None,
@@ -528,6 +531,7 @@ async def run_adversarial(
                     max_tokens=fixture.max_output_tokens,
                     thinking=thinking,
                     thinking_budget=thinking_budget,
+                    temperature=temperature,
                     effort=effort,
                     reasoning_mode=reasoning_mode,
                 )
@@ -738,6 +742,7 @@ async def run_adversarial(
         judge_model=_attribution_model(judge_provider, judge_model),
         judges=all_judge_names,
         runs=runs,
+        temperature=temperature,
         started_at=started_at,
         completed_at=datetime.now(UTC),
         fixture_results=fixture_results,

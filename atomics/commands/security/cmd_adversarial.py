@@ -22,6 +22,7 @@ from atomics.commands.common import (
     extra_judges_option,
     parse_extra_judges,
     run_async,
+    temperature_option,
 )
 from atomics.commands.suite_run import SuiteRun, finalize_adversarial_run
 from atomics.config import load_settings
@@ -108,6 +109,7 @@ def _parse_model_spec(spec: str, default_provider: str) -> tuple[str, str, str |
     help="Force thinking mode on or off (default: auto-detect).",
 )
 @click.option("--thinking-budget", type=int, default=8000, show_default=True)
+@temperature_option
 @effort_options
 @click.option("--save/--no-save", "save_results", default=True, show_default=True)
 @click.option(
@@ -162,6 +164,7 @@ def adversarial(
     fixtures_filter: str | None,
     thinking_flag: bool | None,
     thinking_budget: int,
+    temperature: float | None,
     effort: str | None,
     reasoning_mode: str | None,
     save_results: bool,
@@ -372,6 +375,7 @@ def adversarial(
         run_id=run_id,
         thinking=thinking_flag,
         thinking_budget=thinking_budget,
+        temperature=temperature,
         effort=effort,
         reasoning_mode=reasoning_mode,
         on_fixture_start=on_start,
@@ -490,6 +494,7 @@ def adversarial(
                 run_id=cmp_run_id,
                 thinking=thinking_flag,
                 thinking_budget=thinking_budget,
+                temperature=temperature,
                 effort=effort,
                 reasoning_mode=reasoning_mode,
                 on_fixture_done=on_compare_done,

@@ -277,8 +277,8 @@ def step_args(
     """Argv for one step, starting with the subcommand. No `atomics` prefix.
 
     Omit ``model`` so a matching ``inference.env`` can fill it. Do not invent a
-    provider — the caller passes ``-p``. ``temperature`` reaches raw qa and
-    toolcall only; a profile sets its own.
+    provider — the caller passes ``-p``. ``temperature`` reaches every step
+    that samples the model; a qa profile sets its own.
     """
     pinned = [] if temperature is None else ["--temperature", str(temperature)]
     if step.suite == "provider-test":
@@ -359,7 +359,6 @@ def step_args(
         args.extend(["--budget", budget])
     if step.suite in _NO_THINKING_SUITES:
         args.extend(_effort_flags(effort, reasoning_mode))
-    if step.suite == "toolcall":
         args.extend(pinned)
     args.extend(step.extra)
     return args

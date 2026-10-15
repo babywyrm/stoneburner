@@ -21,6 +21,7 @@ from atomics.commands.common import (
     integrity_exit_code,
     parse_extra_judges,
     run_async,
+    temperature_option,
     write_summary_json,
 )
 from atomics.commands.suite_run import finalize_task_run, suite_run
@@ -73,6 +74,7 @@ from atomics.eval.suite_integrity import format_headline_rate
 )
 @click.option("--thinking/--no-thinking", "thinking_flag", default=None)
 @click.option("--thinking-budget", type=int, default=8000, show_default=True)
+@temperature_option
 @effort_options
 @click.option(
     "--max-output-tokens",
@@ -112,6 +114,7 @@ def redblue(
     runs: int,
     thinking_flag: bool | None,
     thinking_budget: int,
+    temperature: float | None,
     effort: str | None,
     reasoning_mode: str | None,
     max_output_tokens: int | None,
@@ -244,6 +247,7 @@ def redblue(
                 run_id=run_id,
                 thinking=thinking_flag,
                 thinking_budget=thinking_budget,
+                temperature=temperature,
                 effort=effort,
                 reasoning_mode=reasoning_mode,
                 min_output_tokens=max_output_tokens,

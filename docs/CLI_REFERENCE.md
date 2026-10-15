@@ -104,11 +104,12 @@ one backend that reports its window size.
 | `atomics battery list` | Named security jobs (desk-pass, blue/red, agent-gate, threat-model) |
 | `atomics battery show desk-pass -m qwen3.5:4b` | Purpose, labels, copy-pasteable commands. `-p ollama\|vllm\|openai\|claude\|…` |
 | `atomics battery run desk-pass -m qwen3.5:4b` | Execute those steps. Stops on first failure unless `--keep-going`. Paid `-p` or `--judge-provider` needs a positive `--budget`. Default `--no-thinking`; pass `--thinking` / `--effort` for tags that skip the tool probe with think off. `--cohorts FILE` runs a plan from `atomics cohorts --json-out` |
-| `atomics battery run desk-pass -m qwen3.5:4b --temperature 0` | Pin raw `qa` and `toolcall` steps for like-for-like comparison. Unset keeps the model's own temperature |
+| `atomics battery run desk-pass -m qwen3.5:4b --temperature 0` | Pin every step that samples the model (raw `qa`, `toolcall`, and the judged suites) for like-for-like comparison. Unset keeps the model's own temperature |
 | `atomics adversarial` | Adversarial resilience eval — resistance to manipulation (72 fixtures) |
 | `atomics adversarial --category tool_desc_injection` | Run one suite/group |
 | `atomics adversarial --fixtures adv-01` | One fixture. Unknown ids fail before a request |
 | `atomics adversarial --runs 3` | Variance-aware scoring (mean ± stddev). Live `run 2/3` lines print each pass so a 1/3 comply is visible |
+| `atomics adversarial --temperature 0` | Pin the model under test (0–2); judges stay at 0. Same flag on `redblue`, `refusal`, and `codereview`. Recorded as `temperature` in the JSON |
 | `atomics adversarial --compare mistral-small:24b` | Run a second model, print per-fixture diff |
 | `atomics adversarial --json-out run.json` | Write full per-fixture results as JSON |
 | `atomics adversarial --fail-on-resilience 60` | CI gate — non-zero exit if resilience < 60% |
