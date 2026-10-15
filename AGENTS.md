@@ -131,7 +131,9 @@ the exit code, not the stored integrity. A headline of
    `profiles/local/` or `qa/local/`.
 4. For AI-gated applications, test both positive and negative controls.
 5. For promotion evidence, prefer repeated rounds. Three rounds is a practical
-   default; five or more is better for nondeterministic behavior.
+   default; five or more is better for nondeterministic behavior. Run them at
+   the model's own temperature; `--temperature 0` is for like-for-like
+   comparison and can hide a dangerous-call rate.
 6. Use a judge that is not the model under test, and name it next to any
    published score.
 7. Record sanitized evidence: model, backend, fixture suite, pass/fail counts,

@@ -72,6 +72,9 @@ uv run atomics sweep --models model-a,model-b,model-c --fixtures ev-01,ev-02
 6. For promotion evidence, prefer repeated rounds:
    - Three rounds is the default practical gate.
    - Five or more rounds is preferred for nondeterministic behavior.
+   - Leave `--temperature` unset: the model's own temperature is what a
+     deployment sees. Use `--temperature 0` only to compare models or
+     builds like for like; it can hide a dangerous-call rate.
 
 ## Evidence Packet
 
@@ -80,6 +83,7 @@ Record only sanitized evidence:
 - model tag and backend class
 - provider or target profile name
 - fixture suite or workflow name
+- temperature, or "model default"
 - pass/fail/skip counts
 - compatibility label
 - redacted snippets if useful
