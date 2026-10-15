@@ -98,6 +98,7 @@ one backend that reports its window size.
 | `atomics eval` | Run evaluation suite against a provider |
 | `atomics eval --verbose` | Print the full prompt, model reply, thinking, and judge rationale |
 | `atomics eval --fixtures ev-19` | Run a fixture subset for a fast spot-check |
+| `atomics eval --temperature 0` | Pin the model under test (0–2); the judge stays at 0. Recorded as `temperature` in the JSON |
 | `atomics eval --extra-judges ollama:mistral:7b` | Multi-judge consensus scoring |
 | `atomics judge-agreement --suite refusal --judges ollama:a,ollama:b` | Generate once, judge N times; report pairwise agreement and majority-flip rate |
 | `atomics judge-agreement --suite rag --judges ollama:a,ollama:b` | Same study on the RAG rubric (numeric mean / flip) |
@@ -223,6 +224,7 @@ runs such as a local model judged by a paid one.
 | `atomics capacity` | Project user load capacity from stress data |
 | `atomics labcompare --host a=URL --host b=URL --models m` | Compare two inference hosts |
 | `atomics labcompare --dimensions throughput --prompts 5` | Throughput-only bench |
+| `atomics labcompare --host a=URL --host b=URL --models m --temperature 0` | Pin the quality suite on every host, so a parity gap is the host and not sampling |
 
 ## QA & Validation
 

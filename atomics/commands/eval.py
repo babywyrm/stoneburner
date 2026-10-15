@@ -22,6 +22,7 @@ from atomics.commands.common import (
     parse_extra_judges,
     run_async,
     setup_logging,
+    temperature_option,
     write_summary_json,
 )
 from atomics.commands.suite_run import finalize_task_run, suite_run
@@ -94,6 +95,7 @@ from atomics.eval.budget import share_budget
     help="Enable/disable thinking for capable models",
 )
 @click.option("--thinking-budget", type=int, default=None, help="Max thinking tokens")
+@temperature_option
 @effort_options
 @budget_option
 @click.pass_context
@@ -114,6 +116,7 @@ def eval(
     verbose: bool,
     thinking_flag: bool | None,
     thinking_budget: int | None,
+    temperature: float | None,
     effort: str | None,
     reasoning_mode: str | None,
     budget_usd: float | None,
@@ -299,6 +302,7 @@ def eval(
                 on_fixture_done=on_done,
                 thinking=eff_thinking,
                 thinking_budget=thinking_budget,
+                temperature=temperature,
                 effort=effort,
                 reasoning_mode=reasoning_mode,
                 extra_judges=extra_judge_pairs,

@@ -565,7 +565,17 @@ def test_toolcall_cli_forwards_temperature(monkeypatch):
 
 @pytest.mark.parametrize(
     "command",
-    ["toolcall", "qa", "battery", "adversarial", "redblue", "refusal", "codereview"],
+    [
+        "toolcall",
+        "qa",
+        "battery",
+        "eval",
+        "labcompare",
+        "adversarial",
+        "redblue",
+        "refusal",
+        "codereview",
+    ],
 )
 def test_temperature_outside_zero_to_two_is_rejected(command):
     from click.testing import CliRunner
@@ -576,6 +586,7 @@ def test_temperature_outside_zero_to_two_is_rejected(command):
         "toolcall": ["toolcall", "-p", "ollama", "-m", "x", "--no-save"],
         "qa": ["qa", "--file", "qa/examples/ctf-solvability.yaml", "-m", "x"],
         "battery": ["battery", "run", "desk-pass", "-m", "x"],
+        "labcompare": ["labcompare", "--host", "a=http://localhost:1", "--models", "x"],
     }.get(command, [command, "-m", "x", "--no-save"])
     result = CliRunner().invoke(cli, [*argv, "--temperature", "2.5"])
     assert result.exit_code == 2
@@ -727,11 +738,13 @@ async def test_judged_suites_pin_the_model_and_keep_the_judge_at_zero(suite):
 
 
 _RUNNER_PATHS = {
+    "eval": "atomics.eval.runner.run_eval",
     "adversarial": "atomics.eval.adversarial.runner.run_adversarial",
     "redblue": "atomics.eval.redblue.runner.run_redblue",
     "refusal": "atomics.eval.refusal.run_refusal",
     "codereview": "atomics.eval.codereview.run_codereview",
 }
+_COMMAND_MODULES = {"eval": "atomics.commands.eval"}
 
 
 @pytest.mark.parametrize("suite", sorted(_RUNNER_PATHS))
@@ -747,7 +760,7 @@ def test_judged_commands_forward_temperature(monkeypatch, suite):
         raise RuntimeError("stop after capture")
 
     monkeypatch.setattr(
-        f"atomics.commands.security.cmd_{suite}._make_provider",
+        f"{_COMMAND_MODULES.get(suite, f'atomics.commands.security.cmd_{suite}')}._make_provider",
         lambda *_a, **_k: _TemperatureRecorder(),
     )
     monkeypatch.setattr(_RUNNER_PATHS[suite], fake_run)
@@ -854,6 +867,54 @@ def test_sweep_cli_forwards_temperature(monkeypatch, suites, target):
         cli, ["sweep", "--models", "a,b", "--suites", suites, "--temperature", "0.3"]
     )
     assert seen.get("temperature") == 0.3
+
+
+@pytest.mark.parametrize(
+    ("suite", "runner"),
+    [
+        ("eval", "atomics.eval.runner.run_eval"),
+        ("redblue", "atomics.eval.redblue.runner.run_redblue"),
+    ],
+)
+def test_labcompare_pins_the_quality_suite(monkeypatch, suite, runner):
+    import asyncio
+
+    from click.testing import CliRunner
+
+    from atomics.cli import cli
+
+    seen: dict = {}
+
+    async def fake_run(*_args, **kwargs):
+        seen.update(kwargs)
+        raise RuntimeError("stop after capture")
+
+    def fake_sync(**kwargs):
+        asyncio.run(kwargs["quality_fn"](_TemperatureRecorder(), "http://judge", "j", "m"))
+
+    monkeypatch.setattr(
+        "atomics.commands.labcompare._make_provider", lambda *_a, **_k: _TemperatureRecorder()
+    )
+    monkeypatch.setattr("atomics.commands.labcompare._run_labcompare_sync", fake_sync)
+    monkeypatch.setattr(runner, fake_run)
+    CliRunner().invoke(
+        cli,
+        [
+            "labcompare",
+            "--host",
+            "a=http://localhost:11434",
+            "--host",
+            "b=http://127.0.0.1:11434",
+            "--models",
+            "m",
+            "--quality-suite",
+            suite,
+            "--no-save",
+            "--temperature",
+            "0",
+        ],
+    )
+    assert seen.get("temperature") == 0.0
 
 
 def test_sweep_rejects_temperature_outside_zero_to_two():
