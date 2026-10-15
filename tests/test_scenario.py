@@ -525,10 +525,10 @@ class TestRamp:
 
         from atomics.scenario import _run_workload
 
-        start_times: list[float] = []
+        first_call: dict[object, float] = {}
 
         async def _timed_request(client, host, model, prompt, num_predict):
-            start_times.append(asyncio.get_event_loop().time())
+            first_call.setdefault(asyncio.current_task(), asyncio.get_running_loop().time())
             await asyncio.sleep(0.001)
             return (10, 5, 1.0, 100.0)
 
@@ -546,9 +546,10 @@ class TestRamp:
                     await _run_workload(client, "http://fake", spec, 0.05, ramp_seconds=0.0)
 
         asyncio.run(_run())
-        if len(start_times) >= 2:
-            spread = max(start_times) - min(start_times)
-            assert spread < 0.1  # all started near-simultaneously
+        # Workers loop until the duration ends; only each one's first call
+        # shows when it started.
+        assert len(first_call) == spec.concurrency
+        assert max(first_call.values()) - min(first_call.values()) < 0.01
 
 
 # ── Profile-based workload (scenario.py lines 53-58, 67-68, 112-118, 151) ───
