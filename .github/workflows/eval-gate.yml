@@ -31,6 +31,9 @@ on:
         type: number
         default: 0
 
+permissions:
+  contents: read
+
 env:
   UV_CACHE_DIR: /tmp/uv-cache
 
