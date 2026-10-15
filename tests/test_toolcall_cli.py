@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 from click.testing import CliRunner
 
 from atomics.cli import cli
@@ -463,6 +464,31 @@ def test_toolcall_fixtures_flag_runs_only_those_ids(monkeypatch) -> None:
     assert result.exit_code == 0, result.output
     assert seen["ids"] == ["tc-01"]
     assert "1 fixtures" in result.output
+
+
+@pytest.mark.parametrize(
+    "judge_args",
+    [["--judge-model", "j"], ["--judge-host", "http://localhost:11434"]],
+)
+def test_a_judge_option_alone_still_judges_on_ollama(monkeypatch, judge_args) -> None:
+    from types import SimpleNamespace
+
+    built: list[str] = []
+    seen: dict = {}
+
+    def fake_make(name, *_a, **_k):
+        built.append(name)
+        return SimpleNamespace(name=name, default_model="x")
+
+    async def fake_run(**kwargs):
+        seen.update(kwargs)
+        raise RuntimeError("stop after capture")
+
+    monkeypatch.setattr("atomics.commands.toolcall._make_provider", fake_make)
+    monkeypatch.setattr("atomics.commands.toolcall.run_toolcall_suite", fake_run)
+    CliRunner().invoke(cli, ["toolcall", "-m", "x", "--no-save", *judge_args])
+    assert seen.get("judge_provider") is not None
+    assert built == ["ollama", "ollama"]
 
 
 def test_toolcall_partial_integrity_exits_nonzero(monkeypatch) -> None:

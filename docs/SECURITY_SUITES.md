@@ -76,7 +76,7 @@ uv run atomics toolcall --provider ollama -m qwen3:14b \
     --judge-provider ollama --judge-model qwen2.5:14b
 
 # Tool channel only — no judge needed, and the scoring is fully deterministic
-uv run atomics toolcall --provider claude --channel tools --judge-provider ""
+uv run atomics toolcall --provider claude --channel tools
 
 # One category, with the emitted arguments printed
 uv run atomics toolcall --category exfil --verbose
