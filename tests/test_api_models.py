@@ -61,11 +61,11 @@ def test_eval_request_accepts_judge_host() -> None:
         {
             "suite": "accuracy",
             "provider": "ollama",
-            "host": "http://192.0.2.16:11434",
-            "judge_host": "http://192.0.2.19:11434",
+            "host": "http://10.0.0.10:11434",
+            "judge_host": "http://10.0.0.9:11434",
         }
     )
-    assert req.judge_host == "http://192.0.2.19:11434"
+    assert req.judge_host == "http://10.0.0.9:11434"
 
 
 def test_eval_request_rejects_unknown_fields() -> None:

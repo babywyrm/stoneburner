@@ -112,50 +112,50 @@ def test_submit_eval_forwards_channel() -> None:
 
 def test_session_host_fills_submit_stress() -> None:
     requests: list[httpx.Request] = []
-    session = Session(provider="ollama", model="llama3.2:1b", host="http://192.0.2.19:11434")
+    session = Session(provider="ollama", model="llama3.2:1b", host="http://10.0.0.9:11434")
     handle_line(
         "submit_stress --budget_usd 1",
         session=session,
         client=_client(requests),
     )
     payload = json.loads(requests[0].content)
-    assert payload["host"] == "http://192.0.2.19:11434"
+    assert payload["host"] == "http://10.0.0.9:11434"
 
 
 def test_session_host_fills_submit_sweep() -> None:
     requests: list[httpx.Request] = []
-    session = Session(provider="ollama", model="llama3.2:1b", host="http://192.0.2.19:11434")
+    session = Session(provider="ollama", model="llama3.2:1b", host="http://10.0.0.9:11434")
     handle_line(
         "submit_sweep --suites eval --budget_usd 1",
         session=session,
         client=_client(requests),
     )
     payload = json.loads(requests[0].content)
-    assert payload["host"] == "http://192.0.2.19:11434"
+    assert payload["host"] == "http://10.0.0.9:11434"
 
 
 def test_session_host_fills_submit_run() -> None:
     requests: list[httpx.Request] = []
-    session = Session(provider="ollama", model="llama3.2:1b", host="http://192.0.2.19:11434")
+    session = Session(provider="ollama", model="llama3.2:1b", host="http://10.0.0.9:11434")
     handle_line(
         "submit_run",
         session=session,
         client=_client(requests),
     )
     payload = json.loads(requests[0].content)
-    assert payload["host"] == "http://192.0.2.19:11434"
+    assert payload["host"] == "http://10.0.0.9:11434"
 
 
 def test_session_host_fills_submit_eval() -> None:
     requests: list[httpx.Request] = []
-    session = Session(provider="ollama", model="llama3.2:1b", host="http://192.0.2.19:11434")
+    session = Session(provider="ollama", model="llama3.2:1b", host="http://10.0.0.9:11434")
     handle_line(
         "submit_eval --suite accuracy",
         session=session,
         client=_client(requests),
     )
     payload = json.loads(requests[0].content)
-    assert payload["host"] == "http://192.0.2.19:11434"
+    assert payload["host"] == "http://10.0.0.9:11434"
 
 
 def test_explicit_flag_wins_over_session() -> None:
@@ -194,11 +194,11 @@ def test_submit_sweep_forwards_judge_host() -> None:
     requests: list[httpx.Request] = []
     session = Session(provider="ollama", model="a")
     handle_line(
-        "submit_sweep --suites eval --budget_usd 1 --judge_host http://192.0.2.19:11434",
+        "submit_sweep --suites eval --budget_usd 1 --judge_host http://10.0.0.9:11434",
         session=session,
         client=_client(requests),
     )
-    assert json.loads(requests[0].content)["judge_host"] == "http://192.0.2.19:11434"
+    assert json.loads(requests[0].content)["judge_host"] == "http://10.0.0.9:11434"
 
 
 def test_submit_sweep_models_from_session_model() -> None:

@@ -58,11 +58,11 @@ def test_submitted_headline() -> None:
             "request": {
                 "suite": "toolcall",
                 "model": "llama3.2:1b",
-                "host": "http://192.0.2.19:11434",
+                "host": "http://10.0.0.9:11434",
             },
         }
     )
-    assert text == ("eval  toolcall  llama3.2:1b  http://192.0.2.19:11434\nabc  pending\n")
+    assert text == ("eval  toolcall  llama3.2:1b  http://10.0.0.9:11434\nabc  pending\n")
     assert '"job_id"' not in text
 
 
@@ -73,7 +73,7 @@ def test_completed_headline() -> None:
             "request": {
                 "suite": "accuracy",
                 "model": "llama3.2:1b",
-                "host": "http://192.0.2.19:11434",
+                "host": "http://10.0.0.9:11434",
             },
             "result": {
                 "overall_accuracy": 0.844,
@@ -86,7 +86,7 @@ def test_completed_headline() -> None:
     )
     assert "accuracy" in text
     assert "llama3.2:1b" in text
-    assert "192.0.2.19" in text
+    assert "10.0.0.9" in text
     assert "0.844" in text
     assert "25/25" in text
     assert "16450" in text
@@ -271,7 +271,7 @@ def test_completed_stress_headline() -> None:
             "kind": "stress",
             "request": {
                 "model": "llama3.2:1b",
-                "host": "http://192.0.2.19:11434",
+                "host": "http://10.0.0.9:11434",
             },
             "result": {
                 "peak_tps": 435.2,
@@ -284,7 +284,7 @@ def test_completed_stress_headline() -> None:
             },
         }
     )
-    assert "stress  llama3.2:1b  http://192.0.2.19:11434" in text
+    assert "stress  llama3.2:1b  http://10.0.0.9:11434" in text
     assert "435" in text
     assert "sat=2" in text
     assert "2 phases" in text
@@ -298,7 +298,7 @@ def test_completed_soak_headline() -> None:
             "kind": "soak",
             "request": {
                 "model": "llama3.2:1b",
-                "host": "http://192.0.2.19:11434",
+                "host": "http://10.0.0.9:11434",
             },
             "result": {
                 "verdict": "STABLE",
@@ -312,7 +312,7 @@ def test_completed_soak_headline() -> None:
             },
         }
     )
-    assert "soak  llama3.2:1b  http://192.0.2.19:11434" in text
+    assert "soak  llama3.2:1b  http://10.0.0.9:11434" in text
     assert "STABLE" in text
     assert "2 samples" in text
     assert "-  0" not in text

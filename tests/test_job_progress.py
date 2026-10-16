@@ -40,8 +40,8 @@ def test_truncate_response_caps_at_500() -> None:
 def test_resolve_inference_host_prefers_payload() -> None:
     settings = AtomicsSettings(ollama_host="http://localhost:11434")
     assert (
-        resolve_inference_host("ollama", "http://192.0.2.19:11434", settings)
-        == "http://192.0.2.19:11434"
+        resolve_inference_host("ollama", "http://10.0.0.9:11434", settings)
+        == "http://10.0.0.9:11434"
     )
     assert resolve_inference_host("ollama", None, settings) == "http://localhost:11434"
 
@@ -65,14 +65,14 @@ def test_resolve_eval_request_keeps_runs_and_judge_host() -> None:
         suite="toolcall",
         provider="ollama",
         model="m",
-        host="http://192.0.2.16:11434",
-        judge_host="http://192.0.2.19:11434",
+        host="http://10.0.0.10:11434",
+        judge_host="http://10.0.0.9:11434",
         runs=3,
     )
     request = resolve_eval_request(payload, settings)
     assert request["runs"] == 3
-    assert request["host"] == "http://192.0.2.16:11434"
-    assert request["judge_host"] == "http://192.0.2.19:11434"
+    assert request["host"] == "http://10.0.0.10:11434"
+    assert request["judge_host"] == "http://10.0.0.9:11434"
 
 
 def test_resolve_eval_request_keeps_channel() -> None:
@@ -446,7 +446,7 @@ def test_reporter_grows_result_and_clears_in_flight() -> None:
         provider="ollama",
         model="llama3.2:1b",
         judge_model="llama3.2:1b",
-        host="http://192.0.2.19:11434",
+        host="http://10.0.0.9:11434",
         total=2,
     )
     assert job.progress == {"current": 0, "total": 2, "in_flight": None, "trail": []}
@@ -491,7 +491,7 @@ def test_reporter_grows_result_and_clears_in_flight() -> None:
     assert job.result is not None
     assert job.result["fixtures_run"] == 1
     assert job.result["fixtures"][0]["id"] == fixture.id
-    assert job.result["host"] == "http://192.0.2.19:11434"
+    assert job.result["host"] == "http://10.0.0.9:11434"
 
 
 @pytest.mark.asyncio
