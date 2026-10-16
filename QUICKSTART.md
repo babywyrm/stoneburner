@@ -84,6 +84,7 @@ commands and compare them side-by-side.
 |---------|------|-------------|
 | **Ollama** | `--provider ollama` | Default for eval/security suites — free, private GPU box |
 | **vLLM / OpenAI-compatible gateway** | `--provider vllm` | LiteLLM, vLLM, TGI, or any `/v1/chat/completions` endpoint on the LAN |
+| **llama.cpp** | `--provider llamacpp` | `llama-server` with a GGUF; `ATOMICS_LLAMACPP_HOST` (default `http://localhost:8080`) |
 | **brain-gateway** | `--provider brain-gateway` | Optional HTTP gateway in front of local models |
 
 ```bash
@@ -97,6 +98,13 @@ atomics run --provider vllm --vllm-host http://localhost:8000/v1 -m qwen2.5:7b -
 # Optional brain-gateway
 atomics run --provider brain-gateway --gateway-url http://localhost:30080 -n 5 -i 0
 ```
+
+Serving one yourself for `toolcall`: a server only emits tool calls when
+told how. vLLM needs `--enable-auto-tool-choice --tool-call-parser
+<parser>` (`hermes` for Qwen2.5); `llama-server` needs `--jinja`. Bind
+`127.0.0.1` and tunnel; neither server authenticates by default. On a
+host without the CUDA toolkit, vLLM dies at startup looking for `nvcc`
+(FlashInfer compiles its sampler); set `VLLM_USE_FLASHINFER_SAMPLER=0`.
 
 > **Model-agnostic:** `-m`/`--model` accepts *any* model the backend serves —
 > the `qwen*` tags in these examples are just placeholders. `gemma4:12b`,

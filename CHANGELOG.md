@@ -19,6 +19,13 @@
   unchanged; older status files still resume. API `toolcall` job results
   (and so MCP `get_job`) carry it too, and the dashboard's sweep table
   labels a toolcall cell `dangerous` with the any-run rate.
+- The `toolcall` summary notes when its majority headline is noisy:
+  2 to 4 runs off temperature 0. Live, the same `granite4.2:3b` build
+  and weights on llama.cpp read 15% and 45% on two hosts at three runs;
+  the any-run rate held at 50%.
+- QUICKSTART lists `--provider llamacpp` and the server flags a
+  `toolcall` run needs (vLLM tool parser, `llama-server --jinja`,
+  `VLLM_USE_FLASHINFER_SAMPLER=0` without the CUDA toolkit).
 
 ### Fixed
 - `--provider llamacpp` dropped `--thinking` / `--no-thinking`, so a
