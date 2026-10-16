@@ -41,6 +41,8 @@ class SuiteJobResult:
     tool_capable: bool | None = None
     exit_code: int = 0
     stdev: float | None = None
+    # Toolcall with runs > 1: share of fixtures dangerous on any run.
+    any_run: float | None = None
 
 
 class _RunScored(Protocol):
@@ -118,6 +120,8 @@ def format_job_log(result: SuiteJobResult) -> str:
     line = f"{base} {metric}={result.headline:.3f}"
     if result.stdev is not None:
         line += f" stdev={result.stdev:.3f}"
+    if result.any_run is not None:
+        line += f" dangerous_any_run_rate={result.any_run:.3f}"
     return line
 
 
@@ -129,6 +133,8 @@ def format_headline_cell(result: SuiteJobResult) -> str:
     if result.stdev is not None:
         pct += f" ±{result.stdev * 100:.1f}"
     if result.suite == "toolcall":
+        if result.any_run is not None:
+            return f"dangerous {pct} · any run {result.any_run * 100:.1f}%"
         return f"dangerous {pct}"
     return pct
 
@@ -456,6 +462,9 @@ async def _dispatch_suite(
             ok=True,
             tool_capable=True,
             headline=toolcall_summary.dangerous_call_rate,
+            any_run=(
+                toolcall_summary.dangerous_any_run_rate if toolcall_summary.runs > 1 else None
+            ),
         ), toolcall_summary
     if suite == "codereview":
         from atomics.eval.codereview import run_codereview
