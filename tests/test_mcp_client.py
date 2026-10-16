@@ -82,11 +82,11 @@ def test_submit_run_omits_model_when_not_given():
 def test_submit_run_includes_host_when_given():
     requests: list[httpx.Request] = []
     with client_recording(requests) as client:
-        client.submit_run(provider="ollama", host="http://192.168.1.79:11434")
+        client.submit_run(provider="ollama", host="http://10.0.0.9:11434")
 
     import json
 
-    assert json.loads(requests[0].content)["host"] == "http://192.168.1.79:11434"
+    assert json.loads(requests[0].content)["host"] == "http://10.0.0.9:11434"
 
 
 def test_api_key_is_sent_as_x_api_key_header():
@@ -146,13 +146,13 @@ def test_submit_eval_includes_host_when_given():
         client.submit_eval(
             suite="accuracy",
             provider="ollama",
-            host="http://192.168.1.79:11434",
+            host="http://10.0.0.9:11434",
         )
 
     import json
 
     payload = json.loads(requests[0].content)
-    assert payload["host"] == "http://192.168.1.79:11434"
+    assert payload["host"] == "http://10.0.0.9:11434"
 
 
 def test_submit_eval_includes_runs_and_judge_host_when_given():
@@ -161,14 +161,14 @@ def test_submit_eval_includes_runs_and_judge_host_when_given():
         client.submit_eval(
             suite="toolcall",
             provider="ollama",
-            judge_host="http://192.168.1.79:11434",
+            judge_host="http://10.0.0.9:11434",
             runs=3,
         )
 
     import json
 
     payload = json.loads(requests[0].content)
-    assert payload["judge_host"] == "http://192.168.1.79:11434"
+    assert payload["judge_host"] == "http://10.0.0.9:11434"
     assert payload["runs"] == 3
 
 
@@ -226,12 +226,12 @@ def test_submit_sweep_includes_host_when_given():
             models=["a"],
             suites=["eval"],
             budget_usd=4.0,
-            host="http://192.168.1.79:11434",
+            host="http://10.0.0.9:11434",
         )
 
     import json
 
-    assert json.loads(requests[0].content)["host"] == "http://192.168.1.79:11434"
+    assert json.loads(requests[0].content)["host"] == "http://10.0.0.9:11434"
 
 
 def test_submit_sweep_includes_judge_host_when_given():
@@ -242,12 +242,12 @@ def test_submit_sweep_includes_judge_host_when_given():
             models=["a"],
             suites=["eval"],
             budget_usd=4.0,
-            judge_host="http://192.168.1.79:11434",
+            judge_host="http://10.0.0.9:11434",
         )
 
     import json
 
-    assert json.loads(requests[0].content)["judge_host"] == "http://192.168.1.79:11434"
+    assert json.loads(requests[0].content)["judge_host"] == "http://10.0.0.9:11434"
 
 
 def test_submit_battery_posts_required_budget():
@@ -315,13 +315,13 @@ def test_submit_stress_includes_host_when_given():
             provider="ollama",
             model="qwen3:14b",
             budget_usd=2.0,
-            host="http://192.168.1.79:11434",
+            host="http://10.0.0.9:11434",
         )
 
     import json
 
     payload = json.loads(requests[0].content)
-    assert payload["host"] == "http://192.168.1.79:11434"
+    assert payload["host"] == "http://10.0.0.9:11434"
 
 
 def test_submit_soak_posts_duration_in_seconds():

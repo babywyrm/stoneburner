@@ -153,7 +153,7 @@ async def test_run_stress_forwards_host_to_provider():
         provider="ollama",
         model="qwen3:14b",
         budget_usd=1.0,
-        host="http://192.168.1.79:11434",
+        host="http://10.0.0.9:11434",
     )
     seen: dict = {}
 
@@ -172,7 +172,7 @@ async def test_run_stress_forwards_host_to_provider():
     ):
         await run_stress_from_request(payload)
 
-    assert seen["host"] == "http://192.168.1.79:11434"
+    assert seen["host"] == "http://10.0.0.9:11434"
 
 
 @pytest.mark.asyncio

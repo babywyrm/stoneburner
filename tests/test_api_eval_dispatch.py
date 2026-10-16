@@ -43,14 +43,14 @@ async def test_post_evals_includes_resolved_request(client):
                 "suite": "accuracy",
                 "provider": "ollama",
                 "model": "llama3.2:1b",
-                "host": "http://192.168.1.79:11434",
+                "host": "http://10.0.0.9:11434",
             },
         )
     assert resp.status_code == 202
     body = resp.json()
     assert body["request"]["suite"] == "accuracy"
     assert body["request"]["model"] == "llama3.2:1b"
-    assert body["request"]["host"] == "http://192.168.1.79:11434"
+    assert body["request"]["host"] == "http://10.0.0.9:11434"
     assert body["request"]["judge_model"]
     assert body["progress"]["current"] == 0
     assert body["progress"]["total"] >= 1

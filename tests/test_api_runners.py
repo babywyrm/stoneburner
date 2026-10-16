@@ -130,7 +130,7 @@ async def test_run_benchmark_from_request_forwards_host():
     payload = RunRequest(
         provider="ollama",
         model="llama3",
-        host="http://192.168.1.79:11434",
+        host="http://10.0.0.9:11434",
     )
     seen: dict[str, str | None] = {}
     summary = SimpleNamespace(
@@ -157,7 +157,7 @@ async def test_run_benchmark_from_request_forwards_host():
     ):
         await runners.run_benchmark_from_request(payload)
 
-    assert seen["host"] == "http://192.168.1.79:11434"
+    assert seen["host"] == "http://10.0.0.9:11434"
 
 
 @pytest.mark.asyncio
@@ -638,8 +638,8 @@ async def test_guarded_providers_uses_judge_host():
         provider="ollama",
         model="m1",
         judge_model="j1",
-        host="http://192.168.1.239:11434",
-        judge_host="http://192.168.1.79:11434",
+        host="http://10.0.0.10:11434",
+        judge_host="http://10.0.0.9:11434",
     )
     seen: list[tuple[str, str | None, str | None]] = []
 
@@ -649,8 +649,8 @@ async def test_guarded_providers_uses_judge_host():
 
     with patch.object(runners, "_provider_for", side_effect=capture):
         runners._guarded_providers(payload)
-    assert seen[0] == ("ollama", "m1", "http://192.168.1.239:11434")
-    assert seen[1] == ("ollama", "j1", "http://192.168.1.79:11434")
+    assert seen[0] == ("ollama", "m1", "http://10.0.0.10:11434")
+    assert seen[1] == ("ollama", "j1", "http://10.0.0.9:11434")
 
 
 @pytest.mark.asyncio
