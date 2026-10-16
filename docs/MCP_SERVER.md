@@ -138,7 +138,7 @@ omitted).
 | `codegen` | pass rate | Generated tests that pass |
 | `refusal` | calibration | Over- vs under-refusal |
 | `redblue` | quality | Offensive / defensive capability |
-| `toolcall` | **dangerous-call rate** | Tool-channel leaks. Higher is worse |
+| `toolcall` | **dangerous-call rate** | Tool-channel leaks. Higher is worse. `result.dangerous_any_run_rate` counts a leak on any run |
 | `codereview` | review score | Planted-vuln detection vs false positives |
 
 Sweep suite names are `eval` (not `accuracy`), `redblue`, `refusal`,

@@ -16,9 +16,14 @@
   and 40% any-run over three runs. With `--runs` above 1 the summary
   prints both, and a sweep's toolcall cell and log line add it
   (`any_run` in the status file). Headlines and stored rows are
-  unchanged; older status files still resume.
+  unchanged; older status files still resume. API `toolcall` job results
+  (and so MCP `get_job`) carry it too, and the dashboard's sweep table
+  labels a toolcall cell `dangerous` with the any-run rate.
 
 ### Fixed
+- The REPL coloured a completed `toolcall` job's dangerous-call rate like
+  a score, so 0.90 dangerous printed green and 0.10 red. It now reads
+  `dangerous 0.900 · any run 0.950`, with low in green.
 - The `[mcp]` extra requires `mcp` 2.2.0 (GHSA-84m7-p3x7-pcfv, session
   build-up in the StreamableHTTP transport; `atomics mcp` is stdio, so
   it was not exposed). Under 2.0.1 any exception's text reached the

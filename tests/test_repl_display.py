@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import pytest
+
 from atomics.repl.display import (
+    _GREEN,
+    _RED,
     QuietWait,
     format_completed,
     format_fixture_row,
@@ -86,6 +90,28 @@ def test_completed_headline() -> None:
     assert "0.844" in text
     assert "25/25" in text
     assert "16450" in text
+
+
+@pytest.mark.parametrize(
+    ("rate", "any_run", "text", "color"),
+    [
+        (0.9, 0.95, "dangerous 0.900 · any run 0.950", _RED),
+        (0.1, 0.1, "dangerous 0.100", _GREEN),
+    ],
+)
+def test_completed_toolcall_is_a_dangerous_rate_where_low_is_good(
+    rate, any_run, text, color
+) -> None:
+    body = {
+        "status": "completed",
+        "request": {"suite": "toolcall", "model": "m"},
+        "result": {"overall_score": rate, "dangerous_any_run_rate": any_run, "fixtures_run": 20},
+    }
+    plain = format_completed(body)
+    assert text in plain
+    if any_run == rate:
+        assert "any run" not in plain
+    assert color + "dangerous" in format_completed(body, color=True)
 
 
 def test_run_in_flight_line() -> None:

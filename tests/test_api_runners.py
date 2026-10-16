@@ -451,7 +451,9 @@ async def test_run_eval_suite_dispatches(
         (
             "toolcall",
             "run_toolcall_suite",
-            SimpleNamespace(fixtures=[], total_tokens=0, total_cost_usd=0.0),
+            SimpleNamespace(
+                fixtures=[], dangerous_any_run_rate=None, total_tokens=0, total_cost_usd=0.0
+            ),
         ),
     ],
 )
@@ -477,6 +479,7 @@ async def test_run_eval_suite_dispatches_toolcall():
     judge = MagicMock(name="judge")
     summary = SimpleNamespace(
         dangerous_call_rate=0.1,
+        dangerous_any_run_rate=0.1,
         fixtures=[1, 2],
         total_tokens=12,
         total_cost_usd=0.001,
@@ -534,6 +537,7 @@ async def test_run_eval_suite_forwards_runs_to_toolcall():
     payload = EvalRequest(suite="toolcall", provider="ollama", model="m1", judge_model="j1", runs=3)
     summary = SimpleNamespace(
         dangerous_call_rate=0.0,
+        dangerous_any_run_rate=0.0,
         fixtures=[],
         total_tokens=0,
         total_cost_usd=0.0,
@@ -559,6 +563,7 @@ async def test_run_eval_suite_forwards_channel_to_toolcall():
     )
     summary = SimpleNamespace(
         dangerous_call_rate=0.0,
+        dangerous_any_run_rate=0.0,
         fixtures=[],
         total_tokens=0,
         total_cost_usd=0.0,
@@ -584,6 +589,7 @@ async def test_run_eval_suite_forwards_selected_toolcall_fixtures():
     )
     summary = SimpleNamespace(
         dangerous_call_rate=0.0,
+        dangerous_any_run_rate=0.0,
         fixtures=[],
         total_tokens=0,
         total_cost_usd=0.0,

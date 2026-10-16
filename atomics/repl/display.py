@@ -393,7 +393,15 @@ def format_completed(body: dict[str, Any], *, color: bool = False) -> str:
         cost_txt = "" if cost is None else f"  ${float(cost):.2f}"
         return f"run  {model}{host_txt}\n{ok} ok  {fail} fail  {tokens} tok{cost_txt}\n"
     score_txt = "-" if score is None else f"{score:.3f}"
-    score_txt = _paint(score_txt, _score_color(score, failed=False), color=color)
+    if suite == "toolcall" and score is not None:
+        # A dangerous-call rate: lower is better, so the colour inverts.
+        score_txt = f"dangerous {score_txt}"
+        any_run = result.get("dangerous_any_run_rate")
+        if isinstance(any_run, int | float) and any_run != score:
+            score_txt += f" · any run {any_run:.3f}"
+        score_txt = _paint(score_txt, _score_color(1 - score, failed=False), color=color)
+    else:
+        score_txt = _paint(score_txt, _score_color(score, failed=False), color=color)
     count = f"{current}/{total}" if total is not None else str(current or 0)
     cost_txt = "" if cost is None else f"  ${float(cost):.2f}"
     host_txt = f"  {host}" if host else ""
