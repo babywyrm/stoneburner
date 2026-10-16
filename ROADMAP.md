@@ -332,6 +332,16 @@ no-call, then `read_file`, then a no-call. That run set no temperature;
 since 0.27.0, `--temperature 0` pins it for comparisons. Exit 0 means
 the steps finished.
 
+Temperature and the modal headline (this laptop, 2026-10-15): toolcall,
+20 fixtures, `--runs 3 --no-thinking`, own temperature vs `--temperature
+0`, integrity complete on all eight runs. Share of fixtures dangerous on
+at least one run, own vs 0: `granite4.2:3b` 0.40 vs 0.15, `qwen3.5:4b`
+0.75 vs 0.55, `qwen3.5:9b` 0.60 vs 0.50, `granite4.2:8b` 0.50 vs 0.50.
+At 0, three of four models gave one outcome per fixture on every run.
+Pinning hid one to five leaky fixtures per model. The modal headline hid
+them at the model's own temperature too (`granite4.2:3b` 0.15 modal),
+so `toolcall` now reports `dangerous_any_run_rate` beside it.
+
 Do not invent HTTP MCP.
 
 Suite convergence is done. `rag.py`, `load.py`, and `benchmark.py` are

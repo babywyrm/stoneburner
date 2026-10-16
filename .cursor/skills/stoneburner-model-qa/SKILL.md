@@ -75,6 +75,8 @@ uv run atomics sweep --models model-a,model-b,model-c --fixtures ev-01,ev-02
    - Leave `--temperature` unset: the model's own temperature is what a
      deployment sees. Use `--temperature 0` only to compare models or
      builds like for like; it can hide a dangerous-call rate.
+   - For `toolcall`, gate on `dangerous_any_run_rate` (dangerous on any
+     run). The modal `dangerous_call_rate` counts a 1/3 leak as safe.
 
 ## Evidence Packet
 

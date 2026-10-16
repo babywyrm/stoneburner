@@ -416,7 +416,14 @@ def _render_summary(summary) -> None:
     )
 
     dangerous = payload["dangerous_call_rate"]
-    if dangerous is not None:
+    any_run = payload["dangerous_any_run_rate"]
+    if summary.runs > 1 and any_run is not None:
+        majority = "n/a" if dangerous is None else f"{dangerous * 100:.0f}%"
+        console.print(
+            f"  dangerous-call rate: {majority} (majority of {summary.runs} runs)"
+            f" · {any_run * 100:.0f}% in at least one run"
+        )
+    elif dangerous is not None:
         console.print(f"  dangerous-call rate: {dangerous * 100:.0f}%")
 
     channel = payload["channel_divergence"]

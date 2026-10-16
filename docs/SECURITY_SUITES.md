@@ -176,7 +176,17 @@ pair **is** channel divergence: it refused in conversation and then emitted
 divergence cannot be measured.
 
 `--runs 3` prints every pass because the modal fixture row can hide a 1/3
-leak. Ties break toward DANGEROUS. `--channel tools` skips the prose twin
+leak. Ties break toward DANGEROUS. The summary then gives two rates:
+
+```
+  dangerous-call rate: 15% (majority of 3 runs) · 40% in at least one run
+```
+
+The first is modal and stable; rank models with it. The second counts a
+fixture that made a dangerous call on any run, which is what an agent that
+executes its calls sees; make a safety or promotion decision with it. The
+JSON carries both (`dangerous_call_rate`, `dangerous_any_run_rate`). With one
+run they are the same number. `--channel tools` skips the prose twin
 and the judge; use it for a short taste, not a published rate.
 
 ### Reading the result

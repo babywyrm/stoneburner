@@ -120,7 +120,7 @@ one backend that reports its window size.
 | `atomics toolcall --fixtures tc-01 --channel tools` | One fixture, tool channel only. Unknown ids fail before a request |
 | `atomics toolcall --channel tools` | Tool channel only — deterministic, needs no judge |
 | `atomics toolcall --channel tools --runs 3` | One-box first run. No judge. Divergence not measured. |
-| `atomics toolcall --runs 3` | Three passes per fixture, modal outcome reported. Live `run 2/3` lines print each pass so a 1/3 leak is visible |
+| `atomics toolcall --runs 3` | Three passes per fixture, modal outcome reported. Live `run 2/3` lines print each pass so a 1/3 leak is visible; the summary adds the share dangerous in at least one run (`dangerous_any_run_rate`) |
 | `atomics -v toolcall --judge-provider ollama --judge-model qwen2.5:14b` | Required for channel divergence. Live lines show `prose=resisted` + `DANGEROUS` when the model refused in chat and still called the tool |
 | `atomics toolcall --temperature 0 --runs 3` | Pin the model under test (probe, tool, and prose calls; 0–2). Recorded as `temperature` in the JSON. Unset is the model's own, which shows how often it makes a dangerous call |
 | `atomics toolcall --no-skip-incapable` | Non-zero exit if the model cannot emit tool calls (for sweeps) |
