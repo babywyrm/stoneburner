@@ -21,6 +21,11 @@
   labels a toolcall cell `dangerous` with the any-run rate.
 
 ### Fixed
+- `--provider llamacpp` dropped `--thinking` / `--no-thinking`, so a
+  reasoning model on `llama-server` spent the reply budget thinking and
+  scored as empty. It now sends `chat_template_kwargs.enable_thinking`
+  on chat and tool calls (live: `granite4.2:3b` `ev-01` went from 0 to
+  1.0). Unset keeps the server's default.
 - The REPL coloured a completed `toolcall` job's dangerous-call rate like
   a score, so 0.90 dangerous printed green and 0.10 red. It now reads
   `dangerous 0.900 · any run 0.950`, with low in green.

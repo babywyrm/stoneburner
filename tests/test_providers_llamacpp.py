@@ -164,3 +164,33 @@ async def test_llamacpp_generate_with_tools_uses_the_v1_prefixed_path():
 
 def test_llamacpp_declares_tool_support():
     assert LlamaCppProvider.supports_tools is True
+
+
+class _CapturingClient(httpx.AsyncClient):
+    def __init__(self) -> None:
+        super().__init__()
+        self.body: dict = {}
+
+    async def post(self, url, **kwargs):
+        self.body = kwargs.get("json") or {}
+        return _fake_response()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("thinking", "sent"),
+    [(False, {"enable_thinking": False}), (True, {"enable_thinking": True}), (None, None)],
+)
+@pytest.mark.parametrize("path", ["generate", "generate_with_tools"])
+async def test_llamacpp_sends_the_thinking_switch(thinking, sent, path):
+    """llama-server reads enable_thinking from chat_template_kwargs. Dropping
+    it made --no-thinking a no-op: a reasoning model spent the budget thinking."""
+    client = _CapturingClient()
+    prov = LlamaCppProvider(client=client)
+    if path == "generate":
+        resp = await prov.generate("q", thinking=thinking)
+    else:
+        resp = await prov.generate_with_tools("q", tools=[], thinking=thinking)
+    assert client.body.get("chat_template_kwargs") == sent
+    if sent is not None:
+        assert (resp.reasoning_request or {}).get("chat_template_kwargs") == sent

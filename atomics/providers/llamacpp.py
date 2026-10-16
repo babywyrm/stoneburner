@@ -18,12 +18,37 @@ from atomics.providers.base import BaseProvider, ProviderResponse, compute_tps
 from atomics.providers.effort import apply_chat_effort, normalize_effort
 
 
+def _thinking_switch(body: dict, thinking: bool | None) -> dict[str, object] | None:
+    """Set llama-server's per-request reasoning switch; None keeps its default.
+
+    llama-server (``--jinja``) reads ``enable_thinking`` from
+    ``chat_template_kwargs`` for any reasoning template, not only Qwen's.
+    """
+    if thinking is None:
+        return None
+    kwargs = {"enable_thinking": thinking}
+    body["chat_template_kwargs"] = kwargs
+    return {"chat_template_kwargs": kwargs}
+
+
 class LlamaCppProvider(OpenAICompatibleTools, BaseProvider):
     """llama.cpp server adapter via OpenAI-compatible Chat Completions API."""
 
     # llama.cpp mounts the OpenAI surface under /v1; the other compatible
     # providers fold that into their base URL.
     _tool_path = "/v1/chat/completions"
+
+    def _augment_tool_body(
+        self,
+        body: dict,
+        *,
+        model: str,
+        thinking: bool | None,
+        thinking_budget: int | None,
+        effort: str | None,
+    ) -> dict[str, object] | None:
+        del model, thinking_budget, effort
+        return _thinking_switch(body, thinking)
 
     def __init__(
         self,
@@ -73,8 +98,10 @@ class LlamaCppProvider(OpenAICompatibleTools, BaseProvider):
         }
         if temperature is not None:
             body["temperature"] = temperature
-        reasoning_request = apply_chat_effort(body, effort)
-        del thinking, thinking_budget, reasoning_mode
+        effort_request = apply_chat_effort(body, effort)
+        switch = _thinking_switch(body, thinking)
+        reasoning_request = {**(effort_request or {}), **switch} if switch else effort_request
+        del thinking_budget, reasoning_mode
 
         t0 = time.monotonic()
         try:
