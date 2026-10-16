@@ -58,9 +58,10 @@ api = [
 ]
 # The MCP server is a proxy over a running API server, so it needs no provider
 # or storage dependency of its own — httpx is already a core dependency.
-# MCP 2.1+ wraps tool errors and drops the API detail the agent needs.
+# 2.2.0 fixes GHSA-84m7-p3x7-pcfv. Since 2.1 only a ToolError's message reaches
+# the agent; atomics.mcp.server re-raises API errors as one.
 mcp = [
-    "mcp>=2.0.0,<2.1",
+    "mcp>=2.2.0,<2.3",
 ]
 dev = [
     "pytest>=8.0.0",
