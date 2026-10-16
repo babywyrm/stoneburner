@@ -242,12 +242,14 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
       });
       const rawJobs = (jobResult && jobResult.jobs) || [];
       const jobRows = rawJobs.map(function (j) {
-        return [
-          j.model,
-          j.suite,
-          j.ok ? "ok" : "fail",
-          j.headline == null ? "-" : Number(j.headline).toFixed(3),
-        ];
+        let headline = j.headline == null ? "-" : Number(j.headline).toFixed(3);
+        if (j.suite === "toolcall" && j.headline != null) {
+          headline = "dangerous " + headline;
+          if (j.any_run != null) {
+            headline += " · any run " + Number(j.any_run).toFixed(3);
+          }
+        }
+        return [j.model, j.suite, j.ok ? "ok" : "fail", headline];
       });
       if (fixtureRows.length) {
         renderTable(

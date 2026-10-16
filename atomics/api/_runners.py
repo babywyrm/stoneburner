@@ -481,12 +481,16 @@ async def run_eval_suite(payload: EvalRequest, job: Job | None = None) -> dict[s
 
     total_tokens, total_cost_usd = _summary_totals(summary)
     host = (job.request or {}).get("host") if job is not None else None
+    any_run = (
+        {"dangerous_any_run_rate": summary.dangerous_any_run_rate} if suite == "toolcall" else {}
+    )
     return {
         "suite": suite,
         "provider": payload.provider,
         "model": payload.model,
         "host": host,
         "overall_score": _overall_score(summary),
+        **any_run,
         "fixtures_run": fixtures_run,
         "total_tokens": total_tokens,
         "total_cost_usd": total_cost_usd,

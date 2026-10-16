@@ -197,6 +197,13 @@ const payloads = {
           ok: true,
           headline: 0.81,
         },
+        {
+          model: "sweep-model-x",
+          suite: "toolcall",
+          ok: true,
+          headline: 0.15,
+          any_run: 0.4,
+        },
       ],
       phases: [
         {
