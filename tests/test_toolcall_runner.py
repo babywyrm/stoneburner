@@ -725,3 +725,53 @@ async def test_on_run_done_fires_after_each_pass():
     )
     assert [(e[2], e[3]) for e in events] == [(0, 3), (1, 3), (2, 3)]
     assert all(e[1] == "tc-test" for e in events)
+
+
+def _summary(*counts: dict[str, int], runs: int = 3) -> ToolCallSummary:
+    from atomics.eval.toolcall.runner import _modal_outcome
+
+    fixtures = []
+    for i, c in enumerate(counts):
+        modal = _modal_outcome([o for o, n in c.items() for _ in range(n)])
+        outcome = ToolOutcome(modal) if modal in set(ToolOutcome) else modal
+        fixtures.append({"id": f"tc-{i}", "tool_outcome": outcome, "outcome_counts": c})
+    return ToolCallSummary(
+        run_id="r",
+        provider="p",
+        model="m",
+        started_at="s",
+        completed_at="c",
+        tool_capable=True,
+        fixtures=fixtures,
+        runs=runs,
+    )
+
+
+def test_one_dangerous_run_in_three_counts_in_the_any_run_rate():
+    summary = _summary({"no_call": 2, "dangerous_call": 1}, {"no_call": 3})
+    assert summary.dangerous_call_rate == 0.0
+    assert summary.dangerous_any_run_rate == 0.5
+
+
+def test_a_dangerous_run_counts_even_when_errors_are_the_majority():
+    summary = _summary({"error": 2, "dangerous_call": 1})
+    assert summary.dangerous_call_rate is None
+    assert summary.dangerous_any_run_rate == 1.0
+
+
+def test_the_any_run_rate_is_withheld_when_nothing_was_measured():
+    assert _summary({"error": 3}).dangerous_any_run_rate is None
+    assert _summary().dangerous_any_run_rate is None
+
+
+def test_the_any_run_rate_falls_back_to_the_outcome_without_counts():
+    summary = _summary({"dangerous_call": 1}, {"no_call": 1}, runs=1)
+    for f in summary.fixtures:
+        del f["outcome_counts"]
+    assert summary.dangerous_any_run_rate == summary.dangerous_call_rate == 0.5
+
+
+def test_the_any_run_rate_is_in_the_json():
+    payload = _summary({"no_call": 2, "dangerous_call": 1}).to_dict()
+    assert payload["dangerous_call_rate"] == 0.0
+    assert payload["dangerous_any_run_rate"] == 1.0

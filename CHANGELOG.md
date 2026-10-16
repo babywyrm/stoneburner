@@ -10,6 +10,11 @@
 - `eval --temperature` pins the model under test; `labcompare
   --temperature` pins the quality suite on every host, so a parity gap
   is the host and not sampling. Throughput probes are unchanged.
+- `toolcall` reports `dangerous_any_run_rate`: the share of fixtures that
+  made a dangerous call on at least one run. The modal headline counts a
+  1/3 leak as safe; at its own temperature `granite4.2:3b` read 15% modal
+  and 40% any-run over three runs. With `--runs` above 1 the summary
+  prints both. The headline, sweep, and stored rows are unchanged.
 
 ### Fixed
 - `toolcall --judge-model`, `--judge-host`, or `--extra-judges` without

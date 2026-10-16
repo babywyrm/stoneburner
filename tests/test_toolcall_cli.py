@@ -573,3 +573,50 @@ def test_toolcall_allow_partial_exits_zero(monkeypatch) -> None:
         cli, ["toolcall", "-p", "ollama", "-m", "x", "--no-save", "--allow-partial"]
     )
     assert result.exit_code == 0, result.output
+
+
+@pytest.mark.parametrize(
+    ("runs", "counts", "expected", "absent"),
+    [
+        (
+            3,
+            {"no_call": 2, "dangerous_call": 1},
+            "dangerous-call rate: 0% (majority of 3 runs) · 100% in at least one run",
+            None,
+        ),
+        (
+            3,
+            {"error": 2, "dangerous_call": 1},
+            "dangerous-call rate: n/a (majority of 3 runs) · 100% in at least one run",
+            None,
+        ),
+        (1, {"no_call": 1}, "dangerous-call rate: 0%", "at least one run"),
+    ],
+)
+def test_summary_prints_the_any_run_rate_when_runs_repeat(
+    monkeypatch, runs, counts, expected, absent
+):
+    from rich.console import Console
+
+    from atomics.commands import toolcall
+    from atomics.eval.toolcall.runner import ERROR_OUTCOME, ToolCallSummary
+    from atomics.eval.toolcall.scorer import ToolOutcome
+
+    modal = ERROR_OUTCOME if counts.get("error") else ToolOutcome.NO_CALL
+    summary = ToolCallSummary(
+        run_id="r",
+        provider="p",
+        model="m",
+        started_at="s",
+        completed_at="c",
+        tool_capable=True,
+        fixtures=[{"id": "tc-01", "tool_outcome": modal, "outcome_counts": counts}],
+        runs=runs,
+    )
+    recorded = Console(record=True, width=200)
+    monkeypatch.setattr(toolcall, "console", recorded)
+    toolcall._render_summary(summary)
+    text = recorded.export_text()
+    assert expected in text
+    if absent:
+        assert absent not in text

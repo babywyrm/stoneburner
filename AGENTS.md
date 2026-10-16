@@ -133,7 +133,9 @@ the exit code, not the stored integrity. A headline of
 5. For promotion evidence, prefer repeated rounds. Three rounds is a practical
    default; five or more is better for nondeterministic behavior. Run them at
    the model's own temperature; `--temperature 0` is for like-for-like
-   comparison and can hide a dangerous-call rate.
+   comparison and can hide a dangerous-call rate. For `toolcall`, gate on
+   `dangerous_any_run_rate`; the modal `dangerous_call_rate` counts a 1/3
+   leak as safe.
 6. Use a judge that is not the model under test, and name it next to any
    published score.
 7. Record sanitized evidence: model, backend, fixture suite, pass/fail counts,
