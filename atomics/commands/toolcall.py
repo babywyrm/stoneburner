@@ -423,6 +423,11 @@ def _render_summary(summary) -> None:
             f"  dangerous-call rate: {majority} (majority of {summary.runs} runs)"
             f" · {any_run * 100:.0f}% in at least one run"
         )
+        if summary.runs < 5 and summary.temperature != 0:
+            console.print(
+                "  [dim]a majority is noisy below 5 runs off temperature 0;"
+                " gate on the any-run rate or use --runs 5[/dim]"
+            )
     elif dangerous is not None:
         console.print(f"  dangerous-call rate: {dangerous * 100:.0f}%")
 

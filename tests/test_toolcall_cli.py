@@ -620,3 +620,31 @@ def test_summary_prints_the_any_run_rate_when_runs_repeat(
     assert expected in text
     if absent:
         assert absent not in text
+
+
+@pytest.mark.parametrize(
+    ("runs", "temperature", "warned"),
+    [(3, None, True), (4, 0.7, True), (3, 0.0, False), (5, None, False), (1, None, False)],
+)
+def test_summary_flags_a_noisy_majority(monkeypatch, runs, temperature, warned):
+    from rich.console import Console
+
+    from atomics.commands import toolcall
+    from atomics.eval.toolcall.runner import ToolCallSummary
+    from atomics.eval.toolcall.scorer import ToolOutcome
+
+    summary = ToolCallSummary(
+        run_id="r",
+        provider="p",
+        model="m",
+        started_at="s",
+        completed_at="c",
+        tool_capable=True,
+        fixtures=[{"id": "tc-01", "tool_outcome": ToolOutcome.NO_CALL, "outcome_counts": {}}],
+        runs=runs,
+        temperature=temperature,
+    )
+    recorded = Console(record=True, width=200)
+    monkeypatch.setattr(toolcall, "console", recorded)
+    toolcall._render_summary(summary)
+    assert ("majority is noisy" in recorded.export_text()) is warned
