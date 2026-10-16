@@ -17,6 +17,11 @@
   prints both. The headline, sweep, and stored rows are unchanged.
 
 ### Fixed
+- The `[mcp]` extra requires `mcp` 2.2.0 (GHSA-84m7-p3x7-pcfv, session
+  build-up in the StreamableHTTP transport; `atomics mcp` is stdio, so
+  it was not exposed). Under 2.0.1 any exception's text reached the
+  agent; now only the API's own reason does (budget exceeded, unknown
+  provider), and a crash shows only `Error executing tool <name>`.
 - `toolcall --judge-model`, `--judge-host`, or `--extra-judges` without
   `--judge-provider` silently ran unjudged, so channel divergence was
   never measured. Any of them now defaults the judge to `ollama`, as on

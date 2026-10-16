@@ -17,12 +17,18 @@ on model work.
 
 from __future__ import annotations
 
-from typing import Any
+import functools
+from collections.abc import Callable
+from typing import Any, ParamSpec, TypeVar
 
 from mcp.server import MCPServer
+from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
 
-from atomics.mcp.client import AtomicsApiClient
+from atomics.mcp.client import AtomicsApiClient, AtomicsApiError
+
+P = ParamSpec("P")
+R = TypeVar("R")
 
 INSTRUCTIONS = """Evaluate and benchmark language models through a running atomics API server.
 
@@ -57,7 +63,29 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
         version=_version(),
     )
 
-    @server.tool(annotations=READ_ONLY)
+    def tool(annotations: ToolAnnotations) -> Callable[[Callable[P, R]], Callable[P, R]]:
+        """Register a tool whose API failure reaches the agent with its reason.
+
+        The SDK shows the agent only a `ToolError`'s message; any other
+        exception becomes a bare `Error executing tool <name>`. The API's
+        `detail` (budget exceeded, unknown provider) is meant for the agent,
+        so it is re-raised as one. A crash is not, and keeps the bare message.
+        """
+
+        def register(fn: Callable[P, R]) -> Callable[P, R]:
+            @functools.wraps(fn)
+            def call(*args: P.args, **kwargs: P.kwargs) -> R:
+                try:
+                    return fn(*args, **kwargs)
+                except AtomicsApiError as exc:
+                    raise ToolError(str(exc)) from exc
+
+            server.tool(annotations=annotations)(call)
+            return call
+
+        return register
+
+    @tool(READ_ONLY)
     def list_models(provider: str = "ollama", host: str | None = None) -> Any:
         """List models loaded on an Ollama or vLLM instance.
 
@@ -66,7 +94,7 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
         """
         return api.list_models(provider=provider, host=host)
 
-    @server.tool(annotations=SPENDS)
+    @tool(SPENDS)
     def provider_test(
         provider: str,
         model: str | None = None,
@@ -91,7 +119,7 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
             reasoning_mode=reasoning_mode,
         )
 
-    @server.tool(annotations=READ_ONLY)
+    @tool(READ_ONLY)
     def health() -> Any:
         """Check that the atomics API server is reachable and serving.
 
@@ -99,7 +127,7 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
         """
         return api.health()
 
-    @server.tool(annotations=SPENDS)
+    @tool(SPENDS)
     def submit_run(
         provider: str,
         model: str | None = None,
@@ -134,7 +162,7 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
             host=host,
         )
 
-    @server.tool(annotations=SPENDS)
+    @tool(SPENDS)
     def submit_eval(
         suite: str,
         provider: str,
@@ -183,7 +211,7 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
             channel=channel,
         )
 
-    @server.tool(annotations=SPENDS)
+    @tool(SPENDS)
     def submit_sweep(
         provider: str,
         models: list[str],
@@ -220,7 +248,7 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
             judge_host=judge_host,
         )
 
-    @server.tool(annotations=SPENDS)
+    @tool(SPENDS)
     def submit_battery(
         name: str,
         provider: str,
@@ -262,7 +290,7 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
             profile=profile,
         )
 
-    @server.tool(annotations=SPENDS)
+    @tool(SPENDS)
     def submit_stress(
         provider: str,
         model: str,
@@ -288,7 +316,7 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
             host=host,
         )
 
-    @server.tool(annotations=SPENDS)
+    @tool(SPENDS)
     def submit_soak(
         provider: str,
         model: str,
@@ -316,7 +344,7 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
             host=host,
         )
 
-    @server.tool(annotations=READ_ONLY)
+    @tool(READ_ONLY)
     def get_job(job_id: str) -> Any:
         """Fetch a submitted job's status, live progress, and growing result.
 
@@ -327,12 +355,12 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
         """
         return api.get_job(job_id)
 
-    @server.tool(annotations=READ_ONLY)
+    @tool(READ_ONLY)
     def list_jobs() -> Any:
         """List in-memory API jobs. Results are omitted; poll `get_job` for those."""
         return api.list_jobs()
 
-    @server.tool(annotations=READ_ONLY)
+    @tool(READ_ONLY)
     def get_run(run_id: str) -> Any:
         """Fetch one persisted run and its fixtures.
 
@@ -341,12 +369,12 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
         """
         return api.get_run(run_id)
 
-    @server.tool(annotations=READ_ONLY)
+    @tool(READ_ONLY)
     def trends(hours: int = 24) -> Any:
         """Hourly token and cost series for the last `hours` (1–168)."""
         return api.trends(hours=hours)
 
-    @server.tool(annotations=READ_ONLY)
+    @tool(READ_ONLY)
     def compare(
         by: str = "provider",
         since_hours: float | None = None,
@@ -359,7 +387,7 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
         """
         return api.compare(by=by, since_hours=since_hours, tier=tier, category=category)
 
-    @server.tool(annotations=READ_ONLY)
+    @tool(READ_ONLY)
     def recent_runs(limit: int = 10) -> Any:
         """List the most recent recorded runs."""
         return api.recent_runs(limit=limit)

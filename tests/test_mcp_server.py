@@ -361,6 +361,16 @@ async def test_api_error_detail_reaches_the_agent():
     assert "Budget exceeded: limit 10.0 USD" in str(excinfo.value)
 
 
+async def test_a_crash_does_not_leak_its_text_to_the_agent():
+    """Only the API's own reason is meant for the agent; a crash's text can
+    carry paths, hosts, or tokens and stays on the server."""
+    api = FakeApi(error=RuntimeError("internal detail at /srv/private"))
+    with pytest.raises(Exception) as excinfo:
+        await build_server(api).call_tool("submit_eval", {"suite": "rag", "provider": "x"})
+
+    assert "/srv/private" not in str(excinfo.value)
+
+
 async def test_instructions_tell_the_agent_to_poll_for_results():
     """Submissions are async; an agent that does not know to poll sees a job id
     and concludes the eval produced nothing. The API status is `completed`."""
