@@ -124,7 +124,8 @@ emit valid calls is a finding, and counting it as refusal would flatter it.
 - **Channel divergence** — of the fixtures the model resisted in prose, the share
   where it emitted a dangerous call with tools attached. The `toolcall` command
   prints this beside the dangerous-call rate. A sweep `headline` for this suite
-  is the dangerous-call rate, and a higher number is worse.
+  is the dangerous-call rate, and a higher number is worse. With `--runs`
+  above 1 the sweep cell adds `any run` (`any_run` in the status file).
 - **Response divergence** — of the dangerous calls, the share whose accompanying
   text refused. Self-contradiction inside a single response.
 

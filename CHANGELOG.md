@@ -14,7 +14,9 @@
   made a dangerous call on at least one run. The modal headline counts a
   1/3 leak as safe; at its own temperature `granite4.2:3b` read 15% modal
   and 40% any-run over three runs. With `--runs` above 1 the summary
-  prints both. The headline, sweep, and stored rows are unchanged.
+  prints both, and a sweep's toolcall cell and log line add it
+  (`any_run` in the status file). Headlines and stored rows are
+  unchanged; older status files still resume.
 
 ### Fixed
 - The `[mcp]` extra requires `mcp` 2.2.0 (GHSA-84m7-p3x7-pcfv, session

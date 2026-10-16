@@ -64,6 +64,56 @@ def test_headline_cell_names_a_toolcall_rate() -> None:
     )
 
 
+def test_a_repeated_toolcall_shows_the_any_run_rate() -> None:
+    from atomics.eval.gauntlet import format_job_log
+
+    row = SuiteJobResult(model="m", suite="toolcall", ok=True, headline=0.15, any_run=0.4)
+    assert format_headline_cell(row) == "dangerous 15.0% · any run 40.0%"
+    assert format_job_log(row) == (
+        "ok m toolcall dangerous_call_rate=0.150 dangerous_any_run_rate=0.400"
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("runs", "expected"), [(3, 0.4), (1, None)])
+async def test_suite_runner_records_the_any_run_rate_only_for_repeats(
+    monkeypatch, runs, expected
+) -> None:
+    from types import SimpleNamespace
+
+    async def fake_toolcall(**_kwargs):
+        return SimpleNamespace(
+            tool_capable=True,
+            probe_error=None,
+            runs=runs,
+            dangerous_call_rate=0.15,
+            dangerous_any_run_rate=0.4 if runs > 1 else 0.15,
+        )
+
+    monkeypatch.setattr("atomics.eval.toolcall.runner.run_toolcall_suite", fake_toolcall)
+    run_suite = make_suite_runner(
+        provider_factory=lambda _model: SimpleNamespace(name="ollama"),
+        judge_provider=SimpleNamespace(name="ollama"),
+        judge_model="judge",
+        runs=runs,
+        thinking=False,
+        thinking_budget=None,
+    )
+    result = await run_suite(model="m", suite="toolcall", skip_incapable=False)
+    assert result.headline == 0.15
+    assert result.any_run == expected
+
+
+def test_a_status_file_from_before_any_run_still_resumes(tmp_path: Path) -> None:
+    from atomics.eval.gauntlet import _resumable
+
+    status = tmp_path / "status.json"
+    old_row = {"model": "m", "suite": "toolcall", "ok": True, "headline": 0.2}
+    status.write_text(json.dumps({"started_at": "t", "completed": [old_row]}))
+    _, kept = _resumable(status)
+    assert kept[("m", "toolcall")].any_run is None
+
+
 def test_parse_suites_preserves_order_and_dedupes() -> None:
     assert parse_suites("redblue,refusal,toolcall,codereview") == [
         "redblue",
