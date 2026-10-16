@@ -311,11 +311,11 @@ Absolute red/blue numbers do not. Next:
       false positive moves F1 by 0.09, not 0.33. Older rows compare
       only with `--fixtures scr-01,...,scr-06,scr-clean-01,scr-clean-02`.
 
-A unit test cannot see a live generate. One hole stays open:
+A unit test cannot see a live generate. Of the second local backends,
+only brain-gateway still has none on record:
 
-- A second local backend (vLLM, llama.cpp, or brain-gateway) has no
-  generate on record. CI proves URL rejection. The OpenAI-compatible
-  wire path is proved: `--provider vllm` against Ollama's `/v1` on a lab
+- [x] vLLM and llama.cpp have live generates. CI proves URL
+  rejection. The OpenAI-compatible wire path is proved: `--provider vllm` against Ollama's `/v1` on a lab
   host (2026-10-04, `qwen3.5:4b`) completed toolcall 20/20 scored, 25%
   dangerous calls against 30% native. The two are not a matched pair:
   Ollama ignores `chat_template_kwargs`, so `--no-thinking` did not
@@ -328,7 +328,14 @@ A unit test cannot see a live generate. One hole stays open:
   and weights moved the majority 30 points while the any-run rate
   held; three runs at default temperature are too few for a majority
   headline. The first live run caught llama-server ignoring the
-  thinking switch (fixed). Still owed: a real vLLM server.
+  thinking switch (fixed). vLLM is on record too (2026-10-16, 0.22.0,
+  `Qwen2.5-3B-Instruct-AWQ`, hermes tool parser, same judge and runs):
+  20/20 scored, `complete`, 50% by majority and 60% in at least one
+  run, against 65% and 70% for Ollama's `qwen2.5:3b` on the same
+  host. Different quantizations (AWQ against Q4_K_M), so not a
+  matched pair. A host without the CUDA toolkit needs
+  `VLLM_USE_FLASHINFER_SAMPLER=0`: FlashInfer JIT-compiles its
+  sampler and dies looking for `nvcc`.
 
 `gemma4:26b` blue-capability now has two judges: `granite4.2:8b`
 (2026-09-21) and `qwen3.8:27b` (2026-10-04) agree within 1.2 points on
