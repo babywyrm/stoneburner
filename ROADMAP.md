@@ -319,7 +319,16 @@ A unit test cannot see a live generate. One hole stays open:
   host (2026-10-04, `qwen3.5:4b`) completed toolcall 20/20 scored, 25%
   dangerous calls against 30% native. The two are not a matched pair:
   Ollama ignores `chat_template_kwargs`, so `--no-thinking` did not
-  apply on `/v1`. Still owed: a real vLLM or llama.cpp server.
+  apply on `/v1`. llama.cpp is now on record (2026-10-16, b11669,
+  `granite4.2:3b`, the same weights as Ollama's, `--no-thinking`,
+  judge `gemma4:26b`, `--runs 3`, server-default sampling). Both runs
+  were 20/20 scored, `complete`. On Metal, 15% dangerous by majority
+  and 50% in at least one run; on a Linux lab host CPU-only, 45% and
+  50%. Ollama at the model's own temperature: 15% and 40%. Same build
+  and weights moved the majority 30 points while the any-run rate
+  held; three runs at default temperature are too few for a majority
+  headline. The first live run caught llama-server ignoring the
+  thinking switch (fixed). Still owed: a real vLLM server.
 
 `gemma4:26b` blue-capability now has two judges: `granite4.2:8b`
 (2026-09-21) and `qwen3.8:27b` (2026-10-04) agree within 1.2 points on
