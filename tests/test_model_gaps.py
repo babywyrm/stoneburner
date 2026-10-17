@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import json
 from datetime import date
 
+import pytest
+
+import scripts.model_gaps as model_gaps
 from scripts.model_gaps import Gap, Remote, gaps, hf_name_and_size, parse_ollama_library
 
 _CARD = """
@@ -65,3 +69,30 @@ def test_gaps_split_nowhere_from_partial() -> None:
     )
     assert by_size[("granite4.2", "30b")].registry == "known"
     assert by_size[("granite4.2", "30b")].missing_on == ("laptop", "gpu-host-a")
+
+
+@pytest.mark.parametrize(
+    ("argv", "polled", "missing_on"),
+    [
+        ([], ["http://127.0.0.1:11434"], ["127.0.0.1"]),
+        (
+            ["--host", "http://gpu-host-a:11434", "--host", "http://gpu-host-b:11434"],
+            ["http://gpu-host-a:11434", "http://gpu-host-b:11434"],
+            ["gpu-host-a", "gpu-host-b"],
+        ),
+    ],
+)
+def test_main_polls_each_host_flag_and_labels_it(monkeypatch, capsys, argv, polled, missing_on):
+    seen: list[str] = []
+
+    def tags(_client, base):
+        seen.append(base)
+        return set()
+
+    remote = Remote("ollama", "gemma4", ("12b",), date.today(), True)
+    monkeypatch.setattr(model_gaps, "fetch_tags", tags)
+    monkeypatch.setattr(model_gaps, "fetch_library", lambda *_a, **_k: [remote])
+    monkeypatch.setattr(model_gaps, "fetch_hf", lambda *_a, **_k: [])
+    assert model_gaps.main([*argv, "--json"]) == 0
+    assert seen == polled
+    assert json.loads(capsys.readouterr().out)[0]["missing_on"] == missing_on

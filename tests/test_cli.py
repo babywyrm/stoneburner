@@ -376,6 +376,7 @@ def test_cli_run_with_mocked_claude(monkeypatch, tmp_path):
     class DummyEngine:
         def __init__(self, **kwargs):
             self.kwargs = kwargs
+            calls["handle_signals"] = kwargs.get("handle_signals")
 
         async def run(self, max_iterations=None):
             calls["ran"] = True
@@ -398,6 +399,7 @@ def test_cli_run_with_mocked_claude(monkeypatch, tmp_path):
     assert result.exit_code == 0
     assert calls["ran"] is True
     assert calls["max_iterations"] == 2
+    assert calls["handle_signals"] is True, "the CLI owns its process, so Ctrl-C must stop the run"
 
 
 def test_cli_run_with_mocked_bedrock(monkeypatch, tmp_path):
