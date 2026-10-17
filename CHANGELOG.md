@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Upgrade notes
+- Python imports from the package root moved: `atomics.stress` is
+  `atomics.load.stress`, and so on for 19 modules (list under Removed).
+  The CLI and the HTTP API are unchanged.
+- A server started with API keys answers `404` on `/docs`, `/redoc`,
+  and `/openapi.json`. Use a loopback `--no-auth` server to browse them.
+- `scripts/model_gaps.py` polls only localhost unless given `--host`.
+
 ### Added
 - `temperature` (0–2) on `POST /evals`, `/sweeps`, and `/batteries`,
   MCP `submit_eval` / `submit_sweep` / `submit_battery`, and the REPL's
