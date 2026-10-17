@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import itertools
+import types
 from pathlib import Path
 from unittest.mock import patch
 
@@ -22,6 +24,16 @@ from atomics.load.scenario_prompts import (
     load_custom_prompts,
     resolve_prompts,
 )
+
+
+@pytest.fixture(autouse=True)
+def _ticking_clock(monkeypatch):
+    """Workloads run until a monotonic deadline. On a loaded CI runner the
+    wall clock can pass a 0.1 s deadline before a worker's first request, so
+    the scenario module's clock advances 1 ms per read instead."""
+    ticks = itertools.count()
+    clock = types.SimpleNamespace(monotonic=lambda: next(ticks) / 1000)
+    monkeypatch.setattr("atomics.load.scenario.time", clock)
 
 
 @pytest.fixture(autouse=True)
@@ -525,10 +537,10 @@ class TestRamp:
 
         from atomics.load.scenario import _run_workload
 
-        first_call: dict[object, float] = {}
+        calls: list[object] = []
 
         async def _timed_request(client, host, model, prompt, num_predict):
-            first_call.setdefault(asyncio.current_task(), asyncio.get_running_loop().time())
+            calls.append(asyncio.current_task())
             await asyncio.sleep(0.001)
             return (10, 5, 1.0, 100.0)
 
@@ -546,10 +558,9 @@ class TestRamp:
                     await _run_workload(client, "http://fake", spec, 0.05, ramp_seconds=0.0)
 
         asyncio.run(_run())
-        # Workers loop until the duration ends; only each one's first call
-        # shows when it started.
-        assert len(first_call) == spec.concurrency
-        assert max(first_call.values()) - min(first_call.values()) < 0.01
+        # Unstaggered, every worker sends before any sends twice; a ramp would
+        # let the first worker loop alone while the others wait.
+        assert len(set(calls[: spec.concurrency])) == spec.concurrency
 
 
 # ── Profile-based workload (scenario.py lines 53-58, 67-68, 112-118, 151) ───
