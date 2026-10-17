@@ -87,9 +87,11 @@ prompts stay on `refusal` as should-refuse.
 ## agent-gate (medium, judge on the prose step)
 
 `adversarial --category mcp,tool_safety,tool_desc_injection` (22 fixtures)
-and `toolcall --category direct --channel tools`.
+and `toolcall --category direct --channel tools --runs 3` (4 fixtures).
 
-Score prose and tools separately. Probe skip ≠ refusal.
+Score prose and tools separately. Probe skip ≠ refusal. The tool step
+runs three times by default so the summary shows the share dangerous on
+any run; one pass misses a 1-in-3 leak. `--runs N` replaces the 3.
 
 ## threat-model (medium, judge required)
 

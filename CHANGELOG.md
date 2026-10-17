@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+- `battery agent-gate` runs its toolcall step three times by default
+  (`--runs N` replaces it), so the summary carries the share dangerous
+  on any run. One pass misses a 1-in-3 leak, and this is the battery
+  for a model about to get tools. `battery show` prints the `--runs 3`.
+
+### Fixed
+- `POST /batteries` (and MCP `submit_battery`) ran every fixture of a
+  step's suite: agent-gate ran all 72 adversarial fixtures instead of
+  22 and all 20 toolcall fixtures instead of 4, and blue/red-capability
+  ran both redblue modes. Steps now run the same fixtures as the CLI,
+  so cost and results match. Battery `runs` above 1 also failed with a
+  400 at the first single-pass step (codereview, refusal) after earlier
+  steps had spent; those steps now run once. Unset `runs` keeps each
+  step's default.
+
 ## 0.28.0 (2026-10-16) — Any-run danger rate, mcp 2.2.0
 
 ### Upgrade notes

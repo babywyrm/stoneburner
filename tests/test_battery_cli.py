@@ -426,3 +426,34 @@ def test_battery_run_cohorts_runs_each_job(tmp_path, monkeypatch):
     assert models.count("b:8b") == 3
     assert any("--ollama-host" in args and "http://gpu-host-b:11434" in args for args in seen)
     assert any("--thinking" in args and "b:8b" in args for args in seen)
+
+
+def _runs_by_suite(seen: list[list[str]]) -> dict[str, list[str]]:
+    return {
+        args[0]: args[args.index("--runs") + 1 :][:1] if "--runs" in args else [] for args in seen
+    }
+
+
+def test_agent_gate_repeats_its_tool_step(monkeypatch):
+    seen: list[list[str]] = []
+    monkeypatch.setattr(
+        "atomics.commands.battery.invoke_atomics", lambda args: seen.append(args) or 0
+    )
+    gate = ["battery", "run", "agent-gate", "-m", "m", "--judge-model", "j"]
+
+    assert CliRunner().invoke(cli, gate).exit_code == 0
+    assert _runs_by_suite(seen) == {"adversarial": [], "toolcall": ["3"]}
+
+    seen.clear()
+    assert CliRunner().invoke(cli, [*gate, "--runs", "5"]).exit_code == 0
+    assert _runs_by_suite(seen) == {"adversarial": ["5"], "toolcall": ["5"]}
+    assert all(args.count("--runs") == 1 for args in seen)
+
+    seen.clear()
+    assert CliRunner().invoke(cli, ["battery", "run", "desk-pass", "-m", "m"]).exit_code == 0
+    assert "--runs" not in seen[-1]
+
+
+def test_battery_show_prints_a_step_default_runs():
+    result = CliRunner().invoke(cli, ["battery", "show", "agent-gate", "-m", "m"])
+    assert result.output.count("--runs 3") == 1

@@ -148,6 +148,6 @@ def test_battery_request_defaults():
     from atomics.api.models import BatteryRequest
 
     req = BatteryRequest(name="desk-pass", provider="ollama", model="x", budget_usd=5)
-    assert req.runs == 1
+    assert req.runs is None
     assert req.thinking is None
     assert req.profile is None

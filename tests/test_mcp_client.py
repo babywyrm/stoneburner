@@ -267,7 +267,11 @@ def test_submit_battery_posts_required_budget():
     payload = json.loads(requests[0].content)
     assert payload["name"] == "desk-pass"
     assert payload["budget_usd"] == 5.0
-    assert payload["runs"] == 1
+    assert "runs" not in payload
+
+    with client_recording(requests) as client:
+        client.submit_battery(name="agent-gate", provider="ollama", budget_usd=5.0, runs=2)
+    assert json.loads(requests[1].content)["runs"] == 2
 
 
 def test_submit_battery_forwards_thinking_effort():

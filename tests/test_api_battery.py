@@ -66,6 +66,64 @@ async def test_battery_forwards_thinking_and_effort(monkeypatch):
         assert payload.effort == "low"
 
 
+def _capture_eval_steps(monkeypatch) -> dict:
+    captured: dict = {}
+
+    async def fake_run_eval_suite(payload, job=None):
+        captured[payload.suite] = payload
+        return {"suite": payload.suite, "fixtures": []}
+
+    monkeypatch.setattr("atomics.api._battery.run_eval_suite", fake_run_eval_suite)
+    return captured
+
+
+@pytest.mark.asyncio
+async def test_battery_steps_run_the_cli_subset(monkeypatch):
+    from atomics.eval.adversarial import select_fixtures as adversarial_fixtures
+    from atomics.eval.redblue.fixtures import BLUE_FIXTURES
+    from atomics.eval.toolcall.fixtures import fixtures_for_category
+
+    captured = _capture_eval_steps(monkeypatch)
+    await run_battery_from_request(
+        BatteryRequest(name="agent-gate", provider="ollama", model="x", budget_usd=5)
+    )
+    wanted = adversarial_fixtures(("mcp", "tool_safety", "tool_desc_injection"))
+    assert captured["adversarial"].fixtures == [f.id for f in wanted]
+    assert captured["toolcall"].fixtures == [f.id for f in fixtures_for_category("direct")]
+
+    await run_battery_from_request(
+        BatteryRequest(name="blue-capability", provider="ollama", model="x", budget_usd=5)
+    )
+    assert captured["redblue"].fixtures == [f.id for f in BLUE_FIXTURES]
+    assert captured["refusal"].fixtures == [
+        "rc-b01",
+        "rc-b02",
+        "rc-b03",
+        "rc-b04",
+        "rc-b05",
+        "rc-b06",
+    ]
+    assert captured["codereview"].fixtures is None
+
+
+@pytest.mark.asyncio
+async def test_battery_runs_default_per_step_and_skip_single_pass_suites(monkeypatch):
+    captured = _capture_eval_steps(monkeypatch)
+    gate = {"name": "agent-gate", "provider": "ollama", "model": "x", "budget_usd": 5}
+
+    await run_battery_from_request(BatteryRequest(**gate))
+    assert (captured["adversarial"].runs, captured["toolcall"].runs) == (1, 3)
+
+    await run_battery_from_request(BatteryRequest(**gate, runs=2))
+    assert (captured["adversarial"].runs, captured["toolcall"].runs) == (2, 2)
+
+    result = await run_battery_from_request(
+        BatteryRequest(name="blue-capability", provider="ollama", model="x", budget_usd=5, runs=3)
+    )
+    assert [s["suite"] for s in result["steps"]] == ["redblue", "codereview", "refusal"]
+    assert (captured["redblue"].runs, captured["codereview"].runs) == (3, 1)
+
+
 @pytest.mark.asyncio
 async def test_battery_skips_only_archreview(monkeypatch):
     seen: list[str] = []

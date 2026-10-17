@@ -260,7 +260,7 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
         thinking: bool | None = None,
         effort: str | None = None,
         reasoning_mode: str | None = None,
-        runs: int = 1,
+        runs: int | None = None,
         profile: str | None = None,
     ) -> Any:
         """Run a named battery as one job and return its job id.
@@ -272,7 +272,9 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
         step not-ok. archreview stays on the CLI. `thinking` / `effort`
         forward onto every step (battery default is `--no-thinking` when
         `thinking` is unset). `host` is the inference endpoint; `judge_host`
-        is the judge endpoint when it differs. Poll `get_job` until `status`
+        is the judge endpoint when it differs. `runs` repeats the adversarial,
+        redblue, and toolcall steps; unset keeps each step's default
+        (agent-gate's toolcall step runs 3). Poll `get_job` until `status`
         is `completed`.
         """
         return api.submit_battery(
