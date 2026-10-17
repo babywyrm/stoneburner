@@ -4,6 +4,8 @@
 `stone-burner` Terraform helper, so PyPI rejects it as too similar.
 """
 
+import re
+import subprocess
 from importlib.metadata import entry_points, metadata, version
 from pathlib import Path
 
@@ -67,9 +69,24 @@ def test_readme_landing_is_a_storefront_not_only_a_manual():
     assert "atomics toolcall" in text
     assert "atomics provider-test --provider ollama --no-thinking" in text
     lowered = text.lower()
-    assert "gpu-host-b" not in lowered
     assert "garak" not in lowered
     assert "promptfoo" not in lowered
+
+
+def test_no_tracked_file_names_a_lab_host():
+    """Docs and fixtures use neutral hosts (localhost, gpu-host-a, <host>)."""
+    lab = re.compile(r"\b(gpu-host-b|gpu-host-a)\b", re.IGNORECASE)
+    tracked = subprocess.run(
+        ["git", "ls-files"], capture_output=True, text=True, check=True
+    ).stdout.split()
+    hits = [
+        name
+        for name in tracked
+        if name != "tests/test_distribution.py"
+        and Path(name).is_file()
+        and lab.search(Path(name).read_text(errors="ignore"))
+    ]
+    assert hits == []
 
 
 def test_readme_stays_a_storefront():

@@ -131,7 +131,9 @@ def test_patterns_filter_and_report():
 
 
 def test_same_digest_on_two_hosts_is_one_member():
-    inv = _inv(_model("a:8b"), _model("a:8b", "gpu-host-a"), _model("b:8b"), hosts=("laptop", "gpu-host-a"))
+    inv = _inv(
+        _model("a:8b"), _model("a:8b", "gpu-host-a"), _model("b:8b"), hosts=("laptop", "gpu-host-a")
+    )
     [cohort] = form_cohorts(inv, DESK).cohorts
     assert [(m.name, m.hosts) for m in cohort.members] == [
         ("a:8b", ("laptop", "gpu-host-a")),
@@ -154,7 +156,9 @@ def test_copy_that_fails_on_one_host_is_not_listed_excluded():
 
 def test_digest_mismatch_splits_into_labelled_members():
     inv = _inv(
-        _model("a:8b", digest="x"), _model("a:8b", "gpu-host-a", digest="y"), hosts=("laptop", "gpu-host-a")
+        _model("a:8b", digest="x"),
+        _model("a:8b", "gpu-host-a", digest="y"),
+        hosts=("laptop", "gpu-host-a"),
     )
     assert _names(form_cohorts(inv, DESK)) == [["a:8b@gpu-host-a", "a:8b@laptop"]]
 

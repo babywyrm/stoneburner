@@ -14,6 +14,10 @@
   (`--runs N` replaces it), so the summary carries the share dangerous
   on any run. One pass misses a 1-in-3 leak, and this is the battery
   for a model about to get tools. `battery show` prints the `--runs 3`.
+- `scripts/model_gaps.py` takes `--host URL` (repeatable, default
+  localhost) instead of three built-in lab hosts. Docs and tests name
+  hosts `gpu-host-a` / `gpu-host-b`, and a test fails if a lab
+  hostname is committed again.
 
 ### Fixed
 - `POST /batteries` (and MCP `submit_battery`) ran every fixture of a
