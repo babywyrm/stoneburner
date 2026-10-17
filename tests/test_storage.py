@@ -1092,7 +1092,7 @@ def test_stress_results_table_exists(tmp_path):
 
 
 def test_save_stress_result():
-    from atomics.stress import ConcurrencyResult, StressResult
+    from atomics.load.stress import ConcurrencyResult, StressResult
 
     repo = _tmp_repo()
 
@@ -1143,7 +1143,7 @@ def test_save_stress_result():
 
 
 def test_get_stress_results_multiple_models():
-    from atomics.stress import StressResult
+    from atomics.load.stress import StressResult
 
     repo = _tmp_repo()
 
@@ -1168,7 +1168,7 @@ def test_get_stress_results_multiple_models():
 
 
 def test_get_stress_results_by_model():
-    from atomics.stress import StressResult
+    from atomics.load.stress import StressResult
 
     repo = _tmp_repo()
 

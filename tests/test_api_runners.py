@@ -49,7 +49,7 @@ async def test_run_benchmark_from_request_returns_summary_dict():
         patch.object(runners, "_provider_for", return_value=MagicMock(name="provider")),
         patch("atomics.core.engine.LoopEngine", return_value=engine) as mock_engine_cls,
         patch("atomics.storage.repository.MetricsRepository", return_value=repo),
-        patch("atomics.tiers.get_tier_profile", return_value=profile),
+        patch("atomics.benchmark.tiers.get_tier_profile", return_value=profile),
     ):
         result = await runners.run_benchmark_from_request(payload)
 
@@ -107,7 +107,10 @@ async def test_run_benchmark_from_request_grows_task_rows():
         patch.object(runners, "_provider_for", return_value=MagicMock()),
         patch("atomics.core.engine.LoopEngine", FakeEngine),
         patch("atomics.storage.repository.MetricsRepository", return_value=MagicMock()),
-        patch("atomics.tiers.get_tier_profile", return_value=SimpleNamespace(preferred_model="p")),
+        patch(
+            "atomics.benchmark.tiers.get_tier_profile",
+            return_value=SimpleNamespace(preferred_model="p"),
+        ),
     ):
         result = await runners.run_benchmark_from_request(payload, job=job)
 
@@ -153,7 +156,10 @@ async def test_run_benchmark_from_request_forwards_host():
         patch.object(runners, "_provider_for", side_effect=fake_provider),
         patch("atomics.core.engine.LoopEngine", return_value=engine),
         patch("atomics.storage.repository.MetricsRepository", return_value=MagicMock()),
-        patch("atomics.tiers.get_tier_profile", return_value=SimpleNamespace(preferred_model="p")),
+        patch(
+            "atomics.benchmark.tiers.get_tier_profile",
+            return_value=SimpleNamespace(preferred_model="p"),
+        ),
     ):
         await runners.run_benchmark_from_request(payload)
 
@@ -190,7 +196,7 @@ async def test_run_benchmark_from_request_forwards_effort():
         patch("atomics.core.engine.LoopEngine", return_value=engine) as mock_engine_cls,
         patch("atomics.storage.repository.MetricsRepository", return_value=repo),
         patch(
-            "atomics.tiers.get_tier_profile",
+            "atomics.benchmark.tiers.get_tier_profile",
             return_value=SimpleNamespace(preferred_model=None),
         ),
     ):
@@ -215,7 +221,7 @@ async def test_run_benchmark_none_summary_raises_http_400():
         patch("atomics.core.engine.LoopEngine", return_value=engine),
         patch("atomics.storage.repository.MetricsRepository", return_value=repo),
         patch(
-            "atomics.tiers.get_tier_profile",
+            "atomics.benchmark.tiers.get_tier_profile",
             return_value=SimpleNamespace(preferred_model=None),
         ),
     ):
@@ -853,7 +859,7 @@ async def test_run_benchmark_rethrows_http_exception():
         patch("atomics.core.engine.LoopEngine", return_value=engine),
         patch("atomics.storage.repository.MetricsRepository", return_value=repo),
         patch(
-            "atomics.tiers.get_tier_profile",
+            "atomics.benchmark.tiers.get_tier_profile",
             return_value=SimpleNamespace(preferred_model=None),
         ),
     ):

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from atomics.capacity import (
+from atomics.load.capacity import (
     CapacityProjection,
     CapacityScenario,
     LoadProfile,
@@ -213,8 +213,8 @@ def test_cli_capacity_from_db(monkeypatch, tmp_path):
     from click.testing import CliRunner
 
     from atomics.cli import cli
+    from atomics.load.stress import ConcurrencyResult, StressResult
     from atomics.storage.repository import MetricsRepository
-    from atomics.stress import ConcurrencyResult, StressResult
 
     repo = MetricsRepository(tmp_path / "test.db")
     sr = StressResult(

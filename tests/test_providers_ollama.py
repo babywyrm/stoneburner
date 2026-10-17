@@ -768,7 +768,7 @@ def test_provider_response_tokens_per_second_default_none():
 
 
 def test_ollama_model_classes():
-    from atomics.model_classes import ModelClass, classify_model
+    from atomics.benchmark.model_classes import ModelClass, classify_model
 
     assert classify_model("qwen2.5:7b") == ModelClass.MID
     assert classify_model("qwen2.5:1.5b") == ModelClass.LIGHT

@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from atomics.stress import (
+from atomics.load.stress import (
     ConcurrencyResult,
     StressResult,
     _percentile,
@@ -32,8 +32,8 @@ async def test_stress_refuses_a_non_http_host() -> None:
 @pytest.mark.asyncio
 async def test_stress_request_sends_bounded_context() -> None:
     """Stress posts /api/generate itself, so the provider cap does not apply."""
+    from atomics.load.stress import _single_request
     from atomics.providers.ollama import DEFAULT_NUM_CTX
-    from atomics.stress import _single_request
 
     mock_response = MagicMock()
     mock_response.raise_for_status = MagicMock()
@@ -79,7 +79,7 @@ def test_stress_result_defaults():
 
 
 def test_stress_prompts_are_populated():
-    from atomics.stress import STRESS_PROMPTS
+    from atomics.load.stress import STRESS_PROMPTS
 
     assert len(STRESS_PROMPTS) >= 6
     for p in STRESS_PROMPTS:
@@ -89,7 +89,7 @@ def test_stress_prompts_are_populated():
 @pytest.mark.asyncio
 async def test_run_stress_with_mock():
     """Verify the ramp logic works end-to-end with a mocked HTTP client."""
-    from atomics.stress import _run_phase
+    from atomics.load.stress import _run_phase
 
     call_count = 0
 
@@ -150,8 +150,8 @@ async def test_run_stress_e2e_with_mock(monkeypatch):
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=False)
 
-    monkeypatch.setattr("atomics.stress._get_gpu_info", lambda: ("FakeGPU", 12288.0))
-    monkeypatch.setattr("atomics.stress._get_vram_used_mb", lambda: 4000.0)
+    monkeypatch.setattr("atomics.load.stress._get_gpu_info", lambda: ("FakeGPU", 12288.0))
+    monkeypatch.setattr("atomics.load.stress._get_vram_used_mb", lambda: 4000.0)
 
     import httpx
 
@@ -250,7 +250,7 @@ def test_cli_stress_command_with_save(monkeypatch, tmp_path):
             total_requests=5,
         )
 
-    monkeypatch.setattr("atomics.stress.run_stress", fake_run_stress)
+    monkeypatch.setattr("atomics.load.stress.run_stress", fake_run_stress)
     monkeypatch.setenv("ATOMICS_DB_PATH", str(tmp_path / "test.db"))
 
     runner = CliRunner()
@@ -302,7 +302,7 @@ def test_cli_stress_command_no_save(monkeypatch, tmp_path):
             total_requests=5,
         )
 
-    monkeypatch.setattr("atomics.stress.run_stress", fake_run_stress)
+    monkeypatch.setattr("atomics.load.stress.run_stress", fake_run_stress)
     monkeypatch.setenv("ATOMICS_DB_PATH", str(tmp_path / "test.db"))
 
     runner = CliRunner()
@@ -365,7 +365,7 @@ def test_cli_stress_throttling_detected(monkeypatch, tmp_path):
             total_requests=15,
         )
 
-    monkeypatch.setattr("atomics.stress.run_stress", fake_run_stress)
+    monkeypatch.setattr("atomics.load.stress.run_stress", fake_run_stress)
     monkeypatch.setenv("ATOMICS_DB_PATH", str(tmp_path / "test.db"))
 
     runner = CliRunner()
@@ -405,8 +405,8 @@ def test_cli_stress_help():
 @pytest.mark.asyncio
 async def test_run_stress_provider_basic():
     """run_stress_provider uses BaseProvider.generate() and tracks cost."""
+    from atomics.load.stress import run_stress_provider
     from atomics.providers.base import ProviderResponse
-    from atomics.stress import run_stress_provider
 
     call_count = 0
 
@@ -457,8 +457,8 @@ async def test_run_stress_provider_basic():
 @pytest.mark.asyncio
 async def test_run_stress_provider_on_phase_callback():
     """on_phase callback fires for each concurrency level."""
+    from atomics.load.stress import run_stress_provider
     from atomics.providers.base import ProviderResponse
-    from atomics.stress import run_stress_provider
 
     async def fake_generate(prompt, **kwargs):
         return ProviderResponse(
@@ -491,8 +491,8 @@ async def test_run_stress_provider_on_phase_callback():
 
 @pytest.mark.asyncio
 async def test_run_stress_provider_on_phase_start_fires_before_phase():
+    from atomics.load.stress import run_stress_provider
     from atomics.providers.base import ProviderResponse
-    from atomics.stress import run_stress_provider
 
     async def fake_generate(prompt, **kwargs):
         return ProviderResponse(
@@ -527,8 +527,8 @@ async def test_run_stress_provider_on_phase_start_fires_before_phase():
 @pytest.mark.asyncio
 async def test_run_stress_provider_handles_failures():
     """Failed requests don't crash; they increment failed counter."""
+    from atomics.load.stress import run_stress_provider
     from atomics.providers.base import ProviderResponse
-    from atomics.stress import run_stress_provider
 
     call_count = 0
 
@@ -566,8 +566,8 @@ async def test_run_stress_provider_handles_failures():
 @pytest.mark.asyncio
 async def test_run_stress_provider_tps_fallback():
     """When tokens_per_second is None, compute from output_tokens/latency."""
+    from atomics.load.stress import run_stress_provider
     from atomics.providers.base import ProviderResponse
-    from atomics.stress import run_stress_provider
 
     async def fake_generate(prompt, **kwargs):
         return ProviderResponse(
@@ -634,7 +634,7 @@ def test_cli_stress_with_provider(monkeypatch, tmp_path):
             total_cost_usd=0.005,
         )
 
-    monkeypatch.setattr("atomics.stress.run_stress_provider", fake_run_stress_provider)
+    monkeypatch.setattr("atomics.load.stress.run_stress_provider", fake_run_stress_provider)
     monkeypatch.setenv("ATOMICS_DB_PATH", str(tmp_path / "test.db"))
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test-fake")
 
@@ -689,7 +689,7 @@ def test_cli_stress_provider_claude(monkeypatch, tmp_path):
             total_cost_usd=0.008,
         )
 
-    monkeypatch.setattr("atomics.stress.run_stress_provider", fake_run_stress_provider)
+    monkeypatch.setattr("atomics.load.stress.run_stress_provider", fake_run_stress_provider)
     monkeypatch.setenv("ATOMICS_DB_PATH", str(tmp_path / "test.db"))
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test-fake")
 
@@ -744,7 +744,7 @@ def test_cli_stress_provider_save_cost(monkeypatch, tmp_path):
             total_cost_usd=0.010,
         )
 
-    monkeypatch.setattr("atomics.stress.run_stress_provider", fake_run_stress_provider)
+    monkeypatch.setattr("atomics.load.stress.run_stress_provider", fake_run_stress_provider)
     monkeypatch.setenv("ATOMICS_DB_PATH", str(tmp_path / "test.db"))
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test-fake")
 
@@ -772,7 +772,7 @@ def test_cli_stress_provider_save_cost(monkeypatch, tmp_path):
 
 class TestGPUInfo:
     def test_get_gpu_info_no_nvidia_smi(self):
-        from atomics.stress import _get_gpu_info
+        from atomics.load.stress import _get_gpu_info
 
         with patch("shutil.which", return_value=None):
             name, total = _get_gpu_info()
@@ -780,7 +780,7 @@ class TestGPUInfo:
         assert total is None
 
     def test_get_gpu_info_success(self):
-        from atomics.stress import _get_gpu_info
+        from atomics.load.stress import _get_gpu_info
 
         mock_result = MagicMock()
         mock_result.returncode = 0
@@ -794,7 +794,7 @@ class TestGPUInfo:
         assert total == 24576.0
 
     def test_get_gpu_info_nonzero_returncode(self):
-        from atomics.stress import _get_gpu_info
+        from atomics.load.stress import _get_gpu_info
 
         mock_result = MagicMock()
         mock_result.returncode = 1
@@ -808,7 +808,7 @@ class TestGPUInfo:
         assert total is None
 
     def test_get_gpu_info_exception(self):
-        from atomics.stress import _get_gpu_info
+        from atomics.load.stress import _get_gpu_info
 
         with (
             patch("shutil.which", return_value="/usr/bin/nvidia-smi"),
@@ -819,13 +819,13 @@ class TestGPUInfo:
         assert total is None
 
     def test_get_vram_used_no_smi(self):
-        from atomics.stress import _get_vram_used_mb
+        from atomics.load.stress import _get_vram_used_mb
 
         with patch("shutil.which", return_value=None):
             assert _get_vram_used_mb() is None
 
     def test_get_vram_used_success(self):
-        from atomics.stress import _get_vram_used_mb
+        from atomics.load.stress import _get_vram_used_mb
 
         mock_result = MagicMock()
         mock_result.returncode = 0
@@ -837,7 +837,7 @@ class TestGPUInfo:
             assert _get_vram_used_mb() == 8192.0
 
     def test_get_vram_used_nonzero_returncode(self):
-        from atomics.stress import _get_vram_used_mb
+        from atomics.load.stress import _get_vram_used_mb
 
         mock_result = MagicMock()
         mock_result.returncode = 1
@@ -849,7 +849,7 @@ class TestGPUInfo:
             assert _get_vram_used_mb() is None
 
     def test_get_vram_used_exception(self):
-        from atomics.stress import _get_vram_used_mb
+        from atomics.load.stress import _get_vram_used_mb
 
         with (
             patch("shutil.which", return_value="/usr/bin/nvidia-smi"),
@@ -899,9 +899,11 @@ class TestRunStressProfile:
 
     @pytest.mark.asyncio
     async def test_run_stress_profile_ollama(self):
-        from atomics.stress import run_stress_profile
+        from atomics.load.stress import run_stress_profile
 
-        with patch("atomics.profiles._single_request_profile", side_effect=_instant_profile_req):
+        with patch(
+            "atomics.load.profiles._single_request_profile", side_effect=_instant_profile_req
+        ):
             result = await run_stress_profile(
                 profile=_make_stress_ollama_profile(),
                 max_concurrency=2,
@@ -915,9 +917,11 @@ class TestRunStressProfile:
 
     @pytest.mark.asyncio
     async def test_run_stress_profile_http(self):
-        from atomics.stress import run_stress_profile
+        from atomics.load.stress import run_stress_profile
 
-        with patch("atomics.profiles._single_request_profile", side_effect=_instant_profile_req):
+        with patch(
+            "atomics.load.profiles._single_request_profile", side_effect=_instant_profile_req
+        ):
             result = await run_stress_profile(
                 profile=_make_stress_http_profile(),
                 max_concurrency=1,
@@ -928,14 +932,16 @@ class TestRunStressProfile:
 
     @pytest.mark.asyncio
     async def test_run_stress_profile_on_phase_callback(self):
-        from atomics.stress import run_stress_profile
+        from atomics.load.stress import run_stress_profile
 
         phases_received: list[ConcurrencyResult] = []
 
         def on_phase(p: ConcurrencyResult) -> None:
             phases_received.append(p)
 
-        with patch("atomics.profiles._single_request_profile", side_effect=_instant_profile_req):
+        with patch(
+            "atomics.load.profiles._single_request_profile", side_effect=_instant_profile_req
+        ):
             result = await run_stress_profile(
                 profile=_make_stress_ollama_profile(),
                 max_concurrency=2,
@@ -946,7 +952,7 @@ class TestRunStressProfile:
 
     @pytest.mark.asyncio
     async def test_run_stress_profile_failure_in_phase(self):
-        from atomics.stress import run_stress_profile
+        from atomics.load.stress import run_stress_profile
 
         call_n = [0]
 
@@ -956,7 +962,7 @@ class TestRunStressProfile:
                 raise RuntimeError("gate error")
             return ("ok", 10.0, "pass")
 
-        with patch("atomics.profiles._single_request_profile", side_effect=_sometimes_fail):
+        with patch("atomics.load.profiles._single_request_profile", side_effect=_sometimes_fail):
             result = await run_stress_profile(
                 profile=_make_stress_ollama_profile(),
                 max_concurrency=1,
@@ -966,9 +972,11 @@ class TestRunStressProfile:
 
     @pytest.mark.asyncio
     async def test_run_stress_profile_saturation_concurrency_set(self):
-        from atomics.stress import run_stress_profile
+        from atomics.load.stress import run_stress_profile
 
-        with patch("atomics.profiles._single_request_profile", side_effect=_instant_profile_req):
+        with patch(
+            "atomics.load.profiles._single_request_profile", side_effect=_instant_profile_req
+        ):
             result = await run_stress_profile(
                 profile=_make_stress_ollama_profile(),
                 max_concurrency=4,
@@ -978,9 +986,11 @@ class TestRunStressProfile:
 
     @pytest.mark.asyncio
     async def test_run_stress_profile_no_prompts_uses_stress_prompts(self):
-        from atomics.stress import run_stress_profile
+        from atomics.load.stress import run_stress_profile
 
-        with patch("atomics.profiles._single_request_profile", side_effect=_instant_profile_req):
+        with patch(
+            "atomics.load.profiles._single_request_profile", side_effect=_instant_profile_req
+        ):
             result = await run_stress_profile(
                 profile=_make_stress_http_profile(),
                 max_concurrency=1,

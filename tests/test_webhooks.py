@@ -8,7 +8,7 @@ import httpx
 import pytest
 
 from atomics.models import RunSummary
-from atomics.webhooks import (
+from atomics.reporting.webhooks import (
     _build_discord_payload,
     _build_generic_payload,
     _build_slack_payload,

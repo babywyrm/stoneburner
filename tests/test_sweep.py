@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from atomics.sweep import ModelSweepResult, run_model_sweep
+from atomics.benchmark.sweep import ModelSweepResult, run_model_sweep
 
 
 def _make_mock_provider(name: str = "ollama") -> AsyncMock:

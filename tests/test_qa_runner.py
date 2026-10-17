@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from atomics.qa_runner import (
+from atomics.benchmark.qa_runner import (
     QAError,
     QAFixture,
     QAResult,
@@ -508,7 +508,7 @@ class TestQARunnerProfileMode:
         async def _fake_query_profile(client, profile, prompt):
             return ("gate response", 250.0)
 
-        with patch("atomics.qa_runner._query_profile", side_effect=_fake_query_profile):
+        with patch("atomics.benchmark.qa_runner._query_profile", side_effect=_fake_query_profile):
             suite = await run_qa_suite(model="", host="", fixtures=[fixture], profile=fake_profile)
 
         assert suite.total == 1
@@ -545,7 +545,7 @@ class TestQARunnerProfileMode:
         async def _fake_query_profile(client, profile, prompt):
             return ("I cannot do that", 100.0)
 
-        with patch("atomics.qa_runner._query_profile", side_effect=_fake_query_profile):
+        with patch("atomics.benchmark.qa_runner._query_profile", side_effect=_fake_query_profile):
             suite = await run_qa_suite(model="", host="", fixtures=[fixture], profile=MagicMock())
 
         assert suite.results[0].status == "PASS"
@@ -558,7 +558,7 @@ class TestQARunnerProfileMode:
         async def _failing_profile(client, profile, prompt):
             raise ConnectionError("gate unreachable")
 
-        with patch("atomics.qa_runner._query_profile", side_effect=_failing_profile):
+        with patch("atomics.benchmark.qa_runner._query_profile", side_effect=_failing_profile):
             suite = await run_qa_suite(model="", host="", fixtures=[fixture], profile=MagicMock())
 
         assert suite.results[0].status == "ERROR"
@@ -609,8 +609,8 @@ class TestQACLI:
     def test_qa_no_thinking_is_forwarded_to_runner(self):
         from click.testing import CliRunner
 
+        from atomics.benchmark.qa_runner import QAFixture, QAResult, QASuiteResult
         from atomics.cli import cli
-        from atomics.qa_runner import QAFixture, QAResult, QASuiteResult
 
         yaml_content = (
             "model: qwen3.8:27b\nhost: http://fake:11434\n"
@@ -624,7 +624,7 @@ class TestQACLI:
         )
 
         with patch(
-            "atomics.qa_runner.run_qa_suite", new=AsyncMock(return_value=fake_suite)
+            "atomics.benchmark.qa_runner.run_qa_suite", new=AsyncMock(return_value=fake_suite)
         ) as mock_run:
             result = CliRunner().invoke(
                 cli, ["qa", "--file", path, "--no-thinking", "--effort", "low"]
@@ -639,8 +639,8 @@ class TestQACLI:
 
         from click.testing import CliRunner
 
+        from atomics.benchmark.qa_runner import QAFixture, QAResult, QASuiteResult
         from atomics.cli import cli
-        from atomics.qa_runner import QAFixture, QAResult, QASuiteResult
 
         yaml_content = (
             "model: test\nhost: http://fake:11434\n"
@@ -664,7 +664,7 @@ class TestQACLI:
         )
 
         with patch(
-            "atomics.qa_runner.run_qa_suite", new=AsyncMock(return_value=fake_suite)
+            "atomics.benchmark.qa_runner.run_qa_suite", new=AsyncMock(return_value=fake_suite)
         ) as mock_run:
             result = CliRunner().invoke(cli, ["qa", "--file", qa_path, "--profile", profile_path])
 
@@ -676,8 +676,8 @@ class TestQACLI:
     def test_qa_runs_suite(self):
         from click.testing import CliRunner
 
+        from atomics.benchmark.qa_runner import QAFixture, QAResult, QASuiteResult
         from atomics.cli import cli
-        from atomics.qa_runner import QAFixture, QAResult, QASuiteResult
 
         yaml_content = (
             "model: test\nhost: http://fake:11434\n"
@@ -691,7 +691,9 @@ class TestQACLI:
             QAResult(fixture=f, response="ok", latency_ms=100.0, status="PASS")
         )
 
-        with patch("atomics.qa_runner.run_qa_suite", new=AsyncMock(return_value=fake_suite)):
+        with patch(
+            "atomics.benchmark.qa_runner.run_qa_suite", new=AsyncMock(return_value=fake_suite)
+        ):
             result = CliRunner().invoke(cli, ["qa", "--file", path])
 
         assert result.exit_code == 0
@@ -699,8 +701,8 @@ class TestQACLI:
     def test_qa_prints_token_counts_when_present(self):
         from click.testing import CliRunner
 
+        from atomics.benchmark.qa_runner import QAFixture, QAResult, QASuiteResult
         from atomics.cli import cli
-        from atomics.qa_runner import QAFixture, QAResult, QASuiteResult
 
         yaml_content = (
             "model: test\nhost: http://fake:11434\n"
@@ -722,7 +724,9 @@ class TestQACLI:
             )
         )
 
-        with patch("atomics.qa_runner.run_qa_suite", new=AsyncMock(return_value=fake_suite)):
+        with patch(
+            "atomics.benchmark.qa_runner.run_qa_suite", new=AsyncMock(return_value=fake_suite)
+        ):
             result = CliRunner().invoke(cli, ["qa", "--file", path])
 
         assert result.exit_code == 0, result.output
@@ -733,8 +737,8 @@ class TestQACLI:
     def test_qa_exits_nonzero_on_fail(self):
         from click.testing import CliRunner
 
+        from atomics.benchmark.qa_runner import QAFixture, QAResult, QASuiteResult
         from atomics.cli import cli
-        from atomics.qa_runner import QAFixture, QAResult, QASuiteResult
 
         yaml_content = (
             "model: test\nhost: http://fake:11434\n"
@@ -747,7 +751,9 @@ class TestQACLI:
             QAResult(fixture=f, response="nope", latency_ms=10.0, status="FAIL")
         )
 
-        with patch("atomics.qa_runner.run_qa_suite", new=AsyncMock(return_value=fake_suite)):
+        with patch(
+            "atomics.benchmark.qa_runner.run_qa_suite", new=AsyncMock(return_value=fake_suite)
+        ):
             result = CliRunner().invoke(cli, ["qa", "--file", path])
 
         assert result.exit_code == 1
@@ -778,7 +784,7 @@ def test_qa_profile_fail_fast_reports_the_stop() -> None:
     async def _nope(client, profile, prompt):
         return ("nope", 10.0)
 
-    with patch("atomics.qa_runner._query_profile", side_effect=_nope):
+    with patch("atomics.benchmark.qa_runner._query_profile", side_effect=_nope):
         result = CliRunner().invoke(
             cli, ["qa", "--file", qa_path, "--profile", profile_path, "--fail-fast"]
         )
@@ -793,8 +799,8 @@ def test_qa_profile_fail_fast_reports_the_stop() -> None:
 @pytest.mark.asyncio
 async def test_qa_ollama_sends_bounded_context() -> None:
     """Raw QA posts /api/generate itself, so the provider cap does not apply."""
+    from atomics.benchmark.qa_runner import _query_ollama
     from atomics.providers.ollama import DEFAULT_NUM_CTX
-    from atomics.qa_runner import _query_ollama
 
     mock_response = MagicMock()
     mock_response.raise_for_status = MagicMock()
@@ -814,7 +820,7 @@ async def test_qa_ollama_sends_bounded_context() -> None:
 
 @pytest.mark.asyncio
 async def test_qa_ollama_refuses_a_non_http_host() -> None:
-    from atomics.qa_runner import _query_ollama
+    from atomics.benchmark.qa_runner import _query_ollama
 
     client = AsyncMock()
     with pytest.raises(ValueError, match="unsupported scheme"):

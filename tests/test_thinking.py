@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from atomics.model_classes import THINKING_CAPABLE, supports_thinking
+from atomics.benchmark.model_classes import THINKING_CAPABLE, supports_thinking
 from atomics.providers.base import ProviderResponse
 
 

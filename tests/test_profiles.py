@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from atomics.profiles import (
+from atomics.load.profiles import (
     ProfileError,
     TargetProfile,
     _extract_latency,
@@ -514,7 +514,7 @@ class TestExtractLatency:
 class TestSingleRequestProfile:
     @pytest.mark.asyncio
     async def test_ollama_mode(self):
-        from atomics.profiles import _single_request_profile
+        from atomics.load.profiles import _single_request_profile
 
         mock_resp = MagicMock()
         mock_resp.status_code = 200
@@ -558,7 +558,7 @@ class TestSingleRequestProfile:
 
     @pytest.mark.asyncio
     async def test_http_mode_json(self):
-        from atomics.profiles import _single_request_profile
+        from atomics.load.profiles import _single_request_profile
 
         mock_resp = MagicMock()
         mock_resp.status_code = 200
@@ -591,7 +591,7 @@ class TestSingleRequestProfile:
 
     @pytest.mark.asyncio
     async def test_http_mode_text(self):
-        from atomics.profiles import _single_request_profile
+        from atomics.load.profiles import _single_request_profile
 
         mock_resp = MagicMock()
         mock_resp.status_code = 200
@@ -617,7 +617,7 @@ class TestSingleRequestProfile:
 
     @pytest.mark.asyncio
     async def test_http_get_method(self):
-        from atomics.profiles import _single_request_profile
+        from atomics.load.profiles import _single_request_profile
 
         mock_resp = MagicMock()
         mock_resp.status_code = 200
@@ -642,7 +642,7 @@ class TestSingleRequestProfile:
 
     @pytest.mark.asyncio
     async def test_no_classification_returns_none(self):
-        from atomics.profiles import _single_request_profile
+        from atomics.load.profiles import _single_request_profile
 
         mock_resp = MagicMock()
         mock_resp.status_code = 200

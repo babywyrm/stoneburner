@@ -6,8 +6,8 @@ from unittest.mock import patch
 
 from click.testing import CliRunner
 
+from atomics.benchmark.labcompare import CellResult
 from atomics.cli import cli
-from atomics.labcompare import CellResult
 
 
 def test_labcompare_cli_renders_table():

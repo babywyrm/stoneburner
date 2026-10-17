@@ -6,7 +6,7 @@ import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 
-from atomics.advisor import analyze_cost_optimization
+from atomics.benchmark.advisor import analyze_cost_optimization
 from atomics.models import TaskCategory, TaskResult, TaskStatus
 from atomics.storage.repository import MetricsRepository
 from atomics.storage.schema import init_db

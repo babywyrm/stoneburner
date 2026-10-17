@@ -843,8 +843,8 @@ def test_cli_run_post_hook(monkeypatch, tmp_path):
     monkeypatch.setattr("atomics.core.engine.LoopEngine", DummyEngine)
     monkeypatch.setattr("atomics.storage.repository.MetricsRepository", _NullRepo)
     monkeypatch.setattr("atomics.providers.claude.ClaudeProvider", DummyClaude)
-    monkeypatch.setattr("atomics.hooks.run_post_hook", capture_hook)
-    monkeypatch.setattr("atomics.hooks.notify_run_complete", lambda *_a, **_k: None)
+    monkeypatch.setattr("atomics.reporting.hooks.run_post_hook", capture_hook)
+    monkeypatch.setattr("atomics.reporting.hooks.notify_run_complete", lambda *_a, **_k: None)
 
     result = runner.invoke(
         cli,
@@ -982,7 +982,7 @@ def test_cli_provider_test_generate_failure_is_not_a_pass(monkeypatch):
 
 def test_cli_sweep_command(monkeypatch):
     """atomics sweep should run eval across multiple models."""
-    from atomics.sweep import ModelSweepResult
+    from atomics.benchmark.sweep import ModelSweepResult
 
     mock_results = [
         ModelSweepResult(
@@ -1014,7 +1014,7 @@ def test_cli_sweep_command(monkeypatch):
                 cb(r)
         return mock_results
 
-    monkeypatch.setattr("atomics.sweep.run_model_sweep", fake_sweep)
+    monkeypatch.setattr("atomics.benchmark.sweep.run_model_sweep", fake_sweep)
     runner = CliRunner()
     result = runner.invoke(
         cli,
@@ -1034,7 +1034,7 @@ def test_cli_sweep_command(monkeypatch):
 
 def test_cli_sweep_cloud_provider(monkeypatch):
     """atomics sweep --provider claude should work with cloud models."""
-    from atomics.sweep import ModelSweepResult
+    from atomics.benchmark.sweep import ModelSweepResult
 
     mock_results = [
         ModelSweepResult(
@@ -1062,7 +1062,7 @@ def test_cli_sweep_cloud_provider(monkeypatch):
                 cb(r)
         return mock_results
 
-    monkeypatch.setattr("atomics.sweep.run_model_sweep", fake_sweep)
+    monkeypatch.setattr("atomics.benchmark.sweep.run_model_sweep", fake_sweep)
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test-fake-key")
     runner = CliRunner()
     result = runner.invoke(
@@ -1083,7 +1083,7 @@ def test_cli_sweep_cloud_provider(monkeypatch):
 
 def test_cli_sweep_openai_provider(monkeypatch):
     """atomics sweep --provider openai should work with OpenAI models."""
-    from atomics.sweep import ModelSweepResult
+    from atomics.benchmark.sweep import ModelSweepResult
 
     mock_results = [
         ModelSweepResult(
@@ -1105,7 +1105,7 @@ def test_cli_sweep_openai_provider(monkeypatch):
                 cb(r)
         return mock_results
 
-    monkeypatch.setattr("atomics.sweep.run_model_sweep", fake_sweep)
+    monkeypatch.setattr("atomics.benchmark.sweep.run_model_sweep", fake_sweep)
     monkeypatch.setenv("OPENAI_API_KEY", "sk-proj-test-fake-key")
     runner = CliRunner()
     result = runner.invoke(
@@ -1186,11 +1186,11 @@ def test_cli_sweep_verbose_shows_replies(monkeypatch):
     """atomics sweep --verbose should print actual model replies."""
     from datetime import UTC, datetime
 
+    from atomics.benchmark.sweep import ModelSweepResult
     from atomics.eval.fixtures import EvalFixture
     from atomics.eval.judge import JudgeResult
     from atomics.eval.runner import EvalRunSummary, FixtureResult
     from atomics.models import TaskCategory, TaskComplexity, TaskResult, TaskStatus
-    from atomics.sweep import ModelSweepResult
 
     fixture = EvalFixture(
         id="ev-01",
@@ -1257,7 +1257,7 @@ def test_cli_sweep_verbose_shows_replies(monkeypatch):
                 model_cb(r)
         return mock_results
 
-    monkeypatch.setattr("atomics.sweep.run_model_sweep", fake_sweep)
+    monkeypatch.setattr("atomics.benchmark.sweep.run_model_sweep", fake_sweep)
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test-fake-key")
     runner = CliRunner()
     result = runner.invoke(
@@ -1280,11 +1280,11 @@ def test_cli_sweep_no_verbose_hides_replies(monkeypatch):
     """Without --verbose, sweep should NOT print full replies."""
     from datetime import UTC, datetime
 
+    from atomics.benchmark.sweep import ModelSweepResult
     from atomics.eval.fixtures import EvalFixture
     from atomics.eval.judge import JudgeResult
     from atomics.eval.runner import EvalRunSummary, FixtureResult
     from atomics.models import TaskCategory, TaskComplexity, TaskResult, TaskStatus
-    from atomics.sweep import ModelSweepResult
 
     fixture = EvalFixture(
         id="ev-01",
@@ -1351,7 +1351,7 @@ def test_cli_sweep_no_verbose_hides_replies(monkeypatch):
                 model_cb(r)
         return mock_results
 
-    monkeypatch.setattr("atomics.sweep.run_model_sweep", fake_sweep)
+    monkeypatch.setattr("atomics.benchmark.sweep.run_model_sweep", fake_sweep)
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test-fake-key")
     runner = CliRunner()
     result = runner.invoke(
@@ -1546,7 +1546,7 @@ def test_cli_provider_test_brain_gateway_default_label(monkeypatch):
 
 def test_cli_sweep_vllm_provider(monkeypatch, tmp_path):
     """atomics sweep --provider vllm should use VllmProvider via _make_provider."""
-    from atomics.sweep import ModelSweepResult
+    from atomics.benchmark.sweep import ModelSweepResult
 
     constructed: list[str] = []
 
@@ -1582,7 +1582,7 @@ def test_cli_sweep_vllm_provider(monkeypatch, tmp_path):
         return mock_results
 
     monkeypatch.setattr("atomics.providers.vllm.VllmProvider", FakeVllm)
-    monkeypatch.setattr("atomics.sweep.run_model_sweep", fake_sweep)
+    monkeypatch.setattr("atomics.benchmark.sweep.run_model_sweep", fake_sweep)
     monkeypatch.chdir(tmp_path)
 
     runner = CliRunner()
@@ -1741,7 +1741,7 @@ def test_cli_baselines_with_records(tmp_path, monkeypatch):
         ),
     ]
 
-    monkeypatch.setattr("atomics.regression.list_baselines", lambda _conn: fake_records)
+    monkeypatch.setattr("atomics.load.regression.list_baselines", lambda _conn: fake_records)
     monkeypatch.chdir(tmp_path)
 
     runner = CliRunner()

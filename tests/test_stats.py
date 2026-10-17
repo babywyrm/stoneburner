@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from atomics.stats import percentile
+from atomics.reporting.stats import percentile
 
 
 def test_percentile_empty_is_zero():
