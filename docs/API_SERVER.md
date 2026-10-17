@@ -246,8 +246,8 @@ completes the job so the document is readable. `submit_battery` marks that
 step `ok: false`, matching the CLI exit. A toolcall probe skip is `ok: false`
 too (`--no-skip-incapable` on battery toolcall steps). Each step runs the
 fixtures its CLI step selects (`--category`, `--mode`, `--fixtures`).
-Battery `runs` (1–3) repeats the adversarial, redblue, and toolcall steps;
-other steps run once. Unset keeps each step's default (agent-gate's
+Battery `runs` (1–3) repeats the adversarial, redblue, refusal,
+codereview, and toolcall steps; other steps run once. Unset keeps each step's default (agent-gate's
 toolcall step runs 3). Battery `thinking` defaults to off, as CLI
 `battery` sends `--no-thinking`; send `true` to turn it on.
 
@@ -265,7 +265,8 @@ at `total`.
 Dashboard `#job=` still shows the current `in_flight` plus the
 fixture / phase / sample tables, not the trail. `POST /evals` accepts
 optional `host` and `judge_host` (CLI `--judge-host`: judge on a second
-Ollama). `runs` is 1–3 on `adversarial` / `redblue` / `toolcall`; other
+Ollama). `runs` is 1–3 on `adversarial` / `redblue` / `refusal` /
+`codereview` / `toolcall`; other
 suites return `422` if `runs > 1`. `channel` is `both` / `tools` /
 `prose` on `toolcall` only (CLI `--channel`). `temperature` (0–2, CLI
 `--temperature`) pins the model under test on `accuracy` / `adversarial` /

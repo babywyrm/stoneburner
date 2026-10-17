@@ -22,6 +22,7 @@ class BatteryStep:
     mode: str | None = None
     qa_file: str | None = None
     repo: str | None = None
+    channel: str | None = None
     extra: tuple[str, ...] = ()
     runs: int | None = None
 
@@ -66,7 +67,8 @@ BATTERIES: tuple[Battery, ...] = (
                 suite="toolcall",
                 purpose="Shadow vs rm — one dangerous, one no-call is a finding not a pass",
                 fixtures=("tc-01", "tc-02"),
-                extra=("--channel", "tools", "--no-save", "--no-skip-incapable"),
+                channel="tools",
+                extra=("--no-save", "--no-skip-incapable"),
             ),
         ),
     ),
@@ -151,7 +153,8 @@ BATTERIES: tuple[Battery, ...] = (
                     " no judge required for this step"
                 ),
                 category="direct",
-                extra=("--channel", "tools", "--no-save", "--no-skip-incapable"),
+                channel="tools",
+                extra=("--no-save", "--no-skip-incapable"),
                 runs=3,
             ),
         ),
@@ -204,7 +207,12 @@ def get_battery(name: str) -> Battery:
         raise KeyError(f"unknown battery {name!r}. Known: {known}") from exc
 
 
-_JUDGED = frozenset({"adversarial", "redblue", "refusal", "codereview", "archreview"})
+# One rule set for CLI `battery run` and `POST /batteries`; tests/test_battery_parity.py
+# fails when the two hand a runner different work.
+JUDGED_SUITES = frozenset({"adversarial", "redblue", "refusal", "codereview", "archreview"})
+RUNS_SUITES = frozenset(
+    {"adversarial", "redblue", "refusal", "codereview", "toolcall", "archreview"}
+)
 _BUDGET_SUITES = frozenset(
     {"adversarial", "redblue", "refusal", "codereview", "toolcall", "archreview"}
 )
@@ -219,6 +227,31 @@ _NO_THINKING_SUITES = frozenset(
         "codereview",
     }
 )
+
+
+def step_runs(step: BatteryStep, override: int | None) -> int | None:
+    """A caller's runs replace the step's own default; suites without runs get None."""
+    count = override if override is not None else step.runs
+    return count if step.suite in RUNS_SUITES else None
+
+
+def step_fixture_ids(step: BatteryStep) -> list[str] | None:
+    """The fixture ids the step's --fixtures / --category / --mode select; None is all."""
+    if step.fixtures:
+        return list(step.fixtures)
+    if step.suite == "adversarial" and step.categories:
+        from atomics.eval.adversarial import select_fixtures as select_adversarial
+
+        return [f.id for f in select_adversarial(step.categories)]
+    if step.suite == "toolcall" and step.category:
+        from atomics.eval.toolcall.fixtures import select_fixtures as select_toolcall
+
+        return [f.id for f in select_toolcall(category=step.category)]
+    if step.suite == "redblue" and step.mode:
+        from atomics.eval.redblue.fixtures import select_fixtures as select_redblue
+
+        return [f.id for f in select_redblue(step.mode)]
+    return None
 
 
 def visible_steps(
@@ -353,7 +386,7 @@ def step_args(
         args.extend(["--category", step.category])
     if step.fixtures:
         args.extend(["--fixtures", ",".join(step.fixtures)])
-    if step.suite in _JUDGED:
+    if step.suite in JUDGED_SUITES:
         if judge_provider:
             args.extend(["--judge-provider", judge_provider])
         if judge_model:
@@ -365,5 +398,7 @@ def step_args(
     if step.suite in _NO_THINKING_SUITES:
         args.extend(_effort_flags(effort, reasoning_mode))
         args.extend(pinned)
+    if step.channel:
+        args.extend(["--channel", step.channel])
     args.extend(step.extra)
     return args

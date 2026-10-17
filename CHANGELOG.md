@@ -16,6 +16,8 @@
   `submit_eval` / `submit_sweep`, matching CLI `--temperature`. Eval
   results echo it. An eval suite that cannot pin it (rag, multiturn,
   codegen) returns `422` rather than silently sampling.
+- `runs` (1–3) on `POST /evals` and MCP `submit_eval` for `refusal`
+  and `codereview`, matching their CLI `--runs`.
 
 ### Changed
 - `battery agent-gate` runs its toolcall step three times by default
@@ -41,6 +43,12 @@
   `from atomics.load.stress import X`.
 
 ### Fixed
+- `POST /batteries` ran refusal and codereview steps once whatever
+  `runs` said, and handed toolcall steps a judge the CLI never gives
+  them. CLI and API now build every step from one rule set in
+  `eval/batteries.py`, and `tests/test_battery_parity.py` runs both
+  paths and fails if any runner gets different fixtures, runs,
+  temperature, thinking, channel, or judge.
 - `POST /batteries` (and MCP `submit_battery`) ran every fixture of a
   step's suite: agent-gate ran all 72 adversarial fixtures instead of
   22 and all 20 toolcall fixtures instead of 4, and blue/red-capability

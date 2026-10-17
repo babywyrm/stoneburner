@@ -16,6 +16,7 @@ from atomics.eval.batteries import (
     BatteryStep,
     get_battery,
     step_args,
+    step_runs,
     visible_steps,
 )
 
@@ -204,15 +205,12 @@ def invoke_atomics(args: list[str]) -> int:
 
 
 _PAID = frozenset({"openai", "claude", "bedrock", "groq", "together", "gemini"})
-_RUNS_SUITES = frozenset(
-    {"adversarial", "redblue", "refusal", "codereview", "toolcall", "archreview"}
-)
 
 
 def _with_runs(args: list[str], step: BatteryStep, runs: int | None) -> list[str]:
     """`--runs` replaces a step's own default rather than repeating it."""
-    count = runs if runs is not None else step.runs
-    if count is not None and step.suite in _RUNS_SUITES:
+    count = step_runs(step, runs)
+    if count is not None:
         args.extend(["--runs", str(count)])
     return args
 

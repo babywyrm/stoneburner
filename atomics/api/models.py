@@ -27,7 +27,7 @@ MAX_EVAL_BUDGET_USD = 1000.0
 MAX_SWEEP_MODELS = 8
 MAX_SWEEP_RUNS = 3
 # CLI --runs 3 exists on these suites. Accuracy / multiturn / rag / … are one pass.
-EVAL_RUNS_SUITES = frozenset({"adversarial", "redblue", "toolcall"})
+EVAL_RUNS_SUITES = frozenset({"adversarial", "redblue", "refusal", "codereview", "toolcall"})
 # Suites whose runners pin the model's sampling temperature (CLI --temperature).
 EVAL_TEMPERATURE_SUITES = frozenset(
     {"accuracy", "adversarial", "redblue", "refusal", "codereview", "toolcall"}
@@ -207,7 +207,7 @@ class BatteryRequest(BaseModel):
     thinking: bool = False
     effort: str | None = None
     reasoning_mode: str | None = None
-    # None keeps each step's own default; runs apply only to EVAL_RUNS_SUITES steps.
+    # None keeps each step's own default; runs apply only to eval.batteries.RUNS_SUITES steps.
     runs: int | None = Field(default=None, ge=1, le=MAX_SWEEP_RUNS)
     temperature: float | None = Field(default=None, ge=0.0, le=2.0)
     profile: str | None = None

@@ -10,7 +10,7 @@ from fastapi import HTTPException
 
 from atomics.api import _runners as runners
 from atomics.api.jobs import Job, JobStatus
-from atomics.api.models import EvalRequest, RunRequest
+from atomics.api.models import EVAL_RUNS_SUITES, EvalRequest, RunRequest
 from atomics.eval.budget import GuardedProvider
 from atomics.providers.factory import ProviderConfigError
 
@@ -568,6 +568,14 @@ async def test_run_eval_suite_pins_temperature(suite, runner_attr):
         result = await runners.run_eval_suite(payload)
     assert run.await_args.kwargs["temperature"] == 0.0
     assert result["temperature"] == 0.0
+    if suite in EVAL_RUNS_SUITES:
+        payload = EvalRequest(suite=suite, provider="ollama", model="m1", runs=2)
+        with (
+            patch.object(runners, "_provider_for", side_effect=[MagicMock(), MagicMock()]),
+            patch.object(runners, runner_attr, new_callable=AsyncMock, return_value=summary) as run,
+        ):
+            await runners.run_eval_suite(payload)
+        assert run.await_args.kwargs["runs"] == 2
 
 
 @pytest.mark.parametrize("suite", ["rag", "multiturn", "codegen"])

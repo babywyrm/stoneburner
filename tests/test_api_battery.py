@@ -109,7 +109,7 @@ async def test_battery_steps_run_the_cli_subset(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_battery_runs_default_per_step_and_skip_single_pass_suites(monkeypatch):
+async def test_battery_runs_default_per_step_and_reach_every_judged_suite(monkeypatch):
     captured = _capture_eval_steps(monkeypatch)
     gate = {"name": "agent-gate", "provider": "ollama", "model": "x", "budget_usd": 5}
 
@@ -123,7 +123,7 @@ async def test_battery_runs_default_per_step_and_skip_single_pass_suites(monkeyp
         BatteryRequest(name="blue-capability", provider="ollama", model="x", budget_usd=5, runs=3)
     )
     assert [s["suite"] for s in result["steps"]] == ["redblue", "codereview", "refusal"]
-    assert (captured["redblue"].runs, captured["codereview"].runs) == (3, 1)
+    assert [captured[s].runs for s in ("redblue", "codereview", "refusal")] == [3, 3, 3]
 
 
 @pytest.mark.asyncio

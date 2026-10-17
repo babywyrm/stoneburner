@@ -16,57 +16,36 @@ from fastapi import HTTPException
 from atomics.api._discovery import run_provider_test
 from atomics.api._runners import run_eval_suite
 from atomics.api.jobs import Job
-from atomics.api.models import EVAL_RUNS_SUITES, BatteryRequest, EvalRequest, ProviderTestRequest
+from atomics.api.models import BatteryRequest, EvalRequest, ProviderTestRequest
 from atomics.benchmark.qa_runner import load_qa_suite, run_qa_suite
-from atomics.eval.adversarial import select_fixtures as select_adversarial
-from atomics.eval.batteries import BatteryStep, get_battery, visible_steps
+from atomics.eval.batteries import (
+    JUDGED_SUITES,
+    BatteryStep,
+    get_battery,
+    step_fixture_ids,
+    step_runs,
+    visible_steps,
+)
 from atomics.eval.budget import EvalBudgetExceededError
-from atomics.eval.redblue.fixtures import select_fixtures as select_redblue
-from atomics.eval.toolcall.fixtures import fixtures_for_category
-
-
-def _step_channel(step: Any) -> str | None:
-    extra = list(step.extra)
-    if "--channel" in extra:
-        return extra[extra.index("--channel") + 1]
-    return None
-
-
-def _step_fixtures(step: BatteryStep) -> list[str] | None:
-    """The fixture ids the CLI step's --category / --mode / --fixtures select."""
-    if step.fixtures:
-        return list(step.fixtures)
-    if step.suite == "adversarial" and step.categories:
-        return [f.id for f in select_adversarial(step.categories)]
-    if step.suite == "toolcall" and step.category:
-        return [f.id for f in fixtures_for_category(step.category)]
-    if step.suite == "redblue" and step.mode:
-        return [f.id for f in select_redblue(step.mode)]
-    return None
-
-
-def _step_runs(payload: BatteryRequest, step: BatteryStep) -> int:
-    if step.suite not in EVAL_RUNS_SUITES:
-        return 1
-    return payload.runs if payload.runs is not None else step.runs or 1
 
 
 def _step_to_eval(payload: BatteryRequest, step: BatteryStep) -> EvalRequest:
+    judged = step.suite in JUDGED_SUITES
     return EvalRequest(
         suite=step.suite,
         provider=payload.provider,
         model=payload.model,
-        judge_model=payload.judge_model,
+        judge_model=payload.judge_model if judged else None,
         host=payload.host,
-        judge_host=payload.judge_host,
+        judge_host=payload.judge_host if judged else None,
         budget_usd=payload.budget_usd,
         thinking=payload.thinking,
         effort=payload.effort,
         reasoning_mode=payload.reasoning_mode,
-        runs=_step_runs(payload, step),
+        runs=step_runs(step, payload.runs) or 1,
         temperature=payload.temperature,
-        fixtures=_step_fixtures(step),
-        channel=_step_channel(step),
+        fixtures=step_fixture_ids(step),
+        channel=step.channel,
     )
 
 

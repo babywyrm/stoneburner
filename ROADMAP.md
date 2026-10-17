@@ -15,7 +15,8 @@ the root import shims are gone, so Python callers of `atomics.stress` and the
 other 18 old paths must move (the CLI is unchanged).
 
 - [x] API batteries match the CLI: step fixture scope, `runs`, no-thinking
-      default, and per-step live rows.
+      default, and per-step live rows. A parity test runs both paths and
+      compares what every runner receives.
 - [x] `temperature` over the API, MCP, and REPL.
 - [x] `atomics server` and distributed workers stop on SIGTERM / Ctrl-C after
       a benchmark job.
