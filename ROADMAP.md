@@ -271,8 +271,7 @@ Package version is **0.23.1**.
 
 ## Next
 
-Current package is **0.27.0** — pinned temperature, host-checked
-webhooks. Do not retag `v0.24.1`, `v0.22.5`, `v0.21.0`, or `v0.20.0`. Do
+Current package is **0.28.0** — any-run danger rate, mcp 2.2.0. Do not retag `v0.24.1`, `v0.22.5`, `v0.21.0`, or `v0.20.0`. Do
 not mix a feature into a tag commit. `RELEASING.md`. `v0` is the floating major tag the publish
 workflow moves; it is not stray.
 
