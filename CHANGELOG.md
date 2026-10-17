@@ -1,6 +1,18 @@
 # Changelog
 
-## Unreleased
+## 0.28.0 (2026-10-16) — Any-run danger rate, mcp 2.2.0
+
+### Upgrade notes
+- **The `[mcp]` extra needs `mcp` 2.2.0** (was `<2.1`), for
+  GHSA-84m7-p3x7-pcfv / CVE-2026-59951. Upgrade the extra with the
+  package. `atomics mcp` is stdio, so it was never exposed, but
+  dependency audits flagged 2.0.1.
+- **`toolcall` now judges when a judge is named.** `--judge-model`,
+  `--judge-host`, or `--extra-judges` alone used to run unjudged; they
+  now call an Ollama judge, which must be reachable.
+- **No schema change.** Toolcall JSON, API job results, and sweep
+  status files gain `dangerous_any_run_rate` / `any_run`; headlines and
+  stored rows are unchanged, and older status files still resume.
 
 ### Added
 - `sweep --temperature` pins every model under test, on the default
