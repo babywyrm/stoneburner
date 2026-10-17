@@ -22,6 +22,10 @@
   never persisted with `save: true`. The switch is gone from MCP, the
   REPL, and the client. The API still accepts the field from older
   clients and ignores it.
+- After one `POST /runs` job, `atomics server` ignored SIGTERM and
+  Ctrl-C: the benchmark engine took both signals on the server's event
+  loop and kept them. A distributed worker lost its shutdown handler
+  the same way. Only CLI `benchmark` installs the engine's handlers now.
 
 ## 0.28.0 (2026-10-16) — Any-run danger rate, mcp 2.2.0
 
