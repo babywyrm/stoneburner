@@ -41,7 +41,11 @@ class LoopEngine:
         reasoning_mode: str | None = None,
         on_task_start: Callable[[str], None] | None = None,
         on_task_done: Callable[[TaskResult], None] | None = None,
+        # Only a caller that owns the process may take SIGINT/SIGTERM; a host
+        # loop (API server, worker pool) keeps its own shutdown handlers.
+        handle_signals: bool = False,
     ) -> None:
+        self._handle_signals = handle_signals
         self._provider = provider
         self._repo = repo
         self._settings = settings
@@ -84,7 +88,8 @@ class LoopEngine:
 
     async def run(self, max_iterations: int | None = None) -> RunSummary | None:
         """Start the benchmarking loop. Runs until shutdown signal or iteration cap."""
-        self._install_signal_handlers()
+        if self._handle_signals:
+            self._install_signal_handlers()
         self._run_id = uuid.uuid4().hex[:12]
         self._repo.create_run(
             self._run_id,

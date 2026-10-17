@@ -185,6 +185,7 @@ def run(
         thinking_budget=thinking_budget,
         effort=effort,
         reasoning_mode=reasoning_mode,
+        handle_signals=True,
     )
 
     from atomics.reporting.hooks import hook_env, notify_run_complete, run_post_hook

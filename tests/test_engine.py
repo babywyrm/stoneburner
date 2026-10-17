@@ -1,6 +1,7 @@
 """Tests for the loop engine using a mock provider."""
 
 import asyncio
+import signal
 
 import pytest
 
@@ -58,6 +59,18 @@ async def test_engine_runs_n_iterations(make_engine):
     runs = repo.get_recent_runs(limit=1)
     assert runs[0]["total_tasks"] == 5
     assert runs[0]["successful_tasks"] == 5
+    repo.close()
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_engine_leaves_the_host_process_signal_handlers_alone(make_engine):
+    # The API server and worker pool await run() on their own loop; taking
+    # SIGTERM there leaves the server unkillable after one benchmark job.
+    before = signal.getsignal(signal.SIGTERM)
+    engine, _, repo = make_engine()
+    await engine.run(max_iterations=1)
+    assert signal.getsignal(signal.SIGTERM) is before
     repo.close()
 
 
