@@ -10,7 +10,14 @@ from rich.console import Console
 from rich.table import Table
 
 from atomics.commands.common import PROVIDER_CHOICES, effort_options, temperature_option
-from atomics.eval.batteries import BATTERIES, Battery, get_battery, step_args, visible_steps
+from atomics.eval.batteries import (
+    BATTERIES,
+    Battery,
+    BatteryStep,
+    get_battery,
+    step_args,
+    visible_steps,
+)
 
 
 def _format_command(args: list[str]) -> str:
@@ -133,6 +140,7 @@ def battery_show(
             reasoning_mode=reasoning_mode,
             temperature=temperature,
         )
+        _with_runs(args, step, None)
         console.print(f"# {step.purpose}")
         console.print(_format_command(args))
     if item.optional_steps:
@@ -154,6 +162,7 @@ def battery_show(
                 reasoning_mode=reasoning_mode,
                 temperature=temperature,
             )
+            _with_runs(args, step, None)
             console.print(f"# {step.purpose}")
             console.print("# " + _format_command(args))
 
@@ -198,6 +207,14 @@ _PAID = frozenset({"openai", "claude", "bedrock", "groq", "together", "gemini"})
 _RUNS_SUITES = frozenset(
     {"adversarial", "redblue", "refusal", "codereview", "toolcall", "archreview"}
 )
+
+
+def _with_runs(args: list[str], step: BatteryStep, runs: int | None) -> list[str]:
+    """`--runs` replaces a step's own default rather than repeating it."""
+    count = runs if runs is not None else step.runs
+    if count is not None and step.suite in _RUNS_SUITES:
+        args.extend(["--runs", str(count)])
+    return args
 
 
 def _positive_budget(budget: str | None) -> bool:
@@ -265,8 +282,7 @@ def _run_battery(
             reasoning_mode=reasoning_mode,
             temperature=temperature,
         )
-        if runs is not None and step.suite in _RUNS_SUITES:
-            args.extend(["--runs", str(runs)])
+        _with_runs(args, step, runs)
         console.print(f"# {step.purpose}")
         console.print(_format_command(args))
         code = invoke_atomics(args)

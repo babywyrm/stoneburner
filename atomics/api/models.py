@@ -193,7 +193,8 @@ class BatteryRequest(BaseModel):
     thinking: bool | None = None
     effort: str | None = None
     reasoning_mode: str | None = None
-    runs: int = Field(default=1, ge=1, le=MAX_SWEEP_RUNS)
+    # None keeps each step's own default; runs apply only to EVAL_RUNS_SUITES steps.
+    runs: int | None = Field(default=None, ge=1, le=MAX_SWEEP_RUNS)
     profile: str | None = None
 
     @field_validator("profile")

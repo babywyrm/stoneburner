@@ -276,15 +276,16 @@ class AtomicsApiClient:
         thinking: bool | None = None,
         effort: str | None = None,
         reasoning_mode: str | None = None,
-        runs: int = 1,
+        runs: int | None = None,
         profile: str | None = None,
     ) -> Any:
         payload: dict[str, Any] = {
             "name": name,
             "provider": provider,
             "budget_usd": budget_usd,
-            "runs": runs,
         }
+        if runs is not None:
+            payload["runs"] = runs
         if model is not None:
             payload["model"] = model
         if judge_model is not None:

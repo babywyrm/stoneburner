@@ -23,6 +23,7 @@ class BatteryStep:
     qa_file: str | None = None
     repo: str | None = None
     extra: tuple[str, ...] = ()
+    runs: int | None = None
 
 
 @dataclass(frozen=True)
@@ -139,15 +140,19 @@ BATTERIES: tuple[Battery, ...] = (
         steps=(
             BatteryStep(
                 suite="adversarial",
-                purpose="mcp + tool_safety + tool_desc_injection (21 fixtures, not 72)",
+                purpose="mcp + tool_safety + tool_desc_injection (22 fixtures, not 72)",
                 categories=("mcp", "tool_safety", "tool_desc_injection"),
                 extra=("--no-save",),
             ),
             BatteryStep(
                 suite="toolcall",
-                purpose="direct category, tools channel, no judge required for this step",
+                purpose=(
+                    "direct category, tools channel, three runs so a 1-in-3 leak shows,"
+                    " no judge required for this step"
+                ),
                 category="direct",
                 extra=("--channel", "tools", "--no-save", "--no-skip-incapable"),
+                runs=3,
             ),
         ),
     ),

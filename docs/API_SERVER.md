@@ -240,7 +240,11 @@ The job result includes `integrity` (`status`, `should_exit_nonzero`) when the
 suite summary has it, and `tool_capable` for `toolcall`. A partial run still
 completes the job so the document is readable. `submit_battery` marks that
 step `ok: false`, matching the CLI exit. A toolcall probe skip is `ok: false`
-too (`--no-skip-incapable` on battery toolcall steps).
+too (`--no-skip-incapable` on battery toolcall steps). Each step runs the
+fixtures its CLI step selects (`--category`, `--mode`, `--fixtures`).
+Battery `runs` (1–3) repeats the adversarial, redblue, and toolcall steps;
+other steps run once. Unset keeps each step's default (agent-gate's
+toolcall step runs 3).
 
 `GET /jobs/{id}` includes resolved `request` (suite, provider, model, judge,
 host) at submit time. Every eval suite carries `progress` (`current` /
