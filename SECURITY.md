@@ -169,6 +169,11 @@ the port as equivalent to holding the key.
 
 - `--no-auth` is refused on any non-loopback `--host`. It disables
   authentication for every route, including eval submission.
+- Every route but `/api/v1/health` and `/api/v1/ready` needs a key. A test
+  walks the live OpenAPI schema and requires `401` without one, so a new
+  route that forgets auth fails CI.
+- `/docs`, `/redoc`, and `/openapi.json` bypass auth and map every route, so
+  only a loopback `--no-auth` server serves them.
 - Workers authenticate with `--worker-api-key` when supplied. Leave it unset and
   workers share the submitter keys, which means a worker credential also
   authorizes runs and evals. Set it whenever workers run on hosts you do not
