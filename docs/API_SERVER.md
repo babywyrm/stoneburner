@@ -262,7 +262,13 @@ fixture / phase / sample tables, not the trail. `POST /evals` accepts
 optional `host` and `judge_host` (CLI `--judge-host`: judge on a second
 Ollama). `runs` is 1–3 on `adversarial` / `redblue` / `toolcall`; other
 suites return `422` if `runs > 1`. `channel` is `both` / `tools` /
-`prose` on `toolcall` only (CLI `--channel`). Unknown keys are `422`. `list_jobs` includes a
+`prose` on `toolcall` only (CLI `--channel`). `temperature` (0–2, CLI
+`--temperature`) pins the model under test on `accuracy` / `adversarial` /
+`redblue` / `refusal` / `codereview` / `toolcall` and is echoed in the
+result; other suites return `422` for it. `POST /sweeps` and
+`POST /batteries` take it too (judges stay at 0; a qa profile keeps its
+own). Unset keeps the model's own temperature, which is what safety
+evidence should use. Unknown keys are `422`. `list_jobs` includes a
 short `request` (suite / model / host, plus sweep `models` / `suites`)
 and omits fixture rows.
 

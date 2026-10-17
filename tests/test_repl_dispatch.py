@@ -120,6 +120,19 @@ def test_submit_eval_forwards_channel() -> None:
     assert json.loads(requests[0].content)["channel"] == "tools"
 
 
+def test_submit_eval_and_sweep_forward_temperature() -> None:
+    requests: list[httpx.Request] = []
+    session = Session(provider="ollama", model="a")
+    client = _client(requests, response=httpx.Response(200, json=_EVAL_JOB))
+    handle_line("submit_eval --suite toolcall --temperature 0", session=session, client=client)
+    handle_line(
+        "submit_sweep --models a --suites eval --budget_usd 1 --temperature 0.7",
+        session=session,
+        client=client,
+    )
+    assert [json.loads(r.content)["temperature"] for r in requests] == [0.0, 0.7]
+
+
 def test_session_host_fills_submit_stress() -> None:
     requests: list[httpx.Request] = []
     session = Session(provider="ollama", model="llama3.2:1b", host="http://10.0.0.9:11434")

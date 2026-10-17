@@ -129,6 +129,26 @@ async def test_spending_tools_are_not_labelled_read_only(name):
     assert tools[name].annotations.read_only_hint is False
 
 
+@pytest.mark.parametrize("name", ["submit_eval", "submit_sweep", "submit_battery"])
+async def test_spending_suite_tools_forward_temperature(name):
+    api = FakeApi()
+    tools = {tool.name: tool for tool in await build_server(api).list_tools()}
+    assert "temperature" in tools[name].input_schema["properties"]
+    args = {
+        "submit_eval": {"suite": "toolcall", "provider": "ollama"},
+        "submit_sweep": {
+            "provider": "ollama",
+            "models": ["a"],
+            "suites": ["eval"],
+            "budget_usd": 1,
+        },
+        "submit_battery": {"name": "agent-gate", "provider": "ollama", "budget_usd": 1},
+    }[name]
+    await build_server(api).call_tool(name, {**args, "temperature": 0.0})
+    called, kwargs = api.calls[-1]
+    assert (called, kwargs["temperature"]) == (name, 0.0)
+
+
 @pytest.mark.parametrize("name", ["submit_run", "submit_eval"])
 async def test_no_tool_offers_a_save_switch_the_api_ignores(name):
     """Runs always persist and evals never do; a `save` knob would lie."""

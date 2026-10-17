@@ -249,6 +249,22 @@ def test_submit_sweep_includes_judge_host_when_given():
     assert json.loads(requests[0].content)["judge_host"] == "http://10.0.0.9:11434"
 
 
+def test_submit_methods_send_temperature_only_when_set():
+    requests: list[httpx.Request] = []
+    with client_recording(requests) as client:
+        client.submit_eval(suite="toolcall", provider="ollama", temperature=0.0)
+        client.submit_sweep(
+            provider="ollama", models=["a"], suites=["eval"], budget_usd=1.0, temperature=0.5
+        )
+        client.submit_battery(name="agent-gate", provider="ollama", budget_usd=1.0, temperature=1.0)
+        client.submit_eval(suite="toolcall", provider="ollama")
+
+    import json
+
+    sent = [json.loads(r.content).get("temperature", "absent") for r in requests]
+    assert sent == [0.0, 0.5, 1.0, "absent"]
+
+
 def test_submit_battery_posts_required_budget():
     requests: list[httpx.Request] = []
     with client_recording(requests) as client:

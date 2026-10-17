@@ -196,8 +196,11 @@ class AtomicsApiClient:
         judge_host: str | None = None,
         runs: int | None = None,
         channel: str | None = None,
+        temperature: float | None = None,
     ) -> Any:
         payload: dict[str, Any] = {"suite": suite, "provider": provider}
+        if temperature is not None:
+            payload["temperature"] = temperature
         if model is not None:
             payload["model"] = model
         if host is not None:
@@ -238,6 +241,7 @@ class AtomicsApiClient:
         reasoning_mode: str | None = None,
         host: str | None = None,
         judge_host: str | None = None,
+        temperature: float | None = None,
     ) -> Any:
         payload: dict[str, Any] = {
             "provider": provider,
@@ -246,6 +250,8 @@ class AtomicsApiClient:
             "budget_usd": budget_usd,
             "runs": runs,
         }
+        if temperature is not None:
+            payload["temperature"] = temperature
         if judge_model is not None:
             payload["judge_model"] = judge_model
         if thinking is not None:
@@ -275,6 +281,7 @@ class AtomicsApiClient:
         reasoning_mode: str | None = None,
         runs: int | None = None,
         profile: str | None = None,
+        temperature: float | None = None,
     ) -> Any:
         payload: dict[str, Any] = {
             "name": name,
@@ -283,6 +290,8 @@ class AtomicsApiClient:
         }
         if runs is not None:
             payload["runs"] = runs
+        if temperature is not None:
+            payload["temperature"] = temperature
         if model is not None:
             payload["model"] = model
         if judge_model is not None:

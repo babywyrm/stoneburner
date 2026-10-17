@@ -149,5 +149,7 @@ def test_battery_request_defaults():
 
     req = BatteryRequest(name="desk-pass", provider="ollama", model="x", budget_usd=5)
     assert req.runs is None
-    assert req.thinking is None
+    assert req.thinking is False
+    nulled = BatteryRequest(name="desk-pass", provider="ollama", budget_usd=5, thinking=None)
+    assert nulled.thinking is False
     assert req.profile is None

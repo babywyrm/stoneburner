@@ -53,7 +53,7 @@ _INT = frozenset(
         "max_concurrency",
     }
 )
-_FLOAT = frozenset({"budget_usd", "since_hours", "phase_seconds"})
+_FLOAT = frozenset({"budget_usd", "since_hours", "phase_seconds", "temperature"})
 _LIST = frozenset({"models", "suites", "fixtures"})
 _SESSION_FIELDS = ("provider", "model", "effort", "reasoning_mode", "host")
 _QUIET_FORMATTERS: dict[str, Callable[[dict[str, Any]], str]] = {
@@ -116,6 +116,7 @@ _VERBS: dict[str, tuple[str, frozenset[str], str | None]] = {
                 "judge_host",
                 "runs",
                 "channel",
+                "temperature",
             }
         ),
         None,
@@ -135,6 +136,7 @@ _VERBS: dict[str, tuple[str, frozenset[str], str | None]] = {
                 "reasoning_mode",
                 "host",
                 "judge_host",
+                "temperature",
             }
         ),
         None,

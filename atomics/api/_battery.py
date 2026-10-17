@@ -64,6 +64,7 @@ def _step_to_eval(payload: BatteryRequest, step: BatteryStep) -> EvalRequest:
         effort=payload.effort,
         reasoning_mode=payload.reasoning_mode,
         runs=_step_runs(payload, step),
+        temperature=payload.temperature,
         fixtures=_step_fixtures(step),
         channel=_step_channel(step),
     )
@@ -112,6 +113,7 @@ async def _run_qa_step(payload: BatteryRequest, step: Any) -> dict[str, Any]:
             fixtures=fixtures,
             thinking=payload.thinking,
             effort=payload.effort,
+            temperature=payload.temperature,
         )
     return {
         "suite": "qa",
@@ -156,6 +158,9 @@ async def run_battery_from_request(
             if step.suite == "archreview":
                 steps_out.append({"suite": step.suite, "skipped": True, "reason": "repo pack"})
                 continue
+            if job is not None:
+                # The step's reporter streams rows into job.result; start each step empty.
+                job.result = None
             result = await run_eval_suite(_step_to_eval(payload, step), job=job)
         except EvalBudgetExceededError:
             raise

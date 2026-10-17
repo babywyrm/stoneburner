@@ -248,6 +248,7 @@ async def test_run_eval_from_request_accuracy_normalized():
         "model": "m1",
         "judge_model": "j1",
         "host": None,
+        "temperature": None,
         "overall_accuracy": 0.9,
         "fixtures_run": 3,
         "total_tokens": 120,
@@ -530,6 +531,50 @@ async def test_run_eval_suite_reports_partial_integrity():
         "status": "partial",
         "should_exit_nonzero": True,
     }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("suite", "runner_attr"),
+    [
+        ("accuracy", "run_eval"),
+        ("adversarial", "run_adversarial"),
+        ("refusal", "run_refusal"),
+        ("redblue", "run_redblue"),
+        ("codereview", "run_codereview"),
+        ("toolcall", "run_toolcall_suite"),
+    ],
+)
+async def test_run_eval_suite_pins_temperature(suite, runner_attr):
+    payload = EvalRequest(suite=suite, provider="ollama", model="m1", temperature=0.0)
+    summary = SimpleNamespace(
+        overall_accuracy=1.0,
+        dangerous_any_run_rate=None,
+        fixtures=[],
+        fixture_results=[],
+        total_tokens=0,
+        total_cost_usd=0.0,
+    )
+    with (
+        patch.object(runners, "_provider_for", side_effect=[MagicMock(), MagicMock()]),
+        patch.object(runners, runner_attr, new_callable=AsyncMock, return_value=summary) as run,
+    ):
+        result = await runners.run_eval_suite(payload)
+    assert run.await_args.kwargs["temperature"] == 0.0
+    assert result["temperature"] == 0.0
+
+
+@pytest.mark.parametrize("suite", ["rag", "multiturn", "codegen"])
+def test_eval_request_rejects_temperature_where_the_suite_cannot_pin_it(suite):
+    with pytest.raises(ValueError, match="temperature"):
+        EvalRequest(suite=suite, provider="ollama", temperature=0.0)
+    assert EvalRequest(suite=suite, provider="ollama").temperature is None
+
+
+@pytest.mark.parametrize("temperature", [-0.1, 2.1])
+def test_eval_request_rejects_out_of_range_temperature(temperature):
+    with pytest.raises(ValueError):
+        EvalRequest(suite="toolcall", provider="ollama", temperature=temperature)
 
 
 @pytest.mark.asyncio
