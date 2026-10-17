@@ -50,8 +50,6 @@ gitignored local files and document only sanitized patterns (`localhost`,
   `ALL_FIXTURES`); never build a parallel list.
 - The API server never imports `commands/`. The MCP server, REPL, and workers
   are HTTP clients of the API; new MCP tools mean new API endpoints first.
-- Import implementations, not the compatibility shims at the package root.
-
 ## Testing Conventions
 
 - Tests mock providers and HTTP and must not hit the network by default.

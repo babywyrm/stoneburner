@@ -22,6 +22,16 @@
   `/openapi.json`. They skipped auth and handed an anonymous caller a
   map of every route; loopback `--no-auth` still serves them.
 
+### Removed
+- The 19 compatibility shims at the package root. Python code that
+  imported them moves to the implementation; the CLI is unchanged.
+  `atomics.load.*`: capacity, contention, profiles, regression,
+  scenario, scenario_models, scenario_prompts, soak, stress.
+  `atomics.benchmark.*`: advisor, labcompare, model_classes, qa_runner,
+  sweep, tiers. `atomics.reporting.*`: exporters, hooks, stats,
+  webhooks. So `from atomics.stress import X` becomes
+  `from atomics.load.stress import X`.
+
 ### Fixed
 - `POST /batteries` (and MCP `submit_battery`) ran every fixture of a
   step's suite: agent-gate ran all 72 adversarial fixtures instead of

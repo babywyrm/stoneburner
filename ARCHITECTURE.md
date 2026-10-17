@@ -32,11 +32,6 @@ Support / infra      config, paths, secrets, validation, inference,
                      doctor, reporting/, scheduler/
 ```
 
-The 19 one-screen modules at the package root (`atomics/sweep.py`,
-`atomics/soak.py`, `atomics/stats.py`, …) are compatibility shims that
-re-export the implementation named in their docstring. Import the real
-module in new code; the shims stay for external callers.
-
 Solid arrows are imports; the CLI and API also build providers and open the
 repository directly. Dashed arrows are HTTP: the MCP server, the REPL, and
 workers hold no provider, storage, or budget logic of their own.
@@ -266,7 +261,7 @@ New code should follow the target column, not copy whichever suite you opened fi
 | Multi-pass arg | `runs` | archreview accepts `--runs` as an alias for `--rounds` |
 | JSON export | `Summary.to_dict()` + `--json-out` | done — every suite runner |
 | Parent run row | `commands/suite_run.py` | done — every recording command owns its repository through the shared lifetime, so the row is finalized and the connection closed even when the run raises |
-| Stats helpers | one shared `stats` module | done — `atomics/stats.py` |
+| Stats helpers | one shared `stats` module | done — `atomics/reporting/stats.py` |
 | Provider build | `providers.factory.make_provider()` | done — single factory, CLI wraps it |
 | CLI modules | one module per command under `commands/` | done for the oversized ones — `rag.py` split into `rag` / `codegen` / `probe` / `archreview` / `qa`; `soak`, `scenario`, `compare`, `sweep`, and `labcompare` are their own modules. `load.py` (stress / capacity / baselines) and `benchmark.py` (run / report / tiers) keep a cohesive family each. `admin.py` and `rag.py` are still over 500 lines; do not reopen the split to chase the number |
 | Repository modules | persistence grouped by domain | done — `storage/repository/` mixins |
