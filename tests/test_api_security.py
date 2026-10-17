@@ -7,6 +7,8 @@ still fails here.
 
 from __future__ import annotations
 
+import re
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -247,3 +249,27 @@ class TestConstantTimeKeyComparison:
         from atomics.api.auth import key_matches
 
         assert key_matches("anything", set()) is False
+
+
+class TestEveryRouteRequiresAuth:
+    """A new route that forgets require_auth is open to anyone who can reach
+    the port. Walks the live OpenAPI spec so the check grows with the API."""
+
+    OPEN = frozenset({"/api/v1/health", "/api/v1/ready"})
+
+    @pytest.mark.parametrize("headers", [{}, {"X-API-Key": "wrong-key-0123456789"}])
+    def test_every_api_route_rejects_a_caller_without_a_valid_key(self, tmp_path, headers):
+        settings = ServerSettings(api_keys={"k" * 32}, db_path=tmp_path / "a.db")
+        app = create_app(settings)
+        with TestClient(app, base_url="http://127.0.0.1") as client:
+            paths = app.openapi()["paths"]
+            served = {
+                (method.upper(), path): client.request(
+                    method.upper(), re.sub(r"\{[^}]+\}", "x", path), json={}, headers=headers
+                ).status_code
+                for path, ops in paths.items()
+                for method in ops
+                if path not in self.OPEN
+            }
+        assert len(served) > 20
+        assert {route: code for route, code in served.items() if code != 401} == {}
