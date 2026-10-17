@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
-from atomics.contention import (
+from atomics.load.contention import (
     ContentionModelResult,
     ContentionResult,
     _percentile,
@@ -112,7 +112,7 @@ class TestRunContention:
             await asyncio.sleep(0.001)
             return (50, 10, 200.0, 100.0)
 
-        with patch("atomics.stress._single_request", side_effect=_fake_request):
+        with patch("atomics.load.stress._single_request", side_effect=_fake_request):
             result = await run_contention(
                 host="http://fake:11434",
                 models=["alpha", "beta"],
@@ -134,7 +134,7 @@ class TestRunContention:
             await asyncio.sleep(0.001)
             return (50, 10, 200.0, 80.0)
 
-        with patch("atomics.stress._single_request", side_effect=_fake_request):
+        with patch("atomics.load.stress._single_request", side_effect=_fake_request):
             result = await run_contention(
                 host="http://fake:11434",
                 models=["m1", "m2"],
@@ -154,7 +154,7 @@ class TestRunContention:
             await asyncio.sleep(0.001)
             return (50, 10, 200.0, 80.0)
 
-        with patch("atomics.stress._single_request", side_effect=_fake_request):
+        with patch("atomics.load.stress._single_request", side_effect=_fake_request):
             result = await run_contention(
                 host="http://fake:11434",
                 models=["m"],
@@ -175,7 +175,7 @@ class TestRunContention:
                 raise ConnectionError("simulated failure")
             return (50, 10, 200.0, 80.0)
 
-        with patch("atomics.stress._single_request", side_effect=_flaky_request):
+        with patch("atomics.load.stress._single_request", side_effect=_flaky_request):
             result = await run_contention(
                 host="http://fake:11434",
                 models=["m"],
@@ -205,7 +205,7 @@ class TestContentionCLI:
         from click.testing import CliRunner
 
         from atomics.cli import cli
-        from atomics.contention import ContentionResult
+        from atomics.load.contention import ContentionResult
 
         captured: dict = {}
 
@@ -219,7 +219,7 @@ class TestContentionCLI:
             return r
 
         runner = CliRunner()
-        with patch("atomics.contention.run_contention", side_effect=_fake_contention):
+        with patch("atomics.load.contention.run_contention", side_effect=_fake_contention):
             result = runner.invoke(
                 cli,
                 [
@@ -240,14 +240,14 @@ class TestContentionCLI:
 
 
 def test_contention_model_result_avg_latency_empty():
-    from atomics.contention import ContentionModelResult
+    from atomics.load.contention import ContentionModelResult
 
     r = ContentionModelResult(model="m", requests=0, failed=0, latencies=[])
     assert r.avg_latency_ms == 0.0
 
 
 def test_contention_factor_mixed_none():
-    from atomics.contention import ContentionModelResult, ContentionResult
+    from atomics.load.contention import ContentionModelResult, ContentionResult
 
     cr = ContentionResult(host="h", models=["a", "b"], phase_seconds=5.0)
     cr.solo_tps = {"a": 10.0, "b": 5.0}
@@ -262,7 +262,7 @@ def test_contention_factor_mixed_none():
 
 
 def test_contention_factor_solo_zero():
-    from atomics.contention import ContentionModelResult, ContentionResult
+    from atomics.load.contention import ContentionModelResult, ContentionResult
 
     cr = ContentionResult(host="h", models=["a"], phase_seconds=5.0)
     cr.solo_tps = {"a": 0.0}  # solo == 0 → factor is None

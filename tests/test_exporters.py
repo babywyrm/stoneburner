@@ -2,7 +2,7 @@
 
 import io
 
-from atomics.exporters import write_csv, write_jsonl, write_tasks_export
+from atomics.reporting.exporters import write_csv, write_jsonl, write_tasks_export
 
 
 def test_write_jsonl_roundtrip_keys():
@@ -41,7 +41,7 @@ def _tmp_repo_with_data(tmp_path):
     repo = MetricsRepository(tmp_path / "db.sqlite")
 
     # insert a stress result
-    from atomics.stress import StressResult
+    from atomics.load.stress import StressResult
 
     sr = StressResult(
         model="qwen2.5:7b",
@@ -104,8 +104,8 @@ def test_export_cli_stress_suite(tmp_path, monkeypatch):
     from click.testing import CliRunner
 
     from atomics.cli import cli
+    from atomics.load.stress import StressResult
     from atomics.storage.repository import MetricsRepository
-    from atomics.stress import StressResult
 
     monkeypatch.chdir(tmp_path)
     repo = MetricsRepository(tmp_path / "db.sqlite")
@@ -163,14 +163,14 @@ def test_export_cli_sweep_suite(tmp_path, monkeypatch):
 def test_json_default_datetime():
     from datetime import UTC, datetime
 
-    from atomics.exporters import _json_default
+    from atomics.reporting.exporters import _json_default
 
     dt = datetime(2026, 1, 15, 12, 0, 0, tzinfo=UTC)
     assert _json_default(dt) == dt.isoformat()
 
 
 def test_json_default_non_datetime():
-    from atomics.exporters import _json_default
+    from atomics.reporting.exporters import _json_default
 
     assert _json_default(object()) != ""  # falls through to str()
 
@@ -178,7 +178,7 @@ def test_json_default_non_datetime():
 def test_write_csv_empty_rows():
     import io
 
-    from atomics.exporters import write_csv
+    from atomics.reporting.exporters import write_csv
 
     out = io.StringIO()
     write_csv([], out)
@@ -188,7 +188,7 @@ def test_write_csv_empty_rows():
 def test_write_csv_nonempty():
     import io
 
-    from atomics.exporters import write_csv
+    from atomics.reporting.exporters import write_csv
 
     out = io.StringIO()
     write_csv([{"a": 1, "b": "x"}, {"a": 2, "b": "y"}], out)

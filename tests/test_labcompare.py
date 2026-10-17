@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from atomics.labcompare import HostSpec, parse_host_specs
+from atomics.benchmark.labcompare import HostSpec, parse_host_specs
 
 
 def test_parse_single_host():
@@ -35,7 +35,7 @@ def test_parse_host_empty_name_raises():
 
 # ── VRAM fit ──────────────────────────────────────────────
 
-from atomics.labcompare import vram_fit_from_ps
+from atomics.benchmark.labcompare import vram_fit_from_ps
 
 
 def test_vram_fit_full_gpu():
@@ -69,7 +69,7 @@ def test_vram_fit_zero_size_returns_none():
 
 # ── Verdict math ──────────────────────────────────────────
 
-from atomics.labcompare import parity_verdict, speedup_ratio
+from atomics.benchmark.labcompare import parity_verdict, speedup_ratio
 
 
 def test_speedup_ratio_basic():
@@ -104,7 +104,7 @@ def test_parity_verdict_missing_score_returns_none():
 
 # ── Throughput probe ──────────────────────────────────────
 
-from atomics.labcompare import ThroughputResult, probe_throughput
+from atomics.benchmark.labcompare import ThroughputResult, probe_throughput
 from atomics.providers.base import ProviderResponse
 
 
@@ -168,7 +168,7 @@ async def test_probe_throughput_handles_ps_failure():
 
 # ── Orchestrator ──────────────────────────────────────────
 
-from atomics.labcompare import run_labcompare
+from atomics.benchmark.labcompare import run_labcompare
 
 
 @pytest.mark.asyncio

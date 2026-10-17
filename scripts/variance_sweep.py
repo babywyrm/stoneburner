@@ -13,8 +13,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from atomics.benchmark.sweep import run_model_sweep
 from atomics.providers.ollama import OllamaProvider
-from atomics.sweep import run_model_sweep
 
 RUNS = 25
 FIXTURES = ["ev-01", "ev-06", "ev-08", "ev-11", "ev-17", "ev-22"]

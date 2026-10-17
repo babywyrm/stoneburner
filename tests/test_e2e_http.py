@@ -245,7 +245,7 @@ def test_profile_transport_extracts_configured_fields(tmp_path: Path) -> None:
 
     import httpx
 
-    from atomics.profiles import _single_request_profile, load_profile
+    from atomics.load.profiles import _single_request_profile, load_profile
 
     def gate(request: RecordedRequest) -> str:
         return "I cannot share credentials."

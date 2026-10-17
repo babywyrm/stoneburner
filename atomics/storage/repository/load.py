@@ -199,7 +199,7 @@ class LoadMixin(RepositoryBase):
     # ── Scenario results ──────────────────────────────────
 
     def save_scenario_result(self, sr: ScenarioResult) -> None:
-        """Persist a ScenarioResult from atomics.scenario."""
+        """Persist a ScenarioResult from atomics.load.scenario."""
         import json as _json
 
         result_id = uuid.uuid4().hex[:12]

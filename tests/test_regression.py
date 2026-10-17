@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from atomics.regression import (
+from atomics.load.regression import (
     BaselineRecord,
     _pct_delta,
     compute_regression,

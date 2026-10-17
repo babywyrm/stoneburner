@@ -676,7 +676,7 @@ def test_vllm_thinking_model_detection():
 
 
 def test_vllm_model_classes():
-    from atomics.model_classes import ModelClass, classify_model
+    from atomics.benchmark.model_classes import ModelClass, classify_model
 
     assert classify_model("qwen2.5:1.5b") == ModelClass.LIGHT
     assert classify_model("qwen2.5:3b") == ModelClass.MID

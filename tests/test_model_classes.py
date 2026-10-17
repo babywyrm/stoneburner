@@ -1,6 +1,6 @@
 """Tests for the model class taxonomy."""
 
-from atomics.model_classes import (
+from atomics.benchmark.model_classes import (
     ModelClass,
     classify_model,
     get_models_for_class,

@@ -23,8 +23,8 @@ from atomics.api.models import (
 )
 from atomics.api.server import create_app
 from atomics.eval.budget import GuardedProvider
-from atomics.soak import SoakResult, SoakSample
-from atomics.stress import ConcurrencyResult, StressResult
+from atomics.load.soak import SoakResult, SoakSample
+from atomics.load.stress import ConcurrencyResult, StressResult
 
 
 def test_stress_requires_a_budget():

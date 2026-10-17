@@ -1,7 +1,7 @@
 """Tests for burn tier profiles."""
 
+from atomics.benchmark.tiers import TIER_PROFILES, get_tier_profile
 from atomics.models import BurnTier
-from atomics.tiers import TIER_PROFILES, get_tier_profile
 
 
 def test_all_tiers_have_profiles():

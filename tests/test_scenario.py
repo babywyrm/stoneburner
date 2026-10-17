@@ -1,4 +1,4 @@
-"""Tests for atomics.scenario — mixed-workload scenario runner."""
+"""Tests for atomics.load.scenario — mixed-workload scenario runner."""
 
 from __future__ import annotations
 
@@ -8,15 +8,15 @@ from unittest.mock import patch
 
 import pytest
 
-from atomics.scenario import run_scenario
-from atomics.scenario_models import (
+from atomics.load.scenario import run_scenario
+from atomics.load.scenario_models import (
     ScenarioResult,
     WorkloadResult,
     WorkloadSpec,
     load_scenario_yaml,
     parse_workload_flag,
 )
-from atomics.scenario_prompts import (
+from atomics.load.scenario_prompts import (
     EVAL_PROMPTS,
     GATE_PROMPTS,
     load_custom_prompts,
@@ -267,7 +267,7 @@ class TestRunner:
             concurrency=1,
             sla_ms=2000.0,
         )
-        with patch("atomics.scenario._single_request", side_effect=_fake_single_request):
+        with patch("atomics.load.scenario._single_request", side_effect=_fake_single_request):
             result = asyncio.run(
                 run_scenario(
                     host="http://fake:11434",
@@ -287,7 +287,7 @@ class TestRunner:
             WorkloadSpec(name="g1", type="gate", model="m:1b", concurrency=1),
             WorkloadSpec(name="e1", type="eval", model="m:3b", concurrency=1),
         ]
-        with patch("atomics.scenario._single_request", side_effect=_fake_single_request):
+        with patch("atomics.load.scenario._single_request", side_effect=_fake_single_request):
             result = asyncio.run(
                 run_scenario(
                     host="http://fake:11434",
@@ -307,7 +307,7 @@ class TestRunner:
             model="m:1b",
             concurrency=1,
         )
-        with patch("atomics.scenario._single_request", side_effect=_fake_single_request):
+        with patch("atomics.load.scenario._single_request", side_effect=_fake_single_request):
             result = asyncio.run(
                 run_scenario(
                     host="http://fake:11434",
@@ -328,7 +328,7 @@ class TestRunner:
             concurrency=1,
             sla_ms=100.0,
         )
-        with patch("atomics.scenario._single_request", side_effect=_fake_single_request):
+        with patch("atomics.load.scenario._single_request", side_effect=_fake_single_request):
             result = asyncio.run(
                 run_scenario(
                     host="http://fake:11434",
@@ -352,7 +352,7 @@ class TestRunner:
         def on_wr(wr) -> None:
             workloads_seen.append(wr.spec.name)
 
-        with patch("atomics.scenario._single_request", side_effect=_fake_single_request):
+        with patch("atomics.load.scenario._single_request", side_effect=_fake_single_request):
             asyncio.run(
                 run_scenario(
                     host="http://fake:11434",
@@ -463,7 +463,7 @@ class TestRamp:
     def test_run_scenario_accepts_ramp_seconds(self):
         import inspect
 
-        from atomics.scenario import run_scenario
+        from atomics.load.scenario import run_scenario
 
         sig = inspect.signature(run_scenario)
         assert "ramp_seconds" in sig.parameters
@@ -472,7 +472,7 @@ class TestRamp:
     def test_run_workload_accepts_ramp_seconds(self):
         import inspect
 
-        from atomics.scenario import _run_workload
+        from atomics.load.scenario import _run_workload
 
         sig = inspect.signature(_run_workload)
         assert "ramp_seconds" in sig.parameters
@@ -481,7 +481,7 @@ class TestRamp:
         """run_scenario propagates ramp_seconds to ScenarioResult."""
         import asyncio
 
-        from atomics.scenario import run_scenario
+        from atomics.load.scenario import run_scenario
 
         async def _fake_request(client, host, model, prompt, num_predict):
             await asyncio.sleep(0.001)
@@ -495,7 +495,7 @@ class TestRamp:
             prompts=["hello"],
         )
 
-        with patch("atomics.scenario._single_request", side_effect=_fake_request):
+        with patch("atomics.load.scenario._single_request", side_effect=_fake_request):
             result = asyncio.run(
                 run_scenario(
                     host="http://fake:11434",
@@ -523,7 +523,7 @@ class TestRamp:
 
         import httpx
 
-        from atomics.scenario import _run_workload
+        from atomics.load.scenario import _run_workload
 
         first_call: dict[object, float] = {}
 
@@ -542,7 +542,7 @@ class TestRamp:
 
         async def _run():
             async with httpx.AsyncClient() as client:
-                with patch("atomics.scenario._single_request", side_effect=_timed_request):
+                with patch("atomics.load.scenario._single_request", side_effect=_timed_request):
                     await _run_workload(client, "http://fake", spec, 0.05, ramp_seconds=0.0)
 
         asyncio.run(_run())
@@ -577,7 +577,7 @@ class TestScenarioProfileBranch:
         import asyncio
         from unittest.mock import patch
 
-        from atomics.scenario import WorkloadSpec, run_scenario
+        from atomics.load.scenario import WorkloadSpec, run_scenario
 
         async def _fake_profile_req(client, profile, prompt):
             return ("ok", 150.0, "pass")
@@ -595,9 +595,9 @@ class TestScenarioProfileBranch:
 
         mock_profile = self._make_profile()
         with (
-            patch("atomics.profiles.load_profile", return_value=mock_profile),
-            patch("atomics.profiles._single_request_profile", side_effect=_fake_profile_req),
-            patch("atomics.scenario._single_request", side_effect=_fake_single_req),
+            patch("atomics.load.profiles.load_profile", return_value=mock_profile),
+            patch("atomics.load.profiles._single_request_profile", side_effect=_fake_profile_req),
+            patch("atomics.load.scenario._single_request", side_effect=_fake_single_req),
         ):
             result = asyncio.run(
                 run_scenario(
@@ -616,7 +616,7 @@ class TestScenarioProfileBranch:
         import asyncio
         from unittest.mock import patch
 
-        from atomics.scenario import WorkloadSpec, run_scenario
+        from atomics.load.scenario import WorkloadSpec, run_scenario
 
         async def _fake_profile_req(client, profile, prompt):
             return ("ok", 100.0, "pass")
@@ -632,8 +632,8 @@ class TestScenarioProfileBranch:
 
         mock_profile = self._make_profile()
         with (
-            patch("atomics.profiles.load_profile", return_value=mock_profile),
-            patch("atomics.profiles._single_request_profile", side_effect=_fake_profile_req),
+            patch("atomics.load.profiles.load_profile", return_value=mock_profile),
+            patch("atomics.load.profiles._single_request_profile", side_effect=_fake_profile_req),
         ):
             result = asyncio.run(
                 run_scenario(
@@ -651,7 +651,7 @@ class TestScenarioProfileBranch:
         import asyncio
         from unittest.mock import patch
 
-        from atomics.scenario import WorkloadSpec, run_scenario
+        from atomics.load.scenario import WorkloadSpec, run_scenario
 
         baselines_seen: list[str] = []
 
@@ -668,7 +668,7 @@ class TestScenarioProfileBranch:
             concurrency=1,
         )
 
-        with patch("atomics.scenario._single_request", side_effect=_fake_single_req):
+        with patch("atomics.load.scenario._single_request", side_effect=_fake_single_req):
             asyncio.run(
                 run_scenario(
                     host="http://fake:11434",
