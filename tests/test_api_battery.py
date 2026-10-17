@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from unittest.mock import AsyncMock
+
 import pytest
 
 from atomics.api._battery import run_battery_from_request
@@ -122,6 +124,75 @@ async def test_battery_runs_default_per_step_and_skip_single_pass_suites(monkeyp
     )
     assert [s["suite"] for s in result["steps"]] == ["redblue", "codereview", "refusal"]
     assert (captured["redblue"].runs, captured["codereview"].runs) == (3, 1)
+
+
+@pytest.mark.asyncio
+async def test_battery_pins_temperature_on_every_eval_step(monkeypatch):
+    captured = _capture_eval_steps(monkeypatch)
+    await run_battery_from_request(
+        BatteryRequest(
+            name="agent-gate", provider="ollama", model="x", budget_usd=5, temperature=0.0
+        )
+    )
+    assert {suite: p.temperature for suite, p in captured.items()} == {
+        "adversarial": 0.0,
+        "toolcall": 0.0,
+    }
+
+
+@pytest.mark.asyncio
+async def test_battery_step_rows_stay_with_their_step(monkeypatch):
+    from atomics.api.jobs import Job, JobStatus
+
+    async def reporting_run_eval_suite(payload, job=None):
+        # What EvalJobReporter does: live rows accumulate on the job.
+        if job.result is None:
+            job.result = {"fixtures": []}
+        job.result["fixtures"].append({"id": payload.suite})
+        return {"suite": payload.suite, "fixtures": list(job.result["fixtures"])}
+
+    monkeypatch.setattr("atomics.api._battery.run_eval_suite", reporting_run_eval_suite)
+    job = Job(job_id="b", kind="battery", status=JobStatus.RUNNING, created_at=0.0)
+    result = await run_battery_from_request(
+        BatteryRequest(name="agent-gate", provider="ollama", model="x", budget_usd=5), job=job
+    )
+    assert [s["result"]["fixtures"] for s in result["steps"]] == [
+        [{"id": "adversarial"}],
+        [{"id": "toolcall"}],
+    ]
+
+
+@pytest.mark.asyncio
+async def test_battery_defaults_to_no_thinking_like_the_cli(monkeypatch):
+    captured = _capture_eval_steps(monkeypatch)
+    await run_battery_from_request(
+        BatteryRequest(name="agent-gate", provider="ollama", model="x", budget_usd=5)
+    )
+    assert {p.thinking for p in captured.values()} == {False}
+
+
+@pytest.mark.asyncio
+async def test_battery_pins_temperature_on_raw_qa(monkeypatch):
+    seen: dict = {}
+
+    async def fake_run_qa_suite(**kwargs):
+        from atomics.benchmark.qa_runner import QASuiteResult
+
+        seen.update(kwargs)
+        return QASuiteResult(model="x", host="http://x")
+
+    _capture_eval_steps(monkeypatch)
+    monkeypatch.setattr(
+        "atomics.api._battery.run_provider_test", AsyncMock(return_value={"ok": True})
+    )
+    monkeypatch.setattr("atomics.api._battery.load_qa_suite", lambda path: ("", "http://x", []))
+    monkeypatch.setattr("atomics.api._battery.run_qa_suite", fake_run_qa_suite)
+    await run_battery_from_request(
+        BatteryRequest(
+            name="desk-pass", provider="ollama", model="x", budget_usd=5, temperature=0.3
+        )
+    )
+    assert seen["temperature"] == 0.3
 
 
 @pytest.mark.asyncio

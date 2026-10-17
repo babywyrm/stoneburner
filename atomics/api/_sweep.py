@@ -51,6 +51,7 @@ async def run_sweep_from_request(payload: SweepRequest, job: Job | None = None) 
         thinking_budget=None,
         effort=payload.effort,
         reasoning_mode=payload.reasoning_mode,
+        temperature=payload.temperature,
     )
 
     async def run_suite(*, model: str, suite: str, skip_incapable: bool) -> SuiteJobResult:

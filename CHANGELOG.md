@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Added
+- `temperature` (0–2) on `POST /evals`, `/sweeps`, and `/batteries`,
+  MCP `submit_eval` / `submit_sweep` / `submit_battery`, and the REPL's
+  `submit_eval` / `submit_sweep`, matching CLI `--temperature`. Eval
+  results echo it. An eval suite that cannot pin it (rag, multiturn,
+  codegen) returns `422` rather than silently sampling.
+
 ### Changed
 - `battery agent-gate` runs its toolcall step three times by default
   (`--runs N` replaces it), so the summary carries the share dangerous
@@ -22,6 +29,11 @@
   never persisted with `save: true`. The switch is gone from MCP, the
   REPL, and the client. The API still accepts the field from older
   clients and ignores it.
+- `POST /batteries` left thinking on unless asked, where CLI `battery`
+  sends `--no-thinking`, so a thinking model spent short fixtures'
+  budget on reasoning. It now defaults to off like the CLI. A battery
+  job's live rows also carried every earlier step's fixtures into the
+  next step; each step now starts empty.
 - After one `POST /runs` job, `atomics server` ignored SIGTERM and
   Ctrl-C: the benchmark engine took both signals on the server's event
   loop and kept them. A distributed worker lost its shutdown handler

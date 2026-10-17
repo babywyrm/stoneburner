@@ -175,6 +175,7 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
         judge_host: str | None = None,
         runs: int = 1,
         channel: str | None = None,
+        temperature: float | None = None,
     ) -> Any:
         """Start an eval suite and return its job id immediately.
 
@@ -188,7 +189,10 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
         `redblue`, and `toolcall` only. `channel` is `both`, `tools`, or
         `prose` on `toolcall` only (CLI `--channel`). `effort` /
         `reasoning_mode` are the shared reasoning dial (same values as
-        `provider_test`). Poll `get_job` for live `request` / `progress`
+        `provider_test`). `temperature` (0–2) pins the model under test on
+        `accuracy`, `adversarial`, `redblue`, `refusal`, `codereview`, and
+        `toolcall`; unset keeps the model's own. Use 0 to compare models, not
+        for safety evidence. Poll `get_job` for live `request` / `progress`
         and growing `result.fixtures` (every suite).
         """
         return api.submit_eval(
@@ -205,6 +209,7 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
             judge_host=judge_host,
             runs=runs,
             channel=channel,
+            temperature=temperature,
         )
 
     @tool(SPENDS)
@@ -220,6 +225,7 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
         reasoning_mode: str | None = None,
         host: str | None = None,
         judge_host: str | None = None,
+        temperature: float | None = None,
     ) -> Any:
         """Start a multi-model, multi-suite campaign and return a job id.
 
@@ -228,6 +234,7 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
         from `eval`, `redblue`, `refusal`, `toolcall`, `codereview`. `runs` is
         1–3. `host` is the inference endpoint (same meaning as `submit_eval`).
         `judge_host` is the judge endpoint when it differs from `host`.
+        `temperature` (0–2) pins every model under test; judges stay at 0.
         Poll `get_job` until `status` is `completed`.
         """
         return api.submit_sweep(
@@ -242,6 +249,7 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
             reasoning_mode=reasoning_mode,
             host=host,
             judge_host=judge_host,
+            temperature=temperature,
         )
 
     @tool(SPENDS)
@@ -258,6 +266,7 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
         reasoning_mode: str | None = None,
         runs: int | None = None,
         profile: str | None = None,
+        temperature: float | None = None,
     ) -> Any:
         """Run a named battery as one job and return its job id.
 
@@ -270,8 +279,9 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
         `thinking` is unset). `host` is the inference endpoint; `judge_host`
         is the judge endpoint when it differs. `runs` repeats the adversarial,
         redblue, and toolcall steps; unset keeps each step's default
-        (agent-gate's toolcall step runs 3). Poll `get_job` until `status`
-        is `completed`.
+        (agent-gate's toolcall step runs 3). `temperature` (0–2) pins every
+        step that samples the model except a qa profile, which sets its own.
+        Poll `get_job` until `status` is `completed`.
         """
         return api.submit_battery(
             name=name,
@@ -286,6 +296,7 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
             reasoning_mode=reasoning_mode,
             runs=runs,
             profile=profile,
+            temperature=temperature,
         )
 
     @tool(SPENDS)

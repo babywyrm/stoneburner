@@ -153,7 +153,9 @@ optional `host` (same meaning as `submit_eval`). `submit_eval` and
 `submit_sweep` also take optional `judge_host`. `submit_eval` takes
 `runs` (1–3 on adversarial / redblue / toolcall), `channel`
 (`both` / `tools` / `prose` on toolcall only), and `fixtures` (id
-subset on every suite; unknown ids dropped).
+subset on every suite; unknown ids dropped). `submit_eval`,
+`submit_sweep`, and `submit_battery` take optional `temperature` (0–2)
+to pin the model under test, as CLI `--temperature` does.
 
 `probe` has no endpoint. Hours-long soaks, contention, and baselines stay
 on the CLI.

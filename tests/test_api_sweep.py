@@ -281,6 +281,36 @@ async def test_run_sweep_grows_job_rows():
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("temperature", [None, 0.0, 0.7])
+async def test_run_sweep_pins_temperature(temperature):
+    payload = SweepRequest(
+        provider="ollama", models=["a"], suites=["eval"], budget_usd=1.0, temperature=temperature
+    )
+
+    async def instant_suite(*, model: str, suite: str, skip_incapable: bool):
+        return SuiteJobResult(model=model, suite=suite, ok=True, headline=0.8)
+
+    with (
+        patch("atomics.api._sweep._provider_for", return_value=SimpleNamespace(name="ollama")),
+        patch("atomics.api._sweep.make_suite_runner", return_value=instant_suite) as factory,
+    ):
+        await run_sweep_from_request(payload)
+    assert factory.call_args.kwargs["temperature"] == temperature
+
+
+@pytest.mark.parametrize("temperature", [-0.1, 2.1])
+def test_sweep_rejects_out_of_range_temperature(temperature):
+    with pytest.raises(ValidationError):
+        SweepRequest(
+            provider="ollama",
+            models=["a"],
+            suites=["eval"],
+            budget_usd=1.0,
+            temperature=temperature,
+        )
+
+
+@pytest.mark.asyncio
 async def test_post_sweeps_includes_progress_total():
     app = create_app(settings=ServerSettings(no_auth=True))
     with (

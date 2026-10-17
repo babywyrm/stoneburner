@@ -28,6 +28,10 @@ MAX_SWEEP_MODELS = 8
 MAX_SWEEP_RUNS = 3
 # CLI --runs 3 exists on these suites. Accuracy / multiturn / rag / … are one pass.
 EVAL_RUNS_SUITES = frozenset({"adversarial", "redblue", "toolcall"})
+# Suites whose runners pin the model's sampling temperature (CLI --temperature).
+EVAL_TEMPERATURE_SUITES = frozenset(
+    {"accuracy", "adversarial", "redblue", "refusal", "codereview", "toolcall"}
+)
 EVAL_CHANNELS = frozenset({"both", "tools", "prose"})
 
 # Load tests. The CLI can soak for hours at c=8; a remote caller cannot.
@@ -102,6 +106,7 @@ class EvalRequest(BaseModel):
     judge_host: str | None = None
     runs: int = Field(default=1, ge=1, le=MAX_SWEEP_RUNS)
     channel: str | None = None
+    temperature: float | None = Field(default=None, ge=0.0, le=2.0)
 
     @field_validator("effort")
     @classmethod
@@ -119,6 +124,11 @@ class EvalRequest(BaseModel):
             raise ValueError(
                 f"runs is only valid for {sorted(EVAL_RUNS_SUITES)}; "
                 f"{self.suite} is a single-pass suite"
+            )
+        if self.temperature is not None and self.suite not in EVAL_TEMPERATURE_SUITES:
+            raise ValueError(
+                f"temperature is only valid for {sorted(EVAL_TEMPERATURE_SUITES)}; "
+                f"{self.suite} does not pin it"
             )
         if self.channel is None:
             return self
@@ -153,6 +163,7 @@ class SweepRequest(BaseModel):
     budget_usd: float = Field(gt=0, le=MAX_EVAL_BUDGET_USD)
     host: str | None = None
     judge_host: str | None = None
+    temperature: float | None = Field(default=None, ge=0.0, le=2.0)
 
     @field_validator("effort")
     @classmethod
@@ -192,12 +203,19 @@ class BatteryRequest(BaseModel):
     judge_model: str | None = None
     judge_host: str | None = None
     host: str | None = None
-    thinking: bool | None = None
+    # CLI `battery` sends --no-thinking unless asked, so short fixtures stay visible.
+    thinking: bool = False
     effort: str | None = None
     reasoning_mode: str | None = None
     # None keeps each step's own default; runs apply only to EVAL_RUNS_SUITES steps.
     runs: int | None = Field(default=None, ge=1, le=MAX_SWEEP_RUNS)
+    temperature: float | None = Field(default=None, ge=0.0, le=2.0)
     profile: str | None = None
+
+    @field_validator("thinking", mode="before")
+    @classmethod
+    def _null_thinking_is_the_default(cls, value: object) -> object:
+        return False if value is None else value
 
     @field_validator("profile")
     @classmethod
