@@ -39,6 +39,8 @@ removed without rewriting it.
 sk-test-1234567890 is a unit-test fixture for ApiKeyAuth in tests/test_auth.py.
 alice-key-0123456789 / bob-key-9876543210 are two-caller test keys; one
 commit wrote them inline as X-API-Key header values.
+wrong-key-0123456789 is the invalid key tests/test_api_security.py sends to
+prove every route rejects it.
 """
 regexes = [
   '''sk-abc123''',
@@ -47,6 +49,7 @@ regexes = [
   '''dummy-key-for-tests-not-a-secret''',
   '''alice-key-0123456789''',
   '''bob-key-9876543210''',
+  '''wrong-key-0123456789''',
 ]
 
 [[allowlists]]
