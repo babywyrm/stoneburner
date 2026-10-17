@@ -77,6 +77,10 @@ A key passed only to `--worker-api-key` is rejected on `/api/v1/runs` and
 it is combined with a non-loopback `--host`. Binding `0.0.0.0` without a key
 would expose eval submission to the network unauthenticated.
 
+The interactive docs (`/docs`, `/redoc`) and `/openapi.json` are served only
+under `--no-auth`. They skip auth and list every route and parameter, so a
+keyed server returns `404` for them.
+
 ## Endpoints
 
 | Method | Path | Description |

@@ -76,10 +76,16 @@ def create_app(
         settings = replace(settings, no_auth=no_auth)
     if db_path is not None:
         settings = replace(settings, db_path=db_path)
+    # The docs pages skip auth and map every route; only a loopback --no-auth
+    # server, which already trusts its caller, serves them.
+    docs = settings.no_auth
     app = FastAPI(
         title="atomics API",
         version=__version__,
         lifespan=lifespan,
+        docs_url="/docs" if docs else None,
+        redoc_url="/redoc" if docs else None,
+        openapi_url="/openapi.json" if docs else None,
     )
     app.state.settings = settings
     app.state.auth = NoAuth() if settings.no_auth else ApiKeyAuth(settings.api_keys)

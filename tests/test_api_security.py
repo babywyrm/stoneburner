@@ -273,3 +273,24 @@ class TestEveryRouteRequiresAuth:
             }
         assert len(served) > 20
         assert {route: code for route, code in served.items() if code != 401} == {}
+
+
+class TestApiDocsStayLocal:
+    """Swagger, ReDoc, and the schema map every route and parameter for an
+    anonymous caller; they are served only by a loopback --no-auth server."""
+
+    DOCS = ("/docs", "/redoc", "/openapi.json")
+
+    def test_a_keyed_server_does_not_publish_its_api_map(self, tmp_path):
+        settings = ServerSettings(api_keys={"k" * 32}, db_path=tmp_path / "a.db")
+        with TestClient(create_app(settings), base_url="http://127.0.0.1") as client:
+            assert {path: client.get(path).status_code for path in self.DOCS} == dict.fromkeys(
+                self.DOCS, 404
+            )
+
+    def test_a_local_no_auth_server_still_serves_docs(self, tmp_path):
+        settings = ServerSettings(no_auth=True, db_path=tmp_path / "a.db")
+        with TestClient(create_app(settings), base_url="http://127.0.0.1") as client:
+            assert {path: client.get(path).status_code for path in self.DOCS} == dict.fromkeys(
+                self.DOCS, 200
+            )

@@ -18,6 +18,9 @@
   localhost) instead of three built-in lab hosts. Docs and tests name
   hosts `gpu-host-a` / `gpu-host-b`, and a test fails if a lab
   hostname is committed again.
+- A keyed `atomics server` no longer serves `/docs`, `/redoc`, or
+  `/openapi.json`. They skipped auth and handed an anonymous caller a
+  map of every route; loopback `--no-auth` still serves them.
 
 ### Fixed
 - `POST /batteries` (and MCP `submit_battery`) ran every fixture of a
