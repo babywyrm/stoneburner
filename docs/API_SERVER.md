@@ -244,7 +244,8 @@ too (`--no-skip-incapable` on battery toolcall steps). Each step runs the
 fixtures its CLI step selects (`--category`, `--mode`, `--fixtures`).
 Battery `runs` (1–3) repeats the adversarial, redblue, and toolcall steps;
 other steps run once. Unset keeps each step's default (agent-gate's
-toolcall step runs 3).
+toolcall step runs 3). Battery `thinking` defaults to off, as CLI
+`battery` sends `--no-thinking`; send `true` to turn it on.
 
 `GET /jobs/{id}` includes resolved `request` (suite, provider, model, judge,
 host) at submit time. Every eval suite carries `progress` (`current` /

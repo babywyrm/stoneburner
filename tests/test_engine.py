@@ -1,6 +1,7 @@
 """Tests for the loop engine using a mock provider."""
 
 import asyncio
+import os
 import signal
 
 import pytest
@@ -72,6 +73,41 @@ async def test_engine_leaves_the_host_process_signal_handlers_alone(make_engine)
     await engine.run(max_iterations=1)
     assert signal.getsignal(signal.SIGTERM) is before
     repo.close()
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_engine_that_owns_the_process_stops_on_sigterm(atomics_settings, metrics_repo):
+    before = {sig: signal.getsignal(sig) for sig in (signal.SIGTERM, signal.SIGINT)}
+    engine = LoopEngine(
+        provider=MockProvider(),
+        repo=metrics_repo,
+        settings=atomics_settings,
+        tier=BurnTier.EZ,
+        interval_override=0,
+        handle_signals=True,
+    )
+    loop = asyncio.get_running_loop()
+    unhandled: list[bool] = []
+
+    def send_sigterm() -> None:
+        # Without the engine's handler a real SIGTERM would kill pytest itself.
+        if signal.getsignal(signal.SIGTERM) is before[signal.SIGTERM]:
+            unhandled.append(True)
+            engine.stop()
+        else:
+            os.kill(os.getpid(), signal.SIGTERM)
+
+    loop.call_later(0.05, send_sigterm)
+    try:
+        summary = await asyncio.wait_for(engine.run(max_iterations=1_000_000), timeout=10)
+    finally:
+        for sig, handler in before.items():
+            loop.remove_signal_handler(sig)
+            signal.signal(sig, handler)
+    assert not unhandled, "the engine did not take SIGTERM"
+    assert summary is not None
+    assert summary.total_tasks < 1_000_000
 
 
 @pytest.mark.unit
