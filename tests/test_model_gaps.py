@@ -42,7 +42,7 @@ def test_hf_name_splits_family_and_size() -> None:
 def test_gaps_split_nowhere_from_partial() -> None:
     installed = {
         "laptop": {"gemma4:12b"},
-        "beefy": {"gemma4:12b", "granite4.2:8b"},
+        "gpu-host-a": {"gemma4:12b", "granite4.2:8b"},
     }
     remotes = [
         Remote("ollama", "gemma4", ("12b", "26b"), date(2026, 8, 31), True),
@@ -50,7 +50,7 @@ def test_gaps_split_nowhere_from_partial() -> None:
         Remote("huggingface", "qwen3.5", ("9b",), date(2026, 9, 1), True),
     ]
     installed["laptop"].add("qwen3.5:9b")
-    installed["beefy"].add("qwen3.5:9b")
+    installed["gpu-host-a"].add("qwen3.5:9b")
     rows = gaps(installed, remotes)
     by_size = {(row.name, row.size): row for row in rows}
     assert ("qwen3.5", "9b") not in by_size
@@ -60,8 +60,8 @@ def test_gaps_split_nowhere_from_partial() -> None:
         "gemma4",
         "26b",
         "2026-08-31",
-        ("laptop", "beefy"),
+        ("laptop", "gpu-host-a"),
         "known",
     )
     assert by_size[("granite4.2", "30b")].registry == "known"
-    assert by_size[("granite4.2", "30b")].missing_on == ("laptop", "beefy")
+    assert by_size[("granite4.2", "30b")].missing_on == ("laptop", "gpu-host-a")

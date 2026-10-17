@@ -1,8 +1,8 @@
 """Compare installed Ollama tags with recent public releases.
 
-Usage: uv run python scripts/model_gaps.py [--days 45] [--json]
+Usage: uv run python scripts/model_gaps.py [--host URL ...] [--days 45] [--json]
 
-Reads /api/tags on the laptop, beefy, and brainbox. Polls the Ollama
+Reads /api/tags on each --host (default localhost). Polls the Ollama
 library page and recent Hugging Face text models from the labs this
 tool already scores. Prints sizes the catalog advertises that at least
 one host does not have. Does not pull. Does not load a model.
@@ -24,12 +24,9 @@ from atomics.benchmark.model_classes import (
     supports_ollama_think_field,
     supports_ollama_think_levels,
 )
+from atomics.inventory.readers import unique_labels
 
-DEFAULT_HOSTS: dict[str, str] = {
-    "laptop": "http://127.0.0.1:11434",
-    "beefy": "http://beefy:11434",
-    "brainbox": "http://brainbox:11434",
-}
+DEFAULT_HOST = "http://127.0.0.1:11434"
 
 HF_ORGS: tuple[str, ...] = (
     "Qwen",
@@ -251,15 +248,19 @@ def _line(row: Gap) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--host", action="append", help=f"Ollama URL, repeatable (default {DEFAULT_HOST})"
+    )
     parser.add_argument("--days", type=int, default=45)
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
+    urls: list[str] = args.host or [DEFAULT_HOST]
     today = date.today()
     installed: dict[str, set[str]] = {}
     down: dict[str, str] = {}
     timeout = httpx.Timeout(20.0, connect=8.0)
     with httpx.Client(timeout=timeout, follow_redirects=True) as client:
-        for host, base in DEFAULT_HOSTS.items():
+        for host, base in zip(unique_labels(urls), urls):
             try:
                 installed[host] = fetch_tags(client, base)
             except (httpx.HTTPError, OSError) as exc:

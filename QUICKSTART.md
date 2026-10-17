@@ -123,7 +123,7 @@ tags where the host and our tables disagree, and models loaded at a
 different context than Stoneburner requests.
 
 ```bash
-atomics models --host http://localhost:11434 --host http://brainbox:11434 \
+atomics models --host http://localhost:11434 --host http://gpu-host-b:11434 \
   --json-out logs/inventory/fleet.json
 atomics models --probe -m 'gemma4*'        # does it answer, think, call tools
 atomics models --probe-judge -m gemma4:26b # can it judge the others

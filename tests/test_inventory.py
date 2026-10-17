@@ -538,52 +538,52 @@ def _tags(*pairs: tuple[str, str]) -> dict[str, object]:
 
 def test_digest_mismatch_flags_every_copy():
     a = ModelRecord(host="laptop", name="gemma4:26b", digest="aaa")
-    b = ModelRecord(host="beefy", name="gemma4:26b", digest="bbb")
-    c = ModelRecord(host="brainbox", name="gemma4:26b", digest="aaa")
-    d = ModelRecord(host="beefy", name="qwen3:8b", digest="ccc")
+    b = ModelRecord(host="gpu-host-a", name="gemma4:26b", digest="bbb")
+    c = ModelRecord(host="gpu-host-b", name="gemma4:26b", digest="aaa")
+    d = ModelRecord(host="gpu-host-a", name="qwen3:8b", digest="ccc")
     mark_digest_mismatches([a, b, c, d])
     assert [m.flags for m in (a, b, c, d)] == [["digest-mismatch"]] * 3 + [[]]
 
 
 def test_unique_labels_add_the_port_only_when_needed():
-    assert unique_labels(["http://box:11434", "http://box:11435", "http://beefy:11434"]) == [
+    assert unique_labels(["http://box:11434", "http://box:11435", "http://gpu-host-a:11434"]) == [
         "box:11434",
         "box:11435",
-        "beefy",
+        "gpu-host-a",
     ]
 
 
 async def test_unreachable_host_is_reported_and_skipped(monkeypatch):
     per_host = {"laptop": {"/api/tags": _tags(("gemma4:26b", "aaa"))}}
     monkeypatch.setattr(readers, "new_client", lambda: _hosts(per_host))
-    inv = await take_inventory("ollama", ["http://laptop:11434", "http://brainbox:11434"])
-    assert [h.label for h in inv.hosts] == ["laptop", "brainbox"]
+    inv = await take_inventory("ollama", ["http://laptop:11434", "http://gpu-host-b:11434"])
+    assert [h.label for h in inv.hosts] == ["laptop", "gpu-host-b"]
     assert inv.hosts[1].error and "Cannot reach" in inv.hosts[1].error
     assert [m.host for m in inv.models] == ["laptop"]
 
 
 async def test_every_host_down_raises(monkeypatch):
     monkeypatch.setattr(readers, "new_client", lambda: _hosts({}))
-    with pytest.raises(ConnectionError, match="brainbox"):
-        await take_inventory("ollama", ["http://laptop:11434", "http://brainbox:11434"])
+    with pytest.raises(ConnectionError, match="gpu-host-b"):
+        await take_inventory("ollama", ["http://laptop:11434", "http://gpu-host-b:11434"])
 
 
 def test_models_spans_hosts_and_flags_digests(monkeypatch, tmp_path):
     per_host = {
         "laptop": {"/api/tags": _tags(("gemma4:26b", "aaa"))},
-        "beefy": {"/api/tags": _tags(("gemma4:26b", "bbb"), ("qwen3:8b", "ccc"))},
+        "gpu-host-a": {"/api/tags": _tags(("gemma4:26b", "bbb"), ("qwen3:8b", "ccc"))},
     }
     monkeypatch.setattr(readers, "new_client", lambda: _hosts(per_host))
     out = tmp_path / "inv.json"
-    args = ["--host", "http://laptop:11434", "--host", "http://beefy:11434"]
+    args = ["--host", "http://laptop:11434", "--host", "http://gpu-host-a:11434"]
     result = CliRunner().invoke(cli, ["models", *args, "--json-out", str(out)])
     assert result.exit_code == 0, result.output
-    assert "beefy/gemma4:26b digest-mismatch" in result.output
+    assert "gpu-host-a/gemma4:26b digest-mismatch" in result.output
     data = json.loads(out.read_text())
     assert [(m["host"], m["name"]) for m in data["models"]] == [
         ("laptop", "gemma4:26b"),
-        ("beefy", "gemma4:26b"),
-        ("beefy", "qwen3:8b"),
+        ("gpu-host-a", "gemma4:26b"),
+        ("gpu-host-a", "qwen3:8b"),
     ]
 
 

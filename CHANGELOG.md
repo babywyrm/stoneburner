@@ -14,6 +14,10 @@
   (`--runs N` replaces it), so the summary carries the share dangerous
   on any run. One pass misses a 1-in-3 leak, and this is the battery
   for a model about to get tools. `battery show` prints the `--runs 3`.
+- `scripts/model_gaps.py` takes `--host URL` (repeatable, default
+  localhost) instead of three built-in lab hosts. Docs and tests name
+  hosts `gpu-host-a` / `gpu-host-b`, and a test fails if a lab
+  hostname is committed again.
 
 ### Fixed
 - `POST /batteries` (and MCP `submit_battery`) ran every fixture of a
@@ -430,7 +434,7 @@
   reply at 256 tokens while fixtures get 1024. A reasoning model could be
   called incapable of what its fixtures would do. The probe now uses the
   same settings and budget, and logs when it hit the cap while reasoning.
-  Re-checked on brainbox: the four tags from the 2026-09-22 night that
+  Re-checked on gpu-host-b: the four tags from the 2026-09-22 night that
   declare Ollama tool support (`functiongemma`, `phi4-mini`,
   `phi4-mini-reasoning`, `deepseek-r1:7b`) still emit no probe call, so
   those verdicts stand.
@@ -639,7 +643,7 @@
   level instead of nothing. Probed before it was added, not assumed from the
   model card. First desk-pass row is in `docs/BATTERIES.md`.
 - **`scripts/model_gaps.py` lists recent tags the lab does not have.**
-  It reads `/api/tags` on the laptop, beefy, and brainbox, then the
+  It reads `/api/tags` on the laptop, gpu-host-a, and gpu-host-b, then the
   Ollama library and recent Hugging Face text models from the labs
   this tool already scores. It prints gaps. It does not pull.
 

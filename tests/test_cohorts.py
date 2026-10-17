@@ -131,10 +131,12 @@ def test_patterns_filter_and_report():
 
 
 def test_same_digest_on_two_hosts_is_one_member():
-    inv = _inv(_model("a:8b"), _model("a:8b", "beefy"), _model("b:8b"), hosts=("laptop", "beefy"))
+    inv = _inv(
+        _model("a:8b"), _model("a:8b", "gpu-host-a"), _model("b:8b"), hosts=("laptop", "gpu-host-a")
+    )
     [cohort] = form_cohorts(inv, DESK).cohorts
     assert [(m.name, m.hosts) for m in cohort.members] == [
-        ("a:8b", ("laptop", "beefy")),
+        ("a:8b", ("laptop", "gpu-host-a")),
         ("b:8b", ("laptop",)),
     ]
 
@@ -142,21 +144,23 @@ def test_same_digest_on_two_hosts_is_one_member():
 def test_copy_that_fails_on_one_host_is_not_listed_excluded():
     inv = _inv(
         _model("a:8b", tools=False),
-        _model("a:8b", "beefy"),
+        _model("a:8b", "gpu-host-a"),
         _model("b:8b"),
-        hosts=("laptop", "beefy"),
+        hosts=("laptop", "gpu-host-a"),
     )
     result = form_cohorts(inv, DESK)
     assert _names(result) == [["a:8b", "b:8b"]]
-    assert result.cohorts[0].members[0].hosts == ("beefy",)
+    assert result.cohorts[0].members[0].hosts == ("gpu-host-a",)
     assert result.excluded == []
 
 
 def test_digest_mismatch_splits_into_labelled_members():
     inv = _inv(
-        _model("a:8b", digest="x"), _model("a:8b", "beefy", digest="y"), hosts=("laptop", "beefy")
+        _model("a:8b", digest="x"),
+        _model("a:8b", "gpu-host-a", digest="y"),
+        hosts=("laptop", "gpu-host-a"),
     )
-    assert _names(form_cohorts(inv, DESK)) == [["a:8b@beefy", "a:8b@laptop"]]
+    assert _names(form_cohorts(inv, DESK)) == [["a:8b@gpu-host-a", "a:8b@laptop"]]
 
 
 def test_max_members_splits_band_evenly():
@@ -197,30 +201,30 @@ def _fit(good, bad):
 def test_placement_spreads_load_by_size():
     inv = _inv(
         _model("a:8b", size=9),
-        _model("a:8b", "beefy", size=9),
+        _model("a:8b", "gpu-host-a", size=9),
         _model("b:8b", size=5),
-        _model("b:8b", "beefy", size=5),
+        _model("b:8b", "gpu-host-a", size=5),
         _model("c:8b", size=4),
-        _model("c:8b", "beefy", size=4),
-        hosts=("laptop", "beefy"),
+        _model("c:8b", "gpu-host-a", size=4),
+        hosts=("laptop", "gpu-host-a"),
     )
     [cohort] = form_cohorts(inv, DESK).cohorts
     assert {m.name: m.host for m in cohort.members} == {
         "a:8b": "laptop",
-        "b:8b": "beefy",
-        "c:8b": "beefy",
+        "b:8b": "gpu-host-a",
+        "c:8b": "gpu-host-a",
     }
 
 
 def test_placement_tie_goes_to_faster_host():
     inv = _inv(
         _model("a:8b", tps=10),
-        _model("a:8b", "beefy", tps=40),
+        _model("a:8b", "gpu-host-a", tps=40),
         _model("b:8b"),
-        hosts=("laptop", "beefy"),
+        hosts=("laptop", "gpu-host-a"),
     )
     [cohort] = form_cohorts(inv, DESK).cohorts
-    assert cohort.members[0].host == "beefy"
+    assert cohort.members[0].host == "gpu-host-a"
 
 
 def test_judge_is_widest_margin_and_recomputes_fit():
@@ -250,15 +254,15 @@ def test_judge_skips_members_and_their_family():
 def test_judge_does_not_add_to_member_load():
     inv = _inv(
         _model("a:8b", size=9),
-        _model("a:8b", "beefy", size=9),
+        _model("a:8b", "gpu-host-a", size=9),
         _model("b:8b", size=5),
-        _model("b:8b", "beefy", size=5),
+        _model("b:8b", "gpu-host-a", size=5),
         _model("j:30b", params="30B", size=1, judge=_fit(1.0, 0.0)),
-        _model("j:30b", "beefy", params="30B", size=1, judge=_fit(1.0, 0.0)),
-        hosts=("laptop", "beefy"),
+        _model("j:30b", "gpu-host-a", params="30B", size=1, judge=_fit(1.0, 0.0)),
+        hosts=("laptop", "gpu-host-a"),
     )
     [cohort] = form_cohorts(inv, RED, patterns=("a:*", "b:*")).cohorts
-    assert cohort.judge.host == "beefy"
+    assert cohort.judge.host == "gpu-host-a"
 
 
 def test_no_fit_judge_raises():
@@ -349,15 +353,15 @@ def test_cli_missing_judge_exits_1_after_render(tmp_path):
 
 def test_plan_jobs_one_battery_run_per_member():
     inv = _inv(
-        _model("a:8b", host="beefy", recommended="--thinking"),
+        _model("a:8b", host="gpu-host-a", recommended="--thinking"),
         _model("b:8b", host="laptop"),
         _model("ref:30b", params="30B", judge=_fit(1.0, 0.3)),
-        hosts=("laptop", "beefy"),
+        hosts=("laptop", "gpu-host-a"),
     )
     result = form_cohorts(inv, get_battery("red-capability"), ("a:*", "b:*"))
     jobs = plan_jobs(result)
     assert [j.model for j in jobs] == ["a:8b", "b:8b"]
-    assert jobs[0].host == "http://beefy:11434"
+    assert jobs[0].host == "http://gpu-host-a:11434"
     assert jobs[0].thinking is True
     assert jobs[0].judge == "ref:30b"
     assert jobs[0].judge_host == "http://laptop:11434"
@@ -372,7 +376,7 @@ def test_plan_jobs_one_battery_run_per_member():
         "ollama",
         "--thinking",
         "--ollama-host",
-        "http://beefy:11434",
+        "http://gpu-host-a:11434",
         "--judge-model",
         "ref:30b",
         "--judge-host",

@@ -88,7 +88,7 @@ every item here is a refactor with the test suite as the contract.
 
 ## v0.18.0 — Honest local evals
 
-The 2026-08-14/15 brainbox overnight (32 on-card models × redblue `--runs 3` ×
+The 2026-08-14/15 gpu-host-b overnight (32 on-card models × redblue `--runs 3` ×
 refusal × toolcall × codereview) did not find a new architecture problem. It
 found places the tool still lets a number look finished when the run was not.
 

@@ -403,7 +403,7 @@ def test_battery_run_cohorts_runs_each_job(tmp_path, monkeypatch):
             },
             {
                 "model": "b:8b",
-                "host": "http://brainbox:11434",
+                "host": "http://gpu-host-b:11434",
                 "provider": "ollama",
                 "thinking": True,
                 "judge": None,
@@ -424,7 +424,7 @@ def test_battery_run_cohorts_runs_each_job(tmp_path, monkeypatch):
     models = [args[args.index("-m") + 1] for args in seen if "-m" in args]
     assert models.count("a:8b") == 3
     assert models.count("b:8b") == 3
-    assert any("--ollama-host" in args and "http://brainbox:11434" in args for args in seen)
+    assert any("--ollama-host" in args and "http://gpu-host-b:11434" in args for args in seen)
     assert any("--thinking" in args and "b:8b" in args for args in seen)
 
 
