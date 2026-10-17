@@ -157,7 +157,6 @@ class AtomicsApiClient:
         tier: str = "ez",
         iterations: int = 3,
         interval: int = 5,
-        save: bool = True,
         thinking: bool | None = None,
         effort: str | None = None,
         reasoning_mode: str | None = None,
@@ -168,7 +167,6 @@ class AtomicsApiClient:
             "tier": tier,
             "iterations": iterations,
             "interval": interval,
-            "save": save,
         }
         if model is not None:
             payload["model"] = model
@@ -191,7 +189,6 @@ class AtomicsApiClient:
         host: str | None = None,
         judge_model: str | None = None,
         fixtures: list[str] | None = None,
-        save: bool = True,
         budget_usd: float | None = None,
         thinking: bool | None = None,
         effort: str | None = None,
@@ -200,7 +197,7 @@ class AtomicsApiClient:
         runs: int | None = None,
         channel: str | None = None,
     ) -> Any:
-        payload: dict[str, Any] = {"suite": suite, "provider": provider, "save": save}
+        payload: dict[str, Any] = {"suite": suite, "provider": provider}
         if model is not None:
             payload["model"] = model
         if host is not None:

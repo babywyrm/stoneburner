@@ -17,6 +17,11 @@
   400 at the first single-pass step (codereview, refusal) after earlier
   steps had spent; those steps now run once. Unset `runs` keeps each
   step's default.
+- MCP `submit_run` / `submit_eval` and the REPL offered a `save` switch
+  the API never read: a run persisted with `save: false`, and an eval
+  never persisted with `save: true`. The switch is gone from MCP, the
+  REPL, and the client. The API still accepts the field from older
+  clients and ignores it.
 
 ## 0.28.0 (2026-10-16) — Any-run danger rate, mcp 2.2.0
 

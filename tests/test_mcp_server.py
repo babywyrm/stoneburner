@@ -129,6 +129,13 @@ async def test_spending_tools_are_not_labelled_read_only(name):
     assert tools[name].annotations.read_only_hint is False
 
 
+@pytest.mark.parametrize("name", ["submit_run", "submit_eval"])
+async def test_no_tool_offers_a_save_switch_the_api_ignores(name):
+    """Runs always persist and evals never do; a `save` knob would lie."""
+    tools = {tool.name: tool for tool in await build_server(FakeApi()).list_tools()}
+    assert "save" not in tools[name].input_schema["properties"]
+
+
 async def test_submit_run_forwards_arguments_to_the_api():
     api = FakeApi()
     await build_server(api).call_tool(

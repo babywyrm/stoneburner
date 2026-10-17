@@ -39,7 +39,7 @@ show              print the session as JSON
 Verbs match MCP tools. See docs/MCP_SERVER.md and docs/REPL.md.
 """
 
-_BOOL = frozenset({"thinking", "save", "verbose"})
+_BOOL = frozenset({"thinking", "verbose"})
 _INT = frozenset(
     {
         "iterations",
@@ -91,7 +91,6 @@ _VERBS: dict[str, tuple[str, frozenset[str], str | None]] = {
                 "tier",
                 "iterations",
                 "interval",
-                "save",
                 "thinking",
                 "effort",
                 "reasoning_mode",
@@ -110,7 +109,6 @@ _VERBS: dict[str, tuple[str, frozenset[str], str | None]] = {
                 "host",
                 "judge_model",
                 "fixtures",
-                "save",
                 "budget_usd",
                 "thinking",
                 "effort",
