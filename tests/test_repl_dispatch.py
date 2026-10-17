@@ -42,6 +42,16 @@ def test_unknown_verb_stays_in_the_prompt() -> None:
     assert "frobnicate" in result.stderr
 
 
+def test_submit_verbs_reject_save() -> None:
+    for verb in ("submit_run", "submit_eval --suite refusal"):
+        result = handle_line(
+            f"{verb} --save false",
+            session=Session(provider="ollama"),
+            client=_Boom(),  # type: ignore[arg-type]
+        )
+        assert "unknown flag --save" in result.stderr
+
+
 def test_exit_asks_the_loop_to_stop() -> None:
     result = handle_line("exit", session=Session(), client=_Boom())  # type: ignore[arg-type]
     assert result.exit_loop is True

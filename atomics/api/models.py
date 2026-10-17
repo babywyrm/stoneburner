@@ -64,6 +64,7 @@ class RunRequest(BaseModel):
     tier: str = "ez"
     iterations: int = Field(default=3, ge=1, le=MAX_ITERATIONS)
     interval: int = Field(default=5, ge=0, le=MAX_INTERVAL_SECONDS)
+    # Accepted for old clients and ignored: a benchmark run always persists.
     save: bool = True
     thinking: bool | None = None
     effort: str | None = None
@@ -92,6 +93,7 @@ class EvalRequest(BaseModel):
     judge_model: str | None = None
     host: str | None = None
     fixtures: list[str] | None = Field(default=None, max_length=MAX_FIXTURES)
+    # Accepted for old clients and ignored: API evals return results and never persist.
     save: bool = True
     thinking: bool | None = None
     effort: str | None = None

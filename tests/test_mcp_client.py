@@ -46,7 +46,6 @@ def test_submit_run_posts_expected_payload():
         "tier": "mid",
         "iterations": 7,
         "interval": 5,
-        "save": True,
     }
 
 
@@ -118,7 +117,7 @@ def test_submit_eval_omits_budget_so_server_default_applies():
 
     payload = json.loads(requests[0].content)
     assert "budget_usd" not in payload
-    assert payload == {"suite": "adversarial", "provider": "claude", "save": True}
+    assert payload == {"suite": "adversarial", "provider": "claude"}
 
 
 def test_submit_eval_includes_effort_when_given():
