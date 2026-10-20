@@ -186,7 +186,7 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
         the server's default ceiling. `host` is the inference endpoint
         (same meaning as `list_models`). `judge_host` is the judge endpoint
         when it differs from `host`. `runs` is 1–3 on `adversarial`,
-        `redblue`, and `toolcall` only. `channel` is `both`, `tools`, or
+        `redblue`, `refusal`, `codereview`, and `toolcall` only. `channel` is `both`, `tools`, or
         `prose` on `toolcall` only (CLI `--channel`). `effort` /
         `reasoning_mode` are the shared reasoning dial (same values as
         `provider_test`). `temperature` (0–2) pins the model under test on
@@ -278,7 +278,7 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
         forward onto every step (battery default is `--no-thinking` when
         `thinking` is unset). `host` is the inference endpoint; `judge_host`
         is the judge endpoint when it differs. `runs` repeats the adversarial,
-        redblue, and toolcall steps; unset keeps each step's default
+        redblue, refusal, codereview, and toolcall steps; unset keeps each step's default
         (agent-gate's toolcall step runs 3). `temperature` (0–2) pins every
         step that samples the model except a qa profile, which sets its own.
         Poll `get_job` until `status` is `completed`.

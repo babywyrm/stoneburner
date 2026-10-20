@@ -37,6 +37,10 @@ Same `-p` as every other suite: `ollama`, `vllm`, `brain-gateway`, `openai`,
 Raw `qa --file` is Ollama HTTP. Other providers skip that step unless
 `--profile` points at an app-level gate.
 
+`POST /batteries` and MCP `submit_battery` run the same steps with the
+same fixtures, runs, channel, and judge as `battery run`; archreview
+stays on the CLI. `tests/test_battery_parity.py` fails if they drift.
+
 Start with `provider-test`. `battery` defaults to `--no-thinking` so
 short fixtures stay visible. Pass `--thinking` when a tag 500s or
 skips the tool probe with think off; add `--effort low` when the tag
