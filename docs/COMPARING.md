@@ -69,6 +69,48 @@ high on every item, yet all three ranked the models the same way.
   judge. Re-check the reference when a new local judge appears.
 - Name the judge next to every published score.
 
+### Calibrate a judge
+
+`atomics judge-calibrate` scores a judge against a human-graded set on the
+judge's own rubric and reports mean error, bias (judge minus human, so
+positive means lenient), and pair order. It passes when mean error is at most
+`--max-error` (default 0.15).
+
+```bash
+uv run atomics judge-calibrate --judge-model gemma4:26b
+uv run atomics judge-calibrate --judge-provider claude --judge-model claude-sonnet-4-6 --budget 1
+uv run atomics judge-calibrate --judge-model gemma4:26b --set qa/local/my-graded-set.yaml
+```
+
+The shipped set is the six blue answers from the 2026-10-03 grade. The red
+answers are model output on offensive tasks and stay out of the repo; keep
+sets like that in gitignored `qa/local/`, in the same YAML format
+(`atomics/eval/calibration_sets/redblue-blue.yaml`). Replayed from the
+study's stored scores, the blue six give the following. Live runs on
+2026-10-20 matched to the item:
+
+| Judge | Mean error | Bias | Default verdict |
+|---|---|---|---|
+| `gemma4:26b` | 0.133 | −0.067 | pass |
+| `granite4.2:8b` | 0.200 | +0.200 | fail |
+| `qwen3.8:27b` | 0.233 | −0.133 | fail |
+
+Six items is small: each is a sixth of the mean, so treat a result near the
+threshold as a tie.
+
+A complete run is stored, keyed by judge provider and model. Every judged
+suite (eval, adversarial, redblue, refusal, codereview, probe, multiturn) then
+prints the judge's latest result under its header, and API eval and battery
+results carry it as `judge_calibration`:
+
+```
+Judge calibration: calibrated · error 0.13 · bias -0.07 · redblue-blue-2026-10-03 · 2026-10-20
+```
+
+The label is advisory. It never changes a score, integrity, or exit code. A
+judge with no stored run reads `uncalibrated`. A run with any unscored item
+exits nonzero and is not stored.
+
 ### Model temperature
 
 Judges always run at 0. The model under test runs at its own temperature

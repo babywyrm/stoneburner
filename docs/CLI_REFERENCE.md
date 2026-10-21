@@ -102,6 +102,8 @@ one backend that reports its window size.
 | `atomics eval --extra-judges ollama:mistral:7b` | Multi-judge consensus scoring |
 | `atomics judge-agreement --suite refusal --judges ollama:a,ollama:b` | Generate once, judge N times; report pairwise agreement and majority-flip rate |
 | `atomics judge-agreement --suite rag --judges ollama:a,ollama:b` | Same study on the RAG rubric (numeric mean / flip) |
+| `atomics judge-calibrate --judge-model gemma4:26b` | Score a judge against the human-graded set: mean error, bias, pass at `--max-error` (0.15). Stored; judged suites show it under their header |
+| `atomics judge-calibrate --judge-model gemma4:26b --set qa/local/set.yaml` | Same against your own graded set (keep it in gitignored `qa/local/`) |
 | `atomics battery list` | Named security jobs (desk-pass, blue/red, agent-gate, threat-model) |
 | `atomics battery show desk-pass -m qwen3.5:4b` | Purpose, labels, copy-pasteable commands. `-p ollama\|vllm\|openai\|claude\|…` |
 | `atomics battery run desk-pass -m qwen3.5:4b` | Execute those steps. Stops on first failure unless `--keep-going`. Paid `-p` or `--judge-provider` needs a positive `--budget`. Default `--no-thinking`; pass `--thinking` / `--effort` for tags that skip the tool probe with think off. `--cohorts FILE` runs a plan from `atomics cohorts --json-out` |

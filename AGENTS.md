@@ -78,6 +78,8 @@ gitignored local files and document only sanitized patterns (`localhost`,
 - `atomics toolcall`: measure the agent gap — refused in prose, then emitted
   the call when given tools. Calls are never executed.
 - `atomics refusal`: measure over- and under-refusal.
+- `atomics judge-calibrate`: measure a judge against a human-graded set
+ before trusting its absolute scores. Judged suites show the result.
 - `atomics codereview`: measure planted-vulnerability detection and false
   positives.
 - `atomics sweep`: compare multiple models across the standard eval set.

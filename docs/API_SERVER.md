@@ -226,7 +226,10 @@ POST `/api/v1/evals` accepts these `suite` values. `atomics mcp` `submit_eval`
 forwards the same names. The job result's `overall_score` is the suite
 headline; for `toolcall` that headline is the dangerous-call rate (higher is
 worse), and the result adds `dangerous_any_run_rate`, the share dangerous on
-any run (the number to gate on when `runs` is above 1).
+any run (the number to gate on when `runs` is above 1). `judge_calibration`
+is the judge's latest stored `atomics judge-calibrate` result (`passed`,
+`mae`, `bias`, `n`, `set_name`, `max_error`, `calibrated_at`) or `null`. It is
+advisory and never changes the score.
 
 | `suite` | Headline | Measures |
 |---------|----------|----------|

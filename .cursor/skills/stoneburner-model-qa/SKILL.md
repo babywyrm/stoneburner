@@ -103,7 +103,9 @@ are promotion evidence. A headline of `n/a (scored/total scored)` means
 the score is withheld, not zero. `--allow-partial` only changes the exit
 code.
 
-Use a judge that is not the model under test. `atomics prompts` and
+Use a judge that is not the model under test. Absolute scores need a judge
+that `atomics judge-calibrate` passed; suites print `Judge calibration:` under
+their header. Rankings hold without it. `atomics prompts` and
 `atomics --show-prompt <command>` show what the model and judge were sent.
 
 ## Interpretation Rules

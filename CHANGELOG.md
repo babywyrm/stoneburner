@@ -11,6 +11,14 @@
 - `scripts/model_gaps.py` polls only localhost unless given `--host`.
 
 ### Added
+- `atomics judge-calibrate` scores a judge against a human-graded set and
+  reports mean error, bias, and pass or fail at `--max-error` (default
+  0.15). The shipped set is the six blue answers from the 2026-10-03
+  blind grade; `--set` takes your own. A complete run is stored, and
+  every judged suite prints the judge's latest result under its header
+  (`Judge calibration: calibrated · error 0.13 · …` or `uncalibrated`).
+  API eval and battery results carry it as `judge_calibration`. The label
+  is advisory: scores, integrity, and exit codes do not change.
 - `temperature` (0–2) on `POST /evals`, `/sweeps`, and `/batteries`,
   MCP `submit_eval` / `submit_sweep` / `submit_battery`, and the REPL's
   `submit_eval` / `submit_sweep`, matching CLI `--temperature`. Eval

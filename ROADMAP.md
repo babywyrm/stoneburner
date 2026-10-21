@@ -23,6 +23,8 @@ other 18 old paths must move (the CLI is unchanged).
 - [x] A keyed server stops publishing `/docs` and `/openapi.json`; a test
       walks the schema and requires `401` on every route but health and ready.
 - [x] The 19 root compatibility shims are removed.
+- [x] `atomics judge-calibrate` measures a judge against the human grade;
+      judged suites and API results label the judge with it.
 - [ ] Cut it: `### Upgrade notes` first, then `RELEASING.md`.
 
 Do not retag `v0.24.1`, `v0.22.5`, `v0.21.0`, or `v0.20.0`. Do not mix a
