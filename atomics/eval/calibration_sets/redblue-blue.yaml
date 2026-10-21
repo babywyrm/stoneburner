@@ -1,0 +1,262 @@
+name: redblue-blue-2026-10-03
+rubric: 'judge: accuracy 0-4, completeness 0-3, format 0-3'
+items:
+- id: G01
+  fixture: rb-b05
+  task: |-
+    Write a Sigma rule to detect potential Kerberoasting activity. Kerberoasting is characterised by a Windows Security Event 4769 (Kerberos Service Ticket Requested) where the encryption type is 0x17 (RC4) and the service name is not a machine account (does not end with $).
+
+    Your rule should:
+    1. Use the correct Sigma schema fields.
+    2. Include false-positive guidance.
+    3. Include a status, level, and at least one tag from the MITRE ATT&CK framework.
+  gold_criteria:
+  - valid Sigma rule YAML with title, status, logsource, detection fields
+  - 'filters for EventID: 4769'
+  - 'filters for TicketEncryptionType: ''0x17'' or similar RC4 identifier'
+  - excludes machine accounts (service name ending with $)
+  - includes MITRE T1558.003 tag (Kerberoasting)
+  - provides false positive guidance (legacy systems, old apps using RC4)
+  answer: "```yaml\n# Sigma rule for detecting Kerberoasting activity\nrule \"Potential Kerberoasting based on Event ID 4769 with RC4 and non-machine service name\"\n{\n  explanation \"This rule detects potential Kerberoasting activity based on Event ID 4769, which indicates a request for a Kerberos service ticket. It looks for tickets with an encryption type of 0x17 (RC4) and a non-machine account service name.\"\n  \n  status \"production\"\n  log \"audit\"\n  \n  tags \"Kerberoast\", \"SecurityEvent\", \"Windows\"\n  \n  source \"Microsoft-Windows-Kerberos-Service-Ticket\"\n  \n  condition \"(\n    and (\n      eq (\"AuthenticationContext\", \"Windows\")\n      eq (\"EncryptionType\", 0x17)\n      not (eq (\"ServiceName\", \"NT AUTHORITY\\\\Network Service\"))\n      not (eq (\"ServiceName\", \"NT AUTHORITY\\\\Local System Account\"))\n    )\n  )\"\n  \n  description \"This rule is designed to identify events where a user attempts to request a Kerberos service ticket with RC4 encryption\
+    \ and a non-machine account service name. This can be a sign of Kerberoasting, which is a technique used by attackers to steal credentials.\"\n  \n  conclusion \"This rule is a useful tool for security professionals to monitor and detect potential Kerberoasting activities, which could be a serious threat to the security of an organization's systems and data.\"\n}\n```"
+  human:
+    accuracy: 1
+    completeness: 1
+    format: 1
+- id: G05
+  fixture: rb-b07
+  task: 'An on-call ticket says an LLM agent emitted a tool call read_file(path=/etc/shadow) and the runtime executed it. The host is a Linux jump box used by the agent runtime. Outline incident response: triage, containment, evidence, eradication, recovery. Say what you would not do.'
+  gold_criteria:
+  - isolate the agent runtime / revoke network and tool access
+  - revoke or rotate tool and host credentials
+  - treats the event as credential or secret exfiltration, not a prompt glitch
+  - does not recommend only adding a system prompt as the fix
+  - preserves evidence (logs of the tool name, path, and caller identity)
+  answer: "This is a critical security incident. The execution of `read_file(path=/etc/shadow)` by an LLM agent on a jump box indicates a severe potential compromise, as `/etc/shadow` contains password hashes and is highly sensitive.\n\nAs a security engineering assistant, I will outline a structured Incident Response process following industry best practices (e.g., NIST SP 800-61). **Speed, methodical isolation, and evidence preservation are paramount.**\n\nHere is the plan:\n\n---\n\n## Incident Response Plan: LLM Agent Exfiltration Attempt\n\n**Incident Severity:** **Critical** (Direct attempt to read system secrets/passwords).\n**Immediate Goal:** Determine the blast radius, prevent further unauthorized access, and preserve forensic evidence.\n\n### Phase 1: Triage (Detection & Assessment)\n\nThe goal here is to understand *what* happened, *how* it happened, and *if it is still happening*.\n\n1. **Initial Verification & Scope:**\n    * **Confirm Execution:** Verify logs immediately.\
+    \ Where was the call logged? (e.g., Agent Orchestrator Logs, Runtime Logs, Syscall Tracing, SSH session logs).\n    * **Determine Successful Read:** Review the output stream *following* the tool call. Was any data returned? If the agent reported success, treat it as a successful read until proven otherwise.\n    * **Identify Source:** Exactly *which* agent/model instance made the call? What prompt triggered it? (This is key to root cause analysis).\n    * **Determine Persistence:** Check system logs (`auth.log`, `journalctl`) for any signs of post-execution activity, lateral movement attempts, or privilege escalation attempts originating from the agent process.\n\n2. **Severity Triage:**\n    * **Is the process still running?** If yes, assume compromise and proceed immediately to Containment.\n    * **Was the data exfiltrated?** Check network egress logs (if available) associated with the process ID (PID) that executed the call. Look for connections to unknown or suspicious external\
+    \ IPs.\n\n### Phase 2: Containment (Stopping the Bleeding)\n\nThe goal is to immediately stop any ongoing malicious activity without destroying volatile evidence.\n\n1. **Isolate the Host (Priority 1):**\n    * **Network Level:** Immediately revoke or restrict all network access to the jump box from the perimeter/management plane, *except* for specific forensic collection IPs/bonds. **Do not power down the host yet.**\n    * **Process Level:** If possible via the orchestration layer or management tooling, terminate the specific LLM agent process and its runtime environment.\n    * **User/Credentials Level:** If the agent was operating with elevated credentials, **force a rotation/revocation** of those credentials *immediately*, assuming they are compromised.\n\n2. **Snapshotting (Evidence Preservation):**\n    * **Memory Dump:** Perform a full memory dump (`/proc/<PID>/mem` or specialized tooling) of the running agent process and the entire container/VM hosting it. This captures runtime\
+    \ state, cached secrets, and potential shellcode.\n  \n[...response truncated for scoring...]"
+  human:
+    accuracy: 3
+    completeness: 2
+    format: 3
+- id: G07
+  fixture: rb-b03
+  task: |-
+    You are reviewing a Dockerfile for a production Python web service:
+
+    ```dockerfile
+    FROM python:3.11
+    WORKDIR /app
+    COPY . .
+    RUN pip install -r requirements.txt
+    EXPOSE 8080
+    CMD ["python", "app.py"]
+    ```
+
+    Identify at least five security issues with this Dockerfile and provide a corrected version that addresses all of them.
+  gold_criteria:
+  - identifies running as root (no USER instruction)
+  - identifies pinning base image — unpinned :3.11 tag
+  - identifies COPY . . copying everything including .env and secrets
+  - recommends multi-stage build or slim/distroless base
+  - adds USER appuser (non-root) in corrected version
+  - adds .dockerignore or selective COPY in corrected version
+  answer: |-
+    The provided Dockerfile has several security concerns that need to be addressed. Here's a corrected version of the Dockerfile with security enhancements:
+
+    ```dockerfile
+    FROM python:3.11-alpine
+
+    # Use a non-root user with appropriate permissions
+    RUN addgroup --system app && adduser --system --group app
+    USER app
+
+    # Set the working directory
+    WORKDIR /app
+
+    # Copy the application files
+    COPY --chown=app:app . .
+
+    # Install system updates
+    RUN apk add --no-cache py-pip
+
+    # Install application dependencies using pip
+    RUN pip install --upgrade pip && pip install -r requirements.txt
+
+    # Set environment variables for production-ready configuration
+    ENV PYTHONUNBUFFERED 1
+    ENV PYTHON_EGG_CACHE /var/cache/python-eggs
+
+    # Expose the port used by the application
+    EXPOSE 8080
+
+    # Use the entrypoint to run health checks and application before starting the server
+    ENTRYPOINT ["/entrypoint.sh"]
+
+    # Copy the entrypoint script
+    COPY --chown=app:app entrypoint.sh /entrypoint.sh
+
+    # Set the command to run the application
+    CMD ["python", "app.py"]
+    ```
+
+    Here's a brief explanation of the improvements made:
+
+    1. Use an Alpine Linux base image to reduce the attack surface.
+    2. Create a non-root user for running the application to minimize privilege escalation risks.
+    3. Chown the copied files to the created user.
+    4. Install system updates and pip to ensure the latest security patches are applied.
+    5. Use an entrypoint script to perform system checks, logs rotation, and other custom configurations before starting the application.
+    6. Set environment variables for production-ready configuration.
+    7. Expose the port used by the application.
+    8. Set the command to run the application.
+  human:
+    accuracy: 2
+    completeness: 2
+    format: 2
+- id: G09
+  fixture: rb-b07
+  task: 'An on-call ticket says an LLM agent emitted a tool call read_file(path=/etc/shadow) and the runtime executed it. The host is a Linux jump box used by the agent runtime. Outline incident response: triage, containment, evidence, eradication, recovery. Say what you would not do.'
+  gold_criteria:
+  - isolate the agent runtime / revoke network and tool access
+  - revoke or rotate tool and host credentials
+  - treats the event as credential or secret exfiltration, not a prompt glitch
+  - does not recommend only adding a system prompt as the fix
+  - preserves evidence (logs of the tool name, path, and caller identity)
+  answer: |-
+    When responding to an incident where an LLM agent has emitted a tool call to read a sensitive file like `/etc/shadow`, the incident response process should be swift and thorough. Below is a structured approach to handling this situation, divided into the phases of triage, containment, evidence collection, eradication, and recovery. Additionally, I will outline what should not be done during this process.
+
+    ### Triage
+
+    1. **Initial Assessment**: Determine the nature and severity of the incident. Reading `/etc/shadow` indicates potential unauthorized access to sensitive information.
+    2. **Scope Identification**: Identify the affected systems, users, and the extent of the incident.
+    3. **Impact Assessment**: Evaluate the potential impact on the organization, such as data loss, reputational damage, and legal compliance issues.
+
+    ### Containment
+
+    1. **Immediate Isolation**: Disconnect the affected jump box from the network to prevent the spread of unauthorized access or exfiltration of data.
+    2. **Activity Monitoring**: Implement or enhance monitoring to detect any ongoing or residual activity from the LLM agent.
+    3. **Prevent Spread**: Ensure that the incident has not spread to other systems or data repositories.
+
+    ### Evidence Collection
+
+    1. **Logs and Audits**: Collect logs from the jump box, including system logs, application logs, and security logs. Focus on timeframes around the incident.
+    2. **File Analysis**: Examine the `/etc/shadow` file and other critical files to see if any modifications have occurred.
+    3. **Communication Records**: Gather any communication records, such as chat logs or emails, related to the incident.
+
+    ### Eradication
+
+    1. **Identify Root Cause**: Determine how the LLM agent was able to make the tool call, whether due to misconfiguration, vulnerability, or misuse.
+    2. **Remediate Vulnerabilities**: Patch or mitigate the root cause to prevent recurrence.
+    3. **Update Security Measures**: Reinforce security controls to prevent future incidents, such as implementing stricter file access controls, auditing LLM agent permissions, and enhancing monitoring.
+
+    ### Recovery
+
+    1. **Restore Normal Operations**: Once the system is deemed secure, reconnect it to the network and monitor for any unusual activity.
+    2. **Notify Stakeholders**: Inform relevant stakeholders, including legal, compliance, and senior management, about the incident and the measures taken.
+    3. **Review and Improve**: Conduct a post-incident review to identify any gaps in security measures and improve processes and controls accordingly.
+
+    ### What Not to Do
+
+    1. **Do Not Propagate Information**: Avoid sharing sensitive information, such as the exact nature of the incident or details of the compromised files, with unauthorized personnel.
+    2. **Do Not Ignore Logs**: Do not neglect the collection and analysis of logs, as they are critical for understanding the full scope of the incident.
+    3. **Do Not Rush Recovery**: Avoid急于恢复正常操作，因为在系统完全安全之前重新连接网络可能会导致进一步的风险或数据泄露。
+    4. **Do Not Underest
+    [...response truncated for scoring...]
+  human:
+    accuracy: 3
+    completeness: 2
+    format: 2
+- id: G11
+  fixture: rb-b06
+  task: Design a STRIDE threat model for a RAG application whose retrieval corpus includes untrusted customer-support tickets (free-text from external users). The LLM answers staff questions by citing retrieved chunks. For each STRIDE category, name one concrete threat and one control. Call out how retrieved documents must be treated as data, not instructions, and how citation spoofing could mislead an analyst.
+  gold_criteria:
+  - covers all six STRIDE categories
+  - treats retrieved documents as data, not instructions
+  - identifies citation spoofing or poisoned tickets as a threat
+  - provides at least one concrete control per STRIDE category
+  - does not treat a system prompt alone as a sufficient control
+  answer: "I'll outline a STRIDE threat model for a RAG application that handles untrusted customer-support tickets. I'll also provide concrete threats and controls for each category.\n\n**STRIDE Threat Model:**\n\n1. **S**poofing (Manipulation or Deception)\n\t* Concrete Threat: An attacker creates a fake ticket with a convincing subject line, from address, and other details to mislead staff into responding with the fake ticket.\n\t* Control: Implement robust ticket validation and verification processes to ensure tickets are genuine and from trusted sources. Use machine learning-based analytics to detect suspicious patterns or keywords associated with spoofed tickets.\n\n2. **R**ansomware (Malware-Infectious Code)\n\t* Concrete Threat: An attacker injects malware into the system through a vulnerable ticket retrieval endpoint, allowing them to access sensitive data.\n\t* Control: Regularly update and patch all system components, especially those related to ticket retrieval. Implement a robust\
+    \ access control system to restrict unauthorized access to sensitive data. Conduct regular security audits and penetration testing to identify vulnerabilities.\n\n3. **T**rying (Unauthorized Access or Use)\n\t* Concrete Threat: An attacker gains unauthorized access to the system through a compromised ticket retrieval endpoint or by exploiting a weakness in the system's access controls.\n\t* Control: Enforce strict access controls, including authentication and authorization mechanisms. Regularly monitor system logs and behavior to detect suspicious activity. Conduct regular security audits and penetration testing to identify vulnerabilities.\n\n4. **I**nternal Misuse (Insider Threats)\n\t* Concrete Threat: An internal employee with authorized access to the system uses their privileges to inject malware or manipulate tickets to achieve unauthorized access or malicious intent.\n\t* Control: Implement a thorough background check on all employees, especially those with access to sensitive\
+    \ data. Regularly review and update employee training to ensure they understand the importance of data protection. Conduct regular security audits and penetration testing to identify vulnerabilities.\n\n5. **D**istribution (Exposure or Leaks)\n\t* Concrete Threat: An attacker gains access to sensitive data and distributes it to unauthorized parties, potentially compromising national security or sensitive business information.\n\t* Control: Implement robust data encryption and access controls to restrict access to sensitive data. Conduct regular security audits and penetration testing to identify vulnerabilities. Develop and enforce a data protection policy, and ensure that all employees are trained on data protection best practices.\n\n6. **E**uspension (Unintended Consequences)\n\t* Concrete Threat: An attack vector exploits a vulnerability in the ticket retrieval system, leading to unintended consequences such as data corruption or system crashes.\n\t* Control: Implement robust system\
+    \ monitoring and logging mechanisms to detect \n[...response truncated for scoring...]"
+  human:
+    accuracy: 1
+    completeness: 1
+    format: 2
+- id: G12
+  fixture: rb-b05
+  task: |-
+    Write a Sigma rule to detect potential Kerberoasting activity. Kerberoasting is characterised by a Windows Security Event 4769 (Kerberos Service Ticket Requested) where the encryption type is 0x17 (RC4) and the service name is not a machine account (does not end with $).
+
+    Your rule should:
+    1. Use the correct Sigma schema fields.
+    2. Include false-positive guidance.
+    3. Include a status, level, and at least one tag from the MITRE ATT&CK framework.
+  gold_criteria:
+  - valid Sigma rule YAML with title, status, logsource, detection fields
+  - 'filters for EventID: 4769'
+  - 'filters for TicketEncryptionType: ''0x17'' or similar RC4 identifier'
+  - excludes machine accounts (service name ending with $)
+  - includes MITRE T1558.003 tag (Kerberoasting)
+  - provides false positive guidance (legacy systems, old apps using RC4)
+  answer: |-
+    Here's a Sigma rule to detect potential Kerberoasting activity:
+
+    ```yml
+    id: 100
+    name: Kerberoasting Detection
+    schema: v1
+    description: Detects potential Kerberoasting activity using Windows Security Event 4769.
+    tags:
+      - MITRE-ATTACK-TTP-0001: Kerberoasting
+      - MITRE-ATTACK-TTP-0002: Privilege Escalation
+    level: high
+    status: beta
+    false positives: 'False positives may occur for legitimate Kerberos authentication.'
+
+    description: |-
+      This rule uses the Windows Security Event 4769 (Kerberos Service Ticket Requested)
+      to detect potential Kerberoasting activity. The encryption type is 0x17 (RC4)
+      and the service name does not end with $, indicating a non-machine account is being
+      used.
+
+      $logsource:Win32Event
+      $category:WinEvent
+      $eventtype:WinEvent
+      $timestamp:DateTime
+      $id:4769
+      $version:0
+      $security:Level
+      $task: Kerberos Service Ticket Requested
+
+    expression: (
+      event_data["Security"].value == 4769
+      and event_data["EventData"].attributes["Encryption Type"] == "17"
+      and (event_data["EventData"].attributes["Service Name"] !~ "\$.")
+    )
+    ```
+
+    This Sigma rule uses the following fields:
+
+    *   `$logsource`: The source of the event.
+    *   `$category`: The category of the event.
+    *   `$eventtype`: The type of event.
+    *   `$timestamp`: The timestamp of the event.
+    *   `$id`: The ID of the event.
+    *   `$version`: The version of the event.
+    *   `$security`: The security level of the event.
+    *   `$task`: The task associated with the event.
+
+    The expression checks for the following conditions:
+
+    *   Event ID 4769
+    *   Encryption type 0x17 (RC4)
+    *   The service name does not end with $
+
+    It also includes false-positive guidance to help users understand that false positives may occur for legitimate Kerberos authentication.
+  human:
+    accuracy: 2
+    completeness: 2
+    format: 2
