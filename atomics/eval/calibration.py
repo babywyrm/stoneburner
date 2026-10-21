@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import hashlib
 import itertools
+import logging
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -26,6 +27,11 @@ from atomics.eval.judge import JudgeResult, char_budget_for_tokens, score_respon
 from atomics.eval.outcomes import RunIntegrity, RunStatus
 from atomics.eval.suite_integrity import fixture_outcome, integrity_of
 from atomics.providers.base import BaseProvider
+from atomics.storage import MetricsRepository
+from atomics.storage.records import EvaluationResultRecord
+from atomics.validation import sanitize_error
+
+logger = logging.getLogger(__name__)
 
 # Signature of a scoring function compatible with score_response.
 ScoreFn = Callable[..., Awaitable[JudgeResult]]
@@ -333,3 +339,117 @@ async def run_judge_calibration(
         max_error=max_error,
         items=items,
     )
+
+
+@dataclass(frozen=True)
+class CalibrationStatus:
+    passed: bool
+    mae: float
+    bias: float
+    n: int
+    set_name: str
+    max_error: float
+    calibrated_at: str
+
+    def label(self) -> str:
+        state = "calibrated" if self.passed else "failed calibration"
+        return (
+            f"{state} · error {self.mae:.2f} · bias {self.bias:+.2f} · "
+            f"{self.set_name} · {self.calibrated_at[:10]}"
+        )
+
+
+def calibration_label(status: CalibrationStatus | None) -> str:
+    return status.label() if status is not None else "uncalibrated"
+
+
+def save_calibration(
+    repository: MetricsRepository, run_id: str, calibration: JudgeCalibration
+) -> None:
+    """Store a calibration as a completed parent run with one row per item."""
+    repository.create_run(
+        run_id,
+        tier=CALIBRATE_SUITE,
+        provider=calibration.judge_provider,
+        model=calibration.judge_model,
+    )
+    for item in calibration.items:
+        repository.save_evaluation_result(
+            EvaluationResultRecord(
+                run_id=run_id,
+                suite=CALIBRATE_SUITE,
+                fixture_id=item.id,
+                status="complete",
+                generation_status="completed",
+                judge_status="scored" if item.judge is not None else "parse_failed",
+                latency_ms=0.0,
+                input_tokens=0,
+                output_tokens=0,
+                total_tokens=0,
+                score=item.judge,
+                provider=calibration.judge_provider,
+                model=calibration.judge_model,
+                result_json={
+                    "human": item.human,
+                    "set_name": calibration.set_name,
+                    "set_digest": calibration.set_digest,
+                    "max_error": calibration.max_error,
+                },
+            )
+        )
+    repository.complete_evaluation_run(run_id)
+
+
+def judge_calibration_status(db_path: Path, provider: str, model: str) -> CalibrationStatus | None:
+    """The newest stored calibration for a judge. None when absent or unreadable; never raises."""
+    # ponytail: keyed by provider + model, not host or quantization, so one tag
+    # pulled at two quants shares a calibration. Add a digest to the key if they diverge.
+    if not db_path.exists():
+        return None
+    try:
+        repository = MetricsRepository(db_path)
+        try:
+            rows = [
+                row
+                for row in repository.get_evaluation_results(suite=CALIBRATE_SUITE)
+                if row["provider"] == provider and row["model"] == model
+            ]
+        finally:
+            repository.close()
+        if not rows:
+            return None
+        newest = max(rows, key=lambda row: str(row["timestamp"]))["run_id"]
+        return _status_from_rows([row for row in rows if row["run_id"] == newest])
+    except Exception as exc:  # noqa: BLE001 — a label must never fail the run it labels
+        logger.debug("judge calibration lookup failed: %s", sanitize_error(exc))
+        return None
+
+
+def _status_from_rows(rows: Sequence[dict[str, object]]) -> CalibrationStatus:
+    pairs: list[Pair] = []
+    meta: dict[object, object] = {}
+    for row in rows:
+        result = row["result_json"]
+        if not isinstance(result, dict):
+            raise ValueError("calibration row has no result_json")
+        meta = result
+        pairs.append((_number(result["human"]), _number(row["score"])))
+    mae, bias = mean_abs_error(pairs), mean_bias(pairs)
+    if mae is None or bias is None:
+        raise ValueError("calibration run has no rows")
+    max_error = _number(meta["max_error"])
+    return CalibrationStatus(
+        passed=mae <= max_error,
+        mae=mae,
+        bias=bias,
+        n=len(pairs),
+        set_name=str(meta["set_name"]),
+        max_error=max_error,
+        calibrated_at=str(rows[0]["timestamp"]),
+    )
+
+
+def _number(value: object) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"expected a number, got {type(value).__name__}")
+    return float(value)

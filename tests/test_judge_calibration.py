@@ -7,17 +7,25 @@ from pathlib import Path
 import pytest
 
 from atomics.eval.calibration import (
+    CalibrationStatus,
     GradedItem,
     GradedSet,
+    ItemCalibration,
+    JudgeCalibration,
+    _status_from_rows,
+    calibration_label,
     default_set_path,
+    judge_calibration_status,
     load_graded_set,
     mean_abs_error,
     mean_bias,
     pair_order_agreement,
     run_judge_calibration,
+    save_calibration,
 )
 from atomics.eval.judge import JudgeResult
 from atomics.eval.outcomes import RunStatus
+from atomics.storage import MetricsRepository
 
 PAIRS = [(0.3, 0.3), (0.8, 0.6), (0.5, 0.7)]  # (human, judge)
 
@@ -76,6 +84,7 @@ def test_loader_digest_tracks_content(tmp_path):
     [
         ("items: []", "non-empty items"),
         ("- 1", "non-empty items"),
+        ("items: [1]", "item 1: not a mapping"),
         (GOOD.replace("    answer: did x\n", ""), "missing answer"),
         (GOOD.replace("accuracy: 4", "accuracy: 5"), "accuracy must be an integer 0-4"),
         (GOOD.replace("format: 3", "format: true"), "format must be an integer 0-3"),
@@ -182,3 +191,77 @@ async def test_study_replay_matches_the_human_grade(judge, mae, bias, passes):
         score_fn=_scores(*(STUDY[judge][i.id] for i in graded.items)),
     )
     assert (result.mae, result.bias, result.passed) == (mae, bias, passes)
+
+
+def _calibration(model: str = "j", judge: float = 0.3) -> JudgeCalibration:
+    return JudgeCalibration(
+        set_name="t",
+        set_digest="abc",
+        judge_provider="ollama",
+        judge_model=model,
+        max_error=0.15,
+        items=[ItemCalibration("A", 0.3, judge), ItemCalibration("B", 0.8, 0.8)],
+    )
+
+
+def test_lookup_is_none_and_creates_nothing_when_db_missing(tmp_path):
+    db = tmp_path / "nope.db"
+    assert judge_calibration_status(db, "ollama", "j") is None
+    assert not db.exists()
+
+
+def test_save_then_lookup_newest_wins_per_judge(tmp_path):
+    db = tmp_path / "m.db"
+    repo = MetricsRepository(db)
+    save_calibration(repo, "r1", _calibration(judge=0.9))
+    save_calibration(repo, "r2", _calibration(judge=0.3))
+    save_calibration(repo, "r3", _calibration(model="other", judge=0.9))
+    repo.close()
+
+    status = judge_calibration_status(db, "ollama", "j")
+    assert status is not None
+    assert (status.passed, status.mae, status.bias, status.n) == (True, 0.0, 0.0, 2)
+    assert status.set_name == "t"
+    other = judge_calibration_status(db, "ollama", "other")
+    assert other is not None and not other.passed and other.mae == 0.3
+    assert judge_calibration_status(db, "ollama", "missing") is None
+    assert judge_calibration_status(db, "claude", "j") is None
+
+
+def test_saved_calibration_is_a_completed_run(tmp_path):
+    repo = MetricsRepository(tmp_path / "m.db")
+    save_calibration(repo, "r1", _calibration())
+    run = repo.get_run("r1")
+    rows = repo.get_evaluation_results(run_id="r1")
+    repo.close()
+    assert run is not None and run["completed_at"] and run["model"] == "j"
+    assert [r["fixture_id"] for r in rows] == ["A", "B"]
+    assert rows[0]["result_json"]["human"] == 0.3
+
+
+def test_lookup_swallows_an_unreadable_db(tmp_path):
+    db = tmp_path / "bad.db"
+    db.write_bytes(b"not sqlite at all, just bytes" * 10)
+    assert judge_calibration_status(db, "ollama", "j") is None
+
+
+@pytest.mark.parametrize(
+    ("rows", "message"),
+    [
+        ([], "no rows"),
+        ([{"result_json": None, "score": 0.3}], "no result_json"),
+        ([{"result_json": {"human": "0.3", "max_error": 0.15}, "score": 0.3}], "got str"),
+        ([{"result_json": {"human": True, "max_error": 0.15}, "score": 0.3}], "got bool"),
+    ],
+)
+def test_corrupt_stored_rows_are_rejected(rows, message):
+    with pytest.raises(ValueError, match=message):
+        _status_from_rows(rows)
+
+
+def test_labels_for_each_state():
+    assert calibration_label(None) == "uncalibrated"
+    passed = CalibrationStatus(True, 0.133, -0.067, 6, "t", 0.15, "2026-10-20T01:02:03")
+    assert calibration_label(passed) == "calibrated · error 0.13 · bias -0.07 · t · 2026-10-20"
+    failed = CalibrationStatus(False, 0.2, 0.2, 6, "t", 0.15, "2026-10-20T01:02:03")
+    assert failed.label() == "failed calibration · error 0.20 · bias +0.20 · t · 2026-10-20"

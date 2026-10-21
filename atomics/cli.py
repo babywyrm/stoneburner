@@ -11,6 +11,7 @@ from atomics.commands import api as api_commands
 from atomics.commands import archreview as archreview_commands
 from atomics.commands import battery as battery_commands
 from atomics.commands import benchmark as benchmark_commands
+from atomics.commands import calibration as calibration_commands
 from atomics.commands import codegen as codegen_commands
 from atomics.commands import compare as compare_commands
 from atomics.commands import distributed as distributed_commands
@@ -73,6 +74,7 @@ def cli(ctx: click.Context, verbose: bool, progress: bool, show_prompt: bool) ->
 
 
 cli.add_command(agreement_commands.judge_agreement)
+cli.add_command(calibration_commands.judge_calibrate)
 cli.add_command(security_commands.refusal)
 cli.add_command(security_commands.codereview)
 cli.add_command(toolcall_commands.toolcall)
