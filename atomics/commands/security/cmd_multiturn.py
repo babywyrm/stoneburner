@@ -12,6 +12,7 @@ from rich.table import Table
 
 from atomics.commands.common import (
     PROVIDER_CHOICES,
+    _attribution_model,
     _make_provider,
     budget_option,
     effort_options,
@@ -19,6 +20,7 @@ from atomics.commands.common import (
     extra_judges_option,
     integrity_exit_code,
     parse_extra_judges,
+    print_judge_calibration,
     run_async,
     setup_logging,
     write_summary_json,
@@ -148,6 +150,9 @@ def multiturn(
         f"judge: [cyan]{judge_provider_name}:{judge_model or 'default'}[/cyan]\n"
         f"Conversations: [bold]{len(selected_fixtures)}[/bold] | "
         f"Total turns: [bold]{total_turns}[/bold]\n"
+    )
+    print_judge_calibration(
+        console, judge_provider_name, _attribution_model(judge_provider, judge_model)
     )
 
     mt_run_id = uuid.uuid4().hex[:12]

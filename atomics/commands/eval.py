@@ -14,12 +14,14 @@ from rich.table import Table
 
 from atomics.commands.common import (
     PROVIDER_CHOICES,
+    _attribution_model,
     _make_provider,
     budget_option,
     effort_options,
     eval_budget_from,
     extra_judges_option,
     parse_extra_judges,
+    print_judge_calibration,
     run_async,
     setup_logging,
     temperature_option,
@@ -208,6 +210,9 @@ def eval(
         f"Judge: [cyan]{judge_provider_name}[/cyan] ({judge_label})\n"
         f"Fixtures: [bold]{fixture_count}[/bold] | "
         f"Results saved: [bold]{'yes' if save_results else 'no'}[/bold]\n"
+    )
+    print_judge_calibration(
+        console, judge_provider_name, _attribution_model(judge_provider, judge_model)
     )
 
     from atomics.eval.runner import run_eval

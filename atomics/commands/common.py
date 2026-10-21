@@ -13,6 +13,7 @@ from typing import Protocol, TypeVar, cast
 import click
 from rich.console import Console
 from rich.logging import RichHandler
+from rich.markup import escape
 from rich.status import Status
 
 from atomics.config import AtomicsSettings
@@ -255,6 +256,15 @@ class FixtureProgress:
             return f"{seconds:.0f}s"
         minutes, remaining_seconds = divmod(int(seconds), 60)
         return f"{minutes}m{remaining_seconds:02d}s"
+
+
+def print_judge_calibration(console: Console, provider_name: str, model: str) -> None:
+    """One dim line naming the judge's stored calibration. Advisory: never fails a run."""
+    from atomics.config import load_settings
+    from atomics.eval.calibration import calibration_label, judge_calibration_status
+
+    status = judge_calibration_status(load_settings().db_path, provider_name, model)
+    console.print(f"[dim]Judge calibration: {escape(calibration_label(status))}[/dim]")
 
 
 def effective_model(requested_model: str | None, provider: object) -> str:

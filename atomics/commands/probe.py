@@ -12,10 +12,12 @@ from atomics.commands.common import (
     PROVIDER_CHOICES,
     _make_provider,
     budget_option,
+    effective_model,
     effort_options,
     eval_budget_from,
     extra_judges_option,
     parse_extra_judges,
+    print_judge_calibration,
     run_async,
     write_summary_json,
 )
@@ -160,6 +162,7 @@ def probe(
         f"({model or 'default'})\n"
         f"Judge: [cyan]{judge_provider_name}[/cyan] | Targets: [bold]{len(targets)}[/bold]\n"
     )
+    print_judge_calibration(console, judge_provider_name, effective_model(judge_model, judge))
 
     run_id = uuid.uuid4().hex[:12]
 

@@ -21,6 +21,7 @@ from atomics.commands.common import (
     eval_budget_from,
     extra_judges_option,
     parse_extra_judges,
+    print_judge_calibration,
     run_async,
     temperature_option,
 )
@@ -242,6 +243,7 @@ def adversarial(
         f"Fixtures: [bold]{selected_count}[/bold] | "
         f"Categories: [bold]{category or 'all'}[/bold]\n"
     )
+    print_judge_calibration(console, judge_provider_name, effective_judge_model)
 
     ctx = click.get_current_context()
     # Not the `suite_run` context manager: this command's body is long enough that

@@ -253,6 +253,7 @@ async def test_run_eval_from_request_accuracy_normalized():
         "provider": "ollama",
         "model": "m1",
         "judge_model": "j1",
+        "judge_calibration": None,
         "host": None,
         "temperature": None,
         "overall_accuracy": 0.9,

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import asdict
 from typing import Any
 
 from fastapi import HTTPException
@@ -20,6 +21,7 @@ from atomics.api.models import EvalRequest, RunRequest
 from atomics.config import load_settings
 from atomics.eval.adversarial.runner import run_adversarial
 from atomics.eval.budget import EvalBudget, EvalBudgetExceededError, share_budget
+from atomics.eval.calibration import judge_calibration_status
 from atomics.eval.codegen.runner import run_codegen
 from atomics.eval.codereview.runner import run_codereview
 from atomics.eval.multiturn.runner import run_multiturn
@@ -84,6 +86,15 @@ def _guarded_providers(
     budget = EvalBudget(budget_limit_usd=payload.budget_usd)
     guarded = share_budget(budget, provider, judge_provider)
     return guarded[0], guarded[1]
+
+
+def _judge_calibration(
+    judge_model: str | None, judge_provider: BaseProvider
+) -> dict[str, object] | None:
+    """The API judge is always Ollama (`_guarded_providers`); advisory, never raises."""
+    model = judge_model or judge_provider.default_model or "default"
+    status = judge_calibration_status(load_settings().db_path, "ollama", model)
+    return asdict(status) if status is not None else None
 
 
 def _can_row(fr: Any) -> bool:
@@ -327,6 +338,7 @@ async def run_eval_from_request(payload: EvalRequest, job: Job | None = None) ->
         "provider": payload.provider,
         "model": payload.model,
         "judge_model": payload.judge_model,
+        "judge_calibration": _judge_calibration(payload.judge_model, judge_provider),
         "host": host,
         "temperature": payload.temperature,
         "overall_accuracy": summary.overall_accuracy,
@@ -497,6 +509,7 @@ async def run_eval_suite(payload: EvalRequest, job: Job | None = None) -> dict[s
         "suite": suite,
         "provider": payload.provider,
         "model": payload.model,
+        "judge_calibration": _judge_calibration(payload.judge_model, judge_provider),
         "host": host,
         "temperature": payload.temperature,
         "overall_score": _overall_score(summary),

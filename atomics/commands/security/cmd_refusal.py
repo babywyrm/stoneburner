@@ -23,6 +23,7 @@ from atomics.commands.common import (
     extra_judges_option,
     integrity_exit_code,
     parse_extra_judges,
+    print_judge_calibration,
     run_async,
     temperature_option,
     write_summary_json,
@@ -175,6 +176,7 @@ def refusal(
         f"Judge: [cyan]{escape(judge_provider_name)}[/cyan] "
         f"({escape(attributed_judge)})\n"
     )
+    print_judge_calibration(console, judge_provider_name, attributed_judge)
 
     show_progress = bool((ctx.obj or {}).get("progress", True))
     progress = FixtureProgress(len(selected), console, label="refusal") if show_progress else None
