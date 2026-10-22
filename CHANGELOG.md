@@ -39,6 +39,9 @@
 - A keyed `atomics server` no longer serves `/docs`, `/redoc`, or
   `/openapi.json`. They skipped auth and handed an anonymous caller a
   map of every route; loopback `--no-auth` still serves them.
+- **pydantic 2.14.1, pydantic-settings 2.16.0, boto3 1.43.114, openai
+  3.31.0, fastapi 0.143.2, ruff 0.17.1.** Routine bumps (Dependabot #33,
+  #32).
 
 ### Removed
 - The 19 compatibility shims at the package root. Python code that
@@ -79,6 +82,13 @@
   Ctrl-C: the benchmark engine took both signals on the server's event
   loop and kept them. A distributed worker lost its shutdown handler
   the same way. Only CLI `benchmark` installs the engine's handlers now.
+
+### Security
+- `uv.lock` pins `certifi` 2026.10.19 for PYSEC-2026-4320. A clone that
+  ran `uv sync` on 2026.7.22 should sync again; a `pip install` resolves
+  its own `certifi` and is unaffected by the lock.
+- The lab-host test also fails on any `192.168.x.y` outside the eval
+  fixtures, and it no longer spells out the host names it forbids.
 
 ## 0.28.0 (2026-10-16) — Any-run danger rate, mcp 2.2.0
 
