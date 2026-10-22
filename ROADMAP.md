@@ -7,29 +7,23 @@ stoneburner and [mcpnuke](https://github.com/babywyrm/mcpnuke) meet at the
 agent: stoneburner grades the model, mcpnuke scans the MCP server. An
 endpoint-scanning idea belongs in mcpnuke, not here.
 
-## 0.29.0 — next release
+## 0.30.0 — next release
 
-Current package is **0.28.0** — any-run danger rate, mcp 2.2.0. Everything
-below is on `main` under `## Unreleased`. It is a minor bump, not 0.28.1:
-the root import shims are gone, so Python callers of `atomics.stress` and the
-other 18 old paths must move (the CLI is unchanged).
+Current package is **0.29.0** — judge calibration, CLI-matched API
+batteries. Git history was rewritten on 2026-10-21 to remove private lab
+hosts; every tag was re-pointed once for that, and only for that.
 
-- [x] API batteries match the CLI: step fixture scope, `runs`, no-thinking
-      default, and per-step live rows. A parity test runs both paths and
-      compares what every runner receives.
-- [x] `temperature` over the API, MCP, and REPL.
-- [x] `atomics server` and distributed workers stop on SIGTERM / Ctrl-C after
-      a benchmark job.
-- [x] A keyed server stops publishing `/docs` and `/openapi.json`; a test
-      walks the schema and requires `401` on every route but health and ready.
-- [x] The 19 root compatibility shims are removed.
-- [x] `atomics judge-calibrate` measures a judge against the human grade;
-      judged suites and API results label the judge with it.
-- [ ] Cut it: `### Upgrade notes` first, then `RELEASING.md`.
+- [ ] Confidence intervals on suite headlines, so a 20-fixture rate
+      carries its uncertainty.
+- [ ] Multi-step tool trajectories in `toolcall`: a dangerous call that
+      only appears after a tool result comes back.
+- [ ] Declare the supported surfaces (providers, suites, API) and what
+      each one is tested against.
+- [ ] A live brain-gateway generate on record; the Anthropic 1.x jump;
+      timing-sensitive tests on fake clocks.
 
-Do not retag `v0.24.1`, `v0.22.5`, `v0.21.0`, or `v0.20.0`. Do not mix a
-feature into a tag commit. `v0` is the floating major tag the publish workflow
-moves; it is not stray.
+Do not retag again. Do not mix a feature into a tag commit. `v0` is the
+floating major tag the publish workflow moves; it is not stray.
 
 ## Next
 
@@ -147,6 +141,8 @@ Not scheduled, roughly in order of how often they come up.
   `atomics judge-agreement` measures how often a single judge would flip the
   headline, including `--suite rag`. Probe and archreview stay out of the
   study command: they need live artifacts or a repo pack.
+  `atomics judge-calibrate` ships only the six blue answers. Red items
+  need payload-free answers, blind-graded, before they can be committed.
 - [x] **Interactive REPL.** `atomics repl` is an API-client prompt over a
       running `atomics server` (`docs/REPL.md`). Session `host`, quiet
       `wait` / `wait --verbose`, same verbs as MCP. Not Click-tree
