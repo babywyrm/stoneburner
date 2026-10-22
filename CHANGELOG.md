@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.29.0 (2026-10-21) — Judge calibration, CLI-matched API batteries
 
 ### Upgrade notes
 - Python imports from the package root moved: `atomics.stress` is
@@ -9,6 +9,13 @@
 - A server started with API keys answers `404` on `/docs`, `/redoc`,
   and `/openapi.json`. Use a loopback `--no-auth` server to browse them.
 - `scripts/model_gaps.py` polls only localhost unless given `--host`.
+- Git history was rewritten on 2026-10-21 to remove private lab hosts,
+  so every commit and tag has a new id. Re-clone, or run
+  `git fetch --force --tags origin && git reset --hard origin/main`
+  on a clone with no local work. Tag names are unchanged; older tags
+  differ only where a lab host name or address was replaced.
+- No schema change. Judge calibrations are ordinary runs and results
+  rows, so an existing database needs no migration.
 
 ### Added
 - `atomics judge-calibrate` scores a judge against a human-graded set and
