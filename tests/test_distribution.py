@@ -4,6 +4,7 @@
 `stone-burner` Terraform helper, so PyPI rejects it as too similar.
 """
 
+import hashlib
 import re
 import subprocess
 from importlib.metadata import entry_points, metadata, version
@@ -73,20 +74,48 @@ def test_readme_landing_is_a_storefront_not_only_a_manual():
     assert "promptfoo" not in lowered
 
 
+# ponytail: sha256 hides the names from grep and readers, not from a
+# dictionary guess. Add a name by hashing its lowercase form.
+_LAB_HOST_HASHES = frozenset(
+    {
+        "6267fcbbe76a73a3",
+        "7a70093427b414ca",
+        "9535deb12f7d4b83",
+        "a856911711504fe4",
+        "bd68bebf91242ada",
+        "ea28aab4ade0f034",
+    }
+)
+_FICTIONAL_LAN_FILES = frozenset(
+    {"atomics/eval/fixtures.py", "atomics/eval/redblue/fixtures.py", "tests/test_distribution.py"}
+)
+
+
+def _lab_leaks(name: str, text: str) -> bool:
+    words = {
+        hashlib.sha256(w.encode()).hexdigest()[:16] for w in re.findall(r"[a-z0-9]+", text.lower())
+    }
+    lan = name not in _FICTIONAL_LAN_FILES and re.search(r"\b192\.168\.\d+\.\d+\b", text)
+    return bool(words & _LAB_HOST_HASHES or lan)
+
+
 def test_no_tracked_file_names_a_lab_host():
     """Docs and fixtures use neutral hosts (localhost, gpu-host-a, <host>)."""
-    lab = re.compile(r"\b(gpu-host-b|gpu-host-a)\b", re.IGNORECASE)
     tracked = subprocess.run(
         ["git", "ls-files"], capture_output=True, text=True, check=True
     ).stdout.split()
     hits = [
         name
         for name in tracked
-        if name != "tests/test_distribution.py"
-        and Path(name).is_file()
-        and lab.search(Path(name).read_text(errors="ignore"))
+        if Path(name).is_file() and _lab_leaks(name, Path(name).read_text(errors="ignore"))
     ]
     assert hits == []
+
+
+def test_lab_leak_check_catches_names_and_lan_addresses():
+    assert not _lab_leaks("README.md", "gpu-host-a at http://<host>:11434")
+    assert _lab_leaks("README.md", "http://192.168.7.7:11434")
+    assert not _lab_leaks("atomics/eval/fixtures.py", "10.0.0.1 and 192.168.7.7")
 
 
 def test_readme_stays_a_storefront():
