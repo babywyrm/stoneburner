@@ -164,6 +164,11 @@ Two hazards it accounts for, both hit while backfilling:
   gh workflow enable publish
   ```
 
+**Release tags are immutable.** The `protect-release-tags` ruleset rejects
+deleting, moving, or force-pushing any `v*` tag except the floating `v0`;
+`protect-main` rejects force-pushing or deleting `main`. Neither has a bypass,
+so a bad tag is fixed by cutting the next patch release, not by retagging.
+
 **Two legacy lightweight tags.** `v0.9.0` and `v0.10.0` are lightweight rather
 than annotated. Converting them means deleting and recreating the tags, which
 requires a force push, so they are left as they are. Everything from `v0.11.0`
