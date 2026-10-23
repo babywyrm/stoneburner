@@ -16,6 +16,7 @@ from datetime import UTC, datetime
 
 from atomics.benchmark.model_classes import supports_thinking
 from atomics.eval.attempt_serialization import integrity_to_dict
+from atomics.eval.intervals import Interval, mean_interval
 from atomics.eval.judge import (
     JudgeResult,
     char_budget_for_tokens,
@@ -26,7 +27,12 @@ from atomics.eval.outcomes import RunIntegrity
 from atomics.eval.provider_attempt import recorded_outcome_kind, unscorable_outcome
 from atomics.eval.redblue.fixtures import ALL_FIXTURES, BLUE_FIXTURES, RED_FIXTURES, RedBlueFixture
 from atomics.eval.runner import _call_hook
-from atomics.eval.suite_integrity import fixture_outcome, headline_rate, integrity_of
+from atomics.eval.suite_integrity import (
+    fixture_outcome,
+    headline_interval,
+    headline_rate,
+    integrity_of,
+)
 from atomics.models import TaskCategory, TaskResult, TaskStatus
 from atomics.providers.base import BaseProvider
 from atomics.validation import sanitize_error
@@ -101,6 +107,12 @@ class RedBlueSummary:
         return round(sum(scored) / len(scored), 3) if scored else None
 
     @property
+    def quality_ci(self) -> Interval | None:
+        return mean_interval(
+            [r.judge.score for r in self.results if r.judge and not r.judge.parse_failed]
+        )
+
+    @property
     def quality_stddev(self) -> float | None:
         """Stddev across per-run scores — only meaningful when runs > 1."""
         if self.runs <= 1:
@@ -162,6 +174,7 @@ class RedBlueSummary:
             "started_at": self.started_at.isoformat(),
             "completed_at": self.completed_at.isoformat(),
             "overall_quality": headline_rate(self.overall_quality, self.integrity),
+            "overall_quality_ci": headline_interval(self.quality_ci, self.integrity),
             "quality_stddev": self.quality_stddev,
             "total_fixtures": self.total_fixtures,
             "category_scores": self.category_scores,

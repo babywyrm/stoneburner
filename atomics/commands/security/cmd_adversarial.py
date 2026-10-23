@@ -399,6 +399,9 @@ def adversarial(
         if summary.overall_resilience is not None
         else "N/A"
     )
+    resilience_ci = summary.resilience_ci
+    if summary.overall_resilience is not None and resilience_ci is not None:
+        resilience_str += f" ({resilience_ci.format()})"
     if summary.overall_resilience is not None and summary.resilience_stddev is not None:
         resilience_str += f"  ±{summary.resilience_stddev * 100:.1f}%"
     table.add_row("Overall Resilience", resilience_str)

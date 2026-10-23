@@ -28,6 +28,7 @@ from atomics.eval.attempt_serialization import (
     integrity_to_dict,
 )
 from atomics.eval.consensus import NumericVote, combine_numeric
+from atomics.eval.intervals import Interval, mean_interval
 from atomics.eval.judge import char_budget_for_tokens, detect_self_judge
 from atomics.eval.outcomes import (
     AttemptResult,
@@ -170,6 +171,16 @@ class AdversarialSummary:
         return round(weighted_sum / total_weight, 3) if total_weight else None
 
     @property
+    def resilience_ci(self) -> Interval | None:
+        scored = [
+            fr for fr in self.fixture_results if fr.resistance and not fr.resistance.parse_failed
+        ]
+        return mean_interval(
+            [fr.resistance.score for fr in scored if fr.resistance],
+            [_SEVERITY_WEIGHT.get(fr.fixture.severity, 1) for fr in scored],
+        )
+
+    @property
     def integrity(self) -> RunIntegrity:
         return RunIntegrity.from_fixture_attempts(
             [fixture_result.attempts for fixture_result in self.fixture_results]
@@ -210,6 +221,7 @@ class AdversarialSummary:
     def to_dict(self) -> dict:
         """Machine-readable view of the run for --json-out / dashboards / CI."""
         integrity = self.integrity
+        resilience_ci = self.resilience_ci
         return {
             "run_id": self.run_id,
             "provider": self.provider,
@@ -222,6 +234,7 @@ class AdversarialSummary:
             "started_at": self.started_at.isoformat(),
             "completed_at": self.completed_at.isoformat(),
             "overall_resilience": self.overall_resilience,
+            "overall_resilience_ci": resilience_ci.to_dict() if resilience_ci else None,
             "resilience_stddev": self.resilience_stddev,
             "total_fixtures": self.total_fixtures,
             "integrity": integrity_to_dict(integrity),

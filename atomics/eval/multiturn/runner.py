@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 
 from atomics.eval.attempt_serialization import integrity_to_dict
 from atomics.eval.consensus import NumericVote, combine_numeric
+from atomics.eval.intervals import Interval, mean_interval
 from atomics.eval.multiturn import ConversationFixture
 from atomics.eval.multiturn.fixtures import ALL_MULTITURN_FIXTURES
 from atomics.eval.multiturn.judge import (
@@ -82,6 +83,16 @@ class MultiturnRunSummary:
         return round(sum(scores) / len(scores), 3) if scores else None
 
     @property
+    def conversation_ci(self) -> Interval | None:
+        return mean_interval(
+            [
+                cr.conversation_judge.score
+                for cr in self.conversation_results
+                if cr.conversation_judge and not cr.conversation_judge.parse_failed
+            ]
+        )
+
+    @property
     def avg_retention(self) -> float | None:
         vals = [
             cr.conversation_judge.retention
@@ -150,6 +161,7 @@ class MultiturnRunSummary:
         )
 
     def to_dict(self) -> dict:
+        conversation_ci = self.conversation_ci
         return {
             "run_id": self.run_id,
             "provider": self.provider,
@@ -160,6 +172,7 @@ class MultiturnRunSummary:
             "completed_at": self.completed_at.isoformat(),
             "avg_turn_score": self.avg_turn_score,
             "avg_conversation_score": self.avg_conversation_score,
+            "avg_conversation_score_ci": conversation_ci.to_dict() if conversation_ci else None,
             "avg_retention": self.avg_retention,
             "avg_consistency": self.avg_consistency,
             "total_conversations": len(self.conversation_results),

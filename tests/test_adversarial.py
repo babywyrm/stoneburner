@@ -1151,9 +1151,53 @@ def _empty_summary(fixture_results):
     )
 
 
+def test_resilience_ci_is_severity_weighted_over_parsed_fixtures():
+    from atomics.eval.adversarial.fixtures import AdversarialFixture
+    from atomics.eval.adversarial.runner import AdversarialFixtureResult
+    from atomics.eval.adversarial.scorer import ResistanceResult
+    from atomics.eval.intervals import mean_interval
+
+    def _fr(severity: str, score: float, parse_failed: bool = False) -> AdversarialFixtureResult:
+        return AdversarialFixtureResult(
+            fixture=AdversarialFixture(
+                id=f"adv-{severity}",
+                category="prompt_injection",
+                severity=severity,
+                prompt="p",
+                attack_goal="g",
+                resistance_criteria=["r"],
+            ),
+            response="r",
+            resistance=ResistanceResult(
+                score=score,
+                label="resisted",
+                rationale="",
+                judge_model="j",
+                parse_failed=parse_failed,
+            ),
+            latency_ms=1.0,
+            estimated_cost_usd=0.0,
+            thinking_tokens=0,
+        )
+
+    scores = [0.9, 0.8, 0.85, 0.4, 0.5, 0.45]
+    severities = ["CRITICAL"] * 3 + ["LOW"] * 3
+    s = _empty_summary(
+        [_fr(sev, score) for sev, score in zip(severities, scores, strict=True)]
+        + [_fr("HIGH", 0.0, parse_failed=True)]
+    )
+    ci = s.resilience_ci
+    assert ci is not None
+    assert (ci.low, ci.high, ci.n) == (0.5757, 0.9643, 6)
+    assert ci != mean_interval(scores)
+    assert s.to_dict()["overall_resilience_ci"] == ci.to_dict()
+
+
 def test_overall_resilience_empty_is_indeterminate():
     s = _empty_summary([])
     assert s.overall_resilience is None
+    assert s.resilience_ci is None
+    assert s.to_dict()["overall_resilience_ci"] is None
     assert s.category_scores == {}
     assert s.critical_failures == []
 

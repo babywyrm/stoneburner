@@ -869,6 +869,42 @@ def test_redblue_summary_overall_quality():
     assert summary.to_dict()["overall_quality"] is None
 
 
+def test_redblue_quality_ci_is_over_scored_fixtures_and_gated_like_the_headline():
+    summary = _make_summary_with_results()
+    ci = summary.quality_ci
+    assert ci is not None
+    assert (ci.low, ci.high, ci.n, ci.method) == (0.5516, 1.0, 3, "t")
+    assert summary.to_dict()["overall_quality_ci"] is None
+
+    summary.results = [r for r in summary.results if r.judge is not None]
+    assert summary.integrity.status.value == "complete"
+    assert summary.to_dict()["overall_quality_ci"] == ci.to_dict()
+
+
+def test_cli_redblue_prints_the_quality_interval(monkeypatch) -> None:
+    from types import SimpleNamespace
+
+    from click.testing import CliRunner
+
+    from atomics.cli import cli
+
+    summary = _make_summary_with_results()
+    summary.results = [r for r in summary.results if r.judge is not None]
+
+    async def fake_run(_provider, **_kwargs):
+        return summary
+
+    monkeypatch.setattr(
+        "atomics.commands.security.cmd_redblue._make_provider",
+        lambda *_args, **_kwargs: SimpleNamespace(name="ollama", default_model="x"),
+    )
+    monkeypatch.setattr("atomics.eval.redblue.runner.run_redblue", fake_run)
+    result = CliRunner().invoke(cli, ["--no-progress", "redblue", "--no-save", "--mode", "red"])
+
+    assert result.exit_code == 0, result.output
+    assert "80.0% (95% CI 55–100%, n=3)" in result.output
+
+
 def test_redblue_summary_overall_quality_no_results():
     from datetime import UTC, datetime
 

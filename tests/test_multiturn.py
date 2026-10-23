@@ -301,6 +301,63 @@ def test_summary_to_dict():
     assert len(d["conversations"]) == 1
 
 
+def test_conversation_ci_is_over_judged_conversations():
+    from datetime import UTC, datetime
+
+    results = [
+        _make_conversation_result(fixture_id=f"c{i}", turn_scores=[0.5], conv_score=score)
+        for i, score in enumerate([0.9, 0.7, 0.8, None])
+    ]
+    summary = MultiturnRunSummary(
+        run_id="test",
+        provider="mock",
+        model="mock",
+        judge_provider="mock",
+        judge_model="mock",
+        started_at=datetime.now(UTC),
+        completed_at=datetime.now(UTC),
+        conversation_results=results,
+    )
+    ci = summary.conversation_ci
+    assert ci is not None
+    assert (ci.low, ci.high, ci.n, ci.method) == (0.5516, 1.0, 3, "t")
+    assert summary.to_dict()["avg_conversation_score_ci"] == ci.to_dict()
+
+
+def test_cli_multiturn_prints_the_conversation_interval(monkeypatch):
+    from datetime import UTC, datetime
+    from types import SimpleNamespace
+
+    from click.testing import CliRunner
+
+    from atomics.cli import cli
+
+    async def fake_run(*_args, **_kwargs):
+        return MultiturnRunSummary(
+            run_id="test",
+            provider="mock",
+            model="mock",
+            judge_provider="mock",
+            judge_model="mock",
+            started_at=datetime.now(UTC),
+            completed_at=datetime.now(UTC),
+            conversation_results=[
+                _make_conversation_result(fixture_id=f"c{i}", turn_scores=[0.5], conv_score=s)
+                for i, s in enumerate([0.9, 0.7, 0.8])
+            ],
+        )
+
+    monkeypatch.setattr(
+        "atomics.commands.security.cmd_multiturn._make_provider",
+        lambda *_args, **_kwargs: SimpleNamespace(name="mock", default_model="mock"),
+    )
+    monkeypatch.setattr("atomics.eval.multiturn.runner.run_multiturn", fake_run)
+    result = CliRunner().invoke(cli, ["--no-progress", "multiturn", "--no-save"])
+
+    assert result.exit_code == 0, result.output
+    assert "80.0% (95% CI 55–100%, n=3)" in result.output
+
+
 def test_summary_empty():
     from datetime import UTC, datetime
 

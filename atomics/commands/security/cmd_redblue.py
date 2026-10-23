@@ -271,7 +271,9 @@ def redblue(
         table.add_row("Judge", f"{judge_provider_name} / {judge_model or 'default'}")
         table.add_row("Mode", mode)
         table.add_row("Runs per fixture", str(summary.runs))
-        quality_str = format_headline_rate(summary.overall_quality, summary.integrity)
+        quality_str = format_headline_rate(
+            summary.overall_quality, summary.integrity, summary.quality_ci
+        )
         if summary.quality_stddev is not None and summary.integrity.status is RunStatus.COMPLETE:
             quality_str += f"  ±{summary.quality_stddev * 100:.1f}%"
         table.add_row("Overall Quality", quality_str)

@@ -256,13 +256,13 @@ def multiturn(
         summary_table.add_row("Provider", provider_name)
         summary_table.add_row("Model", model or "default")
         integrity = summary.integrity
-        for label, value in (
-            ("Avg Turn Score", summary.avg_turn_score),
-            ("Avg Conversation Score", summary.avg_conversation_score),
-            ("Avg Retention", summary.avg_retention),
-            ("Avg Consistency", summary.avg_consistency),
+        for label, value, ci in (
+            ("Avg Turn Score", summary.avg_turn_score, None),
+            ("Avg Conversation Score", summary.avg_conversation_score, summary.conversation_ci),
+            ("Avg Retention", summary.avg_retention, None),
+            ("Avg Consistency", summary.avg_consistency, None),
         ):
-            summary_table.add_row(label, format_headline_rate(value, integrity))
+            summary_table.add_row(label, format_headline_rate(value, integrity, ci))
         summary_table.add_row("Total Turns", f"{summary.total_turns}/{total_turns}")
         summary_table.add_row("Total Tokens", f"{summary.total_tokens:,}")
         summary_table.add_row("Total Cost", f"${summary.total_cost_usd:.6f}")

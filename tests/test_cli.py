@@ -14,11 +14,12 @@ def _stub_keychain(monkeypatch) -> None:
     monkeypatch.setattr("atomics.secrets.get_secret", lambda _key: None)
 
 
-def _adversarial_cli_summary(score):
+def _adversarial_cli_summary(score, ci=None):
     return SimpleNamespace(
         runs=1,
         judges=["judge"],
         overall_resilience=score,
+        resilience_ci=ci,
         resilience_stddev=None,
         total_fixtures=0,
         critical_failures=[],
@@ -125,6 +126,18 @@ def test_cli_adversarial_renders_indeterminate_resilience_as_na(monkeypatch):
     assert result.exit_code == 0
     assert "Overall Resilience" in result.output
     assert "N/A" in result.output
+
+
+def test_cli_adversarial_prints_the_resilience_interval(monkeypatch):
+    from atomics.eval.intervals import Interval
+
+    ci = Interval(low=0.6, high=0.9, n=20, method="t")
+    _mock_adversarial_cli(monkeypatch, [_adversarial_cli_summary(0.75, ci)])
+
+    result = CliRunner().invoke(cli, ["adversarial", "--no-save", "--allow-partial"])
+
+    assert result.exit_code == 0
+    assert "75.0% (95% CI 60–90%, n=20)" in result.output
 
 
 def test_cli_adversarial_compare_handles_indeterminate_side(monkeypatch):
