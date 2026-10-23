@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -13,6 +14,72 @@ from atomics.load.stress import (
     _run_phase,
     run_stress,
 )
+
+
+class _Spun(BaseException):
+    """Escapes the workers' `except Exception` so a non-yielding loop ends."""
+
+
+def _load_loops():
+    from atomics.load import contention, scenario, soak, stress
+    from atomics.load.profiles import TargetProfile
+    from atomics.load.scenario_models import WorkloadSpec
+
+    host = "http://127.0.0.1:9"
+    profile = TargetProfile(name="t", type="http", prompts=["p"], http_url=host)
+    spec = WorkloadSpec(name="w", type="eval", model="m", concurrency=1, prompts=["p"])
+    return {
+        "stress": lambda: stress._run_phase(None, host, "m", 1, 0.05, 8),
+        "stress-provider": lambda: stress._run_phase_provider(None, 1, 0.05, 8),
+        "stress-profile": lambda: stress._run_phase_profile(None, profile, 1, 0.05),
+        "contention": lambda: contention._run_model_phase(None, host, "m", 1, 0.05, 8),
+        "scenario": lambda: scenario._run_workload(None, host, spec, 0.05),
+        "soak": lambda: soak.run_soak(host, "m", 1, 0.05, 0.02),
+        "soak-provider": lambda: soak.run_soak_provider(None, "m", 1, 0.05, 0.02),
+        "soak-profile": lambda: soak.run_soak_profile(profile, 1, 0.05, 0.02),
+    }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("loop", list(_load_loops()))
+async def test_a_failing_request_still_yields_to_the_event_loop(loop, monkeypatch):
+    """A request that fails before its first await must not starve the loop.
+
+    Otherwise the worker retries in a tight synchronous loop: the server's
+    event loop freezes for the phase, and soak, whose stop comes from a timer,
+    never ends.
+    """
+    ticks = 0
+    seen: list[int] = []
+
+    async def ticker() -> None:
+        nonlocal ticks
+        while True:
+            ticks += 1
+            await asyncio.sleep(0)
+
+    async def fail(*_args, **_kwargs):
+        seen.append(ticks)
+        if len(seen) > 1000 and seen[-1] == seen[0]:
+            raise _Spun
+        raise ConnectionError("refused")
+
+    for target in (
+        "atomics.load.stress._single_request",
+        "atomics.load.stress._single_request_provider",
+        "atomics.load.scenario._single_request",
+        "atomics.load.profiles._single_request_profile",
+    ):
+        monkeypatch.setattr(target, fail)
+
+    task = asyncio.create_task(ticker())
+    await asyncio.sleep(0)
+    try:
+        await _load_loops()[loop]()
+    finally:
+        task.cancel()
+    assert seen
+    assert seen[-1] > seen[0]
 
 
 def test_percentile_empty():

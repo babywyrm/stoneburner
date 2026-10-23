@@ -78,6 +78,9 @@ async def _run_workload(
                     result.per_request_tps.append(tps)
             except Exception:
                 result.failed += 1
+                # A request can fail before its first await. Yield anyway, or
+                # this retry loop holds the event loop for the whole phase.
+                await asyncio.sleep(0)
 
     concurrency = spec.concurrency
     if ramp_seconds > 0 and concurrency > 1:

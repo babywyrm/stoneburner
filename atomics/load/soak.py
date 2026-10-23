@@ -182,6 +182,9 @@ async def run_soak(
                 async with window_lock:
                     window_failed += 1
                     window_requests += 1
+                # A request can fail before its first await. Yield anyway, or
+                # this retry loop starves the timer that ends the soak.
+                await asyncio.sleep(0)
 
     async def _sampler() -> None:
         nonlocal window_latencies, window_tokens, window_requests, window_failed
@@ -317,6 +320,9 @@ async def run_soak_provider(
                 async with window_lock:
                     window_failed += 1
                     window_requests += 1
+                # A request can fail before its first await. Yield anyway, or
+                # this retry loop starves the timer that ends the soak.
+                await asyncio.sleep(0)
 
     async def _sampler() -> None:
         nonlocal window_latencies, window_tokens, window_requests, window_failed, window_cost
@@ -456,6 +462,9 @@ async def run_soak_profile(
                 async with window_lock:
                     window_failed += 1
                     window_requests += 1
+                # A request can fail before its first await. Yield anyway, or
+                # this retry loop starves the timer that ends the soak.
+                await asyncio.sleep(0)
 
     async def _sampler() -> None:
         nonlocal window_latencies, window_requests, window_failed

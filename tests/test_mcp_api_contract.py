@@ -55,7 +55,11 @@ def replay(app_client: TestClient, request: httpx.Request, *, with_key: bool = T
 
 
 @pytest.fixture
-def app_client():
+def app_client(monkeypatch):
+    async def _never_run(_self, _job, _work):
+        """Accepting a job is the contract; running it would hit a real provider."""
+
+    monkeypatch.setattr("atomics.api.jobs.JobManager._run", _never_run)
     app = create_app(settings=ServerSettings(api_keys={API_KEY}))
     with TestClient(app, base_url="http://127.0.0.1") as tc:
         yield tc

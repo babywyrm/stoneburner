@@ -211,6 +211,9 @@ async def _run_phase(
                 result.per_request_tps.append(tps)
             except Exception:
                 result.failed += 1
+                # A request can fail before its first await. Yield anyway, or
+                # this retry loop holds the event loop for the whole phase.
+                await asyncio.sleep(0)
 
     workers = [asyncio.create_task(_worker()) for _ in range(concurrency)]
     await asyncio.gather(*workers)
@@ -327,6 +330,9 @@ async def _run_phase_provider(
                 result.total_cost_usd += cost
             except Exception:
                 result.failed += 1
+                # A request can fail before its first await. Yield anyway, or
+                # this retry loop holds the event loop for the whole phase.
+                await asyncio.sleep(0)
 
     workers = [asyncio.create_task(_worker()) for _ in range(concurrency)]
     await asyncio.gather(*workers)
@@ -409,6 +415,9 @@ async def _run_phase_profile(
                 result.latencies.append(lat_ms)
             except Exception:
                 result.failed += 1
+                # A request can fail before its first await. Yield anyway, or
+                # this retry loop holds the event loop for the whole phase.
+                await asyncio.sleep(0)
 
     workers = [asyncio.create_task(_worker()) for _ in range(concurrency)]
     await asyncio.gather(*workers, return_exceptions=True)
