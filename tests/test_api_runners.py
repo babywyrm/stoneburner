@@ -12,6 +12,7 @@ from atomics.api import _runners as runners
 from atomics.api.jobs import Job, JobStatus
 from atomics.api.models import EVAL_RUNS_SUITES, EvalRequest, RunRequest
 from atomics.eval.budget import GuardedProvider
+from atomics.eval.intervals import Interval
 from atomics.providers.factory import ProviderConfigError
 
 
@@ -487,7 +488,9 @@ async def test_run_eval_suite_dispatches_toolcall():
     judge = MagicMock(name="judge")
     summary = SimpleNamespace(
         dangerous_call_rate=0.1,
+        dangerous_call_ci=Interval(low=0.01, high=0.4, n=2, method="wilson"),
         dangerous_any_run_rate=0.1,
+        dangerous_any_run_ci=Interval(low=0.02, high=0.5, n=2, method="wilson"),
         fixtures=[1, 2],
         total_tokens=12,
         total_cost_usd=0.001,
@@ -510,6 +513,8 @@ async def test_run_eval_suite_dispatches_toolcall():
     assert len(kwargs["fixtures"]) > 0
     assert result["suite"] == "toolcall"
     assert result["overall_score"] == 0.1
+    assert result["overall_score_ci"] == summary.dangerous_call_ci.to_dict()
+    assert result["dangerous_any_run_rate_ci"] == summary.dangerous_any_run_ci.to_dict()
     assert result["fixtures_run"] == 2
     assert result["fixtures"] == []
 
@@ -812,6 +817,41 @@ def test_summary_totals_from_fixture_attempts():
 def test_overall_score_prefers_known_attrs():
     assert runners._overall_score(SimpleNamespace(overall_score=0.9)) == 0.9
     assert runners._overall_score(SimpleNamespace()) is None
+
+
+@pytest.mark.parametrize(
+    "summary_cls",
+    [
+        "atomics.eval.adversarial.runner:AdversarialSummary",
+        "atomics.eval.multiturn.runner:MultiturnRunSummary",
+        "atomics.eval.refusal.runner:RefusalSummary",
+        "atomics.eval.redblue.runner:RedBlueSummary",
+        "atomics.eval.toolcall.runner:ToolCallSummary",
+    ],
+)
+def test_each_headline_names_an_interval_its_summary_has(summary_cls):
+    """A misspelled interval attribute would silently publish null."""
+    import importlib
+
+    module, name = summary_cls.split(":")
+    cls = getattr(importlib.import_module(module), name)
+    attr, ci_attr = next((a, c) for a, c in runners._HEADLINES if hasattr(cls, a))
+    assert ci_attr is not None, attr
+    assert isinstance(getattr(cls, ci_attr), property)
+
+
+def test_overall_score_ci_belongs_to_the_picked_headline():
+    picked = Interval(low=0.4, high=0.6, n=10, method="t")
+    other = Interval(low=0.1, high=0.9, n=10, method="t")
+    summary = SimpleNamespace(
+        calibration_score=0.5, calibration_ci=picked, overall_quality=0.6, quality_ci=other
+    )
+    assert runners._overall_score_ci(summary) == picked.to_dict()
+    # Codereview's headline is F1, which carries no interval.
+    assert runners._overall_score_ci(SimpleNamespace(review_score=0.5)) is None
+    assert runners._overall_score_ci(SimpleNamespace(overall_quality=0.6, quality_ci=None)) is None
+    assert runners._overall_score_ci(MagicMock(spec=["overall_quality", "quality_ci"])) is None
+    assert runners._overall_score_ci(SimpleNamespace()) is None
 
 
 def test_provider_for_value_error_maps_to_http_400():

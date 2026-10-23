@@ -24,6 +24,7 @@ from atomics.eval.budget import EvalBudget, EvalBudgetExceededError, share_budge
 from atomics.eval.calibration import judge_calibration_status
 from atomics.eval.codegen.runner import run_codegen
 from atomics.eval.codereview.runner import run_codereview
+from atomics.eval.intervals import Interval
 from atomics.eval.multiturn.runner import run_multiturn
 from atomics.eval.rag.runner import run_rag
 from atomics.eval.redblue.runner import run_redblue
@@ -196,21 +197,39 @@ def _summary_totals(summary: Any) -> tuple[int, float]:
     return int(tokens or 0), float(cost or 0.0)
 
 
+# Each suite's headline attribute, paired with its interval attribute when it
+# has one. The first attribute present is the headline.
+_HEADLINES: tuple[tuple[str, str | None], ...] = (
+    ("overall_score", None),
+    ("overall_rag_score", None),
+    ("overall_pass_rate", None),
+    ("overall_resilience", "resilience_ci"),
+    ("avg_conversation_score", "conversation_ci"),
+    ("calibration_score", "calibration_ci"),
+    ("overall_quality", "quality_ci"),
+    ("review_score", None),
+    ("dangerous_call_rate", "dangerous_call_ci"),
+)
+
+
 def _overall_score(summary: Any) -> float | None:
-    for attr in (
-        "overall_score",
-        "overall_rag_score",
-        "overall_pass_rate",
-        "overall_resilience",
-        "avg_conversation_score",
-        "calibration_score",
-        "overall_quality",
-        "review_score",
-        "dangerous_call_rate",
-    ):
+    for attr, _ci_attr in _HEADLINES:
         value = getattr(summary, attr, None)
         if value is not None:
             return float(value)
+    return None
+
+
+def _ci_dict(summary: Any, ci_attr: str | None) -> dict[str, object] | None:
+    ci = getattr(summary, ci_attr, None) if ci_attr else None
+    return ci.to_dict() if isinstance(ci, Interval) else None
+
+
+def _overall_score_ci(summary: Any) -> dict[str, object] | None:
+    """The interval for whichever headline `_overall_score` picked."""
+    for attr, ci_attr in _HEADLINES:
+        if getattr(summary, attr, None) is not None:
+            return _ci_dict(summary, ci_attr)
     return None
 
 
@@ -503,7 +522,12 @@ async def run_eval_suite(payload: EvalRequest, job: Job | None = None) -> dict[s
     total_tokens, total_cost_usd = _summary_totals(summary)
     host = (job.request or {}).get("host") if job is not None else None
     any_run = (
-        {"dangerous_any_run_rate": summary.dangerous_any_run_rate} if suite == "toolcall" else {}
+        {
+            "dangerous_any_run_rate": summary.dangerous_any_run_rate,
+            "dangerous_any_run_rate_ci": _ci_dict(summary, "dangerous_any_run_ci"),
+        }
+        if suite == "toolcall"
+        else {}
     )
     return {
         "suite": suite,
@@ -513,6 +537,7 @@ async def run_eval_suite(payload: EvalRequest, job: Job | None = None) -> dict[s
         "host": host,
         "temperature": payload.temperature,
         "overall_score": _overall_score(summary),
+        "overall_score_ci": _overall_score_ci(summary),
         **any_run,
         "fixtures_run": fixtures_run,
         "total_tokens": total_tokens,
