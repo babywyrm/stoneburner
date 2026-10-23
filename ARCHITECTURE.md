@@ -307,8 +307,13 @@ handles API keys and can send data to LLM providers. Rules for contributors:
 ## Testing & CI
 
 - Tests live in `tests/`, mock providers/httpx, and must not hit the network by
-  default. The one live test (`test_calibration.py`) is gated behind
-  `ATOMICS_LIVE_JUDGE=1`. The dashboard page script is executed by
+  default. An autouse guard in `tests/conftest.py` refuses any connection
+  past loopback or to a default inference port (11434, 8000, 8080) and fails
+  the test, even when the code under test swallowed the error. Tests that
+  submit API jobs without needing their work use `jobs_never_run`; doctor
+  tests use `offline_doctor`. The one live test (`test_calibration.py`) is
+  gated behind `ATOMICS_LIVE_JUDGE=1` and marked `network`, which the guard
+  exempts. The dashboard page script is executed by
   `tests/test_dashboard_script.py` (skipped if `node` is missing).
 - An autouse fixture in `tests/conftest.py` points the database, the data
   directory, and the keyring at temp or null backends, so no test touches the

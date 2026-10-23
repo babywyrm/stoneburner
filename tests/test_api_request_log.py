@@ -125,7 +125,7 @@ class TestAccessLog:
         assert res.headers[REQUEST_ID_HEADER] == "corr-42"
         assert "request_id=corr-42" in access_lines(caplog)[0]
 
-    def test_the_log_line_identifies_an_authenticated_caller(self, client, caplog):
+    def test_the_log_line_identifies_an_authenticated_caller(self, client, caplog, jobs_never_run):
         from atomics.api.callers import caller_id_from_key
 
         with caplog.at_level(logging.INFO, logger="atomics.api.request_log"):
@@ -137,7 +137,7 @@ class TestAccessLog:
 
         assert f"caller={caller_id_from_key(ALICE)}" in access_lines(caplog)[0]
 
-    def test_the_api_key_never_appears_in_the_log(self, client, caplog):
+    def test_the_api_key_never_appears_in_the_log(self, client, caplog, jobs_never_run):
         with caplog.at_level(logging.INFO):
             client.post(
                 "/api/v1/evals",
@@ -235,7 +235,7 @@ class TestJobCorrelation:
 
         assert "status=failed" in "\n".join(r.getMessage() for r in caplog.records)
 
-    def test_a_job_started_over_http_records_the_request_id(self, client):
+    def test_a_job_started_over_http_records_the_request_id(self, client, jobs_never_run):
         res = client.post(
             "/api/v1/evals",
             json={"suite": "accuracy", "provider": "ollama"},

@@ -10,6 +10,21 @@ from atomics.api._battery import run_battery_from_request
 from atomics.api.models import BatteryRequest
 
 
+def _stub_live_steps(monkeypatch) -> None:
+    """Desk-pass probes the provider and runs a QA file; keep both offline."""
+    from atomics.benchmark.qa_runner import QASuiteResult
+
+    async def fake_provider_test(payload):
+        return {"ok": True, "health": True}
+
+    async def fake_run_qa_suite(**kwargs):
+        return QASuiteResult(model="x", host="http://x")
+
+    monkeypatch.setattr("atomics.api._battery.run_provider_test", fake_provider_test)
+    monkeypatch.setattr("atomics.api._battery.load_qa_suite", lambda _path: ("", "http://x", []))
+    monkeypatch.setattr("atomics.api._battery.run_qa_suite", fake_run_qa_suite)
+
+
 @pytest.mark.asyncio
 async def test_battery_expands_steps_in_order(monkeypatch):
     seen: list[str] = []
@@ -46,6 +61,7 @@ async def test_battery_expands_steps_in_order(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_battery_forwards_thinking_and_effort(monkeypatch):
+    _stub_live_steps(monkeypatch)
     captured: list = []
 
     async def fake_run_eval_suite(payload, job=None):
@@ -228,6 +244,8 @@ async def test_battery_skips_only_archreview(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_battery_runs_provider_test_step(monkeypatch):
+    _stub_live_steps(monkeypatch)
+
     async def fake_provider_test(payload):
         return {"ok": True, "health": True, "provider": "ollama", "model": payload.model}
 

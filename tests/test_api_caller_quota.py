@@ -166,7 +166,7 @@ class TestQuotaOverHttp:
         with pytest.raises(ValueError, match="max_active_jobs_per_caller"):
             ServerSettings(db_path=tmp_path / "q.db", max_active_jobs_per_caller=0)
 
-    def test_an_authenticated_submitter_is_attributed_to_their_key(self, tmp_path):
+    def test_an_authenticated_submitter_is_attributed_to_their_key(self, tmp_path, jobs_never_run):
         """Jobs must carry the submitting caller, or the quota counts nothing."""
         app = create_app(ServerSettings(api_keys={ALICE}, db_path=tmp_path / "q.db"))
         with TestClient(app, base_url="http://127.0.0.1") as client:

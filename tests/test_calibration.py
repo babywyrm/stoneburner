@@ -99,6 +99,7 @@ async def test_calibration_pass_rate_partial():
     not os.getenv("ATOMICS_LIVE_JUDGE"),
     reason="set ATOMICS_LIVE_JUDGE=1 to run live judge calibration against Ollama",
 )
+@pytest.mark.network
 @pytest.mark.asyncio
 async def test_live_judge_is_calibrated():
     from atomics.config import load_settings

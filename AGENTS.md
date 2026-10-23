@@ -53,6 +53,8 @@ gitignored local files and document only sanitized patterns (`localhost`,
 ## Testing Conventions
 
 - Tests mock providers and HTTP and must not hit the network by default.
+ An autouse guard fails any test that connects past loopback or to an
+ inference port; mark a deliberate live test `network`.
 - An autouse fixture isolates the database, data directory, and keyring.
   Do not point tests at `data/atomics.db` or the real keychain.
 - API tests use the `client` fixture or

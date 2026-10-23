@@ -487,7 +487,7 @@ def test_cli_run_keyboard_interrupt(monkeypatch, tmp_path):
     assert "Interrupted" in result.output
 
 
-def test_cli_doctor(tmp_path):
+def test_cli_doctor(tmp_path, offline_doctor):
     runner = CliRunner(env={"ATOMICS_DB_PATH": str(tmp_path / "doctor.db")})
     result = runner.invoke(cli, ["doctor"])
     assert result.exit_code == 0

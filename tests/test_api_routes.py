@@ -17,7 +17,7 @@ def test_post_runs_unauth():
         assert resp.status_code == 401
 
 
-def test_post_runs_with_auth():
+def test_post_runs_with_auth(jobs_never_run):
     app = create_app(settings=ServerSettings(api_keys={"secret"}))
     with TestClient(app, base_url="http://127.0.0.1") as tc:
         resp = tc.post(
@@ -31,7 +31,7 @@ def test_post_runs_with_auth():
         assert body["status"] == "pending"
 
 
-def test_post_runs_advertises_iteration_progress(client):
+def test_post_runs_advertises_iteration_progress(client, jobs_never_run):
     resp = client.post(
         "/api/v1/runs",
         json={"provider": "ollama", "iterations": 2},

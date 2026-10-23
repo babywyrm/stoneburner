@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import socket
 import sqlite3
 import time
 from collections.abc import Callable, Iterator
@@ -87,6 +88,76 @@ def tmp_db_path(tmp_path: Path) -> Path:
 @pytest.fixture
 def metrics_repo(tmp_db_path: Path) -> MetricsRepository:
     return MetricsRepository(tmp_db_path)
+
+
+# The Ollama, vLLM, and llama.cpp default ports. Even on loopback, a connection
+# to one reaches a real inference server; test doubles bind ephemeral ports.
+_INFERENCE_PORTS = frozenset({11434, 8000, 8080})
+_LOOPBACK = frozenset({"127.0.0.1", "::1"})
+_real_connect = socket.socket.connect
+_real_connect_ex = socket.socket.connect_ex
+
+
+@pytest.fixture(autouse=True)
+def _no_network(
+    request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> Iterator[list[str]]:
+    """Refuse and record any connection past loopback or to an inference port.
+
+    The test fails at teardown even when the code under test swallowed the
+    refusal, as health checks do. Mark a live test `network` to opt out.
+    """
+    attempts: list[str] = []
+    if request.node.get_closest_marker("network"):
+        yield attempts
+        return
+
+    def _guard(address: object) -> None:
+        if isinstance(address, tuple) and len(address) >= 2:
+            host, port = str(address[0]), address[1]
+            if host not in _LOOPBACK or port in _INFERENCE_PORTS:
+                attempts.append(f"{host}:{port}")
+                raise ConnectionRefusedError(f"test network guard refused {host}:{port}")
+
+    def connect(self: socket.socket, address: object) -> None:
+        _guard(address)
+        _real_connect(self, address)
+
+    def connect_ex(self: socket.socket, address: object) -> int:
+        _guard(address)
+        return _real_connect_ex(self, address)
+
+    monkeypatch.setattr(socket.socket, "connect", connect)
+    monkeypatch.setattr(socket.socket, "connect_ex", connect_ex)
+    yield attempts
+    if attempts:
+        pytest.fail(f"test reached the network: {', '.join(attempts)}", pytrace=False)
+
+
+@pytest.fixture
+def jobs_never_run(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Accept submitted API jobs without running them; the work would reach a real provider."""
+
+    async def _never_run(_self: object, _job: object, _work: object) -> None:
+        return None
+
+    monkeypatch.setattr("atomics.api.jobs.JobManager._run", _never_run)
+
+
+@pytest.fixture
+def offline_doctor(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Doctor probes Ollama and AWS live; make both unreachable unless a test says otherwise."""
+    import httpx
+
+    def _unreachable(*_args: object, **_kwargs: object) -> None:
+        raise httpx.ConnectError("offline in tests")
+
+    monkeypatch.setattr(httpx, "get", _unreachable)
+    try:
+        import boto3
+    except ImportError:
+        return
+    monkeypatch.setattr(boto3, "client", _unreachable)
 
 
 @pytest.fixture(autouse=True)

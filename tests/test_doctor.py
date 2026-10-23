@@ -7,6 +7,8 @@ import pytest
 from atomics.config import AtomicsSettings
 from atomics.doctor import run_doctor, suggest_next_step
 
+pytestmark = pytest.mark.usefixtures("offline_doctor")
+
 
 def test_doctor_exits_zero(monkeypatch, tmp_path):
     monkeypatch.setenv("ATOMICS_DB_PATH", str(tmp_path / "doc.db"))

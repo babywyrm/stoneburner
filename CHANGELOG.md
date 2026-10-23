@@ -18,6 +18,9 @@
   a request fails before reaching the network, such as a refused local
   connection. A soak against such an endpoint never ended, and an API
   stress or soak job froze the server for its duration.
+- The test suite no longer reaches the network. 29 tests were probing a
+  local Ollama or AWS. A guard in `tests/conftest.py` now fails any test
+  that connects past loopback or to an inference port.
 
 ## 0.29.0 (2026-10-21) — Judge calibration, CLI-matched API batteries
 
