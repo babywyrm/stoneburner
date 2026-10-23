@@ -23,6 +23,11 @@
   local Ollama or AWS. A guard in `tests/conftest.py` now fails any test
   that connects past loopback or to an inference port.
 
+### Security
+- `uv.lock` pins `opentelemetry-api` 1.45.1 for CVE-2026-114603. It
+  comes in through FastAPI (`[api]`) and `mcp` (`[mcp]`). A
+  `pip install` resolves its own copy and is unaffected by the lock.
+
 ## 0.29.0 (2026-10-21) — Judge calibration, CLI-matched API batteries
 
 ### Upgrade notes
