@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import pytest
 
+from atomics.eval.intervals import wilson
 from atomics.eval.outcomes import (
     FixtureOutcome,
     JudgeOutcomeStatus,
@@ -21,6 +22,7 @@ from atomics.eval.outcomes import (
 from atomics.eval.suite_integrity import (
     fixture_outcome,
     format_headline_rate,
+    headline_interval,
     headline_rate,
     integrity_of,
 )
@@ -52,6 +54,28 @@ class TestHeadlineRate:
     def test_complete_run_with_no_score_is_plain_na(self):
         integrity = integrity_of(outcomes((True, True)))
         assert format_headline_rate(None, integrity) == "n/a"
+
+    def test_interval_rides_with_a_complete_headline(self):
+        integrity = integrity_of(outcomes((True, True), (True, True)))
+        ci = wilson(6, 20)
+        assert format_headline_rate(0.3, integrity, ci) == "30.0% (95% CI 15–52%, n=20)"
+        assert headline_interval(ci, integrity) == {
+            "low": 0.1455,
+            "high": 0.519,
+            "n": 20,
+            "method": "wilson",
+        }
+
+    def test_interval_is_withheld_with_a_partial_headline(self):
+        integrity = integrity_of(outcomes((True, True), (True, False)))
+        ci = wilson(1, 1)
+        assert format_headline_rate(1.0, integrity, ci) == "n/a (1/2 scored)"
+        assert headline_interval(ci, integrity) is None
+
+    def test_no_interval_prints_the_bare_rate(self):
+        integrity = integrity_of(outcomes((True, True)))
+        assert format_headline_rate(0.5, integrity, None) == "50.0%"
+        assert headline_interval(None, integrity) is None
 
 
 class TestFixtureOutcomeMapping:

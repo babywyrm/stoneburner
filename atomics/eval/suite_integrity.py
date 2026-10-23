@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+from atomics.eval.intervals import Interval
 from atomics.eval.outcomes import (
     FixtureOutcome,
     JudgeOutcomeStatus,
@@ -71,10 +72,22 @@ def headline_rate(score: float | None, integrity: RunIntegrity) -> float | None:
     return score
 
 
-def format_headline_rate(score: float | None, integrity: RunIntegrity) -> str:
+def headline_interval(
+    interval: Interval | None, integrity: RunIntegrity
+) -> dict[str, object] | None:
+    """Publish an interval exactly when its headline is published."""
+    if interval is None or integrity.status is not RunStatus.COMPLETE:
+        return None
+    return interval.to_dict()
+
+
+def format_headline_rate(
+    score: float | None, integrity: RunIntegrity, ci: Interval | None = None
+) -> str:
     """Render a headline rate, or name the denominator when coverage is partial."""
     if integrity.status is not RunStatus.COMPLETE:
         return f"n/a ({integrity.fixtures_scored}/{integrity.fixtures_total} scored)"
     if score is None:
         return "n/a"
-    return f"{score * 100:.1f}%"
+    rate = f"{score * 100:.1f}%"
+    return f"{rate} ({ci.format()})" if ci else rate
