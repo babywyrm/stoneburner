@@ -27,6 +27,10 @@
 - `uv.lock` pins `opentelemetry-api` 1.45.1 for CVE-2026-114603. It
   comes in through FastAPI (`[api]`) and `mcp` (`[mcp]`). A
   `pip install` resolves its own copy and is unaffected by the lock.
+- `uv.lock` pins `setuptools` 84.2.1 for GHSA-xmj3-9gf7-h52w. It comes in
+  through `torch` in the `[rag]` extra. CI never audited that extra: the
+  audit ran on a synced environment that left `[rag]` out. It now audits
+  the lockfile across every extra.
 - CI workflows are hardened and audited by zizmor in the security
   workflow. Actions are pinned to commit SHAs. The publish build job no
   longer holds a write token, and release builds skip the uv cache.

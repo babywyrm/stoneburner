@@ -26,16 +26,15 @@ jobs:
         with:
           python-version: "3.13"
 
-      # --frozen so the audit reflects the committed lockfile rather than a
-      # fresh resolution that might silently pick up an unpinned fix.
-      - name: Sync dependencies
-        run: uv sync --extra dev --extra api --extra mcp --extra claude --extra openai --extra bedrock --frozen
-
-      # Audits the resolved environment. Running pip-audit against an exported
-      # requirements file instead makes it build its own resolution venv, which
-      # is slower and can fail for reasons unrelated to the project.
+      # Audits the committed lockfile across every extra, so an extra
+      # nothing in CI installs (rag pulls torch) is still covered. --frozen
+      # keeps a fresh resolution from silently picking up an unpinned fix.
+      # --no-deps --disable-pip reads the pins as-is instead of building a
+      # resolution venv.
       - name: Audit dependencies
-        run: uv run --with pip-audit pip-audit
+        run: |
+          uv export --frozen --all-extras --no-emit-project --no-header -q -o "$RUNNER_TEMP/requirements.txt"
+          uv run --no-project --with pip-audit pip-audit --strict --no-deps --disable-pip -r "$RUNNER_TEMP/requirements.txt"
 
   static-analysis:
     runs-on: ubuntu-latest
