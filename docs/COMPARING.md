@@ -123,3 +123,33 @@ unless you pass `--temperature` (on `qa`, `toolcall`, `adversarial`,
 - **Safety and promotion evidence:** leave it off and use `--runs 3` or
   more. Pinning can hide how often a model makes a dangerous call.
 - Each suite's JSON records `temperature`; `null` means the model's own.
+
+### Intervals
+
+Suite headlines carry a 95% confidence interval and the fixture count
+behind it:
+
+```
+│ Over-refusal rate  │ 30.0% (95% CI 15–52%, n=20) │
+```
+
+- **The unit is the fixture.** With `--runs`, a fixture's runs are averaged
+  first, so `n` counts fixtures. More fixtures narrow the interval; more runs
+  do not raise `n`.
+- **Rates** (refusal over- and under-refusal, codereview detection and false
+  positives, toolcall dangerous-call rates) use a Wilson interval. When
+  `--runs` leaves a fixture between 0 and 1, they use a t interval over
+  the per-fixture rates.
+- **Judged means** (refusal calibration, redblue quality, multiturn
+  conversation score) use a Student-t interval, clipped to 0–100%.
+  Adversarial resilience is severity-weighted, so its interval uses the
+  weighted standard error, with degrees of freedom from Kish's effective n.
+- **No interval** for the codereview review score (an F1), judge-calibrate
+  mean error, or the battery and gauntlet tables. A mean over fewer than two
+  fixtures has none either.
+
+In JSON, each headline `<metric>` has a `<metric>_ci` of
+`{low, high, n, method}` (`method` is `wilson` or `t`) or `null`. It is
+`null` whenever its headline is withheld. The interval is advisory: it never
+changes a score, integrity, or exit code. If two models' intervals overlap
+widely, this run does not separate them.

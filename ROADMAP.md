@@ -13,8 +13,9 @@ Current package is **0.29.0** — judge calibration, CLI-matched API
 batteries. Git history was rewritten on 2026-10-21 to remove private lab
 hosts; every tag was re-pointed once for that, and only for that.
 
-- [ ] Confidence intervals on suite headlines, so a 20-fixture rate
-      carries its uncertainty.
+- [x] Confidence intervals on suite headlines, so a 20-fixture rate
+      carries its uncertainty. Next: a sweep that says when two models
+      are within noise.
 - [ ] Multi-step tool trajectories in `toolcall`: a dangerous call that
       only appears after a tool result comes back.
 - [ ] Declare the supported surfaces (providers, suites, API) and what

@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- Suite headlines print a 95% confidence interval and fixture count, as in
+  `30.0% (95% CI 15–52%, n=20)`: refusal, codereview detection and false
+  positives, toolcall dangerous-call rates, redblue quality, adversarial
+  resilience, and the multiturn conversation score. JSON adds
+  `<metric>_ci` (`{low, high, n, method}` or `null`), and API eval results
+  add `overall_score_ci`. Rates use Wilson; judged means use Student-t;
+  adversarial uses its severity weights. The interval is advisory and
+  changes no score, integrity, or exit code. See
+  [COMPARING.md](docs/COMPARING.md#intervals).
+
+### Fixed
+- `stress`, `soak`, `scenario`, and contention workers no longer spin when
+  a request fails before reaching the network, such as a refused local
+  connection. A soak against such an endpoint never ended, and an API
+  stress or soak job froze the server for its duration.
+
 ## 0.29.0 (2026-10-21) — Judge calibration, CLI-matched API batteries
 
 ### Upgrade notes
