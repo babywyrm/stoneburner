@@ -45,6 +45,7 @@ from atomics.eval.consensus import (
     CategoricalVote,
     combine_categorical,
 )
+from atomics.eval.intervals import Interval, rate_interval
 from atomics.eval.judge import detect_self_judge
 from atomics.eval.outcomes import (
     AttemptResult,
@@ -57,7 +58,7 @@ from atomics.eval.outcomes import (
 )
 from atomics.eval.provider_attempt import build_attempt, provider_outcome_from_response
 from atomics.eval.runner import _call_hook
-from atomics.eval.suite_integrity import headline_rate
+from atomics.eval.suite_integrity import headline_interval, headline_rate
 from atomics.providers.base import BaseProvider
 
 logger = logging.getLogger("atomics.eval.codereview.runner")
@@ -149,6 +150,23 @@ class CodeReviewSummary:
         return _false_positive_rate(self._verdicts())
 
     @property
+    def detection_ci(self) -> Interval | None:
+        return self._verdict_ci(vulnerable=True, label="detected")
+
+    @property
+    def false_positive_ci(self) -> Interval | None:
+        return self._verdict_ci(vulnerable=False, label="false_positive")
+
+    def _verdict_ci(self, *, vulnerable: bool, label: str) -> Interval | None:
+        return rate_interval(
+            [
+                r.run_labels.count(label) / len(r.run_labels)
+                for r in self.results
+                if r.fixture.is_vulnerable is vulnerable and r.run_labels
+            ]
+        )
+
+    @property
     def review_score(self) -> float | None:
         return _review_f1(self._verdicts())
 
@@ -187,7 +205,9 @@ class CodeReviewSummary:
             "runs": self.runs,
             "temperature": self.temperature,
             "detection_rate": headline_rate(self.detection_rate, integrity),
+            "detection_rate_ci": headline_interval(self.detection_ci, integrity),
             "false_positive_rate": headline_rate(self.false_positive_rate, integrity),
+            "false_positive_rate_ci": headline_interval(self.false_positive_ci, integrity),
             "review_score": headline_rate(self.review_score, integrity),
             "integrity": integrity_to_dict(self.integrity),
             "total_cost_usd": round(self.total_cost_usd, 6),

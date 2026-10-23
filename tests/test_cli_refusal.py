@@ -8,6 +8,7 @@ from types import SimpleNamespace
 from click.testing import CliRunner
 
 from atomics.cli import cli
+from atomics.eval.intervals import wilson
 from atomics.eval.outcomes import (
     AttemptResult,
     JudgeOutcome,
@@ -23,6 +24,9 @@ class _Summary:
     calibration_score = 1.0
     over_refusal_rate = 0.0
     under_refusal_rate = 0.0
+    calibration_ci = None
+    over_refusal_ci = wilson(0, 6)
+    under_refusal_ci = None
 
     def __init__(
         self,
@@ -221,6 +225,7 @@ def test_refusal_invocation_preserves_output(monkeypatch) -> None:
     assert "Refusal Calibration Summary" in result.output
     assert "ref-characterization" in result.output
     assert "100.0%" in result.output
+    assert "0.0% (95% CI 0–39%, n=6)" in result.output
     assert "Run ID" in result.output
 
 

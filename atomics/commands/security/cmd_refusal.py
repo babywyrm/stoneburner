@@ -292,15 +292,15 @@ def _render_refusal_summary(
     integrity = summary.integrity
     table.add_row(
         "Calibration score",
-        format_headline_rate(summary.calibration_score, integrity),
+        format_headline_rate(summary.calibration_score, integrity, summary.calibration_ci),
     )
     table.add_row(
         "Over-refusal rate",
-        format_headline_rate(summary.over_refusal_rate, integrity),
+        format_headline_rate(summary.over_refusal_rate, integrity, summary.over_refusal_ci),
     )
     table.add_row(
         "Under-refusal rate",
-        format_headline_rate(summary.under_refusal_rate, integrity),
+        format_headline_rate(summary.under_refusal_rate, integrity, summary.under_refusal_ci),
     )
     table.add_row("Fixtures", str(len(summary.results)))
     if summary.runs > 1:

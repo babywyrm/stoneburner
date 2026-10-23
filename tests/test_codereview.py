@@ -6,6 +6,7 @@ import httpx
 import pytest
 
 from atomics.eval.codereview import SECURE_CODE_FIXTURES, run_codereview, select_fixtures
+from atomics.eval.intervals import mean_interval, wilson
 from atomics.eval.outcomes import JudgeOutcomeStatus, ProviderOutcomeKind, RunStatus
 from atomics.providers.base import ProviderResponse
 
@@ -492,3 +493,64 @@ async def test_single_run_has_no_review_spread():
     )
     assert summary.runs == 1
     assert summary.review_score_stdev is None
+
+
+class _CountingJudge(_FakeJudge):
+    """Detects the first `detected` vulnerable calls; flags the first `flagged` clean calls."""
+
+    def __init__(self, *, detected: int, flagged: int) -> None:
+        super().__init__(perfect=True)
+        self._left = {"vuln": detected, "clean": flagged}
+
+    async def generate(self, prompt, **kwargs):
+        kind = "vuln" if "contains this vulnerability" in prompt else "clean"
+        hit = self._left[kind] > 0
+        self._left[kind] -= 1
+        verdict = {"vuln": ("DETECTED", "MISSED"), "clean": ("FALSE_POSITIVE", "CLEAN")}[kind]
+        return ProviderResponse(
+            text=f"VERDICT: {verdict[0] if hit else verdict[1]}\nRATIONALE: x",
+            input_tokens=5,
+            output_tokens=5,
+            total_tokens=10,
+            model="judge",
+            latency_ms=50.0,
+            estimated_cost_usd=0.0,
+        )
+
+
+@pytest.mark.asyncio
+async def test_rates_carry_wilson_intervals_over_their_own_fixtures():
+    summary = await run_codereview(
+        _FakeProvider(), judge_provider=_CountingJudge(detected=2, flagged=1)
+    )
+    assert summary.detection_ci == wilson(2, 6)
+    assert summary.false_positive_ci == wilson(1, 6)
+    payload = summary.to_dict()
+    assert payload["detection_rate_ci"] == wilson(2, 6).to_dict()
+    assert payload["false_positive_rate_ci"] == wilson(1, 6).to_dict()
+    assert "review_score_ci" not in payload
+
+
+@pytest.mark.asyncio
+async def test_runs_collapse_to_fixtures_before_the_interval():
+    summary = await run_codereview(
+        _FakeProvider(), judge_provider=_CountingJudge(detected=2, flagged=0), runs=3
+    )
+    ci = summary.detection_ci
+    assert ci is not None and (ci.n, ci.method) == (6, "t")
+    assert ci == mean_interval([2 / 3, 0, 0, 0, 0, 0])
+
+
+@pytest.mark.asyncio
+async def test_partial_run_withholds_the_intervals():
+    vulnerable = next(f for f in SECURE_CODE_FIXTURES if f.is_vulnerable)
+    clean = next(f for f in SECURE_CODE_FIXTURES if not f.is_vulnerable)
+    summary = await run_codereview(
+        _FakeProvider(),
+        judge_provider=_CleanFixtureFailingJudge(perfect=True),
+        fixtures=[vulnerable, clean],
+    )
+    assert summary.detection_ci is not None
+    payload = summary.to_dict()
+    assert payload["detection_rate_ci"] is None
+    assert payload["false_positive_rate_ci"] is None

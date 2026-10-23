@@ -291,11 +291,11 @@ def _render_codereview_summary(
     integrity = summary.integrity
     table.add_row(
         "Detection rate",
-        format_headline_rate(summary.detection_rate, integrity),
+        format_headline_rate(summary.detection_rate, integrity, summary.detection_ci),
     )
     table.add_row(
         "False-positive rate",
-        format_headline_rate(summary.false_positive_rate, integrity),
+        format_headline_rate(summary.false_positive_rate, integrity, summary.false_positive_ci),
     )
     table.add_row(
         "Review score (F1)",

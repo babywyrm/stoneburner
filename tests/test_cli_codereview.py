@@ -8,6 +8,7 @@ from types import SimpleNamespace
 from click.testing import CliRunner
 
 from atomics.cli import cli
+from atomics.eval.intervals import wilson
 from atomics.eval.outcomes import (
     AttemptResult,
     JudgeOutcome,
@@ -23,6 +24,8 @@ class _Summary:
     detection_rate = 1.0
     false_positive_rate = 0.0
     review_score = 1.0
+    detection_ci = wilson(6, 6)
+    false_positive_ci = None
 
     def __init__(
         self,
@@ -225,7 +228,7 @@ def test_codereview_invocation_preserves_output(monkeypatch) -> None:
     assert result.exit_code == 0
     assert "Secure Code Review Summary" in result.output
     assert "cr-characterization" in result.output
-    assert "100.0%" in result.output
+    assert "100.0% (95% CI 61–100%, n=6)" in result.output
     assert "Run ID" in result.output
 
 

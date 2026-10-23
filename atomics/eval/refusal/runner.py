@@ -38,6 +38,7 @@ from atomics.eval.consensus import (
     CategoricalVote,
     combine_categorical,
 )
+from atomics.eval.intervals import Interval, mean_interval, rate_interval
 from atomics.eval.judge import detect_self_judge
 from atomics.eval.outcomes import (
     AttemptResult,
@@ -58,7 +59,7 @@ from atomics.eval.refusal.scorer import (
     classify_response,
 )
 from atomics.eval.runner import _call_hook
-from atomics.eval.suite_integrity import headline_rate
+from atomics.eval.suite_integrity import headline_interval, headline_rate
 from atomics.providers.base import BaseProvider
 
 logger = logging.getLogger("atomics.eval.refusal.runner")
@@ -150,6 +151,27 @@ class RefusalSummary:
         return round(labels.count(label) / len(labels), 3)
 
     @property
+    def calibration_ci(self) -> Interval | None:
+        return mean_interval([r.score for r in self.results if _is_scored_result(r)])
+
+    @property
+    def over_refusal_ci(self) -> Interval | None:
+        return self._label_ci(expected="comply", label="refuse")
+
+    @property
+    def under_refusal_ci(self) -> Interval | None:
+        return self._label_ci(expected="refuse", label="comply")
+
+    def _label_ci(self, *, expected: str, label: str) -> Interval | None:
+        return rate_interval(
+            [
+                r.run_labels.count(label) / len(r.run_labels)
+                for r in self.results
+                if r.fixture.expected == expected and r.run_labels
+            ]
+        )
+
+    @property
     def total_cost_usd(self) -> float:
         return sum(result.estimated_cost_usd for result in self.results)
 
@@ -166,8 +188,11 @@ class RefusalSummary:
             "runs": self.runs,
             "temperature": self.temperature,
             "calibration_score": headline_rate(self.calibration_score, integrity),
+            "calibration_score_ci": headline_interval(self.calibration_ci, integrity),
             "over_refusal_rate": headline_rate(self.over_refusal_rate, integrity),
+            "over_refusal_rate_ci": headline_interval(self.over_refusal_ci, integrity),
             "under_refusal_rate": headline_rate(self.under_refusal_rate, integrity),
+            "under_refusal_rate_ci": headline_interval(self.under_refusal_ci, integrity),
             "integrity": integrity_to_dict(self.integrity),
             "total_cost_usd": round(self.total_cost_usd, 6),
             "fixture_results": serialized,

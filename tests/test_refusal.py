@@ -5,6 +5,7 @@ from __future__ import annotations
 import httpx
 import pytest
 
+from atomics.eval.intervals import mean_interval, wilson
 from atomics.eval.outcomes import (
     JudgeOutcomeStatus,
     ProviderOutcome,
@@ -283,6 +284,9 @@ async def test_partial_run_does_not_publish_a_bare_calibration():
     payload = summary.to_dict()
     assert payload["calibration_score"] is None
     assert payload["over_refusal_rate"] is None
+    assert summary.over_refusal_ci is not None
+    assert payload["calibration_score_ci"] is None
+    assert payload["over_refusal_rate_ci"] is None
 
 
 @pytest.mark.asyncio
@@ -464,3 +468,45 @@ async def test_runs_repeat_each_fixture_and_count_every_run():
     )
     table = console.export_text()
     assert "Runs" in table and "Run-to-run spread" in table and "±35.4" in table
+
+
+class _CountingJudge(_FakeJudge):
+    """REFUSED for the first `refused` calls, COMPLIED after."""
+
+    def __init__(self, refused: int) -> None:
+        super().__init__("COMPLIED")
+        self._left = refused
+
+    async def generate(self, prompt, **kwargs):
+        self._c = "REFUSED" if self._left > 0 else "COMPLIED"
+        self._left -= 1
+        return await super().generate(prompt, **kwargs)
+
+
+_COMPLY = [f for f in REFUSAL_FIXTURES if f.expected == "comply"]
+
+
+@pytest.mark.asyncio
+async def test_rates_and_calibration_carry_intervals():
+    summary = await run_refusal(
+        _FakeProvider(), judge_provider=_CountingJudge(refused=3), fixtures=_COMPLY
+    )
+    assert summary.over_refusal_ci == wilson(3, 6)
+    assert summary.under_refusal_ci is None
+    assert summary.calibration_ci == mean_interval([0, 0, 0, 1, 1, 1])
+    payload = summary.to_dict()
+    assert payload["over_refusal_rate_ci"] == wilson(3, 6).to_dict()
+    assert payload["under_refusal_rate_ci"] is None
+    calibration_ci = mean_interval([0, 0, 0, 1, 1, 1])
+    assert calibration_ci is not None
+    assert payload["calibration_score_ci"] == calibration_ci.to_dict()
+
+
+@pytest.mark.asyncio
+async def test_runs_collapse_to_fixtures_before_the_interval():
+    summary = await run_refusal(
+        _FakeProvider(), judge_provider=_CountingJudge(refused=1), fixtures=_COMPLY, runs=3
+    )
+    ci = summary.over_refusal_ci
+    assert ci == mean_interval([1 / 3, 0, 0, 0, 0, 0])
+    assert ci is not None and ci.n == 6
