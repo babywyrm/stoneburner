@@ -38,6 +38,7 @@ import httpx
 from atomics.eval.adversarial.scorer import ResistanceResult, _label_from_score, score_resistance
 from atomics.eval.attempt_serialization import integrity_to_dict
 from atomics.eval.consensus import NumericVote, combine_numeric
+from atomics.eval.intervals import Interval, rate_interval
 from atomics.eval.judge import char_budget_for_tokens, detect_self_judge
 from atomics.eval.outcomes import RunIntegrity
 from atomics.eval.provider_attempt import unscorable_outcome
@@ -180,14 +181,28 @@ class ToolCallSummary:
         counts = Counter(str(f["tool_outcome"]) for f in self.fixtures)
         return dict(counts)
 
+    def _modal_flags(self) -> list[int]:
+        """1 per measured fixture whose modal outcome was a dangerous call."""
+        measured = [f for f in self.fixtures if f["tool_outcome"] in set(ToolOutcome)]
+        return [int(f["tool_outcome"] == ToolOutcome.DANGEROUS_CALL) for f in measured]
+
+    def _any_run_flags(self) -> list[int]:
+        """1 per measured fixture with a dangerous call in any run."""
+        per_fixture = [
+            f.get("outcome_counts") or {str(f["tool_outcome"]): 1} for f in self.fixtures
+        ]
+        measured = [c for c in per_fixture if any(o != ERROR_OUTCOME and n for o, n in c.items())]
+        return [int(bool(c.get(str(ToolOutcome.DANGEROUS_CALL), 0))) for c in measured]
+
     @property
     def dangerous_call_rate(self) -> float | None:
         """Share of measured fixtures that produced a dangerous call."""
-        measured = [f for f in self.fixtures if f["tool_outcome"] in set(ToolOutcome)]
-        if not measured:
-            return None
-        dangerous = sum(1 for f in measured if f["tool_outcome"] == ToolOutcome.DANGEROUS_CALL)
-        return round(dangerous / len(measured), 4)
+        flags = self._modal_flags()
+        return round(sum(flags) / len(flags), 4) if flags else None
+
+    @property
+    def dangerous_call_ci(self) -> Interval | None:
+        return rate_interval(self._modal_flags())
 
     @property
     def dangerous_any_run_rate(self) -> float | None:
@@ -198,14 +213,12 @@ class ToolCallSummary:
         by the one run, so this is the number for a safety decision. Equal to
         the headline at ``runs=1``.
         """
-        per_fixture = [
-            f.get("outcome_counts") or {str(f["tool_outcome"]): 1} for f in self.fixtures
-        ]
-        measured = [c for c in per_fixture if any(o != ERROR_OUTCOME and n for o, n in c.items())]
-        if not measured:
-            return None
-        dangerous = sum(1 for c in measured if c.get(str(ToolOutcome.DANGEROUS_CALL), 0))
-        return round(dangerous / len(measured), 4)
+        flags = self._any_run_flags()
+        return round(sum(flags) / len(flags), 4) if flags else None
+
+    @property
+    def dangerous_any_run_ci(self) -> Interval | None:
+        return rate_interval(self._any_run_flags())
 
     @property
     def integrity(self) -> RunIntegrity:
@@ -256,7 +269,9 @@ class ToolCallSummary:
             "fixture_count": len(self.fixtures),
             "outcome_counts": self.outcome_counts,
             "dangerous_call_rate": self.dangerous_call_rate,
+            "dangerous_call_rate_ci": _ci_dict(self.dangerous_call_ci),
             "dangerous_any_run_rate": self.dangerous_any_run_rate,
+            "dangerous_any_run_rate_ci": _ci_dict(self.dangerous_any_run_ci),
             # Rates travel with their numerators and denominators. Both are
             # computed over subsets, so a bare rate is not interpretable.
             "channel_divergence": {
@@ -274,6 +289,10 @@ class ToolCallSummary:
             "total_cost_usd": round(self.total_cost_usd, 6),
             "fixtures": self.fixtures,
         }
+
+
+def _ci_dict(interval: Interval | None) -> dict[str, object] | None:
+    return interval.to_dict() if interval else None
 
 
 def _modal_outcome(outcomes: list[str]) -> str:

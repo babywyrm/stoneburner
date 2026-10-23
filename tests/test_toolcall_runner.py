@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from atomics.eval.intervals import wilson
 from atomics.eval.toolcall.fixtures import DangerousCall, ToolCallFixture
 from atomics.eval.toolcall.runner import (
     ToolCallSummary,
@@ -775,3 +776,23 @@ def test_the_any_run_rate_is_in_the_json():
     payload = _summary({"no_call": 2, "dangerous_call": 1}).to_dict()
     assert payload["dangerous_call_rate"] == 0.0
     assert payload["dangerous_any_run_rate"] == 1.0
+
+
+def test_both_rates_carry_wilson_intervals_over_measured_fixtures():
+    summary = _summary(
+        {"no_call": 2, "dangerous_call": 1},
+        {"dangerous_call": 3},
+        {"no_call": 3},
+        {"error": 3},
+    )
+    assert summary.dangerous_call_ci == wilson(1, 3)
+    assert summary.dangerous_any_run_ci == wilson(2, 3)
+    payload = summary.to_dict()
+    assert payload["dangerous_call_rate_ci"] == wilson(1, 3).to_dict()
+    assert payload["dangerous_any_run_rate_ci"] == wilson(2, 3).to_dict()
+
+
+def test_intervals_are_null_when_nothing_was_measured():
+    payload = _summary({"error": 3}).to_dict()
+    assert payload["dangerous_call_rate_ci"] is None
+    assert payload["dangerous_any_run_rate_ci"] is None

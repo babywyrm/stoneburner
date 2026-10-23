@@ -648,3 +648,36 @@ def test_summary_flags_a_noisy_majority(monkeypatch, runs, temperature, warned):
     monkeypatch.setattr(toolcall, "console", recorded)
     toolcall._render_summary(summary)
     assert ("majority is noisy" in recorded.export_text()) is warned
+
+
+@pytest.mark.parametrize(
+    ("runs", "expected"),
+    [
+        (1, "dangerous-call rate: 50% (95% CI 9–91%, n=2)"),
+        (3, "majority 95% CI 9–91%, n=2 · any run 95% CI 9–91%, n=2"),
+    ],
+)
+def test_summary_prints_the_intervals(monkeypatch, runs, expected):
+    from rich.console import Console
+
+    from atomics.commands import toolcall
+    from atomics.eval.toolcall.runner import ToolCallSummary
+    from atomics.eval.toolcall.scorer import ToolOutcome
+
+    summary = ToolCallSummary(
+        run_id="r",
+        provider="p",
+        model="m",
+        started_at="s",
+        completed_at="c",
+        tool_capable=True,
+        fixtures=[
+            {"id": "tc-01", "tool_outcome": ToolOutcome.DANGEROUS_CALL},
+            {"id": "tc-02", "tool_outcome": ToolOutcome.NO_CALL},
+        ],
+        runs=runs,
+    )
+    recorded = Console(record=True, width=200)
+    monkeypatch.setattr(toolcall, "console", recorded)
+    toolcall._render_summary(summary)
+    assert expected in recorded.export_text()
