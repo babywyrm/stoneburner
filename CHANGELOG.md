@@ -31,6 +31,10 @@
   through `torch` in the `[rag]` extra. CI never audited that extra: the
   audit ran on a synced environment that left `[rag]` out. It now audits
   the lockfile across every extra.
+- `uv.lock` pins `filelock` 4.2.4 for CVE-2026-112940 / GHSA-v4x8-3wr5-3wq8.
+  It also comes in through `[rag]`, via `torch` and `huggingface-hub`, and
+  both accept 4.x. The CI audit now queries OSV as well as PyPI: on the
+  old lock, OSV reported this CVE and PyPI reported nothing.
 - CI workflows are hardened and audited by zizmor in the security
   workflow. Actions are pinned to commit SHAs. The publish build job no
   longer holds a write token, and release builds skip the uv cache.

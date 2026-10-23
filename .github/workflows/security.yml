@@ -30,11 +30,17 @@ jobs:
       # nothing in CI installs (rag pulls torch) is still covered. --frozen
       # keeps a fresh resolution from silently picking up an unpinned fix.
       # --no-deps --disable-pip reads the pins as-is instead of building a
-      # resolution venv.
+      # resolution venv. Both databases: OSV carried CVE-2026-112940
+      # (filelock) while PyPI's feed reported nothing.
       - name: Audit dependencies
         run: |
           uv export --frozen --all-extras --no-emit-project --no-header -q -o "$RUNNER_TEMP/requirements.txt"
-          uv run --no-project --with pip-audit pip-audit --strict --no-deps --disable-pip -r "$RUNNER_TEMP/requirements.txt"
+          status=0
+          for service in pypi osv; do
+            uv run --no-project --with pip-audit pip-audit --vulnerability-service "$service" \
+              --strict --no-deps --disable-pip -r "$RUNNER_TEMP/requirements.txt" || status=1
+          done
+          exit "$status"
 
   static-analysis:
     runs-on: ubuntu-latest
