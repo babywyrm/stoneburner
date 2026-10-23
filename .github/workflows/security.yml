@@ -17,10 +17,12 @@ jobs:
   dependency-audit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
         with:
           python-version: "3.13"
 
@@ -38,10 +40,12 @@ jobs:
   static-analysis:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
         with:
           python-version: "3.13"
 
@@ -57,13 +61,20 @@ jobs:
       - name: Static analysis
         run: uv run --with bandit bandit -q -r atomics/ scripts/ -ll
 
+      # Workflow audit: unpinned actions, template injection, cache poisoning,
+      # persisted credentials. Exceptions carry `# zizmor: ignore[<audit>]`
+      # with the reason above them.
+      - name: Audit workflows
+        run: uvx zizmor@1.31.1 --offline --min-severity low .github/workflows
+
   secret-scan:
     runs-on: ubuntu-latest
     steps:
       # Full history: the point is what has ever been committed, not what the
       # tip happens to contain.
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           fetch-depth: 0
 
       # The binary rather than gitleaks-action, whose licensing differs for
@@ -75,14 +86,17 @@ jobs:
       # `curl -H "X-API-Key: $ATOMICS_API_KEY"` examples and a fixture named
       # dummy-key-for-tests-not-a-secret — that the configured version does
       # not. A scanner that disagrees with the one developers run is worse than
-      # no scanner, because the failures get waved through. Move both together.
+      # no scanner, because the failures get waved through. Move both together,
+      # and take the new SHA-256 from the release's checksums.txt.
       - name: Install gitleaks
         env:
           GITLEAKS_VERSION: "8.30.1"
+          GITLEAKS_SHA256: "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb"
         run: |
           curl -sSfL \
             "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
             -o gitleaks.tar.gz
+          echo "${GITLEAKS_SHA256}  gitleaks.tar.gz" | sha256sum --check --strict
           tar -xzf gitleaks.tar.gz gitleaks
           sudo mv gitleaks /usr/local/bin/
           gitleaks version

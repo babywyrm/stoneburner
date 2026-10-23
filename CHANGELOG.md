@@ -27,6 +27,12 @@
 - `uv.lock` pins `opentelemetry-api` 1.45.1 for CVE-2026-114603. It
   comes in through FastAPI (`[api]`) and `mcp` (`[mcp]`). A
   `pip install` resolves its own copy and is unaffected by the lock.
+- CI workflows are hardened and audited by zizmor in the security
+  workflow. Actions are pinned to commit SHAs. The publish build job no
+  longer holds a write token, and release builds skip the uv cache.
+  Checkouts drop their token after cloning, and the gitleaks download is
+  checksum-verified. Eval Gate inputs no longer expand into shell scripts.
+  See [SECURITY.md](SECURITY.md#static-analysis).
 
 ## 0.29.0 (2026-10-21) — Judge calibration, CLI-matched API batteries
 

@@ -99,6 +99,19 @@ suppressed set is the SQL builders that interpolate a literal column list or a
 quoted identifier while binding every caller value with `?`, the `/tmp` paths
 that are fixture data or smoke scratch, and the post-run hook below.
 
+```bash
+uvx zizmor@1.31.1 --offline --min-severity low .github/workflows
+```
+
+zizmor audits the workflows. Every action is pinned to a commit SHA with
+its version in a comment, and Dependabot's `github-actions` updates move
+both. Checkouts drop their token (`persist-credentials: false`) except the
+release job's, which pushes the floating major tag. Release builds run
+without the uv cache. Workflow inputs reach `run:` scripts through `env:`,
+never `${{ }}` expansion. The CI gitleaks download is checked against its
+release SHA-256. Exceptions carry `# zizmor: ignore[<audit>]` with the reason
+above them.
+
 CI also runs CodeQL (`.github/workflows/codeql.yml`) over Python, the npm
 worker's JavaScript, and the workflow files, on every push, pull request, and
 weekly. Findings land in the repository's code-scanning alerts; on a pull
