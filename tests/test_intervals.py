@@ -80,6 +80,19 @@ def test_identical_scores_give_a_zero_width_interval():
     assert _bounds(mean_interval([0.8, 0.8, 0.8])) == (0.8, 0.8)
 
 
+@pytest.mark.parametrize(("value", "successes"), [(1.0, 5), (0.0, 0)])
+def test_a_unanimous_mean_falls_back_to_wilson(value, successes):
+    # Zero spread gives t no width; 5/5 is not certainty.
+    assert mean_interval([value] * 5) == wilson(successes, 5)
+
+
+def test_a_unanimous_weighted_mean_bounds_on_kish_n_and_counts_fixtures():
+    # Kish n 36 / 12 = 3.
+    interval = mean_interval([1.0] * 4, [3.0, 1.0, 1.0, 1.0])
+    assert _bounds(interval) == _bounds(wilson(3, 3))
+    assert interval is not None and (interval.n, interval.method) == (4, "wilson")
+
+
 def test_rate_interval_is_wilson_for_binary_fixtures():
     assert rate_interval([1, 0, 0, 1, 0, 0] * 3 + [0, 0]) == wilson(6, 20)
 

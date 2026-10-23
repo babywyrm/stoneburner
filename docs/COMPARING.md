@@ -144,6 +144,8 @@ behind it:
   conversation score) use a Student-t interval, clipped to 0–100%.
   Adversarial resilience is severity-weighted, so its interval uses the
   weighted standard error, with degrees of freedom from Kish's effective n.
+  A unanimous 0% or 100% has no spread for t to use, so it falls back to
+  Wilson.
 - **No interval** for the codereview review score (an F1), judge-calibrate
   mean error, or the battery and gauntlet tables. A mean over fewer than two
   fixtures has none either.

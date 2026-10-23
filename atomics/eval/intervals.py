@@ -73,8 +73,13 @@ def mean_interval(
         return None
     mean = sum(x * v for x, v in zip(w, values, strict=True)) / total
     spread = sum(x * x * (v - mean) ** 2 for x, v in zip(w, values, strict=True))
-    se = math.sqrt(n / (n - 1) * spread) / total
     df = math.floor(effective_n) - 1
+    # Zero spread gives t no width, and 5/5 is not certainty.
+    # ponytail: a unanimous fractional score (all 0.8) stays zero-width;
+    # bounding it needs a per-fixture variance model.
+    if spread == 0 and mean in (0.0, 1.0) and (bound := wilson(round(mean) * (df + 1), df + 1)):
+        return _interval(bound.low, bound.high, n, "wilson")
+    se = math.sqrt(n / (n - 1) * spread) / total
     t = _T95[df - 1] if df <= len(_T95) else _Z
     return _interval(mean - t * se, mean + t * se, n, "t")
 

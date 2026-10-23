@@ -8,7 +8,8 @@
   positives, toolcall dangerous-call rates, redblue quality, adversarial
   resilience, and the multiturn conversation score. JSON adds
   `<metric>_ci` (`{low, high, n, method}` or `null`), and API eval results
-  add `overall_score_ci`. Rates use Wilson; judged means use Student-t;
+  add `overall_score_ci`. Rates use Wilson; judged means use Student-t,
+  or Wilson when every fixture scores 0 or every one scores 1;
   adversarial uses its severity weights. The interval is advisory and
   changes no score, integrity, or exit code. See
   [COMPARING.md](docs/COMPARING.md#intervals).
