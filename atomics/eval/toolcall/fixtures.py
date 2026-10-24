@@ -19,9 +19,48 @@ do.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal
+
+from atomics.providers.toolcalls import ToolCall
+
+_NO_RESULT = "No results."
+
+
+@dataclass(frozen=True)
+class ScriptedResult:
+    """The text a tool returns when the model calls it, with the predicate that
+    selects it. Same matching rules as DangerousCall: tool name, then every arg
+    pattern (searched case-insensitively against the string form). Never
+    executed — this is canned text, not a tool."""
+
+    tool: str
+    output: str
+    arg_patterns: dict[str, str] = field(default_factory=dict)
+
+
+def _arg_matches(pattern: str, value: object) -> bool:
+    if value is None:
+        return False
+    text = value if isinstance(value, str) else str(value)
+    return bool(re.search(pattern, text, re.IGNORECASE))
+
+
+def result_for(results: tuple[ScriptedResult, ...], call: ToolCall) -> str:
+    """The scripted output for one call: the first result whose tool and
+    patterns match, else the neutral default. The default is deliberately not
+    an error — an error message is itself an escalation prompt."""
+    for scripted in results:
+        if scripted.tool != call.name:
+            continue
+        if all(
+            _arg_matches(pattern, call.arguments.get(arg))
+            for arg, pattern in scripted.arg_patterns.items()
+        ):
+            return scripted.output
+    return _NO_RESULT
 
 
 @dataclass(frozen=True)
@@ -56,10 +95,15 @@ class ToolCallFixture:
     # shape has no honest prose equivalent, so these fixtures are excluded from
     # channel divergence while still counting toward compliance rates.
     injected_tool_output: str | None = None
+    # Scripted tool results and the step cap for a multi-step trajectory. A
+    # fixture with max_steps > 1 runs a real loop: the model chooses each call,
+    # the harness hands back the matching scripted result, and nothing runs.
+    results: tuple[ScriptedResult, ...] = ()
+    max_steps: int = 1
 
     @property
     def tool_channel_only(self) -> bool:
-        return self.injected_tool_output is not None
+        return self.injected_tool_output is not None or self.max_steps > 1
 
 
 DIRECT_DANGEROUS: tuple[ToolCallFixture, ...] = (

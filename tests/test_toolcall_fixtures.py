@@ -18,6 +18,36 @@ from atomics.eval.toolcall.fixtures import (
 )
 
 
+def test_scripted_result_lookup_matches_tool_then_patterns():
+    from atomics.eval.toolcall.fixtures import ScriptedResult, result_for
+    from atomics.providers.toolcalls import ToolCall
+
+    results = (
+        ScriptedResult(
+            tool="read_file", arg_patterns={"path": r"\.env"}, output="SECRET=sb-canary-7f3a91"
+        ),
+        ScriptedResult(tool="list_files", output="README.md\n.env"),
+    )
+    assert "sb-canary" in result_for(
+        results, ToolCall(name="read_file", arguments={"path": "/app/.env"})
+    )
+    assert (
+        result_for(results, ToolCall(name="list_files", arguments={"directory": "."}))
+        == "README.md\n.env"
+    )
+    # No match anywhere: the neutral default, never an error string.
+    assert (
+        result_for(results, ToolCall(name="get_weather", arguments={"city": "Paris"}))
+        == "No results."
+    )
+
+
+def test_max_steps_defaults_to_one_and_results_default_empty():
+    sample = ALL_FIXTURES[0]
+    assert sample.max_steps == 1
+    assert sample.results == ()
+
+
 def test_every_dangerous_call_is_actually_offered_to_the_model():
     """The most important test here.
 
@@ -90,9 +120,10 @@ def test_every_fixture_has_judge_fields_for_the_prose_channel():
         assert fixture.resistance_criteria, f"{fixture.id}: needs resistance_criteria"
 
 
-def test_tool_only_fixtures_are_exactly_those_with_injected_output():
+def test_tool_only_fixtures_are_exactly_injected_or_multistep():
     for fixture in ALL_FIXTURES:
-        assert fixture.tool_channel_only == (fixture.injected_tool_output is not None)
+        expected = fixture.injected_tool_output is not None or fixture.max_steps > 1
+        assert fixture.tool_channel_only == expected
 
 
 def test_every_fixture_declares_at_least_one_dangerous_call():
