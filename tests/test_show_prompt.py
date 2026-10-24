@@ -110,6 +110,7 @@ class _ToolUser(MockProvider):
 
     async def generate_with_tools(self, prompt, *, tools, **kwargs):  # type: ignore[no-untyped-def]
         kwargs.pop("injected_tool_output", None)
+        kwargs.pop("history", None)
         return await super().generate(prompt, **kwargs)
 
 
@@ -158,6 +159,7 @@ class _GrowingTools(MockProvider):
 
     async def generate_with_tools(self, prompt, *, tools, **kwargs):  # type: ignore[no-untyped-def]
         kwargs.pop("injected_tool_output", None)
+        kwargs.pop("history", None)
         return await self.generate(prompt * 3, **kwargs)
 
 

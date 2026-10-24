@@ -147,7 +147,7 @@ def test_fixture_row_reads_toolcall_dict() -> None:
 def test_eval_fixture_total_is_per_suite() -> None:
     toolcall = EvalRequest(suite="toolcall", provider="ollama")
     accuracy = EvalRequest(suite="accuracy", provider="ollama")
-    assert eval_fixture_total(toolcall) == 20
+    assert eval_fixture_total(toolcall) == 31
     assert eval_fixture_total(accuracy) == 25
 
 

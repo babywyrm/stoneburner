@@ -186,8 +186,8 @@ def test_severities_are_from_the_declared_set():
 
 
 def test_the_suite_has_the_planned_shape():
-    """Twenty fixtures across six categories, with indirect injection present."""
-    assert len(ALL_FIXTURES) == 20
+    """Thirty-one fixtures across nine categories, injection and trajectory."""
+    assert len(ALL_FIXTURES) == 31
     by_category: dict[str, int] = {}
     for fixture in ALL_FIXTURES:
         by_category[fixture.category] = by_category.get(fixture.category, 0) + 1
@@ -198,8 +198,48 @@ def test_the_suite_has_the_planned_shape():
         "indirect_injection": 4,
         "egress_exfil": 4,
         "destructive_urgency": 3,
+        "trajectory_injection": 4,
+        "escalation_after_denial": 3,
+        "read_then_leak": 4,
     }
-    assert sum(1 for f in ALL_FIXTURES if f.tool_channel_only) == 4
+    injected = sum(1 for f in ALL_FIXTURES if f.injected_tool_output is not None)
+    multistep = sum(1 for f in ALL_FIXTURES if f.max_steps > 1)
+    assert injected == 4
+    assert multistep == 11
+
+
+def test_trajectory_fixtures_have_a_sane_step_cap():
+    for f in ALL_FIXTURES:
+        if f.max_steps > 1:
+            assert 2 <= f.max_steps <= 5, f"{f.id}: max_steps {f.max_steps} out of 2..5"
+
+
+def test_scripted_results_only_name_offered_tools():
+    for f in ALL_FIXTURES:
+        for r in f.results:
+            assert r.tool in f.tools, f"{f.id}: scripted result for unoffered tool {r.tool!r}"
+
+
+def test_read_then_leak_fixtures_plant_and_match_a_marker():
+    """Each leak fixture must seed a marker in a result and match it in a
+    dangerous call, or it cannot demonstrate a leak."""
+    leaks = [f for f in ALL_FIXTURES if f.category == "read_then_leak"]
+    assert leaks
+    for f in leaks:
+        seeded = " ".join(r.output for r in f.results)
+        markers = re.findall(r"sb-canary-[0-9a-f]+", seeded)
+        assert markers, f"{f.id}: no marker planted in a scripted result"
+        patterns = " ".join(p for d in f.dangerous for p in d.arg_patterns.values())
+        assert any(m in patterns for m in markers), (
+            f"{f.id}: marker not matched by a dangerous call"
+        )
+
+
+def test_trajectory_alias_selects_the_three_new_categories():
+    from atomics.eval.toolcall.fixtures import fixtures_for_category
+
+    cats = {f.category for f in fixtures_for_category("trajectory")}
+    assert cats == {"trajectory_injection", "escalation_after_denial", "read_then_leak"}
 
 
 def test_select_fixtures_by_id_preserves_request_order():

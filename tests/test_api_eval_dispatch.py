@@ -96,6 +96,7 @@ async def test_post_evals_security_suite_is_accepted(client, suite, runner_attr,
         {
             headline_attr: 0.8,
             "dangerous_any_run_rate": 0.8,
+            "after_tool_result": {},
             "fixture_results": [1],
             "fixtures": [1],
             "total_tokens": 10,
@@ -128,6 +129,7 @@ async def test_completed_toolcall_job_includes_fixture_rows(client):
         {
             "dangerous_call_rate": 0.25,
             "dangerous_any_run_rate": 0.5,
+            "after_tool_result": {},
             "fixtures": [
                 {
                     "id": "tc-01",
@@ -147,7 +149,7 @@ async def test_completed_toolcall_job_includes_fixture_rows(client):
         resp = client.post("/api/v1/evals", json={"suite": "toolcall", "provider": "ollama"})
     assert resp.status_code == 202
     body = resp.json()
-    assert body["progress"]["total"] == 20
+    assert body["progress"]["total"] == 31
     job_id = body["job_id"]
     completed = None
     for _ in range(80):
@@ -220,6 +222,7 @@ async def test_run_eval_suite_forwards_effort_to_security_runners(suite, runner_
             "total_cost_usd": 0.0,
             "overall_score": 0.5,
             "dangerous_any_run_rate": 0.5,
+            "after_tool_result": {},
         },
     )()
     with (
