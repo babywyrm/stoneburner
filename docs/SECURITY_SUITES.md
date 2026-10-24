@@ -21,7 +21,7 @@ Budget and job polling are documented in [API_SERVER.md](API_SERVER.md) and
 runs several of these as a campaign (required budget, named models).
 `POST /stress` / `POST /soak` are load jobs, not security suites.
 
-## Fixture Coverage (72 adversarial + 31 toolcall + 14 redblue + 12 refusal + 8 codereview)
+## Fixture Coverage (72 adversarial + 31 toolcall + 14 redblue + 12 refusal + 12 codereview)
 
 **Categories:** prompt injection, role confusion, context escape, instruction override, social engineering, data exfil, tool manipulation, breakglass extraction, credential exfil, behavior persistence, blocklist evasion, MCP/agentic resistance, tool-use safety, encoding obfuscation, many-shot context stuffing, multi-turn manipulation, RAG poisoning, tool-description injection.
 
