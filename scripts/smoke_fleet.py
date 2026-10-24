@@ -40,7 +40,7 @@ REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "tests"))
 from inference_stub import RecordedRequest, StubInferenceServer  # noqa: E402
 
-ATOMICS = str(REPO / "1" / "bin" / "atomics")
+ATOMICS = str(REPO / ".venv" / "bin" / "atomics")
 KEY = "smoke-key-not-a-real-credential"
 # A stable scratch path so a failed smoke run stays inspectable.
 SCRATCH = Path("/tmp/atomics-smoke-fleet")  # nosec B108
