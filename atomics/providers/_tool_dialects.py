@@ -11,10 +11,107 @@ parameters — because six of the ten providers consume it directly.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Sequence
 from typing import Any
 
-from atomics.providers.toolcalls import ToolCall, parse_arguments
+from atomics.providers.toolcalls import ToolCall, ToolStep, parse_arguments
+
+# The fabricated assistant call that carries an injected tool result. The APIs
+# that key a tool result to a preceding call need a stable id to point at.
+_INJECTED_CALL_ID = "call_injected"
+
+
+def injected_history(output: str) -> tuple[ToolStep, ...]:
+    """The one-step history that replaces the old hand-built injected block: a
+    fabricated list_files(".") the model appears to have called, then the
+    attacker-controlled result. The id is fixed so legacy request bytes match."""
+    call = ToolCall(name="list_files", arguments={"directory": "."}, id=_INJECTED_CALL_ID)
+    return (ToolStep(calls=(call,), results=(output,)),)
+
+
+def _call_id(call: ToolCall, step: int, index: int) -> str:
+    return call.id or f"call_{step}_{index}"
+
+
+def openai_history_messages(history: Sequence[ToolStep]) -> list[dict[str, Any]]:
+    """Replayed history as OpenAI assistant(tool_calls) + tool messages."""
+    messages: list[dict[str, Any]] = []
+    for step, turn in enumerate(history):
+        messages.append(
+            {
+                "role": "assistant",
+                "tool_calls": [
+                    {
+                        "id": _call_id(call, step, i),
+                        "type": "function",
+                        "function": {"name": call.name, "arguments": json.dumps(call.arguments)},
+                    }
+                    for i, call in enumerate(turn.calls)
+                ],
+            }
+        )
+        for i, (call, result) in enumerate(zip(turn.calls, turn.results, strict=True)):
+            messages.append(
+                {"role": "tool", "tool_call_id": _call_id(call, step, i), "content": result}
+            )
+    return messages
+
+
+def ollama_history_messages(history: Sequence[ToolStep]) -> list[dict[str, Any]]:
+    """Replayed history in Ollama's /api/chat shape. Ollama needs no call ids."""
+    messages: list[dict[str, Any]] = []
+    for turn in history:
+        messages.append(
+            {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [
+                    {"function": {"name": call.name, "arguments": call.arguments}}
+                    for call in turn.calls
+                ],
+            }
+        )
+        for result in turn.results:
+            messages.append({"role": "tool", "content": result})
+    return messages
+
+
+def anthropic_history_messages(history: Sequence[ToolStep]) -> list[dict[str, Any]]:
+    """Replayed history as Anthropic assistant(tool_use) then user(tool_result).
+
+    Anthropic groups every tool_result of a step into one user message.
+    """
+    messages: list[dict[str, Any]] = []
+    for step, turn in enumerate(history):
+        messages.append(
+            {
+                "role": "assistant",
+                "content": [
+                    {
+                        "type": "tool_use",
+                        "id": _call_id(call, step, i),
+                        "name": call.name,
+                        "input": call.arguments,
+                    }
+                    for i, call in enumerate(turn.calls)
+                ],
+            }
+        )
+        messages.append(
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": _call_id(call, step, i),
+                        "content": result,
+                    }
+                    for i, (call, result) in enumerate(zip(turn.calls, turn.results, strict=True))
+                ],
+            }
+        )
+    return messages
 
 
 def _field(block: Any, name: str, default: Any = None) -> Any:

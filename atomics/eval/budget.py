@@ -27,6 +27,7 @@ from dataclasses import dataclass
 
 from atomics.core.guard import GuardConfig, RateBudgetGuard
 from atomics.providers.base import BaseProvider, ChatMessage, ProviderResponse
+from atomics.providers.toolcalls import ToolStep
 
 logger = logging.getLogger(__name__)
 
@@ -177,6 +178,7 @@ class GuardedProvider(BaseProvider):
         model: str | None = None,
         max_tokens: int = 1024,
         injected_tool_output: str | None = None,
+        history: Sequence[ToolStep] = (),
         thinking: bool | None = None,
         thinking_budget: int | None = None,
         temperature: float | None = None,
@@ -192,6 +194,7 @@ class GuardedProvider(BaseProvider):
                 model=model,
                 max_tokens=max_tokens,
                 injected_tool_output=injected_tool_output,
+                history=history,
                 thinking=thinking,
                 thinking_budget=thinking_budget,
                 temperature=temperature,

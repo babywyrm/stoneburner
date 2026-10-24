@@ -12,6 +12,8 @@ from typing import TYPE_CHECKING, Any, cast
 
 from atomics.providers import pricing
 from atomics.providers._tool_dialects import (
+    injected_history,
+    openai_history_messages,
     openai_tool_payload,
     parse_openai_tool_calls,
 )
@@ -26,6 +28,7 @@ from atomics.providers.outcomes import (
     ProviderOutcomeKind,
     policy_block_reason,
 )
+from atomics.providers.toolcalls import ToolStep
 from atomics.validation import sanitize_error
 
 if TYPE_CHECKING:
@@ -57,11 +60,6 @@ _MAX_COMPLETION_TOKENS_MODELS = {
 # the entire budget and leave the visible response empty.
 _REASONING_TOKEN_MULTIPLIER = 8
 _NONTERMINAL_RESPONSE_STATUSES = frozenset({"cancelled", "queued", "in_progress"})
-
-# Identifier for the fabricated assistant call that carries an injected tool
-# result. The API requires the tool message's tool_call_id to match a preceding
-# call, so the two have to agree on a constant.
-_INJECTED_CALL_ID = "call_injected"
 
 
 def _estimate_cost(model: str, input_tokens: int, output_tokens: int) -> float:
@@ -318,6 +316,7 @@ class OpenAIProvider(BaseProvider):
         model: str | None = None,
         max_tokens: int = 1024,
         injected_tool_output: str | None = None,
+        history: Sequence[ToolStep] = (),
         thinking: bool | None = None,
         thinking_budget: int | None = None,
         temperature: float | None = None,
@@ -337,34 +336,14 @@ class OpenAIProvider(BaseProvider):
             )
         model = model or self._default_model
 
+        if history and injected_tool_output is not None:
+            raise ValueError("pass history or injected_tool_output, not both")
+        if injected_tool_output is not None:
+            history = injected_history(injected_tool_output)
         messages: list[dict[str, Any]] = []
         messages.append({"role": "system", "content": system or "You are a helpful assistant."})
         messages.append({"role": "user", "content": prompt})
-        if injected_tool_output is not None:
-            # Indirect injection: the attack arrives as the result of a tool the
-            # model appears to have already called.
-            messages.append(
-                {
-                    "role": "assistant",
-                    "tool_calls": [
-                        {
-                            "id": _INJECTED_CALL_ID,
-                            "type": "function",
-                            "function": {
-                                "name": "list_files",
-                                "arguments": '{"directory": "."}',
-                            },
-                        }
-                    ],
-                }
-            )
-            messages.append(
-                {
-                    "role": "tool",
-                    "tool_call_id": _INJECTED_CALL_ID,
-                    "content": injected_tool_output,
-                }
-            )
+        messages.extend(openai_history_messages(history))
 
         is_reasoning = _is_reasoning_model(model)
         if is_reasoning:

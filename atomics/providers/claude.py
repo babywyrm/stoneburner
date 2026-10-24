@@ -8,12 +8,15 @@ from typing import TYPE_CHECKING, Any
 
 from atomics.providers import pricing
 from atomics.providers._tool_dialects import (
+    anthropic_history_messages,
     anthropic_text,
     anthropic_tool_payload,
+    injected_history,
     parse_anthropic_tool_calls,
 )
 from atomics.providers.base import BaseProvider, ProviderResponse, compute_tps
 from atomics.providers.effort import claude_request, normalize_effort
+from atomics.providers.toolcalls import ToolStep
 
 if TYPE_CHECKING:
     import anthropic
@@ -43,10 +46,6 @@ def _estimate_cost(
 
 
 _DEFAULT_THINKING_BUDGET = 10_000
-
-# The tool_result block must reference a preceding tool_use id, so both sides
-# need the same constant. See _INJECTED_CALL_ID in providers/openai.py.
-_INJECTED_CALL_ID = "call_injected"
 
 
 class ClaudeProvider(BaseProvider):
@@ -177,6 +176,7 @@ class ClaudeProvider(BaseProvider):
         model: str | None = None,
         max_tokens: int = 1024,
         injected_tool_output: str | None = None,
+        history: Sequence[ToolStep] = (),
         thinking: bool | None = None,
         thinking_budget: int | None = None,
         temperature: float | None = None,
@@ -193,36 +193,12 @@ class ClaudeProvider(BaseProvider):
         del thinking, thinking_budget, reasoning_mode
         model = model or self._default_model
 
-        messages: list[dict[str, Any]] = [{"role": "user", "content": prompt}]
+        if history and injected_tool_output is not None:
+            raise ValueError("pass history or injected_tool_output, not both")
         if injected_tool_output is not None:
-            # Indirect injection: the attack arrives as the result of a tool the
-            # model appears to have already called. Anthropic requires the
-            # tool_result to sit in a user message.
-            messages.append(
-                {
-                    "role": "assistant",
-                    "content": [
-                        {
-                            "type": "tool_use",
-                            "id": _INJECTED_CALL_ID,
-                            "name": "list_files",
-                            "input": {"directory": "."},
-                        }
-                    ],
-                }
-            )
-            messages.append(
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "tool_result",
-                            "tool_use_id": _INJECTED_CALL_ID,
-                            "content": injected_tool_output,
-                        }
-                    ],
-                }
-            )
+            history = injected_history(injected_tool_output)
+        messages: list[dict[str, Any]] = [{"role": "user", "content": prompt}]
+        messages.extend(anthropic_history_messages(history))
 
         _thinking_block, extra = claude_request(
             model=model,

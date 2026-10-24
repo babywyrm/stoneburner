@@ -20,15 +20,14 @@ from typing import Any
 import httpx
 
 from atomics.providers._tool_dialects import (
+    injected_history,
+    openai_history_messages,
     openai_tool_payload,
     parse_openai_tool_calls,
 )
 from atomics.providers.base import BaseProvider, ProviderResponse, compute_tps
 from atomics.providers.effort import apply_chat_effort, normalize_effort
-
-# See _INJECTED_CALL_ID in providers/openai.py: a tool message's tool_call_id has
-# to match a preceding assistant call, so both sides need the same constant.
-_INJECTED_CALL_ID = "call_injected"
+from atomics.providers.toolcalls import ToolStep
 
 
 class OpenAICompatibleTools:
@@ -77,6 +76,7 @@ class OpenAICompatibleTools:
         model: str | None = None,
         max_tokens: int = 1024,
         injected_tool_output: str | None = None,
+        history: Sequence[ToolStep] = (),
         thinking: bool | None = None,
         thinking_budget: int | None = None,
         temperature: float | None = None,
@@ -87,35 +87,15 @@ class OpenAICompatibleTools:
         this: Any = self
         model = model or this._default_model
 
+        if history and injected_tool_output is not None:
+            raise ValueError("pass history or injected_tool_output, not both")
+        if injected_tool_output is not None:
+            history = injected_history(injected_tool_output)
         messages: list[dict[str, Any]] = [
             {"role": "system", "content": system or "You are a helpful assistant."},
             {"role": "user", "content": prompt},
         ]
-        if injected_tool_output is not None:
-            # Indirect injection: the attack arrives as the result of a tool the
-            # model appears to have already called.
-            messages.append(
-                {
-                    "role": "assistant",
-                    "tool_calls": [
-                        {
-                            "id": _INJECTED_CALL_ID,
-                            "type": "function",
-                            "function": {
-                                "name": "list_files",
-                                "arguments": '{"directory": "."}',
-                            },
-                        }
-                    ],
-                }
-            )
-            messages.append(
-                {
-                    "role": "tool",
-                    "tool_call_id": _INJECTED_CALL_ID,
-                    "content": injected_tool_output,
-                }
-            )
+        messages.extend(openai_history_messages(history))
 
         body: dict[str, Any] = {
             "model": model,

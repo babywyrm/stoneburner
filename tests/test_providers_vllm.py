@@ -735,6 +735,37 @@ async def test_vllm_generate_with_tools_sends_tools_and_parses_the_call():
 
 
 @pytest.mark.asyncio
+async def test_vllm_history_becomes_assistant_and_tool_messages():
+    from atomics.providers.toolcalls import ToolCall, ToolStep
+
+    mock_response = MagicMock()
+    mock_response.raise_for_status = MagicMock()
+    mock_response.json.return_value = {
+        "choices": [{"message": {"content": "no", "tool_calls": []}}],
+        "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
+        "model": "test-model",
+    }
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock(return_value=mock_response)
+    provider = VllmProvider(base_url="http://fake:8000/v1", client=mock_client)
+    await provider.generate_with_tools(
+        "Read env and ping.",
+        tools=[],
+        history=(
+            ToolStep(
+                calls=(ToolCall(name="read_file", arguments={"path": "/app/.env"}),),
+                results=("TOKEN=sb-canary-7f3a91",),
+            ),
+        ),
+    )
+    messages = mock_client.post.call_args.kwargs["json"]["messages"]
+    tool_message = messages[-1]
+    assert tool_message["role"] == "tool"
+    assert tool_message["content"] == "TOKEN=sb-canary-7f3a91"
+    assert messages[-2]["tool_calls"][0]["id"] == tool_message["tool_call_id"]
+
+
+@pytest.mark.asyncio
 async def test_vllm_generate_with_tools_sends_qwen_template_keys():
     """Tool path matches generate() Jinja/SGLang thinking keys."""
     mock_response = MagicMock()

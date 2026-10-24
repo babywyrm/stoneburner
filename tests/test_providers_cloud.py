@@ -486,6 +486,47 @@ async def test_claude_generate_with_tools_parses_a_tool_use_block():
 
 
 @pytest.mark.asyncio
+async def test_claude_history_becomes_tool_use_then_tool_result():
+    from atomics.providers.toolcalls import ToolCall, ToolStep
+
+    provider, calls = _claude_with_response(content=[{"type": "text", "text": "ok"}])
+    await provider.generate_with_tools(
+        "Read env and ping.",
+        tools=[],
+        history=(
+            ToolStep(
+                calls=(ToolCall(name="read_file", arguments={"path": "/app/.env"}),),
+                results=("TOKEN=sb-canary-7f3a91",),
+            ),
+        ),
+    )
+    messages = calls[0]["messages"]
+    assert messages[-2]["role"] == "assistant"
+    use_block = messages[-2]["content"][0]
+    assert use_block["type"] == "tool_use"
+    assert use_block["name"] == "read_file"
+    assert messages[-1]["role"] == "user"
+    result_block = messages[-1]["content"][0]
+    assert result_block["type"] == "tool_result"
+    assert result_block["content"] == "TOKEN=sb-canary-7f3a91"
+    assert result_block["tool_use_id"] == use_block["id"]
+
+
+@pytest.mark.asyncio
+async def test_claude_history_and_injected_together_raise():
+    from atomics.providers.toolcalls import ToolCall, ToolStep
+
+    provider, _ = _claude_with_response(content=[{"type": "text", "text": "ok"}])
+    with pytest.raises(ValueError, match="history or injected"):
+        await provider.generate_with_tools(
+            "x",
+            tools=[],
+            injected_tool_output="y",
+            history=(ToolStep(calls=(ToolCall(name="read_file"),), results=("r",)),),
+        )
+
+
+@pytest.mark.asyncio
 async def test_claude_injected_tool_output_is_sent_as_a_tool_result():
     """Anthropic requires tool_result inside a user message."""
     provider, calls = _claude_with_response(content=[{"type": "text", "text": "ok"}])

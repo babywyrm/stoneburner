@@ -10,12 +10,15 @@ import httpx
 
 from atomics.benchmark.model_classes import classify_model, supports_thinking
 from atomics.providers._tool_dialects import (
+    injected_history,
+    ollama_history_messages,
     openai_tool_payload,
     parse_ollama_tool_calls,
 )
 from atomics.providers.base import BaseProvider, ChatMessage, ProviderResponse, compute_tps
 from atomics.providers.effort import normalize_effort, ollama_think_value
 from atomics.providers.outcomes import ProviderOutcome, ProviderOutcomeKind
+from atomics.providers.toolcalls import ToolStep
 
 # Ollama uses the model's full window when num_ctx is omitted. granite4.2:30b
 # at 131072 tokens allocated a 52 GiB runner on a 64 GiB machine. 8192 matches
@@ -238,6 +241,7 @@ class OllamaProvider(BaseProvider):
         model: str | None = None,
         max_tokens: int = 1024,
         injected_tool_output: str | None = None,
+        history: Sequence[ToolStep] = (),
         thinking: bool | None = None,
         thinking_budget: int | None = None,
         temperature: float | None = None,
@@ -255,23 +259,15 @@ class OllamaProvider(BaseProvider):
         published leaderboard. A test pins generate() to /api/generate.
         """
         del reasoning_mode
+        if history and injected_tool_output is not None:
+            raise ValueError("pass history or injected_tool_output, not both")
+        if injected_tool_output is not None:
+            history = injected_history(injected_tool_output)
         messages: list[dict[str, Any]] = []
         if system:
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
-        if injected_tool_output is not None:
-            # Indirect injection: the attack arrives as the result of a tool the
-            # model appears to have already called.
-            messages.append(
-                {
-                    "role": "assistant",
-                    "content": "",
-                    "tool_calls": [
-                        {"function": {"name": "list_files", "arguments": {"directory": "."}}}
-                    ],
-                }
-            )
-            messages.append({"role": "tool", "content": injected_tool_output})
+        messages.extend(ollama_history_messages(history))
         return await self._chat(
             messages,
             tools=tools,

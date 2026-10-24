@@ -23,6 +23,7 @@ from rich.text import Text
 
 from atomics.providers.base import BaseProvider, ChatMessage, ProviderResponse
 from atomics.providers.outcomes import ProviderOutcomeKind
+from atomics.providers.toolcalls import ToolStep
 
 _console: Console | None = None
 _calls = itertools.count(1)
@@ -247,6 +248,7 @@ class TracedProvider(BaseProvider):
         model: str | None = None,
         max_tokens: int = 1024,
         injected_tool_output: str | None = None,
+        history: Sequence[ToolStep] = (),
         thinking: bool | None = None,
         thinking_budget: int | None = None,
         temperature: float | None = None,
@@ -260,6 +262,7 @@ class TracedProvider(BaseProvider):
             model=model,
             max_tokens=max_tokens,
             injected_tool_output=injected_tool_output,
+            history=history,
             thinking=thinking,
             thinking_budget=thinking_budget,
             temperature=temperature,
@@ -271,6 +274,7 @@ class TracedProvider(BaseProvider):
             "prompt": prompt,
             "tools": json.dumps(list(tools)),
             "tool output": injected_tool_output or "",
+            "history steps": str(len(history)),
         }
         return await self._shown(
             call, model, parts, tools, max_tokens, thinking, budget=thinking_budget
