@@ -47,8 +47,8 @@ from atomics.eval.suite_integrity import fixture_outcome, integrity_of
 from atomics.eval.toolcall.catalog import PROBE_PROMPT, PROBE_TOOL, schemas_for
 from atomics.eval.toolcall.fixtures import ToolCallFixture, result_for
 from atomics.eval.toolcall.scorer import ToolOutcome, classify
-from atomics.providers.toolcalls import ToolCall, ToolStep
 from atomics.providers.base import BaseProvider
+from atomics.providers.toolcalls import ToolCall, ToolStep
 from atomics.validation import sanitize_error
 
 logger = logging.getLogger(__name__)
@@ -221,6 +221,42 @@ class ToolCallSummary:
     def dangerous_any_run_ci(self) -> Interval | None:
         return rate_interval(self._any_run_flags())
 
+    def _after_tool_result_flags(self) -> tuple[list[int], list[int]]:
+        """(modal, any-run) flags per trajectory fixture: a dangerous call that
+        first appeared at step >= 2, i.e. only after a scripted tool result."""
+        modal: list[int] = []
+        any_run: list[int] = []
+        for f in self.fixtures:
+            if f.get("max_steps", 1) <= 1 or f["tool_outcome"] == ERROR_OUTCOME:
+                continue
+            step = f.get("dangerous_step")
+            late = step is not None and step >= 2
+            modal.append(int(late))
+            counts = f.get("outcome_counts") or {}
+            # The modal run's step is the only one recorded, so any-run reuses it:
+            # a dangerous call in some run that the representative placed late.
+            any_run.append(int(bool(counts.get(str(ToolOutcome.DANGEROUS_CALL), 0)) and late))
+        return modal, any_run
+
+    @property
+    def after_tool_result_rate(self) -> float | None:
+        modal, _ = self._after_tool_result_flags()
+        return round(sum(modal) / len(modal), 4) if modal else None
+
+    @property
+    def after_tool_result(self) -> dict[str, Any]:
+        """Headline for the trajectory fixtures: dangerous calls that only
+        appeared after a scripted tool result, modal and any-run, with CIs."""
+        modal, any_run = self._after_tool_result_flags()
+        return {
+            "dangerous": sum(modal),
+            "measured": len(modal),
+            "rate": self.after_tool_result_rate,
+            "rate_ci": _ci_dict(rate_interval(modal)),
+            "any_run_rate": round(sum(any_run) / len(any_run), 4) if any_run else None,
+            "any_run_rate_ci": _ci_dict(rate_interval(any_run)),
+        }
+
     @property
     def integrity(self) -> RunIntegrity:
         """Coverage behind the rates above.
@@ -273,6 +309,7 @@ class ToolCallSummary:
             "dangerous_call_rate_ci": _ci_dict(self.dangerous_call_ci),
             "dangerous_any_run_rate": self.dangerous_any_run_rate,
             "dangerous_any_run_rate_ci": _ci_dict(self.dangerous_any_run_ci),
+            "after_tool_result": self.after_tool_result,
             # Rates travel with their numerators and denominators. Both are
             # computed over subsets, so a bare rate is not interpretable.
             "channel_divergence": {

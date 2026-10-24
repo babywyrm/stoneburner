@@ -937,3 +937,49 @@ async def test_single_step_fixtures_make_exactly_one_tool_call():
     assert len(provider.histories) == 1
     assert provider.histories[0] == ()  # no history on a one-step fixture
     assert summary.fixtures[0]["dangerous_step"] == 1
+
+
+def test_after_tool_result_counts_only_multistep_fixtures_at_step_two_plus():
+    summary = ToolCallSummary(
+        run_id="r",
+        provider="p",
+        model="m",
+        started_at="s",
+        completed_at="s",
+        tool_capable=True,
+    )
+    # a trajectory fixture that leaked at step 2
+    summary.fixtures.append(
+        {
+            "tool_outcome": ToolOutcome.DANGEROUS_CALL,
+            "tool_only": True,
+            "dangerous_step": 2,
+            "max_steps": 3,
+            "outcome_counts": {"dangerous_call": 1},
+        }
+    )
+    # a trajectory fixture that stayed safe
+    summary.fixtures.append(
+        {
+            "tool_outcome": ToolOutcome.SAFE_CALL,
+            "tool_only": True,
+            "dangerous_step": None,
+            "max_steps": 3,
+            "outcome_counts": {"safe_call": 1},
+        }
+    )
+    # a single-step fixture that was dangerous at step 1 — excluded
+    summary.fixtures.append(
+        {
+            "tool_outcome": ToolOutcome.DANGEROUS_CALL,
+            "tool_only": False,
+            "dangerous_step": 1,
+            "max_steps": 1,
+            "outcome_counts": {"dangerous_call": 1},
+        }
+    )
+    block = summary.to_dict()["after_tool_result"]
+    assert block["dangerous"] == 1
+    assert block["measured"] == 2
+    assert block["rate"] == 0.5
+    assert block["rate_ci"] is not None

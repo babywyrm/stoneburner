@@ -461,7 +461,11 @@ async def test_run_eval_suite_dispatches(
             "toolcall",
             "run_toolcall_suite",
             SimpleNamespace(
-                fixtures=[], dangerous_any_run_rate=None, total_tokens=0, total_cost_usd=0.0
+                fixtures=[],
+                dangerous_any_run_rate=None,
+                after_tool_result={},
+                total_tokens=0,
+                total_cost_usd=0.0,
             ),
         ),
     ],
@@ -491,6 +495,14 @@ async def test_run_eval_suite_dispatches_toolcall():
         dangerous_call_ci=Interval(low=0.01, high=0.4, n=2, method="wilson"),
         dangerous_any_run_rate=0.1,
         dangerous_any_run_ci=Interval(low=0.02, high=0.5, n=2, method="wilson"),
+        after_tool_result={
+            "dangerous": 1,
+            "measured": 2,
+            "rate": 0.5,
+            "rate_ci": {"low": 0.1, "high": 0.9},
+            "any_run_rate": 0.5,
+            "any_run_rate_ci": {"low": 0.1, "high": 0.9},
+        },
         fixtures=[1, 2],
         total_tokens=12,
         total_cost_usd=0.001,
@@ -515,6 +527,9 @@ async def test_run_eval_suite_dispatches_toolcall():
     assert result["overall_score"] == 0.1
     assert result["overall_score_ci"] == summary.dangerous_call_ci.to_dict()
     assert result["dangerous_any_run_rate_ci"] == summary.dangerous_any_run_ci.to_dict()
+    assert result["after_tool_result"]["measured"] == 2
+    assert result["after_tool_result"]["rate"] == 0.5
+    assert result["after_tool_result"]["rate_ci"] == {"low": 0.1, "high": 0.9}
     assert result["fixtures_run"] == 2
     assert result["fixtures"] == []
 
@@ -562,6 +577,7 @@ async def test_run_eval_suite_pins_temperature(suite, runner_attr):
     summary = SimpleNamespace(
         overall_accuracy=1.0,
         dangerous_any_run_rate=None,
+        after_tool_result={},
         fixtures=[],
         fixture_results=[],
         total_tokens=0,
@@ -603,6 +619,7 @@ async def test_run_eval_suite_forwards_runs_to_toolcall():
     summary = SimpleNamespace(
         dangerous_call_rate=0.0,
         dangerous_any_run_rate=0.0,
+        after_tool_result={},
         fixtures=[],
         total_tokens=0,
         total_cost_usd=0.0,
@@ -629,6 +646,7 @@ async def test_run_eval_suite_forwards_channel_to_toolcall():
     summary = SimpleNamespace(
         dangerous_call_rate=0.0,
         dangerous_any_run_rate=0.0,
+        after_tool_result={},
         fixtures=[],
         total_tokens=0,
         total_cost_usd=0.0,
@@ -655,6 +673,7 @@ async def test_run_eval_suite_forwards_selected_toolcall_fixtures():
     summary = SimpleNamespace(
         dangerous_call_rate=0.0,
         dangerous_any_run_rate=0.0,
+        after_tool_result={},
         fixtures=[],
         total_tokens=0,
         total_cost_usd=0.0,

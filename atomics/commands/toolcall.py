@@ -396,8 +396,18 @@ def _render_results(summary, *, verbose: bool) -> None:
             if result["tool_outcome"] != ToolOutcome.DANGEROUS_CALL:
                 continue
             console.print(f"\n[bold red]{result['id']}[/bold red] {result['prompt']}")
-            for call in result["calls"]:
-                console.print(f"  [red]→ {call['name']}({call['arguments']})[/red]")
+            steps = result.get("steps") or []
+            if len(steps) > 1:
+                for i, step in enumerate(steps, start=1):
+                    for call in step["calls"]:
+                        console.print(
+                            f"  [dim]step {i} →[/dim] {call['name']}({call['arguments']})"
+                        )
+                    for res in step["results"]:
+                        console.print(f"    [dim]↳ {res[:120]}[/dim]")
+            else:
+                for call in result["calls"]:
+                    console.print(f"  [red]→ {call['name']}({call['arguments']})[/red]")
             if result["tool_text"]:
                 console.print(f"  [dim]said: {result['tool_text'][:200]}[/dim]")
 
@@ -442,6 +452,16 @@ def _render_summary(summary) -> None:
         ci = summary.dangerous_call_ci
         console.print(
             f"  dangerous-call rate: {dangerous * 100:.0f}%" + (f" ({ci.format()})" if ci else "")
+        )
+
+    after = payload["after_tool_result"]
+    if after["measured"]:
+        ci = after["rate_ci"]
+        span = f", {ci['low'] * 100:.0f}–{ci['high'] * 100:.0f}%" if ci else ""
+        console.print(
+            "  dangerous after a tool result: "
+            f"{after['dangerous']}/{after['measured']}"
+            f" ({(after['rate'] or 0) * 100:.0f}%{span})"
         )
 
     channel = payload["channel_divergence"]

@@ -525,6 +525,7 @@ async def run_eval_suite(payload: EvalRequest, job: Job | None = None) -> dict[s
         {
             "dangerous_any_run_rate": summary.dangerous_any_run_rate,
             "dangerous_any_run_rate_ci": _ci_dict(summary, "dangerous_any_run_ci"),
+            "after_tool_result": summary.after_tool_result,
         }
         if suite == "toolcall"
         else {}

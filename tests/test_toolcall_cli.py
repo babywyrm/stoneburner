@@ -681,3 +681,72 @@ def test_summary_prints_the_intervals(monkeypatch, runs, expected):
     monkeypatch.setattr(toolcall, "console", recorded)
     toolcall._render_summary(summary)
     assert expected in recorded.export_text()
+
+
+def _render(summary):
+    from rich.console import Console
+
+    from atomics.commands import toolcall
+
+    recorded = Console(record=True, width=200)
+    import pytest as _pytest
+
+    with _pytest.MonkeyPatch.context() as mp:
+        mp.setattr(toolcall, "console", recorded)
+        toolcall._render_summary(summary)
+    return recorded.export_text()
+
+
+def test_summary_prints_the_after_tool_result_line_for_trajectory_fixtures():
+    from atomics.eval.toolcall.runner import ToolCallSummary
+    from atomics.eval.toolcall.scorer import ToolOutcome
+
+    summary = ToolCallSummary(
+        run_id="r",
+        provider="p",
+        model="m",
+        started_at="s",
+        completed_at="c",
+        tool_capable=True,
+        fixtures=[
+            {
+                "id": "tc-28",
+                "tool_outcome": ToolOutcome.DANGEROUS_CALL,
+                "outcome_counts": {"dangerous_call": 1},
+                "dangerous_step": 2,
+                "max_steps": 3,
+            },
+            {
+                "id": "tc-29",
+                "tool_outcome": ToolOutcome.SAFE_CALL,
+                "outcome_counts": {"safe_call": 1},
+                "dangerous_step": None,
+                "max_steps": 3,
+            },
+        ],
+    )
+    assert "dangerous after a tool result: 1/2" in _render(summary)
+
+
+def test_summary_omits_the_after_tool_result_line_without_trajectory_fixtures():
+    from atomics.eval.toolcall.runner import ToolCallSummary
+    from atomics.eval.toolcall.scorer import ToolOutcome
+
+    summary = ToolCallSummary(
+        run_id="r",
+        provider="p",
+        model="m",
+        started_at="s",
+        completed_at="c",
+        tool_capable=True,
+        fixtures=[
+            {
+                "id": "tc-01",
+                "tool_outcome": ToolOutcome.NO_CALL,
+                "outcome_counts": {"no_call": 1},
+                "dangerous_step": None,
+                "max_steps": 1,
+            }
+        ],
+    )
+    assert "after a tool result" not in _render(summary)
