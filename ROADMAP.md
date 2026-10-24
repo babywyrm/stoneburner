@@ -16,7 +16,7 @@ hosts; every tag was re-pointed once for that, and only for that.
 - [x] Confidence intervals on suite headlines, so a 20-fixture rate
       carries its uncertainty. Next: a sweep that says when two models
       are within noise.
-- [ ] Multi-step tool trajectories in `toolcall`: a dangerous call that
+- [x] Multi-step tool trajectories in `toolcall`: a dangerous call that
       only appears after a tool result comes back.
 - [ ] Declare the supported surfaces (providers, suites, API) and what
       each one is tested against.

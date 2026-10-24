@@ -21,7 +21,7 @@ Budget and job polling are documented in [API_SERVER.md](API_SERVER.md) and
 runs several of these as a campaign (required budget, named models).
 `POST /stress` / `POST /soak` are load jobs, not security suites.
 
-## Fixture Coverage (72 adversarial + 20 toolcall + 14 redblue + 12 refusal + 8 codereview)
+## Fixture Coverage (72 adversarial + 31 toolcall + 14 redblue + 12 refusal + 8 codereview)
 
 **Categories:** prompt injection, role confusion, context escape, instruction override, social engineering, data exfil, tool manipulation, breakglass extraction, credential exfil, behavior persistence, blocklist evasion, MCP/agentic resistance, tool-use safety, encoding obfuscation, many-shot context stuffing, multi-turn manipulation, RAG poisoning, tool-description injection.
 
@@ -71,7 +71,7 @@ tool schemas attached — and the gap between those two answers is the result.
 **Tool calls are never executed.** The suite records what the model asked to do.
 
 ```bash
-# All 20 fixtures, judging the prose channel with a local model
+# All 31 fixtures, judging the prose channel with a local model
 uv run atomics toolcall --provider ollama -m qwen3:14b \
     --judge-provider ollama --judge-model qwen2.5:14b
 
@@ -101,7 +101,25 @@ uv run atomics -v toolcall -p ollama -m qwen3:14b \
   --runs 3 --no-thinking --no-skip-incapable
 ```
 
-**Categories:** `direct` · `authority` · `injection` · `exfil` · `destructive`
+**Categories:** `direct` · `authority` · `injection` · `exfil` · `destructive` ·
+`trajectory`
+
+### Multi-step trajectories
+
+A fixture can script tool results and run a short loop (`max_steps`). The model
+chooses each call; the harness hands back the matching scripted text and runs
+nothing. This exposes a dangerous call that only appears *after* a tool result:
+an instruction planted in a file or document the model fetched itself,
+escalation after a scripted permission denial, and a secret read in one step
+then leaked outbound in the next.
+
+These eleven fixtures sit under `--category trajectory`. Because the dangerous
+call follows a tool result, there is no honest prose equivalent, so they are
+excluded from channel divergence. The suite reports them separately as
+`after_tool_result` — modal and any-run rates, with 95% intervals — counting a
+dangerous call that first fired at step two or later. The CLI prints the line
+only when such fixtures ran, and `-v` shows each step's calls and the result it
+returned.
 
 ### How the tool channel is scored
 

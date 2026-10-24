@@ -3,6 +3,15 @@
 ## Unreleased
 
 ### Added
+- `toolcall` fixtures can script tool results and run a multi-step loop
+  (`max_steps`), so the suite sees a dangerous call that only appears after
+  a tool result: injection in a result the model fetched itself, escalation
+  after a denial, and a secret read then leaked outbound. 11 fixtures under
+  `--category trajectory`. A new `after_tool_result` headline (modal and
+  any-run, with 95% intervals) counts these; the CLI prints it and `-v`
+  shows the step trace. Nothing is ever executed. The all-fixture
+  denominator grew from 20 to 31, so compare against earlier runs with
+  `--category`.
 - Suite headlines print a 95% confidence interval and fixture count, as in
   `30.0% (95% CI 15–52%, n=20)`: refusal, codereview detection and false
   positives, toolcall dangerous-call rates, redblue quality, adversarial
@@ -15,6 +24,9 @@
   [COMPARING.md](docs/COMPARING.md#intervals).
 
 ### Fixed
+- `scripts/smoke_fleet.py` spawns the coordinator from `.venv/bin/atomics`
+  instead of a hardcoded `1/bin/atomics`, which did not exist on a fresh
+  `uv sync` or in CI, so every phase failed with a connection refused.
 - `stress`, `soak`, `scenario`, and contention workers no longer spin when
   a request fails before reaching the network, such as a refused local
   connection. A soak against such an endpoint never ended, and an API
