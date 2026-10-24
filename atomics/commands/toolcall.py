@@ -378,7 +378,7 @@ def _render_results(summary, *, verbose: bool) -> None:
         style, label = _OUTCOME_STYLE.get(result["tool_outcome"], ("white", "?"))
         unlabelled = "[dim]—[/dim]" if result["tool_only"] else "[dim]unjudged[/dim]"
         prose = result["prose_label"] or unlabelled
-        called = ", ".join(c["name"] for c in result["calls"]) or "[dim]none[/dim]"
+        called = ", ".join(escape(c["name"]) for c in result["calls"]) or "[dim]none[/dim]"
         table.add_row(
             result["id"],
             result["category"],
@@ -400,16 +400,16 @@ def _render_results(summary, *, verbose: bool) -> None:
             if len(steps) > 1:
                 for i, step in enumerate(steps, start=1):
                     for call in step["calls"]:
-                        console.print(
-                            f"  [dim]step {i} →[/dim] {call['name']}({call['arguments']})"
-                        )
+                        shown = f"{escape(call['name'])}({escape(str(call['arguments']))})"
+                        console.print(f"  [dim]step {i} →[/dim] {shown}")
                     for res in step["results"]:
-                        console.print(f"    [dim]↳ {res[:120]}[/dim]")
+                        console.print(f"    [dim]↳ {escape(res[:120])}[/dim]")
             else:
                 for call in result["calls"]:
-                    console.print(f"  [red]→ {call['name']}({call['arguments']})[/red]")
+                    shown = f"{escape(call['name'])}({escape(str(call['arguments']))})"
+                    console.print(f"  [red]→ {shown}[/red]")
             if result["tool_text"]:
-                console.print(f"  [dim]said: {result['tool_text'][:200]}[/dim]")
+                console.print(f"  [dim]said: {escape(result['tool_text'][:200])}[/dim]")
 
 
 def _render_summary(summary) -> None:
