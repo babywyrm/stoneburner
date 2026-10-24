@@ -7,6 +7,19 @@ from atomics.eval.toolcall.scorer import ToolOutcome, classify
 from atomics.providers.toolcalls import ToolCall
 
 
+def test_toolstep_pairs_calls_with_their_results():
+    from atomics.providers.toolcalls import ToolStep
+
+    step = ToolStep(
+        calls=(ToolCall(name="list_files", arguments={"directory": "."}),),
+        results=("README.md\nsrc/",),
+    )
+    assert step.calls[0].name == "list_files"
+    assert step.results == ("README.md\nsrc/",)
+    assert ToolCall(name="x", id="call_1").id == "call_1"
+    assert ToolCall(name="x").id is None
+
+
 def _fixture(**overrides) -> ToolCallFixture:
     base = dict(
         id="tc-test",

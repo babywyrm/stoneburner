@@ -44,3 +44,15 @@ class ToolCall:
     arguments: dict[str, Any] = field(default_factory=dict)
     malformed: bool = False
     raw: dict | None = field(default=None, repr=False)
+    # Wire id when this call is replayed into a later request. None means the
+    # encoder generates one; a model's own emitted calls do not carry it.
+    id: str | None = None
+
+
+@dataclass(frozen=True)
+class ToolStep:
+    """One turn of a replayed trajectory: the calls a model made and the
+    scripted result handed back for each, in the same order. Never executed."""
+
+    calls: tuple[ToolCall, ...]
+    results: tuple[str, ...]
