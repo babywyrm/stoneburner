@@ -235,6 +235,15 @@ def test_read_then_leak_fixtures_plant_and_match_a_marker():
         )
 
 
+def test_result_lookup_misses_when_a_patterned_argument_is_absent():
+    from atomics.eval.toolcall.fixtures import ScriptedResult, result_for
+    from atomics.providers.toolcalls import ToolCall
+
+    results = (ScriptedResult(tool="read_file", arg_patterns={"path": r"\.env"}, output="SECRET"),)
+    # The call names read_file but omits the path the pattern needs, so no match.
+    assert result_for(results, ToolCall(name="read_file", arguments={})) == "No results."
+
+
 def test_trajectory_alias_selects_the_three_new_categories():
     from atomics.eval.toolcall.fixtures import fixtures_for_category
 

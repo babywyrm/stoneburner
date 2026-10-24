@@ -766,6 +766,20 @@ async def test_vllm_history_becomes_assistant_and_tool_messages():
 
 
 @pytest.mark.asyncio
+async def test_vllm_history_and_injected_together_raise():
+    from atomics.providers.toolcalls import ToolCall, ToolStep
+
+    provider = VllmProvider(base_url="http://fake:8000/v1", client=AsyncMock())
+    with pytest.raises(ValueError, match="history or injected"):
+        await provider.generate_with_tools(
+            "x",
+            tools=[],
+            injected_tool_output="y",
+            history=(ToolStep(calls=(ToolCall(name="read_file"),), results=("r",)),),
+        )
+
+
+@pytest.mark.asyncio
 async def test_vllm_generate_with_tools_sends_qwen_template_keys():
     """Tool path matches generate() Jinja/SGLang thinking keys."""
     mock_response = MagicMock()
