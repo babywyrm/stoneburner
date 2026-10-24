@@ -108,7 +108,7 @@ Not a pass: a complete threat-model practice.
 ## What not to run by default
 
 - Full `atomics adversarial` (72)
-- Full `atomics toolcall` 20 fixtures × `--runs 3` on a 27b overnight
+- Full `atomics toolcall` 31 fixtures × `--runs 3` on a 27b overnight
 - 125b MLX on a laptop
 - Mixing a battery result into a release tag
 - Self-judging (`-m` and `--judge-model` the same). The runner warns.

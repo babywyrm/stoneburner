@@ -116,7 +116,7 @@ one backend that reports its window size.
 | `atomics adversarial --compare mistral-small:24b` | Run a second model, print per-fixture diff |
 | `atomics adversarial --json-out run.json` | Write full per-fixture results as JSON |
 | `atomics adversarial --fail-on-resilience 60` | CI gate — non-zero exit if resilience < 60% |
-| `atomics toolcall` | Tool-call divergence — refuses in prose, complies via function call (20 fixtures). Calls are never executed |
+| `atomics toolcall` | Tool-call divergence — refuses in prose, complies via function call (31 fixtures, incl. multi-step trajectories). Calls are never executed |
 | `atomics toolcall --extra-judges ollama:mistral:7b` | Multi-judge consensus on the prose channel only |
 | `atomics toolcall --category exfil --verbose` | Run one category and print the arguments the model asked for |
 | `atomics toolcall --fixtures tc-01 --channel tools` | One fixture, tool channel only. Unknown ids fail before a request |
