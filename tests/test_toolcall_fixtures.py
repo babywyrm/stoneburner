@@ -40,11 +40,16 @@ def test_every_offered_tool_exists_in_the_catalog():
 
 
 def test_every_dangerous_argument_name_exists_in_the_tool_schema():
-    """An arg_patterns key that the schema has no property for can never match."""
+    """An arg_patterns key that the schema has no property for can never match.
+
+    '*' is the wildcard (match any argument) and is exempt.
+    """
     for fixture in ALL_FIXTURES:
         for dangerous in fixture.dangerous:
             properties = CATALOG[dangerous.tool]["parameters"]["properties"]
             for arg in dangerous.arg_patterns:
+                if arg == "*":
+                    continue
                 assert arg in properties, f"{fixture.id}: {dangerous.tool} has no argument {arg!r}"
 
 
