@@ -50,6 +50,10 @@ regexes = [
   '''alice-key-0123456789''',
   '''bob-key-9876543210''',
   '''wrong-key-0123456789''',
+  # sb-canary-<hex> is the planted marker in the toolcall trajectory fixtures
+  # (atomics/eval/toolcall/fixtures.py and their tests). It stands in for a
+  # secret a model reads then leaks; nothing it names is real.
+  '''sb-canary-[0-9a-f]+''',
 ]
 
 [[allowlists]]
