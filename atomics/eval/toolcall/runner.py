@@ -45,8 +45,9 @@ from atomics.eval.provider_attempt import unscorable_outcome
 from atomics.eval.runner import _call_hook
 from atomics.eval.suite_integrity import fixture_outcome, integrity_of
 from atomics.eval.toolcall.catalog import PROBE_PROMPT, PROBE_TOOL, schemas_for
-from atomics.eval.toolcall.fixtures import ToolCallFixture
+from atomics.eval.toolcall.fixtures import ToolCallFixture, result_for
 from atomics.eval.toolcall.scorer import ToolOutcome, classify
+from atomics.providers.toolcalls import ToolCall, ToolStep
 from atomics.providers.base import BaseProvider
 from atomics.validation import sanitize_error
 
@@ -577,6 +578,8 @@ async def _run_once(
         "tool_text_label": None,
         "prose_text": "",
         "prose_label": None,
+        "steps": [],
+        "dangerous_step": None,
         "error": None,
         "cost_usd": 0.0,
         "latency_ms": 0.0,
@@ -585,46 +588,84 @@ async def _run_once(
     }
 
     if channel != "prose":
-        started = time.perf_counter()
-        try:
-            response = await provider.generate_with_tools(
-                fixture.prompt,
-                tools=schemas_for(fixture.tools),
-                system=_SYSTEM_PROMPT,
-                model=model,
-                max_tokens=_MAX_TOKENS,
-                injected_tool_output=fixture.injected_tool_output,
-                thinking=thinking,
-                thinking_budget=thinking_budget,
-                temperature=temperature,
-                effort=effort,
-                reasoning_mode=reasoning_mode,
-            )
-        except Exception as exc:
-            record["error"] = f"{type(exc).__name__}: {exc}"
-            record["latency_ms"] = (time.perf_counter() - started) * 1000
-            return record
+        history: list[ToolStep] = []
+        steps_record: list[dict[str, Any]] = []
+        response = None
+        dangerous_step: int | None = None
+        for step in range(fixture.max_steps):
+            started = time.perf_counter()
+            try:
+                response = await provider.generate_with_tools(
+                    fixture.prompt,
+                    tools=schemas_for(fixture.tools),
+                    system=_SYSTEM_PROMPT,
+                    model=model,
+                    max_tokens=_MAX_TOKENS,
+                    # The injected output seeds step 0 only; later steps carry
+                    # the model's own calls as history.
+                    injected_tool_output=fixture.injected_tool_output if step == 0 else None,
+                    history=tuple(history),
+                    thinking=thinking,
+                    thinking_budget=thinking_budget,
+                    temperature=temperature,
+                    effort=effort,
+                    reasoning_mode=reasoning_mode,
+                )
+            except Exception as exc:
+                # A trajectory that fell over before producing a dangerous call
+                # measured nothing. error, never safe.
+                record["error"] = f"{type(exc).__name__}: {exc}"
+                record["latency_ms"] += (time.perf_counter() - started) * 1000
+                record["steps"] = steps_record
+                return record
 
-        record["latency_ms"] = (time.perf_counter() - started) * 1000
-        record["cost_usd"] += response.estimated_cost_usd
-        cutoff = None if response.tool_calls else unscorable_outcome(response)
-        if cutoff is not None:
-            record["error"] = cutoff.kind.value
-            return record
-        scored = classify(fixture, response.tool_calls)
+            record["latency_ms"] += (time.perf_counter() - started) * 1000
+            record["cost_usd"] += response.estimated_cost_usd
+
+            cutoff = None if response.tool_calls else unscorable_outcome(response)
+            if cutoff is not None:
+                record["error"] = cutoff.kind.value
+                record["steps"] = steps_record
+                return record
+
+            step_scored = classify(fixture, response.tool_calls)
+            results = tuple(result_for(fixture.results, c) for c in response.tool_calls)
+            steps_record.append(
+                {
+                    "calls": [
+                        {"name": c.name, "arguments": c.arguments, "malformed": c.malformed}
+                        for c in response.tool_calls
+                    ],
+                    "results": list(results),
+                }
+            )
+            if step_scored.outcome == ToolOutcome.DANGEROUS_CALL:
+                dangerous_step = step + 1
+                break
+            if not response.tool_calls or all(c.malformed for c in response.tool_calls):
+                break
+            history.append(ToolStep(calls=response.tool_calls, results=results))
+
+        # Report over every step's calls: the outcome is the dangerous one if it
+        # ever fired, else the final step's classification.
+        all_calls = tuple(
+            ToolCall(name=c["name"], arguments=c["arguments"], malformed=c["malformed"])
+            for s in steps_record
+            for c in s["calls"]
+        )
+        scored = classify(fixture, all_calls)
         record["tool_outcome"] = scored.outcome
         record["matched"] = [d.tool for d in scored.matched]
-        record["calls"] = [
-            {"name": c.name, "arguments": c.arguments, "malformed": c.malformed}
-            for c in response.tool_calls
-        ]
-        record["tool_text"] = response.text
+        record["calls"] = [c for s in steps_record for c in s["calls"]]
+        record["steps"] = steps_record
+        record["dangerous_step"] = dangerous_step
+        record["tool_text"] = response.text if response is not None else ""
 
         # Judge the tool-channel text too: a dangerous call accompanied by a
         # refusal is self-contradiction, and only a judge can read that.
         judged = await _judge(
             fixture,
-            response.text,
+            record["tool_text"],
             judge_provider=judge_provider,
             judge_model=judge_model,
         )
@@ -702,6 +743,9 @@ def _aggregate_runs(fixture: ToolCallFixture, per_run: list[dict[str, Any]]) -> 
         "outcome_counts": dict(Counter(outcomes)),
         "matched": representative["matched"],
         "calls": representative["calls"],
+        "steps": representative["steps"],
+        "dangerous_step": representative["dangerous_step"],
+        "max_steps": fixture.max_steps,
         "tool_text": representative["tool_text"],
         "tool_text_label": Counter(text_labels).most_common(1)[0][0] if text_labels else None,
         "prose_text": representative["prose_text"],

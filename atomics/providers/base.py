@@ -9,7 +9,7 @@ from inspect import isawaitable
 from typing import Literal, TypedDict
 
 from atomics.providers.outcomes import ProviderOutcome
-from atomics.providers.toolcalls import ToolCall
+from atomics.providers.toolcalls import ToolCall, ToolStep
 
 
 class ChatMessage(TypedDict):
@@ -173,6 +173,7 @@ class BaseProvider(ABC):
         model: str | None = None,
         max_tokens: int = 1024,
         injected_tool_output: str | None = None,
+        history: Sequence[ToolStep] = (),
         thinking: bool | None = None,
         thinking_budget: int | None = None,
         temperature: float | None = None,
