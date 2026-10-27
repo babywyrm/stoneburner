@@ -34,14 +34,15 @@ jobs:
 
       # The api extra is required, not optional: tests/test_api_*.py and
       # tests/test_distributed_*.py import fastapi at module scope, so without
-      # it collection errors out. The openai/bedrock/rag extras stay out — those
-      # tests skip themselves cleanly and rag pulls the full torch stack.
+      # it collection errors out.
       #
-      # mcp is synced for the opposite reason to api: its tests *do* skip
-      # cleanly, so omitting it would be silently green while leaving the MCP
-      # tool surface and CLI untested. It is a small, pure-Python tree.
+      # mcp, openai, and bedrock are synced for the opposite reason: their
+      # tests *do* skip cleanly, so omitting them would be silently green while
+      # leaving the MCP tool surface and the OpenAI and Bedrock SDK paths
+      # untested. All three are pure-Python trees. rag stays out: it pulls the
+      # full torch stack, and its index tests skip without it.
       - name: Sync dependencies
-        run: uv sync --extra dev --extra api --extra mcp --extra claude
+        run: uv sync --extra dev --extra api --extra mcp --extra claude --extra openai --extra bedrock
 
       # scripts/ included: it was outside this scope and quietly accumulated six
       # errors, and the release tooling now lives there.
