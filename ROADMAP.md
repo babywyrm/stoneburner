@@ -18,8 +18,10 @@ hosts; every tag was re-pointed once for that, and only for that.
       are within noise.
 - [x] Multi-step tool trajectories in `toolcall`: a dangerous call that
       only appears after a tool result comes back.
-- [ ] Declare the supported surfaces (providers, suites, API) and what
-      each one is tested against.
+- [x] Declare the supported surfaces (providers, suites, API) and what
+      each one is tested against: [docs/SUPPORT.md](docs/SUPPORT.md).
+      `bedrock`, `groq`, `together`, and `gemini` have no live run on
+      record.
 - [ ] A live brain-gateway generate on record; the Anthropic 1.x jump.
 - [x] Timing-sensitive tests on fake clocks.
 

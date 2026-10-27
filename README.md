@@ -124,6 +124,7 @@ Links are absolute so they work on PyPI as well as GitHub.
 |-------------|------|
 | Copy-paste recipes | [QUICKSTART](https://github.com/babywyrm/stoneburner/blob/main/QUICKSTART.md) |
 | Every flag | [CLI_REFERENCE](https://github.com/babywyrm/stoneburner/blob/main/docs/CLI_REFERENCE.md) |
+| Supported providers, suites, API, and their evidence | [SUPPORT](https://github.com/babywyrm/stoneburner/blob/main/docs/SUPPORT.md) |
 | Quality / compare | [COMPARING](https://github.com/babywyrm/stoneburner/blob/main/docs/COMPARING.md) |
 | Security suites | [SECURITY_SUITES](https://github.com/babywyrm/stoneburner/blob/main/docs/SECURITY_SUITES.md) · [batteries](https://github.com/babywyrm/stoneburner/blob/main/docs/BATTERIES.md) · [leaderboard](https://github.com/babywyrm/stoneburner/blob/main/docs/LEADERBOARD.md) · [red/blue](https://github.com/babywyrm/stoneburner/blob/main/docs/LEADERBOARD-REDBLUE.md) |
 | Load / capacity | [LOAD_TESTING](https://github.com/babywyrm/stoneburner/blob/main/docs/LOAD_TESTING.md) |

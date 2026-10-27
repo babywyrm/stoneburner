@@ -22,6 +22,14 @@
   adversarial uses its severity weights. The interval is advisory and
   changes no score, integrity, or exit code. See
   [COMPARING.md](docs/COMPARING.md#intervals).
+- [docs/SUPPORT.md](docs/SUPPORT.md) declares the supported Python and OS
+  versions, providers, suites, and API surfaces, and what each one is
+  tested against: CI, a live run on record, or neither.
+
+### Changed
+- CI installs the `openai` and `bedrock` extras. Their SDK-level tests
+  had skipped there, so the OpenAI 3.0 timeout and response-model checks
+  never ran in CI.
 
 ### Fixed
 - `scripts/smoke_fleet.py` spawns the coordinator from `.venv/bin/atomics`
