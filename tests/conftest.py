@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import socket
 import sqlite3
 import time
@@ -229,6 +230,53 @@ def scripted_clock(
 
     def _apply(module: ModuleType, elapsed_seconds: float) -> None:
         monkeypatch.setattr(module, "time", _ScriptedClock(elapsed_seconds))
+
+    return _apply
+
+
+class _LoopClock:
+    """Stands in for the ``time`` module with ``monotonic`` read off an event loop."""
+
+    def __init__(self, loop: asyncio.AbstractEventLoop) -> None:
+        self._loop = loop
+
+    def monotonic(self) -> float:
+        return self._loop.time()
+
+    def __getattr__(self, name: str) -> object:
+        return getattr(time, name)
+
+
+@pytest.fixture
+async def fake_clock(monkeypatch: pytest.MonkeyPatch) -> Callable[[ModuleType], None]:
+    """Run the test's event loop on virtual time.
+
+    When nothing is runnable, the clock jumps to the next timer instead of
+    waiting for it, so a 30-second soak takes no wall time and runs the same
+    iterations on every host. A test double that only yields with
+    ``asyncio.sleep(0)`` never lets the clock move: give it a nonzero sleep.
+    Pass a module to make its ``time.monotonic()`` read the same clock.
+    """
+    loop = asyncio.get_running_loop()
+    # asyncio has no public hook for its clock; SelectorEventLoop polls here.
+    selector = loop._selector  # type: ignore[attr-defined]
+    real_select = selector.select
+    now = loop.time()
+
+    def select(timeout: float | None = None) -> list[object]:
+        nonlocal now
+        if timeout is None:
+            return real_select(None)
+        events = real_select(0)
+        if not events:
+            now += timeout
+        return events
+
+    monkeypatch.setattr(loop, "time", lambda: now)
+    monkeypatch.setattr(selector, "select", select)
+
+    def _apply(module: ModuleType) -> None:
+        monkeypatch.setattr(module, "time", _LoopClock(loop))
 
     return _apply
 

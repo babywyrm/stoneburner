@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import tempfile
+import time
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
@@ -207,11 +208,27 @@ class TestSoakResult:
 # ── Runner (mocked) ──────────────────────────────────────────────────────────
 
 
+@pytest.fixture
+def soak_clock(fake_clock):
+    from atomics.load import soak
+
+    fake_clock(soak)
+
+
+async def test_fake_clock_skips_the_wait(fake_clock):
+    loop = asyncio.get_running_loop()
+    started, wall = loop.time(), time.perf_counter()
+    await asyncio.sleep(3600)
+    assert loop.time() - started == pytest.approx(3600)
+    assert time.perf_counter() - wall < 1
+
+
 async def _fake_single_request(client, host, model, prompt, num_predict):
     await asyncio.sleep(0.001)
     return (100, 50, 500.0, 200.0)
 
 
+@pytest.mark.usefixtures("soak_clock")
 class TestRunSoak:
     @pytest.mark.asyncio
     async def test_basic_run(self):
@@ -231,8 +248,8 @@ class TestRunSoak:
             assert result.model == "test-model"
             assert result.concurrency == 2
             assert result.total_requests > 0
-            assert result.actual_duration_seconds >= 0.5
-            assert len(result.samples) >= 2
+            assert result.actual_duration_seconds == 0.55
+            assert len(result.samples) == 5
             assert result.verdict in ("STABLE", "DEGRADED", "UNSTABLE")
 
     @pytest.mark.asyncio
@@ -275,7 +292,7 @@ class TestRunSoak:
                 sample_interval=0.1,
                 on_sample=on_sample,
             )
-            assert len(samples_received) >= 2
+            assert len(samples_received) == 5
 
     @pytest.mark.asyncio
     async def test_failure_handling(self):
@@ -570,7 +587,7 @@ def _async_req_provider(out=80, inp=20, lat=20.0, tps=200.0, cost=0.001):
     """Return an AsyncMock that resolves instantly to (out, inp, lat, tps, cost)."""
 
     async def _fn(provider, prompt, num_predict):
-        await asyncio.sleep(0)
+        await asyncio.sleep(lat / 1000)
         return (out, inp, lat, tps, cost)
 
     return _fn
@@ -584,8 +601,9 @@ def _make_mock_provider(name="mock-cloud", host="https://api.example.com"):
     return p
 
 
+@pytest.mark.usefixtures("soak_clock")
 class TestRunSoakProvider:
-    """Cover run_soak_provider (lines 281-411). Uses short durations + fast mocks."""
+    """Cover run_soak_provider on virtual time."""
 
     @pytest.mark.asyncio
     async def test_basic_provider_run(self):
@@ -612,9 +630,6 @@ class TestRunSoakProvider:
     async def test_provider_samples_collected(self):
         from atomics.load.soak import run_soak_provider
 
-        # duration/interval give ~15 expected samples so coverage/scheduler
-        # overhead on slow CI hosts can't starve this below the >=2 assertion
-        # (1.0s/0.2s still flaked under coverage on a slower Linux box).
         with patch(
             "atomics.load.stress._single_request_provider",
             side_effect=_async_req_provider(out=60, lat=50.0),
@@ -623,10 +638,10 @@ class TestRunSoakProvider:
                 provider=_make_mock_provider("prov2"),
                 model="m",
                 concurrency=1,
-                duration_seconds=3.0,
+                duration_seconds=1.1,
                 sample_interval=0.2,
             )
-        assert len(result.samples) >= 2
+        assert len(result.samples) == 5
         for s in result.samples:
             assert s.requests > 0
 
@@ -639,9 +654,6 @@ class TestRunSoakProvider:
         def on_sample(s: SoakSample) -> None:
             received.append(s)
 
-        # duration/interval give ~15 expected samples — enough margin that
-        # coverage/scheduler overhead on slow CI hosts can't starve this below
-        # the >=2 assertion (1.0s/0.2s still flaked under coverage on Linux).
         with patch(
             "atomics.load.stress._single_request_provider", side_effect=_async_req_provider()
         ):
@@ -649,11 +661,11 @@ class TestRunSoakProvider:
                 provider=_make_mock_provider("cb-prov"),
                 model="m",
                 concurrency=1,
-                duration_seconds=3.0,
+                duration_seconds=1.1,
                 sample_interval=0.2,
                 on_sample=on_sample,
             )
-        assert len(received) >= 2
+        assert len(received) == 5
 
     @pytest.mark.asyncio
     async def test_provider_on_sample_start_fires_before_sample(self):
@@ -694,7 +706,7 @@ class TestRunSoakProvider:
 
         async def _sometimes_fail(provider, prompt, num_predict):
             call_n[0] += 1
-            await asyncio.sleep(0)
+            await asyncio.sleep(0.05)
             if call_n[0] % 3 == 0:
                 raise ConnectionError("boom")
             return (40, 10, 50.0, 160.0, 0.0)
@@ -779,12 +791,13 @@ def _make_http_profile():
 
 
 async def _fast_profile_req(client, profile, prompt):
-    await asyncio.sleep(0)
+    await asyncio.sleep(0.02)
     return ("ok response", 20.0, "pass")
 
 
+@pytest.mark.usefixtures("soak_clock")
 class TestRunSoakProfile:
-    """Cover run_soak_profile (lines 413-542). Short durations + instant mocks."""
+    """Cover run_soak_profile on virtual time."""
 
     @pytest.mark.asyncio
     async def test_ollama_profile_basic_run(self):
@@ -825,17 +838,15 @@ class TestRunSoakProfile:
         def on_sample(s: SoakSample) -> None:
             received.append(s)
 
-        # ~5 expected samples so coverage/scheduler overhead can't starve the
-        # >=2 assertion (0.5s/0.2s left exactly 2 expected with zero slack).
         with patch("atomics.load.profiles._single_request_profile", side_effect=_fast_profile_req):
             await run_soak_profile(
                 profile=_make_ollama_profile(),
                 concurrency=1,
-                duration_seconds=1.0,
+                duration_seconds=1.1,
                 sample_interval=0.2,
                 on_sample=on_sample,
             )
-        assert len(received) >= 2
+        assert len(received) == 5
 
     @pytest.mark.asyncio
     async def test_profile_failure_handling(self):
@@ -845,7 +856,7 @@ class TestRunSoakProfile:
 
         async def _sometimes_fail(client, profile, prompt):
             call_n[0] += 1
-            await asyncio.sleep(0)
+            await asyncio.sleep(0.02)
             if call_n[0] % 3 == 0:
                 raise RuntimeError("gate down")
             return ("ok", 20.0, "pass")

@@ -40,6 +40,13 @@ def _load_loops():
     }
 
 
+@pytest.fixture
+def stress_clock(fake_clock):
+    from atomics.load import stress
+
+    fake_clock(stress)
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize("loop", list(_load_loops()))
 async def test_a_failing_request_still_yields_to_the_event_loop(loop, monkeypatch):
@@ -154,15 +161,13 @@ def test_stress_prompts_are_populated():
 
 
 @pytest.mark.asyncio
+@pytest.mark.usefixtures("stress_clock")
 async def test_run_stress_with_mock():
     """Verify the ramp logic works end-to-end with a mocked HTTP client."""
     from atomics.load.stress import _run_phase
 
-    call_count = 0
-
     async def mock_post(url, *, json, timeout):
-        nonlocal call_count
-        call_count += 1
+        await asyncio.sleep(0.1)
         mock_resp = MagicMock()
         mock_resp.status_code = 200
         mock_resp.raise_for_status = MagicMock()
@@ -183,23 +188,27 @@ async def test_run_stress_with_mock():
         "http://fake:11434",
         "test-model",
         concurrency=2,
-        duration_seconds=1.0,
+        duration_seconds=1.05,
         num_predict=512,
     )
 
+    # Each worker starts a 0.1s request at 0.0, 0.1, ..., 1.0.
     assert result.concurrency == 2
-    assert result.requests >= 2
-    assert result.total_output_tokens >= 200
-    assert result.aggregate_tps > 0
+    assert result.requests == 22
+    assert result.total_output_tokens == 2200
+    assert result.elapsed_seconds == pytest.approx(1.1)
+    assert result.aggregate_tps == pytest.approx(2000)
     assert result.avg_request_tps > 0
-    assert len(result.latencies) >= 2
+    assert len(result.latencies) == 22
 
 
 @pytest.mark.asyncio
+@pytest.mark.usefixtures("stress_clock")
 async def test_run_stress_e2e_with_mock(monkeypatch):
     """Full run_stress ramp with mocked HTTP and GPU helpers."""
 
     async def mock_post(url, *, json, timeout):
+        await asyncio.sleep(0.1)
         mock_resp = MagicMock()
         mock_resp.status_code = 200
         mock_resp.raise_for_status = MagicMock()
@@ -249,6 +258,7 @@ async def test_run_stress_e2e_with_mock(monkeypatch):
 
 
 @pytest.mark.asyncio
+@pytest.mark.usefixtures("stress_clock")
 async def test_run_phase_handles_failures():
     """Failed requests should be counted, not crash the phase."""
     call_count = 0
@@ -258,6 +268,7 @@ async def test_run_phase_handles_failures():
         call_count += 1
         if call_count % 2 == 0:
             raise ConnectionError("refused")
+        await asyncio.sleep(0.1)
         mock_resp = MagicMock()
         mock_resp.status_code = 200
         mock_resp.raise_for_status = MagicMock()
@@ -470,12 +481,11 @@ def test_cli_stress_help():
 
 
 @pytest.mark.asyncio
+@pytest.mark.usefixtures("stress_clock")
 async def test_run_stress_provider_basic():
     """run_stress_provider uses BaseProvider.generate() and tracks cost."""
     from atomics.load.stress import run_stress_provider
     from atomics.providers.base import ProviderResponse
-
-    call_count = 0
 
     async def fake_generate(
         prompt,
@@ -487,8 +497,7 @@ async def test_run_stress_provider_basic():
         thinking_budget=None,
         **_kwargs,
     ):
-        nonlocal call_count
-        call_count += 1
+        await asyncio.sleep(0.1)
         return ProviderResponse(
             text="test " * 50,
             input_tokens=30,
@@ -522,12 +531,14 @@ async def test_run_stress_provider_basic():
 
 
 @pytest.mark.asyncio
+@pytest.mark.usefixtures("stress_clock")
 async def test_run_stress_provider_on_phase_callback():
     """on_phase callback fires for each concurrency level."""
     from atomics.load.stress import run_stress_provider
     from atomics.providers.base import ProviderResponse
 
     async def fake_generate(prompt, **kwargs):
+        await asyncio.sleep(0.1)
         return ProviderResponse(
             text="ok",
             input_tokens=10,
@@ -557,11 +568,13 @@ async def test_run_stress_provider_on_phase_callback():
 
 
 @pytest.mark.asyncio
+@pytest.mark.usefixtures("stress_clock")
 async def test_run_stress_provider_on_phase_start_fires_before_phase():
     from atomics.load.stress import run_stress_provider
     from atomics.providers.base import ProviderResponse
 
     async def fake_generate(prompt, **kwargs):
+        await asyncio.sleep(0.1)
         return ProviderResponse(
             text="ok",
             input_tokens=10,
@@ -592,6 +605,7 @@ async def test_run_stress_provider_on_phase_start_fires_before_phase():
 
 
 @pytest.mark.asyncio
+@pytest.mark.usefixtures("stress_clock")
 async def test_run_stress_provider_handles_failures():
     """Failed requests don't crash; they increment failed counter."""
     from atomics.load.stress import run_stress_provider
@@ -602,6 +616,7 @@ async def test_run_stress_provider_handles_failures():
     async def flaky_generate(prompt, **kwargs):
         nonlocal call_count
         call_count += 1
+        await asyncio.sleep(0.1)
         if call_count % 2 == 0:
             raise ConnectionError("timeout")
         return ProviderResponse(
@@ -631,12 +646,14 @@ async def test_run_stress_provider_handles_failures():
 
 
 @pytest.mark.asyncio
+@pytest.mark.usefixtures("stress_clock")
 async def test_run_stress_provider_tps_fallback():
     """When tokens_per_second is None, compute from output_tokens/latency."""
     from atomics.load.stress import run_stress_provider
     from atomics.providers.base import ProviderResponse
 
     async def fake_generate(prompt, **kwargs):
+        await asyncio.sleep(0.1)
         return ProviderResponse(
             text="ok",
             input_tokens=10,
@@ -956,21 +973,20 @@ def _make_stress_http_profile():
     )
 
 
-async def _instant_profile_req(client, profile, prompt):
-    """Instant fake profile request — no real I/O."""
+async def _fake_profile_req(client, profile, prompt):
+    await asyncio.sleep(0.05)
     return ("ok", 5.0, "pass")
 
 
+@pytest.mark.usefixtures("stress_clock")
 class TestRunStressProfile:
-    """Cover _run_phase_profile + run_stress_profile. Uses instant mock + 0.15s phases."""
+    """Cover _run_phase_profile + run_stress_profile on virtual time."""
 
     @pytest.mark.asyncio
     async def test_run_stress_profile_ollama(self):
         from atomics.load.stress import run_stress_profile
 
-        with patch(
-            "atomics.load.profiles._single_request_profile", side_effect=_instant_profile_req
-        ):
+        with patch("atomics.load.profiles._single_request_profile", side_effect=_fake_profile_req):
             result = await run_stress_profile(
                 profile=_make_stress_ollama_profile(),
                 max_concurrency=2,
@@ -986,9 +1002,7 @@ class TestRunStressProfile:
     async def test_run_stress_profile_http(self):
         from atomics.load.stress import run_stress_profile
 
-        with patch(
-            "atomics.load.profiles._single_request_profile", side_effect=_instant_profile_req
-        ):
+        with patch("atomics.load.profiles._single_request_profile", side_effect=_fake_profile_req):
             result = await run_stress_profile(
                 profile=_make_stress_http_profile(),
                 max_concurrency=1,
@@ -1006,9 +1020,7 @@ class TestRunStressProfile:
         def on_phase(p: ConcurrencyResult) -> None:
             phases_received.append(p)
 
-        with patch(
-            "atomics.load.profiles._single_request_profile", side_effect=_instant_profile_req
-        ):
+        with patch("atomics.load.profiles._single_request_profile", side_effect=_fake_profile_req):
             result = await run_stress_profile(
                 profile=_make_stress_ollama_profile(),
                 max_concurrency=2,
@@ -1025,6 +1037,7 @@ class TestRunStressProfile:
 
         async def _sometimes_fail(client, profile, prompt):
             call_n[0] += 1
+            await asyncio.sleep(0.05)
             if call_n[0] % 2 == 0:
                 raise RuntimeError("gate error")
             return ("ok", 10.0, "pass")
@@ -1041,9 +1054,7 @@ class TestRunStressProfile:
     async def test_run_stress_profile_saturation_concurrency_set(self):
         from atomics.load.stress import run_stress_profile
 
-        with patch(
-            "atomics.load.profiles._single_request_profile", side_effect=_instant_profile_req
-        ):
+        with patch("atomics.load.profiles._single_request_profile", side_effect=_fake_profile_req):
             result = await run_stress_profile(
                 profile=_make_stress_ollama_profile(),
                 max_concurrency=4,
@@ -1055,9 +1066,7 @@ class TestRunStressProfile:
     async def test_run_stress_profile_no_prompts_uses_stress_prompts(self):
         from atomics.load.stress import run_stress_profile
 
-        with patch(
-            "atomics.load.profiles._single_request_profile", side_effect=_instant_profile_req
-        ):
+        with patch("atomics.load.profiles._single_request_profile", side_effect=_fake_profile_req):
             result = await run_stress_profile(
                 profile=_make_stress_http_profile(),
                 max_concurrency=1,

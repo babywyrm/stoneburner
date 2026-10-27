@@ -112,6 +112,7 @@ async def test_job_failure_message_is_sanitized():
 
 
 @pytest.mark.asyncio
+@pytest.mark.usefixtures("fake_clock")
 async def test_wait_for_timeout_zero_does_not_cancel():
     manager = JobManager()
     started = asyncio.Event()
@@ -136,6 +137,7 @@ async def test_wait_for_timeout_zero_does_not_cancel():
 
 
 @pytest.mark.asyncio
+@pytest.mark.usefixtures("fake_clock")
 async def test_wait_for_positive_timeout_does_not_cancel():
     manager = JobManager()
     started = asyncio.Event()

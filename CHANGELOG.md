@@ -34,6 +34,11 @@
 - The test suite no longer reaches the network. 29 tests were probing a
   local Ollama or AWS. A guard in `tests/conftest.py` now fails any test
   that connects past loopback or to an inference port.
+- Soak, stress, job-wait, and engine-stop tests run on a virtual clock
+  (`fake_clock` in `tests/conftest.py`) instead of real seconds. The soak
+  sample-count tests had been padded to 3-second windows after flaking on
+  a slow host; they now assert exact counts. The full suite runs in about
+  two-thirds of the time.
 
 ### Security
 - `uv.lock` pins `opentelemetry-api` 1.45.1 for CVE-2026-114603. It

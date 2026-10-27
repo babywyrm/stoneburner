@@ -207,6 +207,7 @@ async def test_engine_guard_rate_limit_yields_then_continues(make_engine, monkey
 
 @pytest.mark.unit
 @pytest.mark.asyncio
+@pytest.mark.usefixtures("fake_clock")
 async def test_engine_stops_during_interval_wait(make_engine):
     engine, provider, repo = make_engine(interval=1)
 

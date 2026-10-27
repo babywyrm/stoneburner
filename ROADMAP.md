@@ -20,8 +20,8 @@ hosts; every tag was re-pointed once for that, and only for that.
       only appears after a tool result comes back.
 - [ ] Declare the supported surfaces (providers, suites, API) and what
       each one is tested against.
-- [ ] A live brain-gateway generate on record; the Anthropic 1.x jump;
-      timing-sensitive tests on fake clocks.
+- [ ] A live brain-gateway generate on record; the Anthropic 1.x jump.
+- [x] Timing-sensitive tests on fake clocks.
 
 Do not retag again. Do not mix a feature into a tag commit. `v0` is the
 floating major tag the publish workflow moves; it is not stray.
