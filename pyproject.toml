@@ -46,7 +46,9 @@ dependencies = [
 
 [project.optional-dependencies]
 bedrock = ["boto3>=1.35.0"]
-claude = ["anthropic>=0.39.0"]
+# 2.x sends API version 2026-10-21, which rejects temperature with a 400;
+# the judge and --temperature 0 still need it on Claude.
+claude = ["anthropic>=1.0,<2"]
 openai = ["openai>=3.0.0"]
 rag = [
     "sqlite-vec>=0.1.0",

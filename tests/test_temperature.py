@@ -7,6 +7,7 @@ OpenAI reasoning models and Claude with extended thinking enabled.
 
 from __future__ import annotations
 
+import json
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -246,7 +247,7 @@ def _claude_provider():
 async def test_claude_forwards_temperature_without_thinking():
     provider, msgs = _claude_provider()
     await provider.generate("hi", model="claude-sonnet-4-6", temperature=0.0)
-    assert msgs.kwargs["temperature"] == 0.0
+    assert msgs.kwargs["extra_body"] == {"temperature": 0.0}
 
 
 @pytest.mark.asyncio
@@ -260,7 +261,7 @@ async def test_claude_omits_temperature_with_thinking():
     )
     # Anthropic requires temperature=1 with extended thinking, so we must not
     # send our explicit value.
-    assert "temperature" not in msgs.kwargs
+    assert "extra_body" not in msgs.kwargs
     assert "thinking" in msgs.kwargs
 
 
@@ -342,7 +343,53 @@ async def test_claude_tools_forward_temperature():
     await provider.generate_with_tools(
         "hi", tools=_TOOLS, model="claude-sonnet-4-6", temperature=0.0
     )
-    assert msgs.kwargs["temperature"] == 0.0
+    assert msgs.kwargs["extra_body"] == {"temperature": 0.0}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("tools", [False, True])
+async def test_claude_request_through_the_real_sdk(tools):
+    """The fake client takes any kwarg; the real SDK raises TypeError on one it dropped."""
+    anthropic = pytest.importorskip("anthropic")
+    import httpx2
+
+    from atomics.providers.claude import ClaudeProvider
+
+    sent: list[dict] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        sent.append(json.loads(request.content))
+        return httpx2.Response(
+            200,
+            json={
+                "id": "msg_1",
+                "type": "message",
+                "role": "assistant",
+                "model": "claude-sonnet-4-6",
+                "content": [{"type": "text", "text": "ok"}],
+                "stop_reason": "end_turn",
+                "stop_sequence": None,
+                "usage": {"input_tokens": 1, "output_tokens": 1},
+            },
+        )
+
+    client = anthropic.AsyncAnthropic(
+        api_key="fake",
+        max_retries=0,
+        http_client=anthropic.DefaultAsyncHttpxClient(transport=httpx2.MockTransport(handler)),
+    )
+    provider = ClaudeProvider(api_key="fake", client=client)
+    if tools:
+        await provider.generate_with_tools(
+            "hi", tools=_TOOLS, model="claude-sonnet-4-6", temperature=0.0, effort="low"
+        )
+    else:
+        await provider.generate(
+            "hi", model="claude-sonnet-4-6", temperature=0.0, effort="low", thinking=False
+        )
+    await provider.aclose()
+    assert sent[0]["temperature"] == 0.0
+    assert sent[0]["output_config"] == {"effort": "low"}
 
 
 class _ToolRecorder(BaseProvider):

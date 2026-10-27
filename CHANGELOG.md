@@ -27,6 +27,11 @@
   tested against: CI, a live run on record, or neither.
 
 ### Changed
+- The `claude` extra moves to the Anthropic SDK 1.x (`anthropic>=1.0,<2`,
+  locked at 1.17.0). 1.x dropped `temperature` from `messages.create`, so
+  the Claude provider now sends it in `extra_body`; the request on the
+  wire is unchanged. 2.x is held back: its API version, 2026-10-21,
+  rejects `temperature`, which the judge and `--temperature 0` need.
 - CI installs the `openai` and `bedrock` extras. Their SDK-level tests
   had skipped there, so the OpenAI 3.0 timeout and response-model checks
   never ran in CI.

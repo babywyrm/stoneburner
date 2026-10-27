@@ -22,7 +22,11 @@ hosts; every tag was re-pointed once for that, and only for that.
       each one is tested against: [docs/SUPPORT.md](docs/SUPPORT.md).
       `bedrock`, `groq`, `together`, and `gemini` have no live run on
       record.
-- [ ] A live brain-gateway generate on record; the Anthropic 1.x jump.
+- [ ] A live brain-gateway generate on record.
+- [x] The Anthropic 1.x jump: `anthropic>=1.0,<2`, temperature through
+      `extra_body`. Proved offline through the real SDK; a live generate
+      on 1.x is still to record. 2.x is held: its API version rejects
+      temperature, which the judge and `--temperature 0` rely on.
 - [x] Timing-sensitive tests on fake clocks.
 
 Do not retag again. Do not mix a feature into a tag commit. `v0` is the
@@ -153,7 +157,7 @@ Not scheduled, roughly in order of how often they come up.
       shipped after the 0.21.0 tag.
 - [x] **OpenAI SDK 3.0 / HTTPX2.** Extra is `openai>=3.0.0`. Client
       timeout is `openai.Timeout` (httpx2). PR #9 / #13 stay closed.
-      Anthropic 1.x is a separate core-dep jump.
+      Anthropic 1.x is in the 0.30.0 list above.
 - **HTTP MCP.** Do not invent. `atomics mcp` stays a stdio proxy over
   a running API server. Remote reach is `--api-url` on that API.
 

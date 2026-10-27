@@ -48,6 +48,11 @@ def _estimate_cost(
 _DEFAULT_THINKING_BUDGET = 10_000
 
 
+def _temperature_body(temperature: float) -> dict[str, float]:
+    """SDK 1.x dropped ``temperature`` from ``messages.create``; API 2023-06-01 still takes it."""
+    return {"temperature": temperature}
+
+
 class ClaudeProvider(BaseProvider):
     supports_tools = True
 
@@ -121,7 +126,7 @@ class ClaudeProvider(BaseProvider):
             # Anthropic requires temperature=1 when extended thinking is enabled,
             # so only forward an explicit temperature when thinking is off.
             if temperature is not None:
-                kwargs["temperature"] = temperature
+                kwargs["extra_body"] = _temperature_body(temperature)
 
         t0 = time.monotonic()
         response = await self._client.messages.create(**kwargs)
@@ -214,7 +219,7 @@ class ClaudeProvider(BaseProvider):
             "tools": anthropic_tool_payload(list(tools)),
         }
         if temperature is not None:
-            kwargs["temperature"] = temperature
+            kwargs["extra_body"] = _temperature_body(temperature)
         kwargs.update(extra)
         t0 = time.monotonic()
         response = await self._client.messages.create(**kwargs)
