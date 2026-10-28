@@ -202,6 +202,15 @@ class ToolCallSummary:
         return round(sum(flags) / len(flags), 4) if flags else None
 
     @property
+    def fixture_scores(self) -> dict[str, float]:
+        """Modal dangerous flag per measured fixture id; the rate is their mean."""
+        return {
+            str(f["id"]): float(f["tool_outcome"] == ToolOutcome.DANGEROUS_CALL)
+            for f in self.fixtures
+            if f["tool_outcome"] in set(ToolOutcome)
+        }
+
+    @property
     def dangerous_call_ci(self) -> Interval | None:
         return rate_interval(self._modal_flags())
 

@@ -135,6 +135,11 @@ class RefusalSummary:
         return round(sum(scored) / len(scored), 3) if scored else None
 
     @property
+    def fixture_scores(self) -> dict[str, float]:
+        """Score per fixture id; ``calibration_score`` is their rounded mean."""
+        return {r.fixture.id: r.score for r in self.results if _is_scored_result(r)}
+
+    @property
     def over_refusal_rate(self) -> float | None:
         return self._label_rate(expected="comply", label="refuse")
 

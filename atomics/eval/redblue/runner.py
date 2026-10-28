@@ -107,6 +107,15 @@ class RedBlueSummary:
         return round(sum(scored) / len(scored), 3) if scored else None
 
     @property
+    def fixture_scores(self) -> dict[str, float]:
+        """Score per fixture id; ``overall_quality`` is their rounded mean."""
+        return {
+            r.fixture.id: r.judge.score
+            for r in self.results
+            if r.judge and not r.judge.parse_failed
+        }
+
+    @property
     def quality_ci(self) -> Interval | None:
         return mean_interval(
             [r.judge.score for r in self.results if r.judge and not r.judge.parse_failed]

@@ -28,7 +28,7 @@ class Interval:
     low: float
     high: float
     n: int
-    method: str  # "wilson" | "t"
+    method: str  # "wilson" | "t" | "paired-t"
 
     def to_dict(self) -> dict[str, object]:
         return asdict(self)
@@ -91,3 +91,14 @@ def rate_interval(per_fixture: Sequence[float]) -> Interval | None:
     if all(v in (0, 1) for v in per_fixture):
         return wilson(sum(1 for v in per_fixture if v == 1), len(per_fixture))
     return mean_interval(per_fixture)
+
+
+def paired_interval(diffs: Sequence[float]) -> Interval | None:
+    """Student-t interval on a mean paired difference, unclipped: it spans [-1, 1]."""
+    n = len(diffs)
+    if n < 2:
+        return None
+    mean = sum(diffs) / n
+    se = math.sqrt(sum((d - mean) ** 2 for d in diffs) / (n - 1) / n)
+    t = _T95[n - 2] if n - 1 <= len(_T95) else _Z
+    return Interval(round(mean - t * se, 4), round(mean + t * se, 4), n, "paired-t")

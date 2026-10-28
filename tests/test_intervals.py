@@ -4,7 +4,13 @@ from __future__ import annotations
 
 import pytest
 
-from atomics.eval.intervals import Interval, mean_interval, rate_interval, wilson
+from atomics.eval.intervals import (
+    Interval,
+    mean_interval,
+    paired_interval,
+    rate_interval,
+    wilson,
+)
 
 
 def _bounds(interval: Interval | None) -> tuple[float, float]:
@@ -110,3 +116,26 @@ def test_format_is_whole_percent_with_n():
     interval = wilson(6, 20)
     assert interval is not None
     assert interval.format() == "95% CI 15–52%, n=20"
+
+
+def test_paired_interval_needs_two_fixtures() -> None:
+    assert paired_interval([]) is None
+    assert paired_interval([0.5]) is None
+
+
+def test_identical_pairs_are_a_zero_width_interval_at_zero() -> None:
+    interval = paired_interval([0.0, 0.0, 0.0])
+    assert interval is not None
+    assert (interval.low, interval.high, interval.n, interval.method) == (0.0, 0.0, 3, "paired-t")
+
+
+def test_a_consistent_gap_excludes_zero() -> None:
+    interval = paired_interval([0.5, 0.4, 0.6, 0.5, 0.5])
+    assert interval is not None
+    assert interval.low > 0
+
+
+def test_noise_straddles_zero_and_is_not_clipped() -> None:
+    interval = paired_interval([1.0, -1.0, 1.0, -1.0])
+    assert interval is not None
+    assert interval.low < -1.0 < 0 < 1.0 < interval.high

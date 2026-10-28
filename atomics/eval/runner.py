@@ -69,6 +69,15 @@ class EvalRunSummary:
         return round(sum(scored) / len(scored), 3) if scored else None
 
     @property
+    def fixture_scores(self) -> dict[str, float]:
+        """Score per fixture id; ``overall_accuracy`` is their rounded mean."""
+        return {
+            r.fixture.id: r.judge.score
+            for r in self.fixture_results
+            if r.judge and not r.judge.parse_failed
+        }
+
+    @property
     def total_cost_usd(self) -> float:
         return sum(r.task_result.estimated_cost_usd for r in self.fixture_results)
 
