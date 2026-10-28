@@ -16,8 +16,9 @@ from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import asdict, dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
 
+from atomics.eval.intervals import paired_interval
 from atomics.eval.outcomes import RunStatus
 from atomics.eval.suite_integrity import headline_rate
 from atomics.providers.base import BaseProvider
@@ -29,6 +30,7 @@ KNOWN_SUITES = ("eval", "redblue", "refusal", "toolcall", "codereview")
 
 RunSuite = Callable[..., Awaitable["SuiteJobResult"]]
 Persist = Callable[[str, str, str, object], None]
+VsBest = Literal["best", "tied", "behind"]
 
 
 @dataclass
@@ -43,6 +45,9 @@ class SuiteJobResult:
     stdev: float | None = None
     # Toolcall with runs > 1: share of fixtures dangerous on any run.
     any_run: float | None = None
+    # Score per fixture id, for the paired comparison against the suite best.
+    fixture_scores: dict[str, float] | None = None
+    vs_best: VsBest | None = None
 
 
 class _RunScored(Protocol):
@@ -139,6 +144,47 @@ def format_headline_cell(result: SuiteJobResult) -> str:
     return pct
 
 
+_LOWER_IS_BETTER = frozenset({"toolcall"})
+
+
+def _comparable(job: SuiteJobResult) -> bool:
+    return job.ok and job.headline is not None and job.fixture_scores is not None
+
+
+def _better(job: SuiteJobResult, lead: SuiteJobResult) -> bool:
+    if job.headline is None or lead.headline is None:
+        return False
+    if job.suite in _LOWER_IS_BETTER:
+        return job.headline < lead.headline
+    return job.headline > lead.headline
+
+
+def _vs_best(job: SuiteJobResult, leader: SuiteJobResult | None) -> VsBest | None:
+    if leader is None or not _comparable(job):
+        return None
+    if job.headline == leader.headline:
+        return "best"
+    if job.fixture_scores is None or leader.fixture_scores is None:
+        return None
+    sign = -1.0 if job.suite in _LOWER_IS_BETTER else 1.0
+    shared = sorted(leader.fixture_scores.keys() & job.fixture_scores.keys())
+    diffs = [sign * (leader.fixture_scores[k] - job.fixture_scores[k]) for k in shared]
+    interval = paired_interval(diffs)
+    if interval is None:
+        return None
+    return "behind" if interval.low > 0 else "tied"
+
+
+def mark_vs_best(results: Sequence[SuiteJobResult]) -> list[SuiteJobResult]:
+    """Mark each job against its suite's best headline. See docs/COMPARING.md#intervals."""
+    leaders: dict[str, SuiteJobResult] = {}
+    for job in filter(_comparable, results):
+        lead = leaders.get(job.suite)
+        if lead is None or _better(job, lead):
+            leaders[job.suite] = job
+    return [replace(job, vs_best=_vs_best(job, leaders.get(job.suite))) for job in results]
+
+
 def write_status(path: Path, progress: GauntletProgress) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(progress.to_dict(), indent=2) + "\n", encoding="utf-8")
@@ -232,6 +278,11 @@ async def run_gauntlet(
                 stopped = True
                 break
 
+    results = mark_vs_best(results)
+    marked = {(job.model, job.suite): asdict(job) for job in results}
+    progress.completed = [
+        marked.get((row["model"], row["suite"]), row) for row in progress.completed
+    ]
     progress.current_model = None
     progress.current_suite = None
     progress.finished_at = _now()
@@ -340,7 +391,13 @@ def _suite_job(
         error=error,
         stdev=stdev,
         exit_code=0 if headline is not None else 1,
+        fixture_scores=_fixture_scores(summary) if headline is not None else None,
     )
+
+
+def _fixture_scores(summary: object) -> dict[str, float] | None:
+    scores: dict[str, float] | None = getattr(summary, "fixture_scores", None)
+    return scores
 
 
 async def _dispatch_suite(
@@ -380,6 +437,7 @@ async def _dispatch_suite(
             suite=suite,
             ok=eval_summary.overall_accuracy is not None,
             headline=eval_summary.overall_accuracy,
+            fixture_scores=_fixture_scores(eval_summary),
         ), eval_summary
     if suite == "redblue":
         from atomics.eval.redblue.runner import run_redblue
@@ -465,6 +523,7 @@ async def _dispatch_suite(
             any_run=(
                 toolcall_summary.dangerous_any_run_rate if toolcall_summary.runs > 1 else None
             ),
+            fixture_scores=_fixture_scores(toolcall_summary),
         ), toolcall_summary
     if suite == "codereview":
         from atomics.eval.codereview import run_codereview

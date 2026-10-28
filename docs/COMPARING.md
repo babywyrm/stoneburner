@@ -155,3 +155,14 @@ In JSON, each headline `<metric>` has a `<metric>_ci` of
 `null` whenever its headline is withheld. The interval is advisory: it never
 changes a score, integrity, or exit code. If two models' intervals overlap
 widely, this run does not separate them.
+
+A suite sweep (`atomics sweep --suites`) adds a `vs best` column. Each
+model is compared with the suite's best headline (lowest for `toolcall`)
+on the fixtures both scored, using a 95% Student-t interval on the
+per-fixture difference. Pairing removes fixture difficulty, so it separates
+models that overlapping intervals cannot. `behind` means the leader is
+better beyond noise; `tied` means this run cannot tell them apart; `—`
+means no comparison (failed, skipped, `codereview`, or fewer than two
+shared fixtures). Each model is compared only with the leader, with no
+correction across models, so treat `tied` as advisory. The status file and
+the API sweep result carry `vs_best` and `fixture_scores` per job.

@@ -310,7 +310,9 @@ as `POST /evals`.
 While it runs, `progress.total` is models × suites,
 `in_flight` is `{model, suite}`, that dict is appended to
 `progress.trail` (cap `total`), and `result.jobs` grows as each cell
-finishes.
+finishes. Once the sweep ends, each job carries `fixture_scores` and
+`vs_best` (`best`, `tied`, `behind`, or `null`); see
+[COMPARING.md](COMPARING.md#intervals).
 
 ```bash
 curl -H "X-API-Key: $ATOMICS_API_KEY" -H "Content-Type: application/json" \

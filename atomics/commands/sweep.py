@@ -359,11 +359,12 @@ def sweep(
         table.add_column("Suite")
         table.add_column("Result", justify="right")
         table.add_column("Headline", justify="right")
+        table.add_column("vs best")
         for row in suite_results:
             mark = "[green]OK[/green]" if row.ok else "[red]FAIL[/red]"
             if row.tool_capable is False:
                 mark = "[yellow]SKIP[/yellow]" if row.ok else "[red]INCAPABLE[/red]"
-            table.add_row(row.model, row.suite, mark, format_headline_cell(row))
+            table.add_row(row.model, row.suite, mark, format_headline_cell(row), row.vs_best or "—")
             try:
                 console.print(f"  [dim]{row.suite}[/dim] {row.model}")
             except BrokenPipeError:
