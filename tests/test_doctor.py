@@ -346,3 +346,47 @@ def test_doctor_omits_next_step_when_the_database_is_unusable(capsys, tmp_path):
         assert run_doctor(settings=settings) == 1
     out = capsys.readouterr().out
     assert "Next:" not in out
+
+
+def _ollama_get(ps_models: list[dict]) -> MagicMock:
+    def get(url: str, **_kwargs: object) -> MagicMock:
+        response = MagicMock()
+        if url.endswith("/api/ps"):
+            response.json.return_value = {"models": ps_models}
+        else:
+            response.json.return_value = {"models": [{"name": m["name"]} for m in ps_models]}
+        return response
+
+    return MagicMock(side_effect=get)
+
+
+def test_doctor_warns_when_a_loaded_model_runs_on_cpu(capsys, tmp_path):
+    settings = AtomicsSettings(db_path=tmp_path / "doc.db")
+    loaded = [
+        {"name": "qwen2.5:7b", "size": 4_700_000_000, "size_vram": 0},
+        {"name": "qwen3:14b", "size": 9_000_000_000, "size_vram": 4_500_000_000},
+        {"name": "llama3.2:3b", "size": 2_000_000_000, "size_vram": 2_000_000_000},
+    ]
+    with patch("httpx.get", _ollama_get(loaded)):
+        assert run_doctor(settings=settings) == 0
+    out = capsys.readouterr().out
+    assert "qwen2.5:7b loaded 0% in VRAM" in out
+    assert "qwen3:14b loaded 50% in VRAM" in out
+    assert "llama3.2:3b loaded" not in out
+
+
+def test_doctor_is_quiet_when_ollama_has_no_ps(capsys, tmp_path):
+    settings = AtomicsSettings(db_path=tmp_path / "doc.db")
+
+    def get(url: str, **_kwargs: object) -> MagicMock:
+        if url.endswith("/api/ps"):
+            raise OSError("no ps")
+        response = MagicMock()
+        response.json.return_value = {"models": [{"name": "qwen2.5:7b"}]}
+        return response
+
+    with patch("httpx.get", side_effect=get):
+        assert run_doctor(settings=settings) == 0
+    out = capsys.readouterr().out
+    assert "reachable" in out
+    assert "in VRAM" not in out

@@ -90,6 +90,25 @@ def _warn_env_shadows_keychain(console: Console) -> None:
             )
 
 
+def _warn_cpu_offload(console: Console, ollama_host: str) -> None:
+    """Name each loaded model not fully in VRAM: a GPU run on CPU is hours slower."""
+    import httpx
+
+    from atomics.benchmark.labcompare import vram_fit_from_ps
+
+    try:
+        ps = httpx.get(f"{ollama_host.rstrip('/')}/api/ps", timeout=5).json()
+        loaded = [m["name"] for m in ps.get("models", [])]
+    except Exception:
+        return
+    for name in loaded:
+        fit, _ = vram_fit_from_ps(ps, name)
+        if fit is not None and fit < 1:
+            console.print(
+                f"[yellow]Ollama[/yellow] {name} loaded {fit:.0%} in VRAM; the rest runs on CPU"
+            )
+
+
 def run_doctor(settings: AtomicsSettings | None = None) -> int:
     """Print diagnostics. Returns 0 if healthy, 1 if blocking issues."""
     console = Console()
@@ -187,6 +206,8 @@ def run_doctor(settings: AtomicsSettings | None = None) -> int:
         console.print(
             "[yellow]Ollama[/yellow] not reachable (optional; needed for --provider ollama)"
         )
+    if ollama_reachable:
+        _warn_cpu_offload(console, ollama_host)
 
     sched = detect_best_scheduler()
     console.print(f"[dim]Preferred scheduler:[/dim] [cyan]{sched}[/cyan]")

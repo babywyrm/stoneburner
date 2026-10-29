@@ -3,6 +3,9 @@
 ## Unreleased
 
 ### Added
+- `atomics doctor` warns for each Ollama model loaded less than fully in
+  VRAM (from `/api/ps`). A GPU host that fell back to CPU turned a sweep
+  into an 8-hour run with no other sign.
 - `atomics sweep --suites` marks each job `best`, `tied`, or `behind`
   against the suite's best headline, from a paired 95% interval on the
   fixtures both models scored. A repeated `toolcall` ranks on its any-run
