@@ -249,7 +249,7 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
             headline += " · any run " + Number(j.any_run).toFixed(3);
           }
         }
-        return [j.model, j.suite, j.ok ? "ok" : "fail", headline];
+        return [j.model, j.suite, j.ok ? "ok" : "fail", headline, j.vs_best || "-"];
       });
       if (fixtureRows.length) {
         renderTable(
@@ -262,7 +262,7 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
         renderTable(
           "job-fixtures",
           jobRows,
-          ["Model", "Suite", "Status", "Headline"],
+          ["Model", "Suite", "Status", "Headline", "vs best"],
           fixtureRows.length > 0,
         );
       }

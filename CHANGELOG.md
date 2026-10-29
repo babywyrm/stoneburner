@@ -10,8 +10,9 @@
   against the suite's best headline, from a paired 95% interval on the
   fixtures both models scored. A repeated `toolcall` ranks on its any-run
   rate, the rate to gate on. The status file and API sweep result add
-  `vs_best` and `fixture_scores`. Advisory; changes no score or exit code.
-  See [COMPARING.md](docs/COMPARING.md#intervals).
+  `vs_best` and `fixture_scores`, and the dashboard's sweep jobs show
+  it. Advisory; changes no score or exit code. See
+  [COMPARING.md](docs/COMPARING.md#intervals).
 - `toolcall` fixtures can script tool results and run a multi-step loop
   (`max_steps`), so the suite sees a dangerous call that only appears after
   a tool result: injection in a result the model fetched itself, escalation

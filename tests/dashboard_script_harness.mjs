@@ -203,6 +203,7 @@ const payloads = {
           ok: true,
           headline: 0.15,
           any_run: 0.4,
+          vs_best: "tied",
         },
       ],
       phases: [
