@@ -1,6 +1,14 @@
 # Changelog
 
-## Unreleased
+## 0.30.0 (2026-10-28) — Intervals, trajectories, within-noise sweeps
+
+### Upgrade notes
+- The `claude` extra needs `anthropic>=1.0,<2`. An environment that pins
+  the 0.x SDK will not resolve with it.
+- The `toolcall` all-fixture denominator grew from 20 to 31 with the
+  trajectory fixtures. Compare a new headline with an older run through
+  `--category`, not the overall rate.
+- No schema change. An existing database needs no migration.
 
 ### Added
 - `atomics doctor` warns for each Ollama model loaded less than fully in
