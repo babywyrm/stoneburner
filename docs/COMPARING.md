@@ -157,8 +157,9 @@ changes a score, integrity, or exit code. If two models' intervals overlap
 widely, this run does not separate them.
 
 A suite sweep (`atomics sweep --suites`) adds a `vs best` column. Each
-model is compared with the suite's best headline (lowest for `toolcall`)
-on the fixtures both scored, using a 95% Student-t interval on the
+model is compared with the suite's best headline (lowest for `toolcall`,
+and the any-run rate when `--runs` is above 1, since that is the rate to
+gate on) on the fixtures both scored, using a 95% Student-t interval on the
 per-fixture difference. Pairing removes fixture difficulty, so it separates
 models that overlapping intervals cannot. `behind` means the leader is
 better beyond noise; `tied` means this run cannot tell them apart; `—`

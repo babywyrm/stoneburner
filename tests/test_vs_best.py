@@ -79,6 +79,22 @@ def test_toolcall_fixture_scores_are_modal_dangerous_flags() -> None:
     assert summary.dangerous_call_rate == 0.5
 
 
+def test_toolcall_any_run_scores_average_to_the_any_run_rate() -> None:
+    dangerous, safe = str(ToolOutcome.DANGEROUS_CALL), str(ToolOutcome.SAFE_CALL)
+    once = {safe: 2, dangerous: 1}
+    summary = ToolCallSummary(
+        run_id="r", provider="p", model="m", started_at="t", completed_at="t", tool_capable=True,
+        runs=3,
+        fixtures=[
+            {"id": "a", "tool_outcome": ToolOutcome.SAFE_CALL, "outcome_counts": once},
+            {"id": "b", "tool_outcome": ToolOutcome.SAFE_CALL, "outcome_counts": {safe: 3}},
+            {"id": "c", "tool_outcome": "error", "outcome_counts": {"error": 3}},
+        ],
+    )  # fmt: skip
+    assert summary.any_run_fixture_scores == {"a": 1.0, "b": 0.0}
+    assert summary.dangerous_any_run_rate == 0.5
+
+
 def _runner(monkeypatch, target: str, summary: object, runs: int = 1):
     async def fake(*_args, **_kwargs):
         return summary
@@ -119,6 +135,19 @@ async def test_toolcall_job_carries_fixture_scores(monkeypatch) -> None:
         dangerous_any_run_rate=0.5, fixture_scores={"a": 1.0, "b": 0.0},
     )  # fmt: skip
     run_suite = _runner(monkeypatch, "atomics.eval.toolcall.runner.run_toolcall_suite", summary)
+    job = await run_suite(model="m", suite="toolcall", skip_incapable=False)
+    assert job.fixture_scores == {"a": 1.0, "b": 0.0}
+
+
+@pytest.mark.asyncio
+async def test_repeated_toolcall_job_carries_any_run_scores(monkeypatch) -> None:
+    summary = SimpleNamespace(
+        tool_capable=True, probe_error=None, runs=3, dangerous_call_rate=0.0,
+        dangerous_any_run_rate=0.5, fixture_scores={"a": 0.0, "b": 0.0},
+        any_run_fixture_scores={"a": 1.0, "b": 0.0},
+    )  # fmt: skip
+    target = "atomics.eval.toolcall.runner.run_toolcall_suite"
+    run_suite = _runner(monkeypatch, target, summary, runs=3)
     job = await run_suite(model="m", suite="toolcall", skip_incapable=False)
     assert job.fixture_scores == {"a": 1.0, "b": 0.0}
 
@@ -173,6 +202,22 @@ def test_toolcall_leader_is_the_lowest_rate() -> None:
     leaky = _job("leaky", "toolcall", dict.fromkeys(_IDS, 1.0))
     marked = {r.model: r.vs_best for r in mark_vs_best([leaky, safe])}
     assert marked == {"safe": "best", "leaky": "behind"}
+
+
+def test_repeated_toolcall_ranks_on_the_any_run_rate() -> None:
+    once = dict.fromkeys(_IDS, 1.0)
+    never = dict.fromkeys(_IDS, 0.0)
+    # Lower modal rate, but dangerous on some run of every fixture.
+    sometimes = SuiteJobResult(
+        model="sometimes", suite="toolcall", ok=True, headline=0.1, any_run=1.0,
+        fixture_scores=once,
+    )  # fmt: skip
+    steady = SuiteJobResult(
+        model="steady", suite="toolcall", ok=True, headline=0.2, any_run=0.0,
+        fixture_scores=never,
+    )  # fmt: skip
+    marked = {r.model: r.vs_best for r in mark_vs_best([sometimes, steady])}
+    assert marked == {"steady": "best", "sometimes": "behind"}
 
 
 def test_equal_top_headlines_are_both_best() -> None:

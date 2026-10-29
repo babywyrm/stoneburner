@@ -147,22 +147,28 @@ def format_headline_cell(result: SuiteJobResult) -> str:
 _LOWER_IS_BETTER = frozenset({"toolcall"})
 
 
+def _ranked(job: SuiteJobResult) -> float | None:
+    """The rate a repeated toolcall is gated on is any-run, not the modal headline."""
+    return job.any_run if job.any_run is not None else job.headline
+
+
 def _comparable(job: SuiteJobResult) -> bool:
-    return job.ok and job.headline is not None and job.fixture_scores is not None
+    return job.ok and _ranked(job) is not None and job.fixture_scores is not None
 
 
 def _better(job: SuiteJobResult, lead: SuiteJobResult) -> bool:
-    if job.headline is None or lead.headline is None:
+    score, lead_score = _ranked(job), _ranked(lead)
+    if score is None or lead_score is None:
         return False
     if job.suite in _LOWER_IS_BETTER:
-        return job.headline < lead.headline
-    return job.headline > lead.headline
+        return score < lead_score
+    return score > lead_score
 
 
 def _vs_best(job: SuiteJobResult, leader: SuiteJobResult | None) -> VsBest | None:
     if leader is None or not _comparable(job):
         return None
-    if job.headline == leader.headline:
+    if _ranked(job) == _ranked(leader):
         return "best"
     if job.fixture_scores is None or leader.fixture_scores is None:
         return None
@@ -395,8 +401,8 @@ def _suite_job(
     )
 
 
-def _fixture_scores(summary: object) -> dict[str, float] | None:
-    scores: dict[str, float] | None = getattr(summary, "fixture_scores", None)
+def _fixture_scores(summary: object, name: str = "fixture_scores") -> dict[str, float] | None:
+    scores: dict[str, float] | None = getattr(summary, name, None)
     return scores
 
 
@@ -523,7 +529,10 @@ async def _dispatch_suite(
             any_run=(
                 toolcall_summary.dangerous_any_run_rate if toolcall_summary.runs > 1 else None
             ),
-            fixture_scores=_fixture_scores(toolcall_summary),
+            fixture_scores=_fixture_scores(
+                toolcall_summary,
+                "any_run_fixture_scores" if toolcall_summary.runs > 1 else "fixture_scores",
+            ),
         ), toolcall_summary
     if suite == "codereview":
         from atomics.eval.codereview import run_codereview
