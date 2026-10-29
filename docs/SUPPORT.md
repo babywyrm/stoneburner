@@ -36,7 +36,7 @@ incapable instead of scoring it.
 | `vllm` | yes, OpenAI-compatible | yes: 2026-10-16, `Qwen2.5-3B-Instruct-AWQ` |
 | `llamacpp` | yes, OpenAI-compatible | yes: 2026-10-16, `granite4.2:3b`, Metal and CPU |
 | `openai` | yes | yes: 2026-07-08 comparison, 2026-09-13 battery cut |
-| `claude` | yes, Anthropic `tool_use` | yes: 2026-07-08 comparison, 2026-09-13 battery cut |
+| `claude` | yes, Anthropic `tool_use` | yes: 2026-07-08 comparison, 2026-09-13 battery cut, 2026-10-28 on SDK 1.x |
 | `bedrock` | no | no |
 | `groq` | yes, OpenAI-compatible | no |
 | `together` | yes, OpenAI-compatible | no |

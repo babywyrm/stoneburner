@@ -24,9 +24,11 @@ hosts; every tag was re-pointed once for that, and only for that.
       record.
 - [ ] A live brain-gateway generate on record.
 - [x] The Anthropic 1.x jump: `anthropic>=1.0,<2`, temperature through
-      `extra_body`. Proved offline through the real SDK; a live generate
-      on 1.x is still to record. 2.x is held: its API version rejects
-      temperature, which the judge and `--temperature 0` rely on.
+      `extra_body`. Live on 1.17.0 (2026-10-28): Haiku 4.5 and Sonnet
+      4.6 generate at default and 0 temperature and emit tool calls; a
+      Haiku `refusal` run judged by Sonnet was `complete`, 12/12 scored.
+      2.x is held: its API version rejects temperature, which the judge
+      and `--temperature 0` rely on.
 - [x] Timing-sensitive tests on fake clocks.
 
 Do not retag again. Do not mix a feature into a tag commit. `v0` is the
