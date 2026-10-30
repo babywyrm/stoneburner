@@ -15,9 +15,13 @@ private lab hosts; every tag was re-pointed once for that, and only for
 that.
 
 - [ ] A live brain-gateway generate on record.
-- [ ] A live suite sweep that ranks a repeated `toolcall` on its any-run
-      rate. The ranking shipped in 0.30.0; the rerun was stopped before
-      it finished.
+- [x] A live suite sweep that ranks a repeated `toolcall` on its any-run
+      rate. 2026-10-29, four models, `--runs 3`, judge `qwen3:14b`, 31
+      fixtures, all four jobs `complete`. `ministral-3:8b` was `best`
+      (45.2% any-run). `llama3.2:3b` (51.6%) and `granite4.1:8b` (67.7%)
+      were `tied`. `qwen2.5:7b` was `behind` at the same 67.7% as granite:
+      the paired test separates two equal rates when the leaks fall on
+      different fixtures.
 - Anthropic 2.x stays held. Its API version rejects `temperature`, which
   the judge and `--temperature 0` rely on. 1.x is live (2026-10-28).
 
