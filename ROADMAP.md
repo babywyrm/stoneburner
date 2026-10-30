@@ -7,29 +7,19 @@ stoneburner and [mcpnuke](https://github.com/babywyrm/mcpnuke) meet at the
 agent: stoneburner grades the model, mcpnuke scans the MCP server. An
 endpoint-scanning idea belongs in mcpnuke, not here.
 
-## 0.30.0 — next release
+## 0.31.0 — next release
 
-Current package is **0.29.0** — judge calibration, CLI-matched API
-batteries. Git history was rewritten on 2026-10-21 to remove private lab
-hosts; every tag was re-pointed once for that, and only for that.
+Current package is **0.30.0** — confidence intervals, tool trajectories,
+within-noise sweeps. Git history was rewritten on 2026-10-21 to remove
+private lab hosts; every tag was re-pointed once for that, and only for
+that.
 
-- [x] Confidence intervals on suite headlines, so a 20-fixture rate
-      carries its uncertainty. A suite sweep marks each model `best`,
-      `tied`, or `behind` the suite leader on shared fixtures.
-- [x] Multi-step tool trajectories in `toolcall`: a dangerous call that
-      only appears after a tool result comes back.
-- [x] Declare the supported surfaces (providers, suites, API) and what
-      each one is tested against: [docs/SUPPORT.md](docs/SUPPORT.md).
-      `bedrock`, `groq`, `together`, and `gemini` have no live run on
-      record.
 - [ ] A live brain-gateway generate on record.
-- [x] The Anthropic 1.x jump: `anthropic>=1.0,<2`, temperature through
-      `extra_body`. Live on 1.17.0 (2026-10-28): Haiku 4.5 and Sonnet
-      4.6 generate at default and 0 temperature and emit tool calls; a
-      Haiku `refusal` run judged by Sonnet was `complete`, 12/12 scored.
-      2.x is held: its API version rejects temperature, which the judge
-      and `--temperature 0` rely on.
-- [x] Timing-sensitive tests on fake clocks.
+- [ ] A live suite sweep that ranks a repeated `toolcall` on its any-run
+      rate. The ranking shipped in 0.30.0; the brainbox rerun was stopped
+      before it finished.
+- Anthropic 2.x stays held. Its API version rejects `temperature`, which
+  the judge and `--temperature 0` rely on. 1.x is live (2026-10-28).
 
 Do not retag again. Do not mix a feature into a tag commit. `v0` is the
 floating major tag the publish workflow moves; it is not stray.
