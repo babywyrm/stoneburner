@@ -296,3 +296,33 @@ def test_sweep_table_shows_vs_best(monkeypatch, tmp_path) -> None:
     assert "vs best" in result.output
     for mark in ("best", "tied", "behind"):
         assert mark in result.output
+
+
+def test_sweep_warns_before_a_cpu_run(monkeypatch, tmp_path) -> None:
+    from click.testing import CliRunner
+
+    from atomics.cli import cli
+
+    def get(url: str, **_kwargs: object) -> SimpleNamespace:
+        assert url.endswith("/api/ps")
+        return SimpleNamespace(
+            json=lambda: {"models": [{"name": "qwen2.5:7b", "size": 100, "size_vram": 0}]}
+        )
+
+    async def fake_gauntlet(**_kwargs):
+        return [
+            SuiteJobResult(model="a:1b", suite="redblue", ok=True, headline=0.9, vs_best="best")
+        ]
+
+    monkeypatch.setattr("httpx.get", get)
+    monkeypatch.setattr("atomics.eval.gauntlet.run_gauntlet", fake_gauntlet)
+    monkeypatch.setattr(
+        "atomics.commands.sweep._make_provider",
+        lambda *_a, **_k: SimpleNamespace(name="ollama", default_model="m"),
+    )
+    result = CliRunner().invoke(
+        cli,
+        ["sweep", "--models", "a:1b", "--suites", "redblue", "--ollama-host", "http://127.0.0.1:9"],
+    )
+    assert result.exit_code == 0, result.output
+    assert "qwen2.5:7b loaded 0% in VRAM" in result.output

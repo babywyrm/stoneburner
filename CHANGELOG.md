@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- `atomics sweep` warns, before it starts, for each Ollama model loaded
+  less than fully in VRAM. `atomics doctor` already did; a sweep did not,
+  so the warning arrived only after the run was underway.
+
 ## 0.30.0 (2026-10-28) — Intervals, trajectories, within-noise sweeps
 
 ### Upgrade notes

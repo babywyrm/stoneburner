@@ -248,6 +248,7 @@ def sweep(
     from pathlib import Path
 
     from atomics.benchmark.sweep import ModelSweepResult, run_model_sweep
+    from atomics.doctor import _warn_cpu_offload
     from atomics.eval.gauntlet import (
         format_headline_cell,
         ignore_broken_pipe,
@@ -295,6 +296,13 @@ def sweep(
     fixture_ids = [f.strip() for f in fixtures.split(",") if f.strip()] if fixtures else None
     if temperature is not None:
         console.print(f"[dim]temperature={temperature} for every model; judges at 0[/dim]")
+    ollama_hosts: list[str] = []
+    if provider_name == "ollama":
+        ollama_hosts.append(effective_host)
+    if judge_provider_name == "ollama" and (judge_host or effective_host) not in ollama_hosts:
+        ollama_hosts.append(judge_host or effective_host)
+    for host in ollama_hosts:
+        _warn_cpu_offload(console, host)
 
     # A sweep builds one provider per model as it goes, so the ceiling has to
     # outlive any single provider. Metering each model separately would make an

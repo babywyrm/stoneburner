@@ -65,7 +65,7 @@ Recipes: [QUICKSTART.md](../QUICKSTART.md).
 | `atomics cohorts FILE -b BATTERY --json-out FILE` | Write cohorts JSON (schema 1) including a `jobs` list |
 | `atomics cohorts FILE -b BATTERY --plan` | Print `atomics battery run` for each member |
 | `atomics battery run --cohorts FILE` | Execute every job in that plan. `--runs` / `--keep-going` apply to each |
-| `atomics doctor` | Check installation health, config, and `inference.env` (never prints the API key). Prints one next command when the check is healthy. Warns for each Ollama model loaded less than fully in VRAM. |
+| `atomics doctor` | Check installation health, config, and `inference.env` (never prints the API key). Prints one next command when the check is healthy. Warns for each Ollama model loaded less than fully in VRAM. `atomics sweep` prints the same warning before it starts. |
 
 ## Seeing the Prompt
 

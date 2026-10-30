@@ -100,6 +100,21 @@ _real_connect_ex = socket.socket.connect_ex
 
 
 @pytest.fixture(autouse=True)
+def _sweep_skips_the_vram_probe(
+    request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A sweep asks Ollama ``/api/ps`` before it starts. That port is guarded.
+
+    ``test_doctor`` and ``test_sweep_warns_before_a_cpu_run`` call the real
+    probe against a mocked ``httpx.get``.
+    """
+    nodeid = request.node.nodeid
+    if "test_doctor.py" in nodeid or "test_sweep_warns_before_a_cpu_run" in nodeid:
+        return
+    monkeypatch.setattr("atomics.doctor._warn_cpu_offload", lambda *_a, **_k: None)
+
+
+@pytest.fixture(autouse=True)
 def _no_network(
     request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
 ) -> Iterator[list[str]]:
