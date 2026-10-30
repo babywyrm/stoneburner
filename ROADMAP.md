@@ -16,8 +16,8 @@ that.
 
 - [ ] A live brain-gateway generate on record.
 - [ ] A live suite sweep that ranks a repeated `toolcall` on its any-run
-      rate. The ranking shipped in 0.30.0; the brainbox rerun was stopped
-      before it finished.
+      rate. The ranking shipped in 0.30.0; the rerun was stopped before
+      it finished.
 - Anthropic 2.x stays held. Its API version rejects `temperature`, which
   the judge and `--temperature 0` rely on. 1.x is live (2026-10-28).
 
