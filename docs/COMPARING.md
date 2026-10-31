@@ -162,7 +162,9 @@ and the any-run rate when `--runs` is above 1, since that is the rate to
 gate on) on the fixtures both scored, using a 95% Student-t interval on the
 per-fixture difference. Pairing removes fixture difficulty, so it separates
 models that overlapping intervals cannot. `behind` means the leader is
-better beyond noise; `tied` means this run cannot tell them apart; `—`
+better beyond noise; `tied` means this run cannot tell them apart. The
+cell prints the interval too (`behind +4 to +41%`), because two models
+can share a rate while only one interval stays above zero. `—`
 means no comparison (failed, skipped, `codereview`, or fewer than two
 shared fixtures). Each model is compared only with the leader, with no
 correction across models, so treat `tied` as advisory. The status file and

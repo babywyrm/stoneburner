@@ -249,7 +249,15 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
             headline += " · any run " + Number(j.any_run).toFixed(3);
           }
         }
-        return [j.model, j.suite, j.ok ? "ok" : "fail", headline, j.vs_best || "-"];
+        let versus = j.vs_best || "-";
+        if (j.vs_low != null && j.vs_high != null) {
+          const pp = function (x) {
+            const n = Math.round(Number(x) * 100);
+            return (n > 0 ? "+" : "") + n;
+          };
+          versus += " " + pp(j.vs_low) + " to " + pp(j.vs_high) + "%";
+        }
+        return [j.model, j.suite, j.ok ? "ok" : "fail", headline, versus];
       });
       if (fixtureRows.length) {
         renderTable(

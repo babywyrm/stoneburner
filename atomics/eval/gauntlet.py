@@ -48,6 +48,9 @@ class SuiteJobResult:
     # Score per fixture id, for the paired comparison against the suite best.
     fixture_scores: dict[str, float] | None = None
     vs_best: VsBest | None = None
+    # Paired-difference interval behind vs_best, in the leader's favor.
+    vs_low: float | None = None
+    vs_high: float | None = None
 
 
 class _RunScored(Protocol):
@@ -165,20 +168,32 @@ def _better(job: SuiteJobResult, lead: SuiteJobResult) -> bool:
     return score > lead_score
 
 
-def _vs_best(job: SuiteJobResult, leader: SuiteJobResult | None) -> VsBest | None:
+def _vs_best(
+    job: SuiteJobResult, leader: SuiteJobResult | None
+) -> tuple[VsBest | None, float | None, float | None]:
     if leader is None or not _comparable(job):
-        return None
+        return None, None, None
     if _ranked(job) == _ranked(leader):
-        return "best"
+        return "best", None, None
     if job.fixture_scores is None or leader.fixture_scores is None:
-        return None
+        return None, None, None
     sign = -1.0 if job.suite in _LOWER_IS_BETTER else 1.0
     shared = sorted(leader.fixture_scores.keys() & job.fixture_scores.keys())
     diffs = [sign * (leader.fixture_scores[k] - job.fixture_scores[k]) for k in shared]
     interval = paired_interval(diffs)
     if interval is None:
-        return None
-    return "behind" if interval.low > 0 else "tied"
+        return None, None, None
+    mark: VsBest = "behind" if interval.low > 0 else "tied"
+    return mark, interval.low, interval.high
+
+
+def format_vs_best(result: SuiteJobResult) -> str:
+    """Mark plus its interval, so two equal rates can still be told apart."""
+    if result.vs_best is None:
+        return "—"
+    if result.vs_low is None or result.vs_high is None:
+        return result.vs_best
+    return f"{result.vs_best} {result.vs_low * 100:+.0f} to {result.vs_high * 100:+.0f}%"
 
 
 def mark_vs_best(results: Sequence[SuiteJobResult]) -> list[SuiteJobResult]:
@@ -188,7 +203,11 @@ def mark_vs_best(results: Sequence[SuiteJobResult]) -> list[SuiteJobResult]:
         lead = leaders.get(job.suite)
         if lead is None or _better(job, lead):
             leaders[job.suite] = job
-    return [replace(job, vs_best=_vs_best(job, leaders.get(job.suite))) for job in results]
+    marked: list[SuiteJobResult] = []
+    for job in results:
+        vs_best, vs_low, vs_high = _vs_best(job, leaders.get(job.suite))
+        marked.append(replace(job, vs_best=vs_best, vs_low=vs_low, vs_high=vs_high))
+    return marked
 
 
 def write_status(path: Path, progress: GauntletProgress) -> None:

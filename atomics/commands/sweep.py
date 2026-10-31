@@ -251,6 +251,7 @@ def sweep(
     from atomics.doctor import _warn_cpu_offload
     from atomics.eval.gauntlet import (
         format_headline_cell,
+        format_vs_best,
         ignore_broken_pipe,
         make_suite_runner,
         parse_suites,
@@ -372,7 +373,9 @@ def sweep(
             mark = "[green]OK[/green]" if row.ok else "[red]FAIL[/red]"
             if row.tool_capable is False:
                 mark = "[yellow]SKIP[/yellow]" if row.ok else "[red]INCAPABLE[/red]"
-            table.add_row(row.model, row.suite, mark, format_headline_cell(row), row.vs_best or "—")
+            table.add_row(
+                row.model, row.suite, mark, format_headline_cell(row), format_vs_best(row)
+            )
             try:
                 console.print(f"  [dim]{row.suite}[/dim] {row.model}")
             except BrokenPipeError:

@@ -3,6 +3,10 @@
 ## Unreleased
 
 ### Added
+- A sweep's `vs best` cell includes the paired interval, as in
+  `behind +4 to +41%`. Two models can share a rate and still differ:
+  one interval stays above zero, the other crosses it. The status file
+  and the dashboard carry `vs_low` and `vs_high`.
 - `atomics sweep` warns, before it starts, for each Ollama model loaded
   less than fully in VRAM. `atomics doctor` already did; a sweep did not,
   so the warning arrived only after the run was underway.

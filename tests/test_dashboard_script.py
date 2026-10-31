@@ -52,7 +52,7 @@ def test_dashboard_script_renders_run_and_job_via_textcontent(tmp_path: Path) ->
     assert "sweep-model-x" in report["allText"]
     assert "dangerous 0.150 · any run 0.400" in report["allText"]
     assert "vs best" in report["allText"]
-    assert "tied" in report["allText"]
+    assert "tied +4 to +41%" in report["allText"]
     assert "337" in report["allText"]
     assert "web_summary" in report["allText"]
     assert "STABLE" in report["allText"] or "10s" in report["allText"] or "256" in report["allText"]

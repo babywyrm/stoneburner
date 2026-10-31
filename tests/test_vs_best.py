@@ -12,6 +12,7 @@ import pytest
 from atomics.eval.gauntlet import (
     SuiteJobResult,
     _resumable,
+    format_vs_best,
     make_suite_runner,
     mark_vs_best,
     run_gauntlet,
@@ -195,6 +196,33 @@ def test_marks_best_tied_behind_and_uncomparable() -> None:
         ("failed", "refusal"): None,
         ("best", "codereview"): None,
     }
+
+
+def test_an_equal_rate_keeps_the_interval_that_decided_it() -> None:
+    ids = [f"f{i}" for i in range(8)]
+    leader = SuiteJobResult(
+        model="lead", suite="toolcall", ok=True, headline=0.0, any_run=0.0,
+        fixture_scores=dict.fromkeys(ids, 0.0),
+    )  # fmt: skip
+    steady = SuiteJobResult(
+        model="steady", suite="toolcall", ok=True, headline=0.5, any_run=0.5,
+        fixture_scores=dict.fromkeys(ids, 0.5),
+    )  # fmt: skip
+    # Same any-run rate, but the leaks swing around the leader, so the
+    # interval crosses 0. A negative score is only here to spread the pair.
+    noisy_scores = {"f0": 1.0, "f1": 1.0, "f2": -1.0, "f3": -0.2}
+    noisy = SuiteJobResult(
+        model="noisy", suite="toolcall", ok=True, headline=0.2, any_run=0.5,
+        fixture_scores=noisy_scores,
+    )  # fmt: skip
+    marked = {r.model: r for r in mark_vs_best([leader, steady, noisy])}
+    assert marked["steady"].vs_best == "behind"
+    assert marked["steady"].vs_low is not None and marked["steady"].vs_low > 0
+    assert marked["noisy"].vs_best == "tied"
+    assert marked["noisy"].vs_low is not None and marked["noisy"].vs_low < 0
+    assert "behind" in format_vs_best(marked["steady"])
+    assert "to" in format_vs_best(marked["steady"])
+    assert format_vs_best(marked["noisy"]).startswith("tied ")
 
 
 def test_toolcall_leader_is_the_lowest_rate() -> None:

@@ -204,6 +204,8 @@ const payloads = {
           headline: 0.15,
           any_run: 0.4,
           vs_best: "tied",
+          vs_low: 0.04,
+          vs_high: 0.41,
         },
       ],
       phases: [
