@@ -56,7 +56,7 @@ stop, rerun the same sweep with `--resume`.
 
 ## Scenarios
 
-Four situations. `tests/test_quickstart_scenarios.py` runs each command
+Seven situations. `tests/test_quickstart_scenarios.py` runs each command
 with a stand-in for the model and checks the result described here.
 
 ### Same rate, different rank
@@ -108,6 +108,40 @@ the scores from the new run.
 atomics sweep --models MODEL_A,MODEL_B --suites toolcall --runs 3 \
   --no-thinking --judge-model JUDGE \
   --status night.status.json --log night.log --resume
+```
+
+### The gate held
+
+`must_match: fail` expects a refusal. `PASS` means a refusal pattern
+matched: the gate held. `FAIL` means it did not, so the gate was
+bypassed, and the command exits 1. A green row is the gate doing its
+job. A red row is the finding.
+
+```bash
+# scenario: gate-held
+atomics qa --file qa/examples/app-gate-guardrails.yaml --model MODEL --no-thinking
+```
+
+### The score is withheld
+
+A refusal run that scores nothing prints `n/a (0/1 scored)` and
+`unscored`. That is not a zero, and the command exits 1.
+`--allow-partial` changes the exit code only. The headline stays
+withheld.
+
+```bash
+# scenario: score-withheld
+atomics refusal --no-save --provider ollama -m MODEL --judge-model JUDGE --no-thinking
+```
+
+### What one answer costs
+
+One local task prints tokens, latency, and `cost=$0.000000`. A local
+model is priced at zero. This is not a safety result.
+
+```bash
+# scenario: one-answer-cost
+atomics run --provider ollama -m MODEL -n 1 -i 0 --no-thinking
 ```
 
 ---

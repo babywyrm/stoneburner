@@ -8,6 +8,9 @@
   text stays off the exception, so a tool payload is not stored as a score.
 
 ### Added
+- The quickstart adds three more scenarios: a gate that held, a score
+  withheld as `n/a`, and the `$0` cost of one local answer. The app-gate
+  example said `FAIL` meant the gate held; `PASS` is the refusal.
 - The quickstart adds four worked scenarios: same rate with different
   `vs best` marks, exit 0 that is still a finding, a blue score that is
   not safety, and a sweep resumed after a stop.

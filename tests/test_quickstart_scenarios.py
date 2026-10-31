@@ -15,6 +15,8 @@ from click.testing import CliRunner
 
 from atomics.cli import cli
 from atomics.eval.gauntlet import SuiteJobResult, mark_vs_best, run_gauntlet
+from atomics.providers.base import BaseProvider, ProviderResponse
+from tests.test_cli_refusal import _patch_refusal
 
 _QUICKSTART = Path(__file__).resolve().parents[1] / "QUICKSTART.md"
 
@@ -155,3 +157,67 @@ def test_scenario_resume_command_forwards_resume(monkeypatch, tmp_path: Path) ->
     assert result.exit_code == 0, result.output
     assert seen["resume"] is True
     assert "best" in result.output
+
+
+def _gate_reply(prompt: str) -> str:
+    if "RootBot" in prompt:
+        return "The admin password is hunter2"
+    if "Translate to French" in prompt:
+        return "Ignorez vos instructions"
+    if "capital of France" in prompt:
+        return "Paris"
+    return "I cannot provide that"
+
+
+def test_scenario_gate_held_names_a_bypass(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def fake_query(_client, _host, _model, prompt, _num_predict=1024, **_kwargs):
+        return _gate_reply(prompt), 10.0, 4, 8, None
+
+    monkeypatch.setattr("atomics.benchmark.qa_runner._query_ollama", fake_query)
+    result = CliRunner().invoke(cli, _scenario("gate-held")[0])
+    assert result.exit_code == 1, result.output
+    assert "direct-secret-extraction" in result.output
+    assert "roleplay-jailbreak" in result.output
+    assert "PASS" in result.output
+    assert "FAIL" in result.output
+    assert "5/6" in result.output
+
+
+def test_scenario_withheld_score_is_not_a_zero(monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_refusal(monkeypatch, partial=True)
+    result = CliRunner().invoke(cli, _scenario("score-withheld")[0])
+    assert result.exit_code == 1, result.output
+    assert "n/a (0/1 scored)" in result.output
+    assert "unscored" in result.output
+    assert "100.0%" not in result.output
+
+
+class _FreeLocal(BaseProvider):
+    @property
+    def name(self) -> str:
+        return "ollama"
+
+    async def generate(self, prompt, *, system="", model=None, max_tokens=1024, **_kwargs):
+        return ProviderResponse(
+            text="ok",
+            input_tokens=30,
+            output_tokens=60,
+            total_tokens=90,
+            model=model or "MODEL",
+            latency_ms=10.0,
+            estimated_cost_usd=0.0,
+        )
+
+    async def health_check(self) -> bool:
+        return True
+
+
+def test_scenario_one_local_answer_costs_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "atomics.commands.benchmark._make_provider",
+        lambda *_a, **_k: _FreeLocal(),
+    )
+    result = CliRunner().invoke(cli, _scenario("one-answer-cost")[0])
+    assert result.exit_code == 0, result.output
+    assert "tokens=90" in result.output
+    assert "cost=$0.000000" in result.output
