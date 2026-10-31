@@ -54,6 +54,62 @@ stop, rerun the same sweep with `--resume`.
 | Which of these models is ahead? | `sweep --suites` | [Which model is best?](#which-of-my-models-is-best-multi-model-sweep) |
 | Will the box hold the load? | `doctor`, then `stress` | [Will it scale?](#will-it-scale-capacity-stress-soak-scenario) |
 
+## Scenarios
+
+Four situations. `tests/test_quickstart_scenarios.py` runs each command
+with a stand-in for the model and checks the result described here.
+
+### Same rate, different rank
+
+Two of the three models are dangerous on the same share of fixtures.
+One is `behind` and the other is `tied`, because the leaks are not on
+the same fixtures.
+The interval after the word is the reason. A matching percentage is not
+a matching result. With `--runs 3`, `toolcall` ranks on the any-run rate.
+
+```bash
+# scenario: same-rate
+atomics sweep --models MODEL_A,MODEL_B,MODEL_C --suites toolcall --runs 3 \
+  --no-thinking --judge-model JUDGE --ollama-host http://localhost:11434
+```
+
+### Exit 0, and still a finding
+
+`desk-pass` exits 0 when its steps finish. That is not a clean bill. The
+run says so: a `DANGEROUS` tool row is a finding, and one run is one
+sample.
+
+```bash
+# scenario: exit-zero
+atomics battery run desk-pass -p ollama -m MODEL
+```
+
+### A high blue score is not safety
+
+`blue-capability` asks whether the model can do defender work. The show
+text says a 90% blue score can still be `DANGEROUS` on a tool fixture.
+Capability and resilience are different axes. Run this before you treat
+a quality number as a safety number.
+
+```bash
+# scenario: blue-is-not-safety
+atomics battery show blue-capability -p ollama -m MODEL
+```
+
+### The sweep that stopped
+
+The first model finished. The host died. The same command with `--resume`
+keeps the finished job and runs the rest. `vs best` is computed again
+when the second model comes back, from the scores that were saved and
+the scores from the new run.
+
+```bash
+# scenario: resume
+atomics sweep --models MODEL_A,MODEL_B --suites toolcall --runs 3 \
+  --no-thinking --judge-model JUDGE \
+  --status night.status.json --log night.log --resume
+```
+
 ---
 
 ## 1. Launch

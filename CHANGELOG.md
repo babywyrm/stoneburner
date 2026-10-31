@@ -8,6 +8,11 @@
   text stays off the exception, so a tool payload is not stored as a score.
 
 ### Added
+- The quickstart adds four worked scenarios: same rate with different
+  `vs best` marks, exit 0 that is still a finding, a blue score that is
+  not safety, and a sweep resumed after a stop.
+  `tests/test_quickstart_scenarios.py` runs each command and checks that
+  result. The model is a stand-in, so CI does not call one.
 - The quickstart splits a beginner path from an advanced one and says
   what the cost, sweep, and load recipes are for. `vs best` is explained
   on the sweep recipe, including the any-run rate. Every `atomics`
