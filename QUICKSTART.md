@@ -56,8 +56,9 @@ stop, rerun the same sweep with `--resume`.
 
 ## Scenarios
 
-Seven situations. `tests/test_quickstart_scenarios.py` runs each command
-with a stand-in for the model and checks the result described here.
+Thirteen situations. `tests/test_quickstart_scenarios.py` runs each
+command with a stand-in for the model and checks the result described
+here.
 
 ### Same rate, different rank
 
@@ -142,6 +143,74 @@ model is priced at zero. This is not a safety result.
 ```bash
 # scenario: one-answer-cost
 atomics run --provider ollama -m MODEL -n 1 -i 0 --no-thinking
+```
+
+### A probe regression
+
+The same artifact scored 90% last time and 40% this time. That drop is
+a regression, and `--alert-on-regression` prints it. The new score is
+not a pass just because the command exits 0.
+
+```bash
+# scenario: probe-regression
+atomics probe --artifact config-file --file qa/examples/app-gate-guardrails.yaml \
+  --model MODEL --judge-model JUDGE --no-save --no-thinking --alert-on-regression
+```
+
+### The index missed the page
+
+Retrieval is not the model's answer. The gold page is `doc.txt`. The
+index returned something else, so `Recall@k` is `0.000`. Fix the index
+before you blame the model.
+
+```bash
+# scenario: retrieval-miss
+atomics rag-retrieval --index index.db --gold gold.json --top-k 1
+```
+
+### Same quality, different box
+
+Two hosts score the same. One is four times faster, and the other is at
+0% GPU. `parity OK` is the quality. The speed and the VRAM line are the
+capacity. Do not pick the slow box because the percents match.
+
+```bash
+# scenario: same-quality
+atomics labcompare --host gpu=http://127.0.0.1:11435 --host cpu=http://127.0.0.1:11434 \
+  --models MODEL --no-save
+```
+
+### A flattering judge fails calibration
+
+The judge gave every human-graded answer a 0. The humans did not.
+`judge-calibrate` prints `FAIL` and exits 1. With `--no-save`, nothing
+is stored, so a later suite still says this judge is uncalibrated.
+
+```bash
+# scenario: judge-fails
+atomics judge-calibrate --judge-provider ollama --judge-model JUDGE --no-save
+```
+
+### Auth off stays on loopback
+
+`--no-auth` on `0.0.0.0` is refused before the server starts. That bind
+would expose every endpoint with no key. The command exits 1. The safe
+form is `atomics server --no-auth`, which binds `127.0.0.1`.
+
+```bash
+# scenario: server-loopback
+atomics server --no-auth --host 0.0.0.0
+```
+
+### A schedule preview does not install
+
+Without `--install`, `schedule` prints the crontab line and writes
+nothing. The line carries `--trigger scheduled`. Read it, then install
+it on purpose.
+
+```bash
+# scenario: schedule-preview
+atomics schedule --format crontab --tier ez --provider ollama
 ```
 
 ---

@@ -7,14 +7,20 @@ The model is a stand-in. Each test invokes the command in the matching
 from __future__ import annotations
 
 import json
+import sys
+import types
 from dataclasses import asdict
 from pathlib import Path
 
 import pytest
 from click.testing import CliRunner
 
+from atomics.benchmark.labcompare import CellResult
 from atomics.cli import cli
+from atomics.eval.calibration import run_judge_calibration
 from atomics.eval.gauntlet import SuiteJobResult, mark_vs_best, run_gauntlet
+from atomics.eval.judge import JudgeResult
+from atomics.probe.runner import ProbeResult, ProbeSummary
 from atomics.providers.base import BaseProvider, ProviderResponse
 from tests.test_cli_refusal import _patch_refusal
 
@@ -221,3 +227,126 @@ def test_scenario_one_local_answer_costs_nothing(monkeypatch: pytest.MonkeyPatch
     assert result.exit_code == 0, result.output
     assert "tokens=90" in result.output
     assert "cost=$0.000000" in result.output
+
+
+def _stand_in(*_a, **_k):
+    return type("P", (), {"name": "ollama", "default_model": "JUDGE"})()
+
+
+def test_scenario_probe_names_the_regression(monkeypatch: pytest.MonkeyPatch) -> None:
+    row = ProbeResult(
+        target_name="app-gate-guardrails.yaml",
+        artifact_type="config-file",
+        check_id="config",
+        score=0.4,
+        prev_score=0.9,
+        regressed=True,
+        judge_model="JUDGE",
+        judge_rationale="dropped",
+    )
+
+    async def fake_probe(*_args, on_result=None, **_kwargs):
+        if on_result is not None:
+            on_result(row)
+        return ProbeSummary(results=[row])
+
+    monkeypatch.setattr("atomics.commands.probe._make_provider", _stand_in)
+    monkeypatch.setattr("atomics.probe.runner.run_probe", fake_probe)
+    result = CliRunner().invoke(cli, _scenario("probe-regression")[0])
+    assert result.exit_code == 0, result.output
+    assert "REGRESSION" in result.output
+    assert "90.0% → 40.0%" in result.output
+
+
+class _MissIndex:
+    def __init__(self, *_args, **_kwargs) -> None:
+        return None
+
+    def info(self) -> dict[str, str]:
+        return {"embedding_model": "mock"}
+
+    def search(self, *_args, **_kwargs) -> list[types.SimpleNamespace]:
+        return [types.SimpleNamespace(source="other.txt")]
+
+
+def test_scenario_retrieval_miss_is_not_the_model(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    gold = tmp_path / "gold.json"
+    gold.write_text(
+        json.dumps({"q1": {"relevant": ["doc.txt"], "scores": {"doc.txt": 1.0}}}),
+        encoding="utf-8",
+    )
+    index = tmp_path / "index.db"
+    index.write_text("", encoding="utf-8")
+    monkeypatch.setitem(
+        sys.modules, "sentence_transformers", types.ModuleType("sentence_transformers")
+    )
+    monkeypatch.setitem(sys.modules, "sqlite_vec", types.ModuleType("sqlite_vec"))
+    monkeypatch.setattr("atomics.eval.rag.retrieval.RAGIndex", _MissIndex)
+    monkeypatch.setattr(
+        "atomics.eval.rag.retrieval.LocalSentenceTransformerEmbedder",
+        lambda *_a, **_k: object(),
+    )
+    argv = [
+        str(index) if item == "index.db" else str(gold) if item == "gold.json" else item
+        for item in _scenario("retrieval-miss")[0]
+    ]
+    result = CliRunner().invoke(cli, argv)
+    assert result.exit_code == 0, result.output
+    assert "Recall@k: 0.000" in result.output
+
+
+def test_scenario_same_quality_names_the_slow_box(monkeypatch: pytest.MonkeyPatch) -> None:
+    cells = [
+        CellResult(
+            "gpu", "http://127.0.0.1:11435", "MODEL",
+            tokens_per_second=40.0, latency_ms=100.0, vram_fit_pct=1.0, quality_score=0.9,
+        ),
+        CellResult(
+            "cpu", "http://127.0.0.1:11434", "MODEL",
+            tokens_per_second=10.0, latency_ms=400.0, vram_fit_pct=0.0, quality_score=0.9,
+        ),
+    ]  # fmt: skip
+
+    monkeypatch.setattr("atomics.commands.labcompare._run_labcompare_sync", lambda **_k: cells)
+    result = CliRunner().invoke(cli, _scenario("same-quality")[0])
+    assert result.exit_code == 0, result.output
+    assert "parity OK" in result.output
+    assert "4.0x faster" in result.output
+    assert "0% GPU" in result.output
+
+
+def test_scenario_a_zero_judge_fails_calibration(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def every_answer_is_zero(*_args, **_kwargs) -> JudgeResult:
+        return JudgeResult(
+            score=0.0, accuracy=0, completeness=0, format_score=0,
+            rationale="empty", judge_model="JUDGE",
+        )  # fmt: skip
+
+    async def fake_run(*args, **kwargs):
+        kwargs["score_fn"] = every_answer_is_zero
+        return await run_judge_calibration(*args, **kwargs)
+
+    monkeypatch.setattr("atomics.commands.calibration._make_provider", _stand_in)
+    monkeypatch.setattr("atomics.commands.calibration.run_judge_calibration", fake_run)
+    result = CliRunner().invoke(cli, _scenario("judge-fails")[0])
+    assert result.exit_code == 1, result.output
+    assert "FAIL" in result.output
+    assert "not stored (--no-save)" in result.output
+
+
+def test_scenario_no_auth_refuses_a_public_bind() -> None:
+    result = CliRunner().invoke(cli, _scenario("server-loopback")[0])
+    assert result.exit_code == 1, result.output
+    assert "no_auth cannot be combined" in result.output
+    assert "127.0.0.1" in result.output
+
+
+def test_scenario_schedule_preview_does_not_install() -> None:
+    result = CliRunner().invoke(cli, _scenario("schedule-preview")[0])
+    assert result.exit_code == 0, result.output
+    assert "Add this to your crontab" in result.output
+    assert "--trigger scheduled" in result.output
+    assert "--provider ollama" in result.output
+    assert "installed" not in result.output

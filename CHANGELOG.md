@@ -8,6 +8,11 @@
   text stays off the exception, so a tool payload is not stored as a score.
 
 ### Added
+- The quickstart adds scenarios for a probe regression, a retrieval
+  miss, a same-quality host comparison, a judge that fails calibration,
+  a `--no-auth` bind that is refused off loopback, and a schedule
+  preview that does not install. Each command is run in
+  `tests/test_quickstart_scenarios.py`.
 - The quickstart adds three more scenarios: a gate that held, a score
   withheld as `n/a`, and the `$0` cost of one local answer. The app-gate
   example said `FAIL` meant the gate held; `PASS` is the refusal.
