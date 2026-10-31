@@ -88,11 +88,17 @@ class BrainGatewayProvider(BaseProvider):
             err = data["error"]
             raise RuntimeError(f"brain-gateway RPC error {err.get('code')}: {err.get('message')}")
 
-        content = data.get("result", {}).get("content", [])
+        result = data.get("result") or {}
+        if result.get("isError"):
+            raise RuntimeError("brain-gateway tool call failed")
+        content = result.get("content", [])
         if not content:
             raise RuntimeError("brain-gateway returned empty content")
 
-        inner = json.loads(content[0].get("text", "{}"))
+        try:
+            inner = json.loads(content[0].get("text", "{}"))
+        except json.JSONDecodeError as exc:
+            raise RuntimeError("brain-gateway returned unreadable content") from exc
         text = inner.get("answer", inner.get("ai_analysis", inner.get("summary", "")))
 
         usage = inner.get("_usage", {})
@@ -132,12 +138,13 @@ class BrainGatewayProvider(BaseProvider):
         return resp.json()
 
     async def _switch_model(self, model: str) -> None:
-        """Switch the brain-gateway's active model before generating."""
+        """Switch the active model. A failed switch must not be scored as that model."""
         try:
-            await self._client.put(
+            resp = await self._client.put(
                 f"{self._url}/config",
                 json={"model": model},
                 timeout=10.0,
             )
-        except httpx.HTTPError:
-            pass
+            resp.raise_for_status()
+        except httpx.HTTPError as exc:
+            raise RuntimeError(f"brain-gateway did not switch to {model}") from exc

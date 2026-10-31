@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Fixed
+- `brain-gateway` no longer scores a generate when the model switch
+  fails, the tool result is an error, or the body is not JSON. The error
+  text stays off the exception, so a tool payload is not stored as a score.
+
 ### Added
 - A sweep's `vs best` cell includes the paired interval, as in
   `behind +4 to +41%`. Two models can share a rate and still differ:

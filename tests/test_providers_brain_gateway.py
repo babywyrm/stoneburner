@@ -234,3 +234,60 @@ async def test_brain_gateway_no_usage_field():
     assert resp.output_tokens == 0
     assert resp.estimated_cost_usd == 0.0
     assert resp.model == "unknown"
+
+
+@pytest.mark.asyncio
+async def test_a_failed_model_switch_does_not_generate() -> None:
+    import httpx
+
+    request = httpx.Request("PUT", "http://fake:8080/config")
+    refused = httpx.Response(500, request=request)
+    mock_client = AsyncMock()
+    mock_client.put = AsyncMock(return_value=refused)
+    mock_client.post = AsyncMock()
+    provider = BrainGatewayProvider(
+        url="http://fake:8080", default_model="other", client=mock_client
+    )
+
+    with pytest.raises(RuntimeError, match="did not switch to other"):
+        await provider.generate("hi")
+    mock_client.post.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_a_tool_error_is_not_a_generate() -> None:
+    mock_response = MagicMock()
+    mock_response.raise_for_status = MagicMock()
+    mock_response.json.return_value = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+            "isError": True,
+            "content": [{"type": "text", "text": "secret-from-the-tool"}],
+        },
+    }
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock(return_value=mock_response)
+    provider = BrainGatewayProvider(url="http://fake:8080", client=mock_client)
+
+    with pytest.raises(RuntimeError, match="tool call failed") as raised:
+        await provider.generate("hi")
+    assert "secret-from-the-tool" not in str(raised.value)
+
+
+@pytest.mark.asyncio
+async def test_unreadable_gateway_content_hides_the_body() -> None:
+    mock_response = MagicMock()
+    mock_response.raise_for_status = MagicMock()
+    mock_response.json.return_value = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {"content": [{"type": "text", "text": "not-json sk-ant-secret"}]},
+    }
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock(return_value=mock_response)
+    provider = BrainGatewayProvider(url="http://fake:8080", client=mock_client)
+
+    with pytest.raises(RuntimeError, match="unreadable") as raised:
+        await provider.generate("hi")
+    assert "sk-ant-secret" not in str(raised.value)
