@@ -8,6 +8,9 @@
   text stays off the exception, so a tool payload is not stored as a score.
 
 ### Added
+- The quickstart opens with the one-box install (`uv` or `pip`) and five
+  lines on how to read a result: exit 0, a `DANGEROUS` finding, `n/a`,
+  `vs best`, and `atomics doctor` when a run is slow.
 - A sweep's `vs best` cell includes the paired interval, as in
   `behind +4 to +41%`. Two models can share a rate and still differ:
   one interval stays above zero, the other crosses it. The status file

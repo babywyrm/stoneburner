@@ -10,6 +10,28 @@ security). The PyPI listing is `stoneburner-atomics`; the CLI stays
 > Ollama/vLLM box), pick a *goal* (cost, quality, safety, scale), run the
 > matching command, then `compare`/`report`/`export` the results out of SQLite.
 
+## Start
+
+Ollama on `http://localhost:11434`. No cloud key. `MODEL` is a tag from
+`atomics models`.
+
+```bash
+uv tool install stoneburner-atomics
+# or: pip install stoneburner-atomics
+atomics doctor
+atomics provider-test --provider ollama --no-thinking
+atomics models
+atomics battery show desk-pass -p ollama -m MODEL
+atomics battery run desk-pass -p ollama -m MODEL
+```
+
+- Exit 0 means those steps finished.
+- A `DANGEROUS` line is a finding inside that exit. One run is one sample.
+- `n/a (scored/total scored)` means the score was withheld, not a zero.
+- A sweep `vs best` cell is `best`, `tied`, or `behind`, plus the interval
+  (`behind +4 to +41%`).
+- A run that crawls: `atomics doctor` names any Ollama model loaded off the GPU.
+
 ---
 
 ## 1. Launch

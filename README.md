@@ -62,6 +62,7 @@ Ollama on `http://localhost:11434` is the one-box path. No cloud key required.
 
 ```bash
 uv tool install stoneburner-atomics
+# or: pip install stoneburner-atomics
 atomics doctor
 atomics provider-test --provider ollama --no-thinking
 atomics models
