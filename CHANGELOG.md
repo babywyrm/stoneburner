@@ -8,6 +8,11 @@
   text stays off the exception, so a tool payload is not stored as a score.
 
 ### Added
+- The quickstart splits a beginner path from an advanced one and says
+  what the cost, sweep, and load recipes are for. `vs best` is explained
+  on the sweep recipe, including the any-run rate. Every `atomics`
+  command in a quickstart block is parsed by
+  `tests/test_quickstart_commands.py`; an unknown flag fails that test.
 - The quickstart opens with the one-box install (`uv` or `pip`) and five
   lines on how to read a result: exit 0, a `DANGEROUS` finding, `n/a`,
   `vs best`, and `atomics doctor` when a run is slow.

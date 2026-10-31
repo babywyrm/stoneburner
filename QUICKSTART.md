@@ -32,6 +32,28 @@ atomics battery run desk-pass -p ollama -m MODEL
   (`behind +4 to +41%`).
 - A run that crawls: `atomics doctor` names any Ollama model loaded off the GPU.
 
+## Which path
+
+**Beginner.** Stay on one machine and one Ollama model. Do the Start block,
+then the cost recipe, then `desk-pass` again with `--temperature 0` only
+when you are comparing two models. Stop when you can say whether the model
+answered, whether a tool line was `DANGEROUS`, and whether `doctor` is
+healthy. You do not need a judge, a cloud key, or `--save`.
+
+**Advanced.** Add a judge that is not the model under test, then a suite
+sweep. Read `vs best` before you rank anyone. Pin `--temperature 0` only
+for a like-for-like comparison; leave it off when you want the temperature
+a deployment actually uses. Paid providers need `--budget`. A repeated
+`toolcall` is gated on the any-run rate, not the modal headline. After a
+stop, rerun the same sweep with `--resume`.
+
+| You want | Start | Then |
+|---|---|---|
+| Does it answer, and what does it cost? | Start block | [Cost](#how-much-will-this-model-cost-and-how-fast-is-it) |
+| Is this one model safe enough to try? | `battery run desk-pass` | [Is it safe?](#is-it-safe-security-evaluation-suites) |
+| Which of these models is ahead? | `sweep --suites` | [Which model is best?](#which-of-my-models-is-best-multi-model-sweep) |
+| Will the box hold the load? | `doctor`, then `stress` | [Will it scale?](#will-it-scale-capacity-stress-soak-scenario) |
+
 ---
 
 ## 1. Launch
@@ -250,6 +272,16 @@ uv run atomics compare              # by provider
 uv run atomics compare --by model   # by individual model
 ```
 
+**Beginner.** `run -n 5` spends five short tasks and prints tokens, cost,
+latency, and tokens per second. `report` is the same history as a table.
+`compare` is empty until at least two models have a saved run. Nothing
+here is a safety result.
+
+**Advanced.** Pass `--budget` on a paid provider before `-n` gets large.
+`--temperature 0` makes two cost runs comparable; it also hides the
+spread a real deployment will see. `compare --by model` is the cut when
+one provider hosts several tags.
+
 ### "Is the model any good?" — quality eval with an LLM judge
 
 The judge defaults to a **local Ollama model**, so scoring is $0. Quality is a
@@ -310,6 +342,30 @@ uv run atomics sweep --models gemma4:12b,llama3.2:1b,mistral:7b,phi4:latest,deep
 # Pin every model so the ranking is not run-to-run noise (judges are always 0)
 uv run atomics sweep --models gemma4:12b,mistral:7b --temperature 0
 ```
+
+**Beginner.** One suite, two models you already have, one pass. `show` is
+not a sweep command; this runs. The `vs best` column is the result, not
+the headline percentage. `best` is the leader. `tied` means this run
+cannot separate that model from the leader. `behind` means the leader is
+ahead beyond noise. The numbers after the word are the 95% interval on
+the paired per-fixture gap, in percentage points (`behind +4 to +41%`).
+`—` means no comparison: the job failed, the suite was `codereview`
+(its headline is an F1, not a per-fixture mean), or the two models
+share fewer than two fixtures. A higher toolcall rate is worse.
+
+```bash
+atomics sweep --models MODEL_A,MODEL_B --suites toolcall --runs 1 \
+  --no-thinking --judge-model JUDGE --ollama-host http://localhost:11434
+```
+
+**Advanced.** Repeat the suite (`--runs 3`) before you believe a ranking.
+For `toolcall`, `vs best` then uses the any-run rate: a fixture that
+leaked on one run out of three counts as a leak. The modal rate can
+call that same fixture safe. Leave temperature at the model's own
+default for that evidence. `--temperature 0` is the like-for-like cut
+only. `atomics doctor` first: a model loaded off the GPU turns this into
+an all-day run. The status file is rewritten after every job. `--resume`
+keeps jobs it already marks ok.
 
 An overnight security sweep. `--status` is rewritten after every
 model×suite, `--log` survives a closed terminal, and `--save` writes each
@@ -401,6 +457,19 @@ uv run atomics adversarial --provider ollama -m gemma4:12b --judge-model qwen2.5
 ```
 
 ### "Will it scale?" — capacity, stress, soak, scenario
+
+**Beginner.** `doctor` first. If it names a model loaded off the GPU,
+fix that before any load test; a CPU fallback looks like a slow box.
+`stress` ramps concurrency and is the first capacity command. `capacity`
+does not call the model again. It turns a measurement you already have
+into a user count.
+
+**Advanced.** `soak --duration 30m` is wall clock, not a sample. One
+model, one host, no second suite beside it. `scenario` shares one box
+between a gate workload and an eval workload; edit `YOUR_MODEL` in the
+example file to a tag from `atomics models` before you run it. A refused
+connection that fails before the network used to spin forever; a current
+build stops. Still point these at a host that is actually up.
 
 ```bash
 # Find the GPU saturation point (ramp concurrency 1→8)
