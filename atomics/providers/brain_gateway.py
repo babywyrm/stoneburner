@@ -85,8 +85,11 @@ class BrainGatewayProvider(BaseProvider):
         data = resp.json()
 
         if "error" in data:
-            err = data["error"]
-            raise RuntimeError(f"brain-gateway RPC error {err.get('code')}: {err.get('message')}")
+            err = data["error"] if isinstance(data["error"], dict) else {}
+            code = err.get("code")
+            if isinstance(code, int) and not isinstance(code, bool):
+                raise RuntimeError(f"brain-gateway RPC error {code}")
+            raise RuntimeError("brain-gateway RPC error")
 
         result = data.get("result") or {}
         if result.get("isError"):

@@ -6,6 +6,8 @@
 - `brain-gateway` no longer scores a generate when the model switch
   fails, the tool result is an error, or the body is not JSON. The error
   text stays off the exception, so a tool payload is not stored as a score.
+- A brain-gateway JSON-RPC error keeps its code and drops the server
+  message. That message can carry a tool payload, a prompt echo, or a key.
 
 ### Added
 - The quickstart adds scenarios for a probe regression, a retrieval

@@ -141,7 +141,7 @@ async def test_brain_gateway_generate_rpc_error():
     mock_response.json.return_value = {
         "jsonrpc": "2.0",
         "id": 1,
-        "error": {"code": -32000, "message": "Rate limit exceeded"},
+        "error": {"code": -32000, "message": "secret-from-the-rpc"},
     }
 
     mock_client = AsyncMock()
@@ -150,8 +150,9 @@ async def test_brain_gateway_generate_rpc_error():
 
     provider = BrainGatewayProvider(url="http://fake:8080", client=mock_client)
 
-    with pytest.raises(RuntimeError, match="Rate limit exceeded"):
+    with pytest.raises(RuntimeError, match="RPC error -32000") as raised:
         await provider.generate("test")
+    assert "secret-from-the-rpc" not in str(raised.value)
 
 
 @pytest.mark.asyncio
