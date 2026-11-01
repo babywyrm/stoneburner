@@ -7,12 +7,11 @@ stoneburner and [mcpnuke](https://github.com/babywyrm/mcpnuke) meet at the
 agent: stoneburner grades the model, mcpnuke scans the MCP server. An
 endpoint-scanning idea belongs in mcpnuke, not here.
 
-## 0.31.0 — next release
+## 0.32.0 — next release
 
-Current package is **0.30.0** — confidence intervals, tool trajectories,
-within-noise sweeps. Git history was rewritten on 2026-10-21 to remove
-private lab hosts; every tag was re-pointed once for that, and only for
-that.
+Current package is **0.31.0** — quickstart, sweep intervals, gateway
+errors. Git history was rewritten on 2026-10-21 to remove private lab
+hosts; every tag was re-pointed once for that, and only for that.
 
 - [ ] A live brain-gateway generate on record.
 - [x] A live suite sweep that ranks a repeated `toolcall` on its any-run

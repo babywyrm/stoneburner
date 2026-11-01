@@ -1,6 +1,14 @@
 # Changelog
 
-## Unreleased
+## 0.31.0 (2026-11-01) — Quickstart, sweep intervals, gateway errors
+
+### Upgrade notes
+- No schema change. An existing database needs no migration.
+- A sweep `vs best` cell now includes the interval, as in
+  `behind +4 to +41%`. A reader that expected only `best`, `tied`, or
+  `behind` has to allow the trailing range.
+- A brain-gateway error no longer includes the server message. Match
+  `brain-gateway RPC error` and the code, not the body.
 
 ### Fixed
 - `brain-gateway` no longer scores a generate when the model switch
@@ -10,27 +18,6 @@
   message. That message can carry a tool payload, a prompt echo, or a key.
 
 ### Added
-- The quickstart adds scenarios for a probe regression, a retrieval
-  miss, a same-quality host comparison, a judge that fails calibration,
-  a `--no-auth` bind that is refused off loopback, and a schedule
-  preview that does not install. Each command is run in
-  `tests/test_quickstart_scenarios.py`.
-- The quickstart adds three more scenarios: a gate that held, a score
-  withheld as `n/a`, and the `$0` cost of one local answer. The app-gate
-  example said `FAIL` meant the gate held; `PASS` is the refusal.
-- The quickstart adds four worked scenarios: same rate with different
-  `vs best` marks, exit 0 that is still a finding, a blue score that is
-  not safety, and a sweep resumed after a stop.
-  `tests/test_quickstart_scenarios.py` runs each command and checks that
-  result. The model is a stand-in, so CI does not call one.
-- The quickstart splits a beginner path from an advanced one and says
-  what the cost, sweep, and load recipes are for. `vs best` is explained
-  on the sweep recipe, including the any-run rate. Every `atomics`
-  command in a quickstart block is parsed by
-  `tests/test_quickstart_commands.py`; an unknown flag fails that test.
-- The quickstart opens with the one-box install (`uv` or `pip`) and five
-  lines on how to read a result: exit 0, a `DANGEROUS` finding, `n/a`,
-  `vs best`, and `atomics doctor` when a run is slow.
 - A sweep's `vs best` cell includes the paired interval, as in
   `behind +4 to +41%`. Two models can share a rate and still differ:
   one interval stays above zero, the other crosses it. The status file
@@ -38,6 +25,16 @@
 - `atomics sweep` warns, before it starts, for each Ollama model loaded
   less than fully in VRAM. `atomics doctor` already did; a sweep did not,
   so the warning arrived only after the run was underway.
+- The quickstart opens on the install (`uv` or `pip`) and how to read a
+  result, then a beginner path and an advanced one. Thirteen scenarios
+  cover the sweep interval, a finding inside exit 0, a gate that held,
+  a withheld `n/a`, a local `$0` answer, a probe regression, a retrieval
+  miss, two hosts at the same quality, a judge that fails calibration,
+  `--no-auth` refused off loopback, and a schedule preview that does
+  not install. `tests/test_quickstart_scenarios.py` runs each command
+  with a stand-in model. `tests/test_quickstart_commands.py` parses
+  every `atomics` command in the file. The app-gate example said `FAIL`
+  meant the gate held; `PASS` is the refusal.
 
 ## 0.30.0 (2026-10-28) — Intervals, trajectories, within-noise sweeps
 
