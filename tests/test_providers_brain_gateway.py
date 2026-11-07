@@ -237,6 +237,58 @@ async def test_brain_gateway_no_usage_field():
     assert resp.model == "unknown"
 
 
+def _ok_response(answer: str = "ok") -> MagicMock:
+    mock_response = MagicMock()
+    mock_response.raise_for_status = MagicMock()
+    mock_response.json.return_value = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+            "content": [{"type": "text", "text": json.dumps({"answer": answer})}],
+            "isError": False,
+        },
+    }
+    return mock_response
+
+
+@pytest.mark.asyncio
+async def test_a_system_prompt_is_part_of_the_question() -> None:
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock(return_value=_ok_response())
+    provider = BrainGatewayProvider(url="http://fake:8080", client=mock_client)
+
+    await provider.generate("What is 2+2?", system="Be accurate.")
+
+    payload = mock_client.post.call_args.kwargs["json"]
+    assert payload["params"]["arguments"]["question"] == "Be accurate.\n\nWhat is 2+2?"
+
+
+@pytest.mark.asyncio
+async def test_an_effort_pin_is_not_silently_ignored() -> None:
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock()
+    mock_client.put = AsyncMock()
+    provider = BrainGatewayProvider(url="http://fake:8080", client=mock_client)
+
+    with pytest.raises(RuntimeError, match="does not apply effort"):
+        await provider.generate("hi", effort="low")
+    mock_client.post.assert_not_called()
+    mock_client.put.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_a_reasoning_mode_is_not_silently_ignored() -> None:
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock()
+    mock_client.put = AsyncMock()
+    provider = BrainGatewayProvider(url="http://fake:8080", client=mock_client)
+
+    with pytest.raises(RuntimeError, match="does not apply reasoning mode"):
+        await provider.generate("hi", reasoning_mode="high")
+    mock_client.post.assert_not_called()
+    mock_client.put.assert_not_called()
+
+
 @pytest.mark.asyncio
 async def test_a_temperature_is_not_silently_ignored() -> None:
     mock_client = AsyncMock()

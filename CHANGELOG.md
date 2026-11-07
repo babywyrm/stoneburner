@@ -7,6 +7,10 @@
   not call the gateway. Sampling is server-side, so a `--temperature 0`
   run, or a judge that always asks for 0, was scored as if the pin had
   been applied.
+- `brain-gateway` sends the system prompt in front of the question. The
+  RPC has no system field, so the instructions were dropped. `--effort`
+  and `--reasoning-mode` are refused. The gateway has no field for
+  either, and a run that asked for one was scored anyway.
 
 ## 0.31.0 (2026-11-01) — Quickstart, sweep intervals, gateway errors
 

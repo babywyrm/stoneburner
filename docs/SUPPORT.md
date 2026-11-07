@@ -85,3 +85,6 @@ Endpoints are listed in [API_SERVER.md](API_SERVER.md).
   server-side and has no per-call field, so the provider refuses the
   generate instead of scoring a pin it did not apply. A judge always
   asks for 0, so this provider cannot be the judge.
+- `--effort` and `--reasoning-mode` on `brain-gateway`. Same refusal:
+  the RPC cannot apply them. A system prompt is sent in front of the
+  question, because that field does not exist either.

@@ -50,22 +50,28 @@ class BrainGatewayProvider(BaseProvider):
         effort: str | None = None,
         reasoning_mode: str | None = None,
     ) -> ProviderResponse:
-        # The ask_agent RPC has no per-call temperature. Scoring a pin that
-        # was never sent records a comparison the gateway did not run.
+        # ask_agent has a question and nothing else. A pin we cannot send
+        # must not be scored. thinking and max_tokens are also absent, and
+        # the CLI always sends them, so refusing those would reject every suite.
         if temperature is not None:
             raise RuntimeError("brain-gateway does not apply temperature; sampling is server-side")
+        if effort is not None:
+            raise RuntimeError("brain-gateway does not apply effort")
+        if reasoning_mode is not None:
+            raise RuntimeError("brain-gateway does not apply reasoning mode")
         effective_model = model or self._default_model
 
         if effective_model:
             await self._switch_model(effective_model)
 
+        question = f"{system}\n\n{prompt}" if system else prompt
         payload = {
             "jsonrpc": "2.0",
             "id": 1,
             "method": "tools/call",
             "params": {
                 "name": "config.ask_agent",
-                "arguments": {"question": prompt},
+                "arguments": {"question": question},
             },
         }
 
