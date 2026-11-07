@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- `brain-gateway` refuses a generate when `temperature` is set, and does
+  not call the gateway. Sampling is server-side, so a `--temperature 0`
+  run, or a judge that always asks for 0, was scored as if the pin had
+  been applied.
+
 ## 0.31.0 (2026-11-01) — Quickstart, sweep intervals, gateway errors
 
 ### Upgrade notes

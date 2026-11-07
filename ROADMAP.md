@@ -13,7 +13,10 @@ Current package is **0.31.0** — quickstart, sweep intervals, gateway
 errors. Git history was rewritten on 2026-10-21 to remove private lab
 hosts; every tag was re-pointed once for that, and only for that.
 
-- [ ] A live brain-gateway generate on record.
+- [ ] A live brain-gateway generate on record. It cannot carry a
+      temperature pin: the provider refuses one rather than scoring it.
+- [x] `brain-gateway` refuses a generate when `temperature` is set.
+      Sampling is server-side, and the RPC has no per-call field.
 - [x] A live suite sweep that ranks a repeated `toolcall` on its any-run
       rate. 2026-10-29, four models, `--runs 3`, judge `qwen3:14b`, 31
       fixtures, all four jobs `complete`. `ministral-3:8b` was `best`

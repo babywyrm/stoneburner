@@ -81,3 +81,7 @@ Endpoints are listed in [API_SERVER.md](API_SERVER.md).
 - HTTP transport for MCP. `atomics mcp` stays stdio; reach a remote API
   with `--api-url`.
 - Tool calling on `bedrock` and `brain-gateway`.
+- A `temperature` pin on `brain-gateway`. The gateway samples
+  server-side and has no per-call field, so the provider refuses the
+  generate instead of scoring a pin it did not apply. A judge always
+  asks for 0, so this provider cannot be the judge.

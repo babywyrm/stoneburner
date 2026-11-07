@@ -50,9 +50,10 @@ class BrainGatewayProvider(BaseProvider):
         effort: str | None = None,
         reasoning_mode: str | None = None,
     ) -> ProviderResponse:
-        # temperature is accepted for interface parity but not enforceable here:
-        # the brain-gateway controls sampling server-side via its own provider
-        # config, so the ask_agent RPC has no per-call temperature field.
+        # The ask_agent RPC has no per-call temperature. Scoring a pin that
+        # was never sent records a comparison the gateway did not run.
+        if temperature is not None:
+            raise RuntimeError("brain-gateway does not apply temperature; sampling is server-side")
         effective_model = model or self._default_model
 
         if effective_model:

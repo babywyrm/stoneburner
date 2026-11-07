@@ -238,6 +238,19 @@ async def test_brain_gateway_no_usage_field():
 
 
 @pytest.mark.asyncio
+async def test_a_temperature_is_not_silently_ignored() -> None:
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock()
+    mock_client.put = AsyncMock()
+    provider = BrainGatewayProvider(url="http://fake:8080", client=mock_client)
+
+    with pytest.raises(RuntimeError, match="does not apply temperature"):
+        await provider.generate("hi", temperature=0.0)
+    mock_client.post.assert_not_called()
+    mock_client.put.assert_not_called()
+
+
+@pytest.mark.asyncio
 async def test_a_failed_model_switch_does_not_generate() -> None:
     import httpx
 
