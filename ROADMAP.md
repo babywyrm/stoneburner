@@ -19,6 +19,8 @@ hosts; every tag was re-pointed once for that, and only for that.
       Sampling is server-side, and the RPC has no per-call field.
 - [x] `brain-gateway` puts a system prompt in front of the question,
       and refuses `--effort` and `--reasoning-mode`.
+- [x] `brain-gateway` refuses a generate when thinking is set. A
+      budget with thinking left unset still generates.
 - [x] A live suite sweep that ranks a repeated `toolcall` on its any-run
       rate. 2026-10-29, four models, `--runs 3`, judge `qwen3:14b`, 31
       fixtures, all four jobs `complete`. `ministral-3:8b` was `best`

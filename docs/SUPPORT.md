@@ -88,3 +88,6 @@ Endpoints are listed in [API_SERVER.md](API_SERVER.md).
 - `--effort` and `--reasoning-mode` on `brain-gateway`. Same refusal:
   the RPC cannot apply them. A system prompt is sent in front of the
   question, because that field does not exist either.
+- `--thinking` and `--no-thinking` on `brain-gateway`. The gateway
+  cannot turn thinking on or off, so a set value is refused. Leaving
+  thinking unset still generates. `max_tokens` is not applied.

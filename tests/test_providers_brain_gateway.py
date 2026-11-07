@@ -290,6 +290,31 @@ async def test_a_reasoning_mode_is_not_silently_ignored() -> None:
 
 
 @pytest.mark.asyncio
+async def test_a_thinking_pin_is_not_silently_ignored() -> None:
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock()
+    mock_client.put = AsyncMock()
+    provider = BrainGatewayProvider(url="http://fake:8080", client=mock_client)
+
+    with pytest.raises(RuntimeError, match="does not apply thinking"):
+        await provider.generate("hi", thinking=False)
+    mock_client.post.assert_not_called()
+    mock_client.put.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_a_default_thinking_budget_still_generates() -> None:
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock(return_value=_ok_response())
+    provider = BrainGatewayProvider(url="http://fake:8080", client=mock_client)
+
+    resp = await provider.generate("hi", thinking_budget=8000)
+
+    assert resp.text == "ok"
+    mock_client.post.assert_called_once()
+
+
+@pytest.mark.asyncio
 async def test_a_temperature_is_not_silently_ignored() -> None:
     mock_client = AsyncMock()
     mock_client.post = AsyncMock()

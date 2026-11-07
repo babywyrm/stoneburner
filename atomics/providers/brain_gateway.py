@@ -51,14 +51,17 @@ class BrainGatewayProvider(BaseProvider):
         reasoning_mode: str | None = None,
     ) -> ProviderResponse:
         # ask_agent has a question and nothing else. A pin we cannot send
-        # must not be scored. thinking and max_tokens are also absent, and
-        # the CLI always sends them, so refusing those would reject every suite.
+        # must not be scored. max_tokens is always set by the caller and is
+        # not on the RPC, so it is not applied. A thinking budget with no
+        # thinking pin is the CLI default, not a request to think.
         if temperature is not None:
             raise RuntimeError("brain-gateway does not apply temperature; sampling is server-side")
         if effort is not None:
             raise RuntimeError("brain-gateway does not apply effort")
         if reasoning_mode is not None:
             raise RuntimeError("brain-gateway does not apply reasoning mode")
+        if thinking is not None:
+            raise RuntimeError("brain-gateway does not apply thinking")
         effective_model = model or self._default_model
 
         if effective_model:
