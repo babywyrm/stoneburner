@@ -17,6 +17,10 @@
   still generates, and CLI commands no longer auto-enable thinking from
   the model name on `brain-gateway`. `max_tokens` is not on the RPC and
   is not applied.
+- API runners (`eval`, `sweep`, `run`, `stress`, `soak`, `models`,
+  `provider-test`), distributed worker assignments, and `labcompare`
+  quality checks now close their async provider clients on the active
+  event loop instead of leaving them to garbage collection.
 
 ## 0.31.0 (2026-11-01) — Quickstart, sweep intervals, gateway errors
 

@@ -22,7 +22,7 @@ from atomics.api.models import MAX_LOAD_PREDICT, SoakRequest, StressRequest
 from atomics.eval.budget import BudgetMeter, EvalBudget, EvalBudgetExceededError
 from atomics.load.soak import SoakResult, SoakSample, run_soak_provider
 from atomics.load.stress import ConcurrencyResult, StressResult, run_stress_provider
-from atomics.providers.base import BaseProvider
+from atomics.providers.base import BaseProvider, aclose_providers
 
 
 def _metered(
@@ -167,6 +167,8 @@ async def run_stress_from_request(payload: StressRequest, job: Job | None = None
         raise
     except (ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    finally:
+        await aclose_providers(provider)
     return _stress_payload(payload, result)
 
 
@@ -188,4 +190,6 @@ async def run_soak_from_request(payload: SoakRequest, job: Job | None = None) ->
         raise
     except (ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    finally:
+        await aclose_providers(provider)
     return _soak_payload(payload, result)

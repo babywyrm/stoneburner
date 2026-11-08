@@ -13,6 +13,7 @@ from atomics.core.engine import LoopEngine
 from atomics.core.runner import execute_task
 from atomics.distributed.models import TaskAssignment
 from atomics.models import BurnTier, TaskCategory, TaskComplexity, TaskDefinition
+from atomics.providers.base import aclose_providers
 from atomics.providers.factory import make_provider
 from atomics.storage.repository import MetricsRepository
 from atomics.tasks.catalog import TASK_CATALOG
@@ -127,13 +128,16 @@ async def execute_assignment(
         assignment.job_id,
         task.name,
     )
-    result = await execute_task(
-        task,
-        prompt,
-        provider=provider,
-        run_id=assignment.job_id,
-        model=model,
-    )
+    try:
+        result = await execute_task(
+            task,
+            prompt,
+            provider=provider,
+            run_id=assignment.job_id,
+            model=model,
+        )
+    finally:
+        await aclose_providers(provider)
     return _serialize_result(result)
 
 
@@ -221,6 +225,7 @@ async def execute_full_run(
             "task_results": task_results,
         }
     finally:
+        await aclose_providers(provider)
         repo.close()
         try:
             db_path.unlink()

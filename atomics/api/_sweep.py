@@ -18,6 +18,7 @@ from atomics.api.jobs import Job
 from atomics.api.models import SweepRequest
 from atomics.eval.budget import BudgetMeter, EvalBudget, EvalBudgetExceededError
 from atomics.eval.gauntlet import SuiteJobResult, make_suite_runner, run_gauntlet
+from atomics.providers.base import BaseProvider, aclose_providers
 
 
 async def run_sweep_from_request(payload: SweepRequest, job: Job | None = None) -> dict[str, Any]:
@@ -35,34 +36,40 @@ async def run_sweep_from_request(payload: SweepRequest, job: Job | None = None) 
             total=sweep_job_total(payload),
         )
 
+    created: list[BaseProvider] = []
+    judge_provider: BaseProvider | None = None
+
     def provider_factory(model_name: str):
-        return meter.wrap(_provider_for(payload.provider, model_name, payload.host))
+        wrapped = meter.wrap(_provider_for(payload.provider, model_name, payload.host))
+        created.append(wrapped)
+        return wrapped
 
     judge_host = payload.judge_host
     if judge_host is None and payload.provider == "ollama":
         judge_host = payload.host
-    judge_provider = meter.wrap(_provider_for("ollama", payload.judge_model, judge_host))
-    inner = make_suite_runner(
-        provider_factory=provider_factory,
-        judge_provider=judge_provider,
-        judge_model=payload.judge_model,
-        runs=payload.runs,
-        thinking=payload.thinking,
-        thinking_budget=None,
-        effort=payload.effort,
-        reasoning_mode=payload.reasoning_mode,
-        temperature=payload.temperature,
-    )
-
-    async def run_suite(*, model: str, suite: str, skip_incapable: bool) -> SuiteJobResult:
-        if reporter is not None:
-            reporter.start(model, suite)
-        result = await inner(model=model, suite=suite, skip_incapable=skip_incapable)
-        if reporter is not None:
-            reporter.done(result)
-        return result
 
     try:
+        judge_provider = meter.wrap(_provider_for("ollama", payload.judge_model, judge_host))
+        inner = make_suite_runner(
+            provider_factory=provider_factory,
+            judge_provider=judge_provider,
+            judge_model=payload.judge_model,
+            runs=payload.runs,
+            thinking=payload.thinking,
+            thinking_budget=None,
+            effort=payload.effort,
+            reasoning_mode=payload.reasoning_mode,
+            temperature=payload.temperature,
+        )
+
+        async def run_suite(*, model: str, suite: str, skip_incapable: bool) -> SuiteJobResult:
+            if reporter is not None:
+                reporter.start(model, suite)
+            result = await inner(model=model, suite=suite, skip_incapable=skip_incapable)
+            if reporter is not None:
+                reporter.done(result)
+            return result
+
         results = await run_gauntlet(
             models=payload.models,
             suites=payload.suites,
@@ -75,6 +82,8 @@ async def run_sweep_from_request(payload: SweepRequest, job: Job | None = None) 
         raise
     except (ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    finally:
+        await aclose_providers(judge_provider, *created)
 
     jobs = [asdict(row) for row in results]
     return {

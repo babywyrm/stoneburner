@@ -32,7 +32,7 @@ from atomics.eval.refusal.runner import run_refusal
 from atomics.eval.runner import run_eval
 from atomics.eval.toolcall.runner import run_toolcall_suite
 from atomics.models import BurnTier
-from atomics.providers.base import BaseProvider
+from atomics.providers.base import BaseProvider, aclose_providers
 from atomics.providers.factory import ProviderConfigError, make_provider
 
 SUPPORTED_EVAL_SUITES = frozenset(
@@ -308,11 +308,14 @@ async def run_benchmark_from_request(payload: RunRequest, job: Job | None = None
     except (ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     finally:
+        await aclose_providers(provider)
         repo.close()
 
 
 async def run_eval_from_request(payload: EvalRequest, job: Job | None = None) -> dict[str, Any]:
     """Run the accuracy eval suite for an API request."""
+    provider: BaseProvider | None = None
+    judge_provider: BaseProvider | None = None
     try:
         provider, judge_provider = _guarded_providers(payload)
         fixtures = fixtures_for_request(payload)
@@ -351,6 +354,8 @@ async def run_eval_from_request(payload: EvalRequest, job: Job | None = None) ->
         raise
     except (ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    finally:
+        await aclose_providers(provider, judge_provider)
 
     host = (job.request or {}).get("host") if job is not None else None
     return {
@@ -385,10 +390,11 @@ async def run_eval_suite(payload: EvalRequest, job: Job | None = None) -> dict[s
         if reporter is not None:
             reporter.fixture_done(aggregated)
 
-    provider, judge_provider = _guarded_providers(payload)
-
+    provider: BaseProvider | None = None
+    judge_provider: BaseProvider | None = None
     summary: Any
     try:
+        provider, judge_provider = _guarded_providers(payload)
         if suite == "rag":
             summary = await run_rag(
                 provider,
@@ -518,6 +524,8 @@ async def run_eval_suite(payload: EvalRequest, job: Job | None = None) -> dict[s
         raise
     except (ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    finally:
+        await aclose_providers(provider, judge_provider)
 
     total_tokens, total_cost_usd = _summary_totals(summary)
     host = (job.request or {}).get("host") if job is not None else None

@@ -13,6 +13,7 @@ from fastapi import HTTPException, status
 
 from atomics.api.models import ProviderTestRequest
 from atomics.config import load_settings
+from atomics.providers.base import aclose_providers
 from atomics.providers.factory import ProviderConfigError, make_provider
 from atomics.validation import sanitize_error
 
@@ -45,51 +46,56 @@ async def list_models(provider: str, host: str | None) -> dict[str, Any]:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY, detail=sanitize_error(exc)
         ) from exc
+    finally:
+        await aclose_providers(adapter)
     return {"provider": name, "models": models}
 
 
 async def run_provider_test(payload: ProviderTestRequest) -> dict[str, Any]:
     adapter = _provider(payload.provider, payload.model, payload.host)
-    health = await adapter.health_check()
-    if not health:
-        return {
-            "ok": False,
-            "health": False,
-            "provider": adapter.name,
-            "model": payload.model,
-            "response": None,
-            "error": "Provider health check failed.",
-            "input_tokens": 0,
-            "output_tokens": 0,
-            "total_tokens": 0,
-            "thinking_tokens": 0,
-            "latency_ms": 0.0,
-            "cost_usd": 0.0,
-        }
     try:
-        resp = await adapter.generate(
-            PROVIDER_TEST_PROMPT,
-            model=payload.model,
-            max_tokens=PROVIDER_TEST_MAX_TOKENS,
-            thinking=payload.thinking,
-            effort=payload.effort,
-            reasoning_mode=payload.reasoning_mode,
-        )
-    except Exception as exc:
-        return {
-            "ok": False,
-            "health": True,
-            "provider": adapter.name,
-            "model": payload.model,
-            "response": None,
-            "error": sanitize_error(exc),
-            "input_tokens": 0,
-            "output_tokens": 0,
-            "total_tokens": 0,
-            "thinking_tokens": 0,
-            "latency_ms": 0.0,
-            "cost_usd": 0.0,
-        }
+        health = await adapter.health_check()
+        if not health:
+            return {
+                "ok": False,
+                "health": False,
+                "provider": adapter.name,
+                "model": payload.model,
+                "response": None,
+                "error": "Provider health check failed.",
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "total_tokens": 0,
+                "thinking_tokens": 0,
+                "latency_ms": 0.0,
+                "cost_usd": 0.0,
+            }
+        try:
+            resp = await adapter.generate(
+                PROVIDER_TEST_PROMPT,
+                model=payload.model,
+                max_tokens=PROVIDER_TEST_MAX_TOKENS,
+                thinking=payload.thinking,
+                effort=payload.effort,
+                reasoning_mode=payload.reasoning_mode,
+            )
+        except Exception as exc:
+            return {
+                "ok": False,
+                "health": True,
+                "provider": adapter.name,
+                "model": payload.model,
+                "response": None,
+                "error": sanitize_error(exc),
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "total_tokens": 0,
+                "thinking_tokens": 0,
+                "latency_ms": 0.0,
+                "cost_usd": 0.0,
+            }
+    finally:
+        await aclose_providers(adapter)
     visible = (resp.text or "").strip()
     thinking_tokens = getattr(resp, "thinking_tokens", 0) or 0
     thinking_text = (getattr(resp, "thinking_text", "") or "").strip()

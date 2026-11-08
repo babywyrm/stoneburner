@@ -21,7 +21,7 @@ from rich.console import Console
 from rich.table import Table
 from rich.text import Text
 
-from atomics.providers.base import BaseProvider, ChatMessage, ProviderResponse
+from atomics.providers.base import BaseProvider, ChatMessage, ProviderResponse, aclose_providers
 from atomics.providers.outcomes import ProviderOutcomeKind
 from atomics.providers.toolcalls import ToolStep
 
@@ -205,7 +205,7 @@ class TracedProvider(BaseProvider):
         return getattr(self._inner, name)
 
     async def aclose(self) -> None:
-        await self._inner.aclose()
+        await aclose_providers(self._inner)
 
     async def health_check(self) -> bool:
         return await self._inner.health_check()

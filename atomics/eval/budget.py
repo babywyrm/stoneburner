@@ -26,7 +26,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from atomics.core.guard import GuardConfig, RateBudgetGuard
-from atomics.providers.base import BaseProvider, ChatMessage, ProviderResponse
+from atomics.providers.base import BaseProvider, ChatMessage, ProviderResponse, aclose_providers
 from atomics.providers.toolcalls import ToolStep
 
 logger = logging.getLogger(__name__)
@@ -135,7 +135,7 @@ class GuardedProvider(BaseProvider):
         return getattr(self._inner, name)
 
     async def aclose(self) -> None:
-        await self._inner.aclose()
+        await aclose_providers(self._inner)
 
     async def health_check(self) -> bool:
         # Not metered: a health check is not model traffic and costs nothing.

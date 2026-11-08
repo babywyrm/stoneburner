@@ -15,6 +15,7 @@ from atomics.benchmark.labcompare import (
 )
 from atomics.commands.common import _make_provider, run_async, temperature_option
 from atomics.config import load_settings
+from atomics.providers.base import aclose_providers
 
 if TYPE_CHECKING:
     from atomics.benchmark.labcompare import CellResult
@@ -148,23 +149,26 @@ def labcompare(
 
     async def quality_fn(provider, jhost, jmodel, model):
         judge = _make_provider("ollama", jmodel, jhost or provider._host, settings)
-        if quality_suite == "redblue":
-            summary = await run_redblue(
+        try:
+            if quality_suite == "redblue":
+                summary = await run_redblue(
+                    provider,
+                    judge_provider=judge,
+                    model=model,
+                    judge_model=jmodel,
+                    temperature=temperature,
+                )
+                return summary.overall_quality
+            summary = await run_eval(
                 provider,
                 judge_provider=judge,
                 model=model,
                 judge_model=jmodel,
                 temperature=temperature,
             )
-            return summary.overall_quality
-        summary = await run_eval(
-            provider,
-            judge_provider=judge,
-            model=model,
-            judge_model=jmodel,
-            temperature=temperature,
-        )
-        return summary.overall_accuracy
+            return summary.overall_accuracy
+        finally:
+            await aclose_providers(judge)
 
     console.print(
         f"\n[bold]LabCompare[/bold] - {len(hosts)} hosts x {len(models)} models "
