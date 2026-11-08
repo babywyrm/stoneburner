@@ -27,6 +27,12 @@
   `provider-test`), distributed worker assignments, and `labcompare`
   quality checks now close their async provider clients on the active
   event loop instead of leaving them to garbage collection.
+- `POST /api/v1/batteries` now shares one `BudgetMeter` across all steps
+  in the battery instead of giving each step its own `budget_usd`
+  ceiling.
+- `notify_run_complete` on macOS now passes notification text to
+  `osascript` as positional `argv` instead of interpolating into
+  AppleScript source.
 
 ## 0.31.0 (2026-11-01) — Quickstart, sweep intervals, gateway errors
 

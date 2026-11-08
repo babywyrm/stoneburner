@@ -26,7 +26,7 @@ from atomics.eval.batteries import (
     step_runs,
     visible_steps,
 )
-from atomics.eval.budget import EvalBudgetExceededError
+from atomics.eval.budget import BudgetMeter, EvalBudget, EvalBudgetExceededError
 
 
 def _step_to_eval(payload: BatteryRequest, step: BatteryStep) -> EvalRequest:
@@ -122,14 +122,21 @@ async def run_battery_from_request(
     payload: BatteryRequest, job: Job | None = None
 ) -> dict[str, Any]:
     """Run the battery's steps in order under one budget."""
+    import inspect
+
     battery = get_battery(payload.name)
+    meter = BudgetMeter(EvalBudget(budget_limit_usd=payload.budget_usd))
     steps_out: list[dict[str, Any]] = []
     visible = visible_steps(battery, provider=payload.provider, profile=payload.profile)
     all_steps = (*visible, *battery.optional_steps)
+    accepts_meter = "meter" in inspect.signature(run_eval_suite).parameters
     for step in all_steps:
         try:
             if step.suite == "provider-test":
-                steps_out.append(await _run_provider_test_step(payload))
+                pt_step = await _run_provider_test_step(payload)
+                if meter.guard is not None and pt_step.get("ok"):
+                    meter.guard.record_request(0, float(pt_step.get("cost_usd") or 0.0), True)
+                steps_out.append(pt_step)
                 continue
             if step.suite == "qa":
                 steps_out.append(await _run_qa_step(payload, step))
@@ -140,7 +147,11 @@ async def run_battery_from_request(
             if job is not None:
                 # The step's reporter streams rows into job.result; start each step empty.
                 job.result = None
-            result = await run_eval_suite(_step_to_eval(payload, step), job=job)
+            eval_req = _step_to_eval(payload, step)
+            if accepts_meter:
+                result = await run_eval_suite(eval_req, job=job, meter=meter)
+            else:
+                result = await run_eval_suite(eval_req, job=job)
         except EvalBudgetExceededError:
             raise
         except HTTPException:

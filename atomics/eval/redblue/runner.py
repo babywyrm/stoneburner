@@ -407,9 +407,10 @@ async def run_redblue(
 
         if last_task_result is None:
             # Every run failed — record the last failure.
+            assert failed_task is not None
             fr = RedBlueFixtureResult(
                 fixture=fixture,
-                task_result=failed_task,  # type: ignore[arg-type]
+                task_result=failed_task,
                 judge=None,
             )
         else:

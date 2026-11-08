@@ -20,7 +20,7 @@ from atomics.api.jobs import Job
 from atomics.api.models import EvalRequest, RunRequest
 from atomics.config import load_settings
 from atomics.eval.adversarial.runner import run_adversarial
-from atomics.eval.budget import EvalBudget, EvalBudgetExceededError, share_budget
+from atomics.eval.budget import BudgetMeter, EvalBudget, EvalBudgetExceededError, share_budget
 from atomics.eval.calibration import judge_calibration_status
 from atomics.eval.codegen.runner import run_codegen
 from atomics.eval.codereview.runner import run_codereview
@@ -72,6 +72,8 @@ def _provider_for(name: str, model: str | None, host: str | None = None) -> Base
 
 def _guarded_providers(
     payload: EvalRequest,
+    *,
+    meter: BudgetMeter | None = None,
 ) -> tuple[BaseProvider, BaseProvider]:
     """Build the model and judge for an eval request, sharing one budget.
 
@@ -84,6 +86,8 @@ def _guarded_providers(
     if judge_host is None and payload.provider == "ollama":
         judge_host = payload.host
     judge_provider = _provider_for("ollama", payload.judge_model, judge_host)
+    if meter is not None:
+        return meter.wrap(provider), meter.wrap(judge_provider)
     budget = EvalBudget(budget_limit_usd=payload.budget_usd)
     guarded = share_budget(budget, provider, judge_provider)
     return guarded[0], guarded[1]
@@ -312,12 +316,17 @@ async def run_benchmark_from_request(payload: RunRequest, job: Job | None = None
         repo.close()
 
 
-async def run_eval_from_request(payload: EvalRequest, job: Job | None = None) -> dict[str, Any]:
+async def run_eval_from_request(
+    payload: EvalRequest,
+    job: Job | None = None,
+    *,
+    meter: BudgetMeter | None = None,
+) -> dict[str, Any]:
     """Run the accuracy eval suite for an API request."""
     provider: BaseProvider | None = None
     judge_provider: BaseProvider | None = None
     try:
-        provider, judge_provider = _guarded_providers(payload)
+        provider, judge_provider = _guarded_providers(payload, meter=meter)
         fixtures = fixtures_for_request(payload)
         reporter = None
         if job is not None:
@@ -373,12 +382,17 @@ async def run_eval_from_request(payload: EvalRequest, job: Job | None = None) ->
     }
 
 
-async def run_eval_suite(payload: EvalRequest, job: Job | None = None) -> dict[str, Any]:
+async def run_eval_suite(
+    payload: EvalRequest,
+    job: Job | None = None,
+    *,
+    meter: BudgetMeter | None = None,
+) -> dict[str, Any]:
     """Dispatch eval request to the correct runner and normalize the response."""
     suite = validate_eval_suite(payload.suite)
 
     if suite == "accuracy":
-        result = await run_eval_from_request(payload, job=job)
+        result = await run_eval_from_request(payload, job=job, meter=meter)
         return {"suite": suite, **result}
 
     reporter = _eval_reporter(payload, job, suite)
@@ -394,7 +408,7 @@ async def run_eval_suite(payload: EvalRequest, job: Job | None = None) -> dict[s
     judge_provider: BaseProvider | None = None
     summary: Any
     try:
-        provider, judge_provider = _guarded_providers(payload)
+        provider, judge_provider = _guarded_providers(payload, meter=meter)
         if suite == "rag":
             summary = await run_rag(
                 provider,

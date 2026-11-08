@@ -418,3 +418,42 @@ def test_battery_profile_under_profiles_is_accepted():
         profile="profiles/examples/a.yaml",
     )
     assert req.profile == "profiles/examples/a.yaml"
+
+
+@pytest.mark.asyncio
+async def test_battery_steps_share_one_budget_guard(monkeypatch):
+    """A 3-step battery with budget_usd=5 must share one guard across all steps, not 3x $5."""
+    from types import SimpleNamespace
+    from unittest.mock import MagicMock
+
+    from atomics.api import _runners
+    from atomics.eval.budget import EvalBudgetExceededError
+
+    guards_seen: list = []
+
+    async def fake_step_runner(provider, **_kwargs):
+        guards_seen.append(provider.guard)
+        # Spend $3 in step 1; step 2 should trip the $5 ceiling before calling the model.
+        await provider._await_capacity()
+        provider.guard.record_request(100, 3.0, success=True)
+        return SimpleNamespace(
+            overall_quality=1.0,
+            review_score=1.0,
+            calibration_score=1.0,
+            fixture_results=[],
+            total_tokens=100,
+            total_cost_usd=3.0,
+        )
+
+    monkeypatch.setattr(_runners, "_provider_for", lambda *_a, **_k: MagicMock())
+    monkeypatch.setattr(_runners, "run_redblue", fake_step_runner)
+    monkeypatch.setattr(_runners, "run_codereview", fake_step_runner)
+    monkeypatch.setattr(_runners, "run_refusal", fake_step_runner)
+
+    with pytest.raises(EvalBudgetExceededError, match="budget exhausted"):
+        await run_battery_from_request(
+            BatteryRequest(name="blue-capability", provider="ollama", model="x", budget_usd=5.0)
+        )
+    # Step 1 ($3) + Step 2 ($3 -> $6 >= $5) trips step 3. All steps share the exact same guard.
+    assert len(guards_seen) == 3
+    assert len({id(g) for g in guards_seen}) == 1

@@ -43,10 +43,6 @@ def run_post_hook(cmd: str, extra_env: Mapping[str, str]) -> int:
     return subprocess.run(cmd, shell=True, env=env, check=False).returncode  # nosec B602
 
 
-def _escape_applescript_string(s: str) -> str:
-    return s.replace("\\", "\\\\").replace('"', '\\"')
-
-
 def notify_run_complete(summary: RunSummary, *, title: str = "Atomics") -> None:
     """Best-effort desktop notification (osascript on macOS, notify-send on Linux)."""
     body = (
@@ -56,9 +52,10 @@ def notify_run_complete(summary: RunSummary, *, title: str = "Atomics") -> None:
     system = platform.system()
     if system == "Darwin" and shutil.which("osascript"):
         script = (
-            f'display notification "{_escape_applescript_string(body)}" '
-            f'with title "{_escape_applescript_string(title)}"'
+            "on run argv\n"
+            "display notification (item 1 of argv) with title (item 2 of argv)\n"
+            "end run"
         )
-        subprocess.run(["osascript", "-e", script], check=False, capture_output=True)
+        subprocess.run(["osascript", "-e", script, body, title], check=False, capture_output=True)
     elif system == "Linux" and shutil.which("notify-send"):
         subprocess.run(["notify-send", title, body], check=False, capture_output=True)

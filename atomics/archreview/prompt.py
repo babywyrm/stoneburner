@@ -150,14 +150,18 @@ def parse_findings(raw: str) -> list[Finding]:
     for line in raw.splitlines():
         if re.match(r"^\s*[|][\s\-:|]+[|]", line):
             continue  # markdown separator row
-        m = _HYBRID_PIPE_RE.match(line) or _PIPE_RE.match(line)  # type: ignore[assignment]
-        if not m:
+        match = _HYBRID_PIPE_RE.match(line) or _PIPE_RE.match(line)
+        if not match:
             continue
         # Skip header rows: first cell is a label word (Category, Finding, etc.)
         # not a recognizable category value.
-        if normalize_category(_clean(m.group("cat"))) is None:
+        if normalize_category(_clean(match.group("cat"))) is None:
             continue
-        findings.append(_mk_finding(m.group("cat"), m.group("loc"), m.group("sev"), m.group("why")))
+        findings.append(
+            _mk_finding(
+                match.group("cat"), match.group("loc"), match.group("sev"), match.group("why")
+            )
+        )
     if findings:
         return _deduplicate(findings)
 
@@ -167,18 +171,18 @@ def parse_findings(raw: str) -> list[Finding]:
     for line in raw.splitlines():
         if re.match(r"^\s*[|][\s\-:|]+[|]", line):
             continue  # separator/header row
-        m = _MD_TABLE_ROW_RE.match(line)  # type: ignore[assignment]
-        if not m:
+        row_match = _MD_TABLE_ROW_RE.match(line)
+        if not row_match:
             continue
-        cat_norm = normalize_category(_clean(m.group("cat")))
+        cat_norm = normalize_category(_clean(row_match.group("cat")))
         if cat_norm is None:
             continue  # skip header rows whose first cell isn't a category
         findings.append(
             Finding(
                 category=cat_norm.value,
-                location=_clean(m.group("loc")),
-                severity=_clean(m.group("sev")).lower(),
-                rationale=_clean(m.group("why")),
+                location=_clean(row_match.group("loc")),
+                severity=_clean(row_match.group("sev")).lower(),
+                rationale=_clean(row_match.group("why")),
             )
         )
     if findings:
@@ -186,8 +190,15 @@ def parse_findings(raw: str) -> list[Finding]:
 
     # Numbered/bulleted bold list: 1. **Category** — location — severity — why
     for line in raw.splitlines():
-        m = _BOLD_LIST_RE.match(line)  # type: ignore[assignment]
-        if not m:
+        bold_match = _BOLD_LIST_RE.match(line)
+        if not bold_match:
             continue
-        findings.append(_mk_finding(m.group("cat"), m.group("loc"), m.group("sev"), m.group("why")))
+        findings.append(
+            _mk_finding(
+                bold_match.group("cat"),
+                bold_match.group("loc"),
+                bold_match.group("sev"),
+                bold_match.group("why"),
+            )
+        )
     return _deduplicate(findings)

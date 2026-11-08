@@ -60,8 +60,17 @@ def test_notify_macos_runs_osascript(monkeypatch):
     monkeypatch.setattr("atomics.reporting.hooks.shutil.which", _which)
     mock_run = MagicMock(return_value=MagicMock(returncode=0))
     monkeypatch.setattr("atomics.reporting.hooks.subprocess.run", mock_run)
-    notify_run_complete(_sample_summary())
+    summary = _sample_summary()
+    summary.run_id = 'run"\n& do shell script "id"'
+    notify_run_complete(summary, title='Title "quoted"')
     assert mock_run.called
+    argv = mock_run.call_args.args[0]
+    assert argv[:2] == ["osascript", "-e"]
+    assert "on run argv" in argv[2]
+    assert 'run"\n& do shell script "id"' not in argv[2]
+    assert 'Title "quoted"' not in argv[2]
+    assert argv[3].startswith('Run run"\n& do shell script "id":')
+    assert argv[4] == 'Title "quoted"'
 
 
 # ── notify-send Linux path ────────────────────────────────────────────────────
