@@ -44,7 +44,12 @@ async def _fetch_file(target: ProbeTarget, *, max_bytes: int) -> str:
 async def _fetch_http(target: ProbeTarget, *, max_bytes: int) -> str:
     import httpx
 
-    url = target.url or ""
+    from atomics.validation import validate_endpoint_url
+
+    try:
+        url = validate_endpoint_url(target.url or "", label=f"Target '{target.name}' url")
+    except ValueError as exc:
+        raise ProbeConnectorError(str(exc)) from exc
     headers = target.headers or {}
 
     try:

@@ -58,7 +58,7 @@ def load_probe_config(config_path: Path) -> list[ProbeTarget]:
         raise ProbeConfigError(f"Config file not found: {config_path}")
 
     try:
-        import yaml  # type: ignore[import]
+        import yaml
     except ImportError as exc:
         raise ProbeConfigError(
             "PyYAML is required for probe config loading. Install it with: pip install pyyaml"

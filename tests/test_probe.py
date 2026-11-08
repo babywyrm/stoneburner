@@ -663,3 +663,17 @@ def test_load_probe_config_rejects_non_http_url(tmp_path):
     )
     with pytest.raises(ProbeConfigError, match="scheme"):
         load_probe_config(cfg)
+
+
+def test_fetch_artifact_http_validates_endpoint_url():
+    from atomics.probe.config import ProbeTarget
+    from atomics.probe.connectors import ProbeConnectorError, fetch_artifact
+
+    target = ProbeTarget(
+        name="bad",
+        artifact_type="api-response",
+        source="http",
+        url="file:///etc/passwd",
+    )
+    with pytest.raises(ProbeConnectorError, match="scheme"):
+        asyncio.run(fetch_artifact(target))

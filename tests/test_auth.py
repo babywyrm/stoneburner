@@ -957,9 +957,22 @@ def test_callback_handler_oauth_error():
         )
     except urllib.error.HTTPError as e:
         assert e.code == 400
+        assert e.headers.get("Content-Type") == "text/plain; charset=utf-8"
+        assert e.headers.get("X-Content-Type-Options") == "nosniff"
+        e.close()
+
+    # A second request (e.g. /favicon.ico or a duplicate hit) must not raise InvalidStateError.
+    try:
+        urllib.request.urlopen(
+            f"http://127.0.0.1:{port}/callback?state=st&code=late",
+            timeout=3,
+        ).close()
+    except urllib.error.HTTPError as e:
+        e.close()
 
     _run_until_future_done(loop, future)
     with pytest.raises(RuntimeError, match="OAuth error"):
         future.result()
     server.shutdown()
+    server.server_close()
     loop.close()

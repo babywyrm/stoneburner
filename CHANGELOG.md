@@ -36,6 +36,11 @@
 - Quality judge (`eval/judge.py`), `probe`, `qa`, `archreview`, and
   `provider-test` now sanitize exception strings through
   `sanitize_error()` before storing or logging them.
+- OAuth PKCE callback responses now set `Content-Type: text/plain;
+  charset=utf-8` and `X-Content-Type-Options: nosniff` on errors, guard
+  the one-shot future against duplicate requests, and close the callback
+  socket on shutdown; `fetch_artifact` validates HTTP target URLs at
+  fetch time.
 
 ## 0.31.0 (2026-11-01) — Quickstart, sweep intervals, gateway errors
 

@@ -106,6 +106,7 @@ class OAuthPKCEAuth(AuthStrategy):
             code = await asyncio.wait_for(code_future, timeout=300)
         finally:
             server.shutdown()
+            server.server_close()
 
         return await self._exchange_code(code, verifier, redirect_uri)
 
@@ -209,7 +210,22 @@ def _start_callback_server(
 ) -> HTTPServer:
     """Start a one-shot HTTP server to catch the OAuth redirect."""
 
+    def _resolve_error(exc: Exception) -> None:
+        if not code_future.done():
+            code_future.set_exception(exc)
+
+    def _resolve_code(value: str) -> None:
+        if not code_future.done():
+            code_future.set_result(value)
+
     class Handler(BaseHTTPRequestHandler):
+        def _send_plain(self, status_code: int, message: str) -> None:
+            self.send_response(status_code)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.end_headers()
+            self.wfile.write(message.encode("utf-8", errors="replace"))
+
         def do_GET(self) -> None:
             qs = parse_qs(urlparse(self.path).query)
             state = qs.get("state", [""])[0]
@@ -217,31 +233,24 @@ def _start_callback_server(
             error = qs.get("error", [""])[0]
 
             if error:
-                self.send_response(400)
-                self.end_headers()
-                self.wfile.write(f"Authorization error: {error}".encode())
-                loop.call_soon_threadsafe(
-                    code_future.set_exception, RuntimeError(f"OAuth error: {error}")
-                )
+                self._send_plain(400, f"Authorization error: {error}")
+                loop.call_soon_threadsafe(_resolve_error, RuntimeError(f"OAuth error: {error}"))
                 return
 
             if state != expected_state:
-                self.send_response(400)
-                self.end_headers()
-                self.wfile.write(b"State mismatch")
-                loop.call_soon_threadsafe(
-                    code_future.set_exception, RuntimeError("OAuth state mismatch")
-                )
+                self._send_plain(400, "State mismatch")
+                loop.call_soon_threadsafe(_resolve_error, RuntimeError("OAuth state mismatch"))
                 return
 
             self.send_response(200)
-            self.send_header("Content-Type", "text/html")
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("X-Content-Type-Options", "nosniff")
             self.end_headers()
             self.wfile.write(
                 b"<html><body><h2>Logged in to Atomics!</h2>"
                 b"<p>You can close this tab.</p></body></html>"
             )
-            loop.call_soon_threadsafe(code_future.set_result, code)
+            loop.call_soon_threadsafe(_resolve_code, code)
 
         def log_message(self, format, *args):
             pass
