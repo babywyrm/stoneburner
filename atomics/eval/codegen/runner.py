@@ -327,8 +327,7 @@ async def run_codegen(
                 test_details=[],
             )
             results.append(fr)
-            if on_fixture_done:
-                on_fixture_done(fr)
+            await _call_hook(on_fixture_done, fr)
             continue
 
         skipped = unscorable_outcome(resp)
@@ -346,8 +345,7 @@ async def run_codegen(
                 test_details=[],
             )
             results.append(fr)
-            if on_fixture_done:
-                on_fixture_done(fr)
+            await _call_hook(on_fixture_done, fr)
             continue
 
         code = extract_function(response_text, fixture.function_name)
@@ -376,8 +374,7 @@ async def run_codegen(
             test_details=test_details,
         )
         results.append(fr)
-        if on_fixture_done:
-            on_fixture_done(fr)
+        await _call_hook(on_fixture_done, fr)
 
     return CodegenRunSummary(
         run_id=effective_run_id,

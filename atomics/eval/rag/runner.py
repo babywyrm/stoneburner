@@ -306,8 +306,7 @@ async def run_rag(
             )
             fr = RAGFixtureResult(fixture=fixture, task_result=tr, judge=None)
             results.append(fr)
-            if on_fixture_done:
-                on_fixture_done(fr)
+            await _call_hook(on_fixture_done, fr)
             continue
 
         skipped = unscorable_outcome(resp)
@@ -317,8 +316,7 @@ async def run_rag(
             tr.error_message = skipped.kind.value
             fr = RAGFixtureResult(fixture=fixture, task_result=tr, judge=None)
             results.append(fr)
-            if on_fixture_done:
-                on_fixture_done(fr)
+            await _call_hook(on_fixture_done, fr)
             continue
 
         judge_tag = judge_model or getattr(effective_judge, "default_model", None)
@@ -336,8 +334,7 @@ async def run_rag(
 
         fr = RAGFixtureResult(fixture=fixture, task_result=tr, judge=judge_result)
         results.append(fr)
-        if on_fixture_done:
-            on_fixture_done(fr)
+        await _call_hook(on_fixture_done, fr)
 
     completed = datetime.now(UTC)
 

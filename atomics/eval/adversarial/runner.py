@@ -8,7 +8,6 @@ Supports:
 
 from __future__ import annotations
 
-import inspect
 import logging
 import math
 import time
@@ -513,11 +512,7 @@ async def run_adversarial(
     ] + [_attribution_model(p, m, fallback_to_provider=True) for p, m in extra_judges]
 
     for idx, fixture in enumerate(selected):
-        if on_fixture_start:
-            if inspect.iscoroutinefunction(on_fixture_start):
-                await on_fixture_start(idx, fixture)
-            else:
-                on_fixture_start(idx, fixture)
+        await _call_hook(on_fixture_start, idx, fixture)
 
         logger.info(
             "[adversarial] %s (%s/%s) runs=%d judges=%d — %s",
@@ -576,7 +571,7 @@ async def run_adversarial(
                     run_num + 1,
                     sanitize_error(exc),
                 )
-                await _emit_run_done(
+                await _call_hook(
                     on_run_done,
                     idx,
                     fixture,
@@ -709,7 +704,7 @@ async def run_adversarial(
                     print(f"    {i}. {c}")
                 print()
 
-            await _emit_run_done(
+            await _call_hook(
                 on_run_done,
                 idx,
                 fixture,
@@ -741,11 +736,7 @@ async def run_adversarial(
 
         fixture_results.append(fr)
 
-        if on_fixture_done is not None:
-            if inspect.iscoroutinefunction(on_fixture_done):
-                await on_fixture_done(fr)
-            else:
-                on_fixture_done(fr)
+        await _call_hook(on_fixture_done, fr)
 
     return AdversarialSummary(
         run_id=run_id,
@@ -771,18 +762,3 @@ def _pass_record(attempt: AttemptResult) -> dict[str, object]:
     if judge is None:
         return {"score": None, "label": None, "status": "failed"}
     return {"score": None, "label": judge.label, "status": "unscored"}
-
-
-async def _emit_run_done(
-    callback: Callable[..., object] | None,
-    index: int,
-    fixture: AdversarialFixture,
-    run_number: int,
-    runs: int,
-    record: dict[str, object],
-) -> None:
-    if callback is None:
-        return
-    result = callback(index, fixture, run_number, runs, record)
-    if inspect.isawaitable(result):
-        await result

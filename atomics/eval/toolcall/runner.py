@@ -23,7 +23,6 @@ them incomparable with future runs.
 
 from __future__ import annotations
 
-import inspect
 import logging
 import time
 import uuid
@@ -558,10 +557,7 @@ async def run_toolcall_suite(
         summary.tool_capable = bool(getattr(provider, "supports_tools", False))
 
     for index, fixture in enumerate(fixtures):
-        if on_fixture_start:
-            result = on_fixture_start(index, fixture)
-            if inspect.isawaitable(result):
-                await result
+        await _call_hook(on_fixture_start, index, fixture)
 
         generate_model = model or getattr(provider, "default_model", None)
         await _call_hook(on_phase, fixture.id, "generate", generate_model)
@@ -585,20 +581,14 @@ async def run_toolcall_suite(
                 on_phase=on_phase,
             )
             per_run.append(record)
-            if on_run_done:
-                result = on_run_done(index, fixture, run_number, runs, record)
-                if inspect.isawaitable(result):
-                    await result
+            await _call_hook(on_run_done, index, fixture, run_number, runs, record)
 
         aggregated = _aggregate_runs(fixture, per_run)
         summary.fixtures.append(aggregated)
         summary.total_cost_usd += sum(r["cost_usd"] for r in per_run)
         summary.judge_parse_failures += sum(r["judge_parse_failures"] for r in per_run)
 
-        if on_fixture_done:
-            result = on_fixture_done(index, fixture, aggregated)
-            if inspect.isawaitable(result):
-                await result
+        await _call_hook(on_fixture_done, index, fixture, aggregated)
 
     summary.completed_at = datetime.now(UTC).isoformat()
     return summary

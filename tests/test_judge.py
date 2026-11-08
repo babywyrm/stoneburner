@@ -436,3 +436,67 @@ def test_self_judge_tolerates_providers_without_default_model():
     collisions = detect_self_judge(_Bare(), "qwen2.5:7b", [(_Bare(), "qwen2.5:7b")])
     assert collisions == ["ollama:qwen2.5:7b"]
     assert detect_self_judge(_Bare(), None, [(_Bare(), None)]) == []
+
+
+@pytest.mark.asyncio
+async def test_judge_probe_and_qa_sanitize_credentials_in_exception_messages(tmp_path):
+    from unittest.mock import AsyncMock, MagicMock
+
+    from atomics.benchmark.qa_runner import QAFixture, run_qa_suite
+    from atomics.probe.config import ProbeTarget
+    from atomics.probe.runner import run_probe
+
+    secret = "sk-ant-api03-supersecretkeyvalue123456"
+    boom = RuntimeError(f"upstream failed with Authorization: Bearer {secret}")
+
+    bad_judge = MagicMock()
+    bad_judge.name = "claude"
+    bad_judge.generate = AsyncMock(side_effect=boom)
+
+    jr = await score_response("q", "a", judge_provider=bad_judge)
+    assert secret not in jr.rationale
+    assert "[REDACTED]" in jr.rationale
+
+    artifact = tmp_path / "app.log"
+    artifact.write_text("ERROR 500\n")
+    bad_provider = MagicMock()
+    bad_provider.name = "claude"
+    bad_provider.generate = AsyncMock(side_effect=boom)
+
+    probe_summary = await run_probe(
+        bad_provider,
+        judge_provider=bad_judge,
+        targets=[
+            ProbeTarget(
+                name="log-check",
+                artifact_type="application-log",
+                source="file",
+                path=str(artifact),
+            )
+        ],
+    )
+    assert secret not in probe_summary.results[0].judge_rationale
+    assert "[REDACTED]" in probe_summary.results[0].judge_rationale
+
+    qa_suite = await run_qa_suite(
+        model="m",
+        host="http://127.0.0.1:11434",
+        fixtures=[QAFixture(id="q1", prompt="hi")],
+        profile=MagicMock(endpoint="not-a-valid-url://x", headers={}),
+    )
+    assert qa_suite.results[0].status == "ERROR"
+
+    from unittest.mock import patch
+
+    with patch(
+        "atomics.benchmark.qa_runner._query_ollama",
+        new_callable=AsyncMock,
+        side_effect=boom,
+    ):
+        qa_suite2 = await run_qa_suite(
+            model="m",
+            host="http://127.0.0.1:11434",
+            fixtures=[QAFixture(id="q1", prompt="hi")],
+        )
+    assert secret not in (qa_suite2.results[0].error or "")
+    assert "[REDACTED]" in (qa_suite2.results[0].error or "")

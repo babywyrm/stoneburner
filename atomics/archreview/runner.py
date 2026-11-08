@@ -104,7 +104,9 @@ async def run_archreview(
                 )
                 result.judge_score = score
             except Exception as exc:  # noqa: BLE001
-                logger.warning("judge failed on %s round %d: %s", result.model, rnd, exc)
+                logger.warning(
+                    "judge failed on %s round %d: %s", result.model, rnd, sanitize_error(exc)
+                )
 
         results.append(result)
 

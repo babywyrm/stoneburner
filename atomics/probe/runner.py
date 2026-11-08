@@ -11,6 +11,7 @@ from atomics.probe.checks import build_check
 from atomics.probe.config import ProbeTarget
 from atomics.probe.connectors import ProbeConnectorError, fetch_artifact
 from atomics.providers.base import BaseProvider
+from atomics.validation import sanitize_error
 
 logger = logging.getLogger("atomics.probe.runner")
 
@@ -108,7 +109,8 @@ async def run_probe(
         try:
             content = await fetch_artifact(target)
         except ProbeConnectorError as exc:
-            logger.warning("[probe] Fetch failed for '%s': %s", target.name, exc)
+            err = sanitize_error(exc)
+            logger.warning("[probe] Fetch failed for '%s': %s", target.name, err)
             result = ProbeResult(
                 target_name=target.name,
                 artifact_type=target.artifact_type,
@@ -117,7 +119,7 @@ async def run_probe(
                 prev_score=prev_scores.get(target.name),
                 regressed=False,
                 judge_model="",
-                judge_rationale=f"Fetch failed: {exc}",
+                judge_rationale=f"Fetch failed: {err}",
             )
             results.append(result)
             if on_result:
@@ -141,7 +143,8 @@ async def run_probe(
             analysis = resp.text
             thinking_tokens = resp.thinking_tokens
         except Exception as exc:
-            logger.warning("[probe] Analysis failed for '%s': %s", target.name, exc)
+            err = sanitize_error(exc)
+            logger.warning("[probe] Analysis failed for '%s': %s", target.name, err)
             result = ProbeResult(
                 target_name=target.name,
                 artifact_type=target.artifact_type,
@@ -150,7 +153,7 @@ async def run_probe(
                 prev_score=prev_scores.get(target.name),
                 regressed=False,
                 judge_model="",
-                judge_rationale=f"Analysis failed: {exc}",
+                judge_rationale=f"Analysis failed: {err}",
                 thinking_enabled=bool(thinking),
             )
             results.append(result)

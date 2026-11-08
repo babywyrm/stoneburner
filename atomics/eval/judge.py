@@ -22,6 +22,7 @@ from dataclasses import dataclass
 
 from atomics.eval.consensus import NumericVote, combine_numeric
 from atomics.providers.base import BaseProvider
+from atomics.validation import sanitize_error
 
 logger = logging.getLogger("atomics.eval.judge")
 
@@ -341,13 +342,14 @@ async def score_response(
     try:
         raw, effective_model = await _ask(judge_prompt, _JUDGE_SYSTEM)
     except Exception as exc:
-        logger.warning("Judge call failed: %s", exc)
+        err = sanitize_error(exc)
+        logger.warning("Judge call failed: %s", err)
         return JudgeResult(
             score=0.5,
             accuracy=0,
             completeness=0,
             format_score=0,
-            rationale=f"Judge call failed: {exc}",
+            rationale=f"Judge call failed: {err}",
             judge_model=judge_model or "unknown",
             parse_failed=True,
             criteria_coverage=criteria_coverage,
@@ -369,7 +371,7 @@ async def score_response(
             if parsed is not None:
                 raw = retry_raw
         except Exception as exc:
-            logger.warning("Judge reformat retry failed: %s", exc)
+            logger.warning("Judge reformat retry failed: %s", sanitize_error(exc))
 
     if parsed is None:
         logger.warning("Judge parse failed for response: %r", raw[:200])

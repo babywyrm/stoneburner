@@ -33,6 +33,9 @@
 - `notify_run_complete` on macOS now passes notification text to
   `osascript` as positional `argv` instead of interpolating into
   AppleScript source.
+- Quality judge (`eval/judge.py`), `probe`, `qa`, `archreview`, and
+  `provider-test` now sanitize exception strings through
+  `sanitize_error()` before storing or logging them.
 
 ## 0.31.0 (2026-11-01) — Quickstart, sweep intervals, gateway errors
 

@@ -298,12 +298,14 @@ async def run_qa_suite(
                     thinking_tokens=think,
                 )
             except Exception as exc:
+                from atomics.validation import sanitize_error
+
                 qa_result = QAResult(
                     fixture=fixture,
                     response="",
                     latency_ms=0.0,
                     status="ERROR",
-                    error=str(exc),
+                    error=sanitize_error(exc),
                 )
             suite.results.append(qa_result)
             if callable(on_result):

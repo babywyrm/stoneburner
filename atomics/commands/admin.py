@@ -24,6 +24,7 @@ from atomics.commands.common import (
 from atomics.config import load_settings
 from atomics.models import BurnTier
 from atomics.providers.base import BaseProvider
+from atomics.validation import sanitize_error
 
 TIER_CHOICES = click.Choice([t.value for t in BurnTier], case_sensitive=False)
 
@@ -765,7 +766,7 @@ def provider_test(
                 reasoning_mode=reasoning_mode,
             )
         except Exception as exc:
-            console.print(f"[red]Generate failed:[/red] {exc}")
+            console.print(f"[red]Generate failed:[/red] {sanitize_error(exc)}")
             sys.exit(1)
         console.print("[green]Provider health check passed.[/green]")
         visible = (resp.text or "").strip()

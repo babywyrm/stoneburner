@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Sequence
+from collections.abc import Awaitable, Sequence
 from dataclasses import dataclass
 
 from atomics.core.guard import GuardConfig, RateBudgetGuard
@@ -231,7 +231,7 @@ class GuardedProvider(BaseProvider):
             )
         )
 
-    async def _metered(self, call: object) -> ProviderResponse:
+    async def _metered(self, call: Awaitable[ProviderResponse]) -> ProviderResponse:
         """Await a provider call and record what it consumed, success or not.
 
         A failure is recorded with zero usage so the circuit breaker still sees
@@ -239,7 +239,7 @@ class GuardedProvider(BaseProvider):
         forever instead of tripping.
         """
         try:
-            response: ProviderResponse = await call  # type: ignore[misc]
+            response = await call
         except Exception:
             self._guard.record_request(0, 0.0, success=False)
             raise

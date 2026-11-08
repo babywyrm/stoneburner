@@ -442,8 +442,7 @@ async def run_multiturn(
             overall_score=overall,
         )
         conversation_results.append(cr)
-        if on_conversation_done:
-            on_conversation_done(cr)
+        await _call_hook(on_conversation_done, cr)
 
     return MultiturnRunSummary(
         run_id=effective_run_id,

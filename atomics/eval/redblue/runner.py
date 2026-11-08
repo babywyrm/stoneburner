@@ -6,7 +6,6 @@ but run against security-domain fixtures tagged as red or blue team.
 
 from __future__ import annotations
 
-import inspect
 import logging
 import math
 import uuid
@@ -264,11 +263,7 @@ async def run_redblue(
     results: list[RedBlueFixtureResult] = []
 
     for idx, fixture in enumerate(fixture_set):
-        if on_fixture_start:
-            if inspect.iscoroutinefunction(on_fixture_start):
-                await on_fixture_start(idx, fixture)
-            else:
-                on_fixture_start(idx, fixture)
+        await _call_hook(on_fixture_start, idx, fixture)
 
         logger.info(
             "[redblue] %s (%s/%s) %s",
@@ -338,7 +333,7 @@ async def run_redblue(
                 task_result.error_message = err
                 task_result.completed_at = datetime.now(UTC)
                 failed_task = task_result
-                await _emit_run_done(
+                await _call_hook(
                     on_run_done,
                     idx,
                     fixture,
@@ -354,7 +349,7 @@ async def run_redblue(
                 task_result.error_class = outcome.kind.value
                 task_result.error_message = outcome.kind.value
                 failed_task = task_result
-                await _emit_run_done(
+                await _call_hook(
                     on_run_done,
                     idx,
                     fixture,
@@ -393,7 +388,7 @@ async def run_redblue(
                 judge.score,
                 judge.rationale[:80],
             )
-            await _emit_run_done(
+            await _call_hook(
                 on_run_done,
                 idx,
                 fixture,
@@ -428,11 +423,7 @@ async def run_redblue(
             )
         results.append(fr)
 
-        if on_fixture_done:
-            if inspect.iscoroutinefunction(on_fixture_done):
-                await on_fixture_done(fr)
-            else:
-                on_fixture_done(fr)
+        await _call_hook(on_fixture_done, fr)
 
     return RedBlueSummary(
         run_id=run_id,
@@ -445,18 +436,3 @@ async def run_redblue(
         temperature=temperature,
         results=results,
     )
-
-
-async def _emit_run_done(
-    callback: Callable[..., object] | None,
-    index: int,
-    fixture: RedBlueFixture,
-    run_number: int,
-    runs: int,
-    record: dict[str, object],
-) -> None:
-    if callback is None:
-        return
-    result = callback(index, fixture, run_number, runs, record)
-    if inspect.isawaitable(result):
-        await result

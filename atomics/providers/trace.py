@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import itertools
 import json
-from collections.abc import Sequence
+from collections.abc import Awaitable, Sequence
 from dataclasses import dataclass
 
 from rich import box
@@ -318,7 +318,7 @@ class TracedProvider(BaseProvider):
 
     async def _shown(
         self,
-        call: object,
+        call: Awaitable[ProviderResponse],
         model: str | None,
         parts: dict[str, str],
         tools: Sequence[dict] | None,
@@ -331,7 +331,7 @@ class TracedProvider(BaseProvider):
         number = next(_calls)
         request = (max_tokens, thinking, budget)
         try:
-            response: ProviderResponse = await call  # type: ignore[misc]
+            response = await call
         except Exception as exc:
             self._print(number, model, parts, tools, request, None, exc, history)
             raise
