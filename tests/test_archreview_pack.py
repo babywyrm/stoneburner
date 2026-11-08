@@ -6,7 +6,7 @@ from atomics.archreview.pack import build_pack, estimate_tokens
 
 
 def _mkrepo(tmp_path: Path) -> Path:
-    (tmp_path / "routes").mkdir()
+    (tmp_path / "routes").mkdir(parents=True, exist_ok=True)
     (tmp_path / "routes" / "login.ts").write_text("// auth route\nlogin();\n")
     (tmp_path / "routes" / "search.ts").write_text("// search\nquery(req.q);\n")
     (tmp_path / "package.json").write_text('{"name":"demo"}\n')
@@ -49,3 +49,21 @@ def test_priority_files_come_first(tmp_path):
     )
     pack = build_pack(repo, cfg)
     assert pack.text.index("login.ts") < pack.text.index("search.ts")
+
+
+def test_pack_rejects_symlinks_outside_repo_and_default_excludes_dotenv(tmp_path):
+    outside = tmp_path / "outside-secret.txt"
+    outside.write_text("TOP_SECRET_OUTSIDE_VALUE\n")
+    repo = _mkrepo(tmp_path / "repo")
+    (repo / "routes" / "leak.ts").symlink_to(outside)
+    (repo / ".env").write_text("OPENAI_API_KEY=sk-live-secret\n")
+    (repo / ".env.local").write_text("DATABASE_URL=postgres://secret\n")
+    (repo / "cert.pem").write_text("-----BEGIN PRIVATE KEY-----\n")
+
+    cfg = TierConfig(budget_tokens=4000)
+    pack = build_pack(repo, cfg)
+    assert "TOP_SECRET_OUTSIDE_VALUE" not in pack.text
+    assert "leak.ts" not in pack.text
+    assert "OPENAI_API_KEY" not in pack.text
+    assert "DATABASE_URL" not in pack.text
+    assert "BEGIN PRIVATE KEY" not in pack.text

@@ -301,3 +301,27 @@ def test_ndcg_non_ideal_ranking():
 
 def test_ndcg_empty_relevance_scores():
     assert ndcg_at_k({}, ["a", "b"], 2) == 0.0
+
+
+def test_load_documents_skips_symlinks_escaping_directory(tmp_path: Path):
+    outside = tmp_path / "outside.txt"
+    outside.write_text("outside secret")
+    docs_dir = tmp_path / "corpus"
+    docs_dir.mkdir()
+    (docs_dir / "inside.txt").write_text("inside public")
+    (docs_dir / "escape.txt").symlink_to(outside)
+
+    docs = load_documents(docs_dir)
+    assert [d.source for d in docs] == ["inside.txt"]
+
+
+def test_rag_index_rejects_non_positive_or_non_int_dim(tmp_path: Path):
+    class _BadEmbedder:
+        dim = 0
+        model_name = "bad"
+
+        def embed(self, texts: list[str]) -> list[list[float]]:
+            return []
+
+    with pytest.raises(ValueError, match="positive integer"):
+        RAGIndex(tmp_path / "bad.vec", embedder=_BadEmbedder())

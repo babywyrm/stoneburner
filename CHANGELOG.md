@@ -41,6 +41,12 @@
   the one-shot future against duplicate requests, and close the callback
   socket on shutdown; `fetch_artifact` validates HTTP target URLs at
   fetch time.
+- `archreview` evidence packing and `rag-index` document loading now
+  reject symlinks that resolve outside the target directory,
+  `archreview` default-excludes `.env` / `.env.*` / `*.pem` / `*.key`,
+  `RAGIndex` validates `embedder.dim` as a positive integer before table
+  creation, and `generate_launchd_plist` serializes via `plistlib.dumps`
+  so paths and labels are XML-escaped.
 
 ## 0.31.0 (2026-11-01) — Quickstart, sweep intervals, gateway errors
 

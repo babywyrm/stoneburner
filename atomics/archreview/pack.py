@@ -16,12 +16,17 @@ from atomics.archreview.models import TierConfig
 
 _CHARS_PER_TOKEN = 4
 
-# Files never worth packing regardless of repo (binary / lockfile noise).
+# Files never worth packing regardless of repo (binary / lockfile noise and
+# local secret/credential files that should not be shipped to external LLMs).
 _DEFAULT_EXCLUDE = (
     "**/.git/**",
     "**/node_modules/**",
     "**/dist/**",
     "**/build/**",
+    "**/.env",
+    "**/.env.*",
+    "**/*.pem",
+    "**/*.key",
     "**/*.min.js",
     "**/*.map",
     "**/*.lock",
@@ -73,7 +78,9 @@ class EvidencePack:
 
 
 def _matches_any(rel: str, patterns: tuple[str, ...]) -> bool:
-    return any(fnmatch.fnmatch(rel, p) or fnmatch.fnmatch(rel, p.lstrip("*/")) for p in patterns)
+    return any(
+        fnmatch.fnmatch(rel, p) or fnmatch.fnmatch(rel, p.removeprefix("**/")) for p in patterns
+    )
 
 
 def _relevance_rank(rel: str, priority: tuple[str, ...]) -> tuple[int, str]:
@@ -95,13 +102,16 @@ def _relevance_rank(rel: str, priority: tuple[str, ...]) -> tuple[int, str]:
 
 def build_pack(repo_path: Path, cfg: TierConfig) -> EvidencePack:
     """Build a deterministic evidence pack for a repo under a TierConfig."""
-    repo_path = Path(repo_path)
+    repo_path = Path(repo_path).resolve()
     exclude = _DEFAULT_EXCLUDE + tuple(cfg.exclude)
     include = tuple(cfg.include)
 
     files: list[str] = []
     for p in sorted(repo_path.rglob("*")):
-        if not p.is_file():
+        try:
+            if not p.is_file() or not p.resolve().is_relative_to(repo_path):
+                continue
+        except OSError:
             continue
         rel = p.relative_to(repo_path).as_posix()
         if _matches_any(rel, exclude):

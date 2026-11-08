@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import platform
+import plistlib
 import shutil
 import subprocess
 import sys
@@ -76,42 +77,30 @@ def generate_launchd_plist(
     wd = working_dir or str(Path.cwd())
     py = shutil.which("python3") or sys.executable
     interval_seconds = interval_minutes * 60
-
-    return f"""<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
-  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>{label}.{tier}</string>
-    <key>WorkingDirectory</key>
-    <string>{wd}</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>{py}</string>
-        <string>-m</string>
-        <string>atomics</string>
-        <string>run</string>
-        <string>--tier</string>
-        <string>{tier}</string>
-        <string>--provider</string>
-        <string>{provider}</string>
-        <string>--trigger</string>
-        <string>scheduled</string>
-        <string>--max-iterations</string>
-        <string>{max_iterations}</string>
-    </array>
-    <key>StartInterval</key>
-    <integer>{interval_seconds}</integer>
-    <key>StandardOutPath</key>
-    <string>{wd}/logs/atomics.log</string>
-    <key>StandardErrorPath</key>
-    <string>{wd}/logs/atomics.log</string>
-    <key>RunAtLoad</key>
-    <true/>
-</dict>
-</plist>
-"""
+    log_path = f"{wd}/logs/atomics.log"
+    payload = {
+        "Label": f"{label}.{tier}",
+        "WorkingDirectory": wd,
+        "ProgramArguments": [
+            py,
+            "-m",
+            "atomics",
+            "run",
+            "--tier",
+            tier,
+            "--provider",
+            provider,
+            "--trigger",
+            "scheduled",
+            "--max-iterations",
+            str(max_iterations),
+        ],
+        "StartInterval": interval_seconds,
+        "StandardOutPath": log_path,
+        "StandardErrorPath": log_path,
+        "RunAtLoad": True,
+    }
+    return plistlib.dumps(payload, sort_keys=False).decode("utf-8")
 
 
 # ── Installation helpers ──────────────────────────────────

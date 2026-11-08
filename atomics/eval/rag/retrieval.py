@@ -104,10 +104,13 @@ def load_documents(path: Path | str) -> list[Document]:
     if not p.is_dir():
         raise ValueError(f"Path is not a file or directory: {path}")
 
+    root = p.resolve()
     docs: list[Document] = []
     for ext in ("*.txt", "*.md", "*.json", "*.html"):
         for file_path in p.rglob(ext):
             try:
+                if not file_path.resolve().is_relative_to(root):
+                    continue
                 docs.append(_load_file(file_path))
             except (UnicodeDecodeError, OSError, json.JSONDecodeError) as exc:
                 logger.warning("Skipping %s: %s", file_path, exc)
@@ -156,6 +159,9 @@ class RAGIndex:
         self._ensure_tables()
 
     def _ensure_tables(self) -> None:
+        dim = self.embedder.dim
+        if isinstance(dim, bool) or not isinstance(dim, int) or dim < 1:
+            raise ValueError(f"embedder.dim must be a positive integer, got {dim!r}")
         vec = _require_sqlite_vec()
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         with sqlite3.connect(self.db_path) as conn:
@@ -163,7 +169,7 @@ class RAGIndex:
             vec.load(conn)
             conn.execute(
                 f"CREATE VIRTUAL TABLE IF NOT EXISTS chunks USING vec0("
-                f"embedding FLOAT[{self.embedder.dim}], "
+                f"embedding FLOAT[{dim}], "
                 f"+source TEXT, +chunk_index INTEGER, +offset INTEGER, +content TEXT)"
             )
             conn.execute("CREATE TABLE IF NOT EXISTS index_meta (key TEXT PRIMARY KEY, value TEXT)")

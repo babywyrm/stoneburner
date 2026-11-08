@@ -174,3 +174,16 @@ def test_check_schedule_health_crontab_absent():
 
 def test_check_schedule_health_unknown_format():
     assert check_schedule_health("windows", "ez", run_cmd=_fake_run(returncode=0)) is False
+
+
+def test_launchd_plist_escapes_xml_special_chars():
+    import plistlib
+
+    plist = generate_launchd_plist(
+        working_dir="/tmp/dir & <evil>",
+        label="com.example.a&b",
+        tier="ez",
+    )
+    parsed = plistlib.loads(plist.encode("utf-8"))
+    assert parsed["WorkingDirectory"] == "/tmp/dir & <evil>"
+    assert parsed["Label"] == "com.example.a&b.ez"
