@@ -1557,6 +1557,60 @@ def test_cli_provider_test_brain_gateway_default_label(monkeypatch):
     assert captured["default_model"] is None
 
 
+def test_cli_provider_test_brain_gateway_does_not_auto_pin_thinking(monkeypatch):
+    """brain-gateway cannot control thinking; a thinking-capable model name must not auto-pin it."""
+    from unittest.mock import AsyncMock
+
+    from atomics.commands.common import effective_thinking
+    from atomics.providers.brain_gateway import BrainGatewayProvider
+
+    assert effective_thinking(None, "claude-sonnet-4-6", "claude") is True
+    assert effective_thinking(None, "claude-sonnet-4-6", "brain-gateway") is None
+    assert effective_thinking(True, "claude-sonnet-4-6", "brain-gateway") is True
+
+    mock_client = AsyncMock()
+    mock_client.get = AsyncMock(return_value=SimpleNamespace(status_code=200))
+    mock_client.put = AsyncMock(
+        return_value=SimpleNamespace(status_code=200, raise_for_status=lambda: None)
+    )
+    mock_client.post = AsyncMock(
+        return_value=SimpleNamespace(
+            status_code=200,
+            raise_for_status=lambda: None,
+            json=lambda: {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "result": {
+                    "content": [{"type": "text", "text": '{"answer": "4"}'}],
+                    "isError": False,
+                },
+            },
+        )
+    )
+
+    monkeypatch.setattr(
+        "atomics.providers.brain_gateway.BrainGatewayProvider",
+        lambda url, default_model=None: BrainGatewayProvider(
+            url=url, default_model=default_model, client=mock_client
+        ),
+    )
+    result = CliRunner().invoke(
+        cli,
+        [
+            "provider-test",
+            "--provider",
+            "brain-gateway",
+            "--gateway-url",
+            "http://gw:8080",
+            "--model",
+            "claude-sonnet-4-6",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert "Provider health check passed." in result.output
+    assert "(thinking ON)" not in result.output
+
+
 def test_cli_sweep_vllm_provider(monkeypatch, tmp_path):
     """atomics sweep --provider vllm should use VllmProvider via _make_provider."""
     from atomics.benchmark.sweep import ModelSweepResult

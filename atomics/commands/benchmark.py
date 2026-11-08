@@ -11,6 +11,7 @@ from rich.table import Table
 from atomics.commands.common import (
     PROVIDER_CHOICES,
     _make_provider,
+    effective_thinking,
     effort_options,
     run_async,
     setup_logging,
@@ -164,12 +165,7 @@ def run(
 
     effective_model = resolve_effective_model(model, provider)
 
-    # Auto-detect thinking capability when not explicitly set
-    if thinking_flag is None and effective_model:
-        from atomics.benchmark.model_classes import supports_thinking
-
-        if supports_thinking(effective_model):
-            thinking_flag = True
+    thinking_flag = effective_thinking(thinking_flag, effective_model, provider_name)
 
     repo = MetricsRepository(settings.db_path)
     engine = LoopEngine(

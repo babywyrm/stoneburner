@@ -16,6 +16,7 @@ from atomics.commands.common import (
     PROVIDER_CHOICES,
     _make_provider,
     effective_model,
+    effective_thinking,
     effort_options,
     run_async,
     setup_logging,
@@ -736,13 +737,7 @@ def provider_test(
         else effective_model(model, prov)
     )
 
-    # Auto-detect thinking if not explicitly set
-    eff_thinking = thinking_flag
-    if eff_thinking is None and model:
-        from atomics.benchmark.model_classes import supports_thinking
-
-        if supports_thinking(model):
-            eff_thinking = True
+    eff_thinking = effective_thinking(thinking_flag, model, provider_name)
 
     async def _test() -> None:
         thinking_label = ""

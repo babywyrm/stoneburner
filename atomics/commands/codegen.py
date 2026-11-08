@@ -14,6 +14,7 @@ from atomics.commands.common import (
     PROVIDER_CHOICES,
     _make_provider,
     budget_option,
+    effective_thinking,
     effort_options,
     eval_budget_from,
     integrity_exit_code,
@@ -155,12 +156,7 @@ def codegen(
             if repo:
                 repo.save_task_result(fr.task_result, suite="codegen")
 
-        eff_thinking = thinking_flag
-        if eff_thinking is None and model:
-            from atomics.benchmark.model_classes import supports_thinking
-
-            if supports_thinking(model):
-                eff_thinking = True
+        eff_thinking = effective_thinking(thinking_flag, model, provider_name)
 
         summary = run_async(
             run_codegen(

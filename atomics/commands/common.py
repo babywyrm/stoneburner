@@ -267,6 +267,19 @@ def print_judge_calibration(console: Console, provider_name: str, model: str) ->
     console.print(f"[dim]Judge calibration: {escape(calibration_label(status))}[/dim]")
 
 
+def effective_thinking(
+    thinking_flag: bool | None,
+    model: str | None,
+    provider_name: str,
+) -> bool | None:
+    """Resolve CLI thinking flag, leaving unset for providers that cannot control thinking."""
+    if thinking_flag is not None or not model or provider_name == "brain-gateway":
+        return thinking_flag
+    from atomics.benchmark.model_classes import supports_thinking
+
+    return True if supports_thinking(model) else None
+
+
 def effective_model(requested_model: str | None, provider: object) -> str:
     """Resolve requested, provider-default, or generic model attribution."""
     if requested_model:

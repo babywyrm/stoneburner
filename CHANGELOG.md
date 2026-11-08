@@ -14,7 +14,9 @@
 - `brain-gateway` refuses a generate when thinking is set. `--thinking`
   and `--no-thinking` were scored as if the gateway had honored them.
   A thinking budget with thinking left unset is the CLI default and
-  still generates. `max_tokens` is not on the RPC and is not applied.
+  still generates, and CLI commands no longer auto-enable thinking from
+  the model name on `brain-gateway`. `max_tokens` is not on the RPC and
+  is not applied.
 
 ## 0.31.0 (2026-11-01) — Quickstart, sweep intervals, gateway errors
 

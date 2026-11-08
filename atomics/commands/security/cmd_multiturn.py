@@ -15,6 +15,7 @@ from atomics.commands.common import (
     _attribution_model,
     _make_provider,
     budget_option,
+    effective_thinking,
     effort_options,
     eval_budget_from,
     extra_judges_option,
@@ -221,12 +222,7 @@ def multiturn(
             if repo:
                 repo.save_task_result(cr.task_result, suite="multiturn")
 
-        eff_thinking = thinking_flag
-        if eff_thinking is None and model:
-            from atomics.benchmark.model_classes import supports_thinking
-
-            if supports_thinking(model):
-                eff_thinking = True
+        eff_thinking = effective_thinking(thinking_flag, model, provider_name)
 
         summary = run_async(
             run_multiturn(

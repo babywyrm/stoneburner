@@ -14,6 +14,7 @@ from atomics.commands.common import (
     PROVIDER_CHOICES,
     _make_provider,
     budget_option,
+    effective_thinking,
     effort_options,
     eval_budget_from,
     extra_judges_option,
@@ -248,12 +249,7 @@ def rag(
             if repo:
                 repo.save_task_result(tr, suite="rag")
 
-        eff_thinking = thinking_flag
-        if eff_thinking is None and model:
-            from atomics.benchmark.model_classes import supports_thinking
-
-            if supports_thinking(model):
-                eff_thinking = True
+        eff_thinking = effective_thinking(thinking_flag, model, provider_name)
 
         index = None
         if index_path is not None:
