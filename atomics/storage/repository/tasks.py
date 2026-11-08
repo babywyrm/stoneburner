@@ -60,3 +60,15 @@ class TasksMixin(RepositoryBase):
             ),
         )
         self._conn.commit()
+
+    def get_run_task_results(self, run_id: str) -> list[dict[str, object]]:
+        cursor = self._conn.execute(
+            "SELECT task_id, run_id, category, task_name, provider, model, status, "
+            "suite, prompt, response, input_tokens, output_tokens, total_tokens, "
+            "thinking_tokens, cache_read_tokens, cache_write_tokens, latency_ms, "
+            "estimated_cost_usd, tokens_per_second, tps_basis, error_class, error_message "
+            "FROM task_results WHERE run_id = ?",
+            (run_id,),
+        )
+        columns = [desc[0] for desc in cursor.description]
+        return [dict(zip(columns, row)) for row in cursor.fetchall()]

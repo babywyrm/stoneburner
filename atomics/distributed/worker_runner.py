@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 import tempfile
-import uuid
 from pathlib import Path
 from typing import Any
 
@@ -190,44 +189,30 @@ async def execute_full_run(
     thinking = run_request.get("thinking")
     thinking_budget = run_request.get("thinking_budget")
 
-    db_path = Path(tempfile.gettempdir()) / f"atomics-full-{uuid.uuid4().hex}.db"
-    repo = MetricsRepository(db_path)
-    try:
-        engine = LoopEngine(
-            provider,
-            repo,
-            settings,
-            tier=tier,
-            budget_override=budget if isinstance(budget, float | int) else None,
-            interval_override=interval if isinstance(interval, int) else None,
-            model_override=effective_model,
-            trigger="distributed",
-            thinking=thinking if isinstance(thinking, bool) else None,
-            thinking_budget=thinking_budget if isinstance(thinking_budget, int) else None,
-        )
-        summary = await engine.run(max_iterations=iterations)
-        if summary is None:
-            raise RuntimeError("Full run produced no summary")
-
-        cursor = repo._conn.execute(
-            "SELECT task_id, run_id, category, task_name, provider, model, status, "
-            "suite, prompt, response, input_tokens, output_tokens, total_tokens, "
-            "thinking_tokens, cache_read_tokens, cache_write_tokens, latency_ms, "
-            "estimated_cost_usd, tokens_per_second, tps_basis, error_class, error_message "
-            "FROM task_results WHERE run_id = ?",
-            (summary.run_id,),
-        )
-        columns = [desc[0] for desc in cursor.description]
-        task_results = [dict(zip(columns, row)) for row in cursor.fetchall()]
-
-        return {
-            "summary": summary.model_dump(mode="json"),
-            "task_results": task_results,
-        }
-    finally:
-        await aclose_providers(provider)
-        repo.close()
+    with tempfile.TemporaryDirectory(prefix="atomics-full-") as scratch:
+        db_path = Path(scratch) / "run.db"
+        repo = MetricsRepository(db_path)
         try:
-            db_path.unlink()
-        except FileNotFoundError:
-            pass
+            engine = LoopEngine(
+                provider,
+                repo,
+                settings,
+                tier=tier,
+                budget_override=budget if isinstance(budget, float | int) else None,
+                interval_override=interval if isinstance(interval, int) else None,
+                model_override=effective_model,
+                trigger="distributed",
+                thinking=thinking if isinstance(thinking, bool) else None,
+                thinking_budget=thinking_budget if isinstance(thinking_budget, int) else None,
+            )
+            summary = await engine.run(max_iterations=iterations)
+            if summary is None:
+                raise RuntimeError("Full run produced no summary")
+
+            return {
+                "summary": summary.model_dump(mode="json"),
+                "task_results": repo.get_run_task_results(summary.run_id),
+            }
+        finally:
+            await aclose_providers(provider)
+            repo.close()

@@ -45,6 +45,8 @@ class WorkerPool:
         try:
             await self._shutdown_event.wait()
         finally:
+            for sig in (signal.SIGINT, signal.SIGTERM):
+                loop.remove_signal_handler(sig)
             await self.stop()
 
         first_nonzero = 0

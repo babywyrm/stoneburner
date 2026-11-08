@@ -534,3 +534,10 @@ def test_from_env_defaults_to_loopback(monkeypatch):
         assert client.base_url == DEFAULT_API_URL
     finally:
         client.close()
+
+
+def test_api_client_validates_base_url():
+    with pytest.raises(ValueError, match="scheme"):
+        AtomicsApiClient("file:///etc/passwd")
+    with pytest.raises(ValueError, match="embedded credentials"):
+        AtomicsApiClient("http://user:pass@127.0.0.1:8000")

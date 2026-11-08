@@ -198,3 +198,23 @@ async def test_poll_and_execute_dispatches_full_mode_to_execute_full_run(mock_ht
     assert post.kwargs["json"]["status"] == "completed"
     assert json.loads(post.kwargs["json"]["result_json"]) == {"summary": {"run_id": "r-3"}}
     await worker.close()
+
+
+def test_worker_client_validates_coordinator_and_endpoint_urls(mock_httpx_client):
+    with pytest.raises(ValueError, match="scheme"):
+        WorkerClient(coordinator_url="file:///etc/passwd", api_key="secret")
+    with pytest.raises(ValueError, match="embedded credentials"):
+        WorkerClient(
+            coordinator_url="http://coordinator:8000",
+            api_key="secret",
+            endpoint="http://user:pass@worker:9000",
+        )
+
+
+@pytest.mark.asyncio
+async def test_worker_client_run_closes_http_client_on_exit(mock_httpx_client):
+    mock_httpx_client.post.return_value = _mock_response({"worker_id": "w-123"})
+    worker = WorkerClient(coordinator_url="http://coordinator:8000", api_key="secret")
+    worker.shutdown()
+    await worker.run()
+    mock_httpx_client.aclose.assert_awaited_once()

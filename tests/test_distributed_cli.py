@@ -521,3 +521,74 @@ def test_distributed_run_sends_runtime_override(monkeypatch):
     )
     assert result.exit_code == 0, result.output
     assert captured["run_request"]["runtime"] == "node"
+
+
+def test_distributed_status_quotes_job_id_and_validates_coordinator(monkeypatch):
+    from unittest.mock import MagicMock
+
+    from click.testing import CliRunner
+
+    from atomics.commands.distributed import distributed
+
+    seen_urls: list[str] = []
+    fake_response = MagicMock()
+    fake_response.json.return_value = {"job_id": "x", "status": "completed", "mode": "split"}
+    fake_response.raise_for_status.return_value = None
+
+    def fake_get(url, *, headers=None):
+        seen_urls.append(url)
+        return fake_response
+
+    monkeypatch.setattr("atomics.commands.distributed.httpx.get", fake_get)
+    res = CliRunner().invoke(
+        distributed,
+        ["status", "../workers", "--coordinator", "http://coordinator:8000", "--api-key", "k"],
+    )
+    assert res.exit_code == 0, res.output
+    assert seen_urls == ["http://coordinator:8000/api/v1/distributed/runs/..%2Fworkers"]
+
+    bad = CliRunner().invoke(
+        distributed,
+        ["status", "job-1", "--coordinator", "file:///etc/passwd", "--api-key", "k"],
+    )
+    assert bad.exit_code != 0
+    assert "scheme" in bad.output.lower()
+
+
+def test_fleet_status_escapes_rich_markup_in_labels_and_models(monkeypatch):
+    from click.testing import CliRunner
+
+    from atomics.commands.distributed import distributed
+
+    payload = {
+        "job_id": "job-[bold red]FAKE[/]",
+        "status": "completed",
+        "mode": "fleet",
+        "summary_json": json.dumps(
+            {
+                "workers": [
+                    {
+                        "worker_id": "w1",
+                        "labels": {"t": "[red]X[/]"},
+                        "completed": 1,
+                        "failed": 0,
+                        "mean_latency_ms": 10.0,
+                        "p95_latency_ms": 10.0,
+                        "mean_tokens_per_second": 50.0,
+                        "estimated_cost_usd": 0.0,
+                        "model": "m-[red]1[/red]",
+                    }
+                ],
+                "completed": 1,
+                "failed": 0,
+                "total_output_tokens": 10,
+                "estimated_cost_usd": 0.0,
+            }
+        ),
+    }
+    _stub_status_response(monkeypatch, payload)
+    result = CliRunner().invoke(distributed, ["status", "job-1", "--api-key", "client-key"])
+    assert result.exit_code == 0, result.output
+    assert "job-[bold red]FAKE[/]" in result.output
+    assert "m-[red]1[/red]" in result.output
+    assert "t=[red]X[/]" in result.output

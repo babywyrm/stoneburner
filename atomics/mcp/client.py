@@ -23,6 +23,8 @@ from urllib.parse import quote
 
 import httpx
 
+from atomics.validation import validate_endpoint_url
+
 DEFAULT_API_URL = "http://127.0.0.1:8000"
 API_URL_ENV = "ATOMICS_API_URL"
 API_KEY_ENV = "ATOMICS_API_KEY"
@@ -59,7 +61,7 @@ class AtomicsApiClient:
         timeout: float = DEFAULT_TIMEOUT_SECONDS,
         transport: httpx.BaseTransport | None = None,
     ) -> None:
-        self.base_url = base_url.rstrip("/")
+        self.base_url = validate_endpoint_url(base_url, label="api_url")
         headers = {"X-API-Key": api_key} if api_key else {}
         self._client = httpx.Client(
             base_url=self.base_url,

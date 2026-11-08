@@ -12,7 +12,7 @@ import httpx
 
 from atomics.distributed.models import TaskAssignment, WorkerRegisterRequest
 from atomics.distributed.worker_runner import execute_assignment, execute_full_run
-from atomics.validation import sanitize_error
+from atomics.validation import sanitize_error, validate_endpoint_url
 
 logger = logging.getLogger("atomics.distributed.worker_client")
 
@@ -33,10 +33,12 @@ class WorkerClient:
         model: str | None = None,
         host: str | None = None,
     ) -> None:
-        self.coordinator_url = coordinator_url.rstrip("/")
+        self.coordinator_url = validate_endpoint_url(coordinator_url, label="coordinator")
         self.api_key = api_key
         self.labels = labels or {}
-        self.endpoint = endpoint
+        self.endpoint = (
+            validate_endpoint_url(endpoint, label="worker endpoint") if endpoint else None
+        )
         self.heartbeat_interval = heartbeat_interval
         self._executor: Executor = executor or execute_assignment
         self._provider_name = provider_name
@@ -109,15 +111,20 @@ class WorkerClient:
         return True
 
     async def run(self) -> None:
-        await self.register()
-        while not self._shutdown.is_set():
-            await self.heartbeat()
-            worked = await self.poll_and_execute()
-            if not worked:
-                try:
-                    await asyncio.wait_for(self._shutdown.wait(), timeout=self.heartbeat_interval)
-                except TimeoutError:
-                    pass
+        try:
+            await self.register()
+            while not self._shutdown.is_set():
+                await self.heartbeat()
+                worked = await self.poll_and_execute()
+                if not worked:
+                    try:
+                        await asyncio.wait_for(
+                            self._shutdown.wait(), timeout=self.heartbeat_interval
+                        )
+                    except TimeoutError:
+                        pass
+        finally:
+            await self.close()
 
     def shutdown(self) -> None:
         self._shutdown.set()

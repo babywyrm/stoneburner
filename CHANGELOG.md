@@ -47,6 +47,15 @@
   `RAGIndex` validates `embedder.dim` as a positive integer before table
   creation, and `generate_launchd_plist` serializes via `plistlib.dumps`
   so paths and labels are XML-escaped.
+- `DistributedRunRequest` now bounds `timeout_seconds`, `max_retries`,
+  and `run_request.iterations` / `interval` to match `/api/v1/runs`,
+  `WorkerClient`, `WorkerRegisterRequest`, `AtomicsApiClient`,
+  `distributed`, and `worker-npm` validate coordinator/API/worker URLs,
+  `WorkerClient.run()` closes its HTTP client on exit, `distributed
+  status` URL-encodes `job_id` and escapes Rich markup in fleet/full
+  tables, `execute_full_run` uses a private `TemporaryDirectory` and
+  `MetricsRepository.get_run_task_results()`, and `WorkerPool.run()`
+  removes its `SIGINT`/`SIGTERM` handlers on exit.
 
 ## 0.31.0 (2026-11-01) — Quickstart, sweep intervals, gateway errors
 

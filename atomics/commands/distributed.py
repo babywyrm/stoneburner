@@ -4,13 +4,16 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from urllib.parse import quote
 
 import click
 import httpx
 from rich.console import Console
+from rich.markup import escape
 from rich.table import Table
 
 from atomics.commands.common import PROVIDER_CHOICES
+from atomics.validation import validate_endpoint_url
 
 
 @click.group()
@@ -66,6 +69,10 @@ def run(
     """Submit a distributed run to the coordinator."""
     if not api_key:
         raise click.UsageError("--api-key is required (or set ATOMICS_API_KEY)")
+    try:
+        coordinator = validate_endpoint_url(coordinator, label="--coordinator")
+    except ValueError as exc:
+        raise click.BadParameter(str(exc), param_hint="--coordinator") from exc
     if labels and mode not in ("fleet", "full"):
         raise click.UsageError(
             "--label only applies to fleet and full mode: split assigns each task to the "
@@ -112,9 +119,11 @@ def _render_fleet_table(job: dict, summary: dict) -> None:
     show_model_column = len(reported_models) > 1
     uniform_model = reported_models[0] if len(reported_models) == 1 else None
 
+    job_label = escape(str(job.get("job_id", "")))
+    status_label = escape(str(job.get("status", "")))
     table = Table(
-        title=f"Fleet run {job.get('job_id', '')} — {job.get('status', '')}",
-        caption=f"model: {uniform_model}" if uniform_model else None,
+        title=f"Fleet run {job_label} — {status_label}",
+        caption=f"model: {escape(uniform_model)}" if uniform_model else None,
     )
     # A 12-hex worker id has to arrive in one piece; wrapped after 11 characters
     # it is no more usable than the truncation this replaced.
@@ -133,11 +142,11 @@ def _render_fleet_table(job: dict, summary: dict) -> None:
         labels = " ".join(f"{k}={v}" for k, v in (worker.get("labels") or {}).items())
         failed = worker.get("failed", 0)
         row = [
-            str(worker.get("worker_id", "")),
-            labels or "-",
+            escape(str(worker.get("worker_id", ""))),
+            escape(labels) if labels else "-",
         ]
         if show_model_column:
-            row.append(str(worker.get("model") or "-"))
+            row.append(escape(str(worker.get("model") or "-")))
         row += [
             str(worker.get("completed", 0)),
             f"[red]{failed}[/red]" if failed else "0",
@@ -164,7 +173,9 @@ def _render_fleet_table(job: dict, summary: dict) -> None:
 def _render_full_table(job: dict, summary: dict) -> None:
     """Print a compact summary of a single full-run delegation."""
     run_summary = summary.get("summary", summary)
-    table = Table(title=f"Full run {job.get('job_id', '')} — {job.get('status', '')}")
+    job_label = escape(str(job.get("job_id", "")))
+    status_label = escape(str(job.get("status", "")))
+    table = Table(title=f"Full run {job_label} — {status_label}")
     table.add_column("Metric")
     table.add_column("Value", justify="right")
     table.add_row("Tasks", str(run_summary.get("total_tasks", 0)))
@@ -190,8 +201,14 @@ def status(coordinator: str, api_key: str, job_id: str, json_out: Path | None) -
     """Check status of a distributed run."""
     if not api_key:
         raise click.UsageError("--api-key is required (or set ATOMICS_API_KEY)")
+    try:
+        coordinator = validate_endpoint_url(coordinator, label="--coordinator")
+    except ValueError as exc:
+        raise click.BadParameter(str(exc), param_hint="--coordinator") from exc
     headers = {"X-API-Key": api_key}
-    resp = httpx.get(f"{coordinator}/api/v1/distributed/runs/{job_id}", headers=headers)
+    resp = httpx.get(
+        f"{coordinator}/api/v1/distributed/runs/{quote(job_id, safe='')}", headers=headers
+    )
     resp.raise_for_status()
     job = resp.json()
 

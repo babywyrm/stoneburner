@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -176,7 +176,10 @@ async def test_end_to_end_full_run(client):
 
     run_resp = client.post(
         "/api/v1/distributed/runs",
-        json={"mode": "full", "run_request": {"iterations": 3, "tier": "ez", "provider": "fake"}},
+        json={
+            "mode": "full",
+            "run_request": {"iterations": 3, "interval": 0, "tier": "ez", "provider": "fake"},
+        },
     )
     assert run_resp.status_code == 202
     job_id = run_resp.json()["job_id"]
@@ -194,64 +197,7 @@ async def test_end_to_end_full_run(client):
     # Subsequent claims should return nothing for this job.
     assert client.get(f"/api/v1/workers/{worker_id}/jobs/next").json() is None
 
-    fake_summary = MagicMock(
-        run_id="run-full",
-        total_tasks=3,
-        successful_tasks=3,
-        failed_tasks=0,
-        total_tokens=90,
-        total_cost_usd=0.0,
-        avg_latency_ms=100.0,
-    )
-    fake_summary.model_dump.return_value = {
-        "run_id": "run-full",
-        "total_tasks": 3,
-        "successful_tasks": 3,
-        "failed_tasks": 0,
-        "total_tokens": 90,
-        "total_cost_usd": 0.0,
-        "avg_latency_ms": 100.0,
-    }
-    fake_rows = [
-        (
-            "t1",
-            "run-full",
-            "general_qa",
-            "q1",
-            "fake",
-            "fake-model",
-            "success",
-            None,
-            "p",
-            "r",
-            10,
-            20,
-            30,
-            0,
-            0,
-            0,
-            100,
-            0.0,
-            None,
-            None,
-            None,
-            None,
-        ),
-    ] * 3
-
-    with (
-        patch("atomics.distributed.worker_runner.LoopEngine") as engine_cls,
-        patch("atomics.distributed.worker_runner.MetricsRepository") as repo_cls,
-        patch("atomics.distributed.worker_runner.make_provider", return_value=FakeProvider()),
-    ):
-        fake_repo = MagicMock()
-        fake_cursor = MagicMock()
-        fake_cursor.description = [("task_id",)] + [("col",)] * 21
-        fake_cursor.fetchall.return_value = fake_rows
-        fake_repo._conn.execute.return_value = fake_cursor
-        fake_repo.close = MagicMock()
-        repo_cls.return_value = fake_repo
-        engine_cls.return_value.run = AsyncMock(return_value=fake_summary)
+    with patch("atomics.distributed.worker_runner.make_provider", return_value=FakeProvider()):
         result = await execute_full_run(assignment, provider_name="fake", model="fake-model")
 
     assert result["summary"]["total_tasks"] == 3

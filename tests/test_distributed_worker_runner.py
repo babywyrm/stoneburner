@@ -268,11 +268,8 @@ async def test_execute_full_run_delegates_to_loop_engine():
         ),
     ]
 
-    fake_cursor = MagicMock()
-    fake_cursor.description = [("task_id",)] + [("col",)] * 21
-    fake_cursor.fetchall.return_value = fake_rows
     fake_repo = MagicMock()
-    fake_repo._conn.execute.return_value = fake_cursor
+    fake_repo.get_run_task_results.return_value = [{"task_id": "t1"}]
     fake_repo.close = MagicMock()
 
     fake_engine = MagicMock()

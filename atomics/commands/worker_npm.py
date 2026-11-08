@@ -12,6 +12,7 @@ from pathlib import Path
 import click
 
 from atomics.commands.common import setup_logging
+from atomics.validation import validate_endpoint_url
 from atomics.workers.pool import WorkerPool
 
 logger = logging.getLogger("atomics.worker_npm")
@@ -78,6 +79,12 @@ def worker_npm(
         raise click.UsageError("node is required to run the npm worker bridge")
     if pool_size < 1:
         raise click.BadParameter("--pool-size must be at least 1")
+    try:
+        coordinator = validate_endpoint_url(coordinator, label="--coordinator")
+        if endpoint:
+            endpoint = validate_endpoint_url(endpoint, label="--endpoint")
+    except ValueError as exc:
+        raise click.BadParameter(str(exc)) from exc
 
     setup_logging("INFO")
 
