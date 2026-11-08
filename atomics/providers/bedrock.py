@@ -7,10 +7,11 @@ Auth: uses standard AWS credential chain (env vars, ~/.aws/credentials, IAM role
 from __future__ import annotations
 
 import time
+from collections.abc import Sequence
 from typing import Any, Protocol
 
 from atomics.providers import pricing
-from atomics.providers.base import BaseProvider, ProviderResponse, compute_tps
+from atomics.providers.base import BaseProvider, ChatMessage, ProviderResponse, compute_tps
 from atomics.providers.effort import claude_request, normalize_effort
 
 
@@ -77,6 +78,31 @@ class BedrockProvider(BaseProvider):
         effort: str | None = None,
         reasoning_mode: str | None = None,
     ) -> ProviderResponse:
+        return await self.generate_chat(
+            [{"role": "user", "content": prompt}],
+            system=system,
+            model=model,
+            max_tokens=max_tokens,
+            thinking=thinking,
+            thinking_budget=thinking_budget,
+            temperature=temperature,
+            effort=effort,
+            reasoning_mode=reasoning_mode,
+        )
+
+    async def generate_chat(
+        self,
+        messages: Sequence[ChatMessage],
+        *,
+        system: str = "",
+        model: str | None = None,
+        max_tokens: int = 1024,
+        thinking: bool | None = None,
+        thinking_budget: int | None = None,
+        temperature: float | None = None,
+        effort: str | None = None,
+        reasoning_mode: str | None = None,
+    ) -> ProviderResponse:
         import asyncio
 
         model_id = model or self._model_id
@@ -87,7 +113,7 @@ class BedrockProvider(BaseProvider):
         response = await loop.run_in_executor(
             None,
             lambda: self._converse(
-                prompt,
+                messages,
                 system=system,
                 model_id=model_id,
                 max_tokens=max_tokens,
@@ -131,7 +157,7 @@ class BedrockProvider(BaseProvider):
 
     def _converse(
         self,
-        prompt: str,
+        turns: str | Sequence[ChatMessage],
         *,
         system: str,
         model_id: str,
@@ -144,9 +170,15 @@ class BedrockProvider(BaseProvider):
         inference_config: dict = {"maxTokens": max_tokens}
         if temperature is not None:
             inference_config["temperature"] = temperature
+        if isinstance(turns, str):
+            converse_messages = [{"role": "user", "content": [{"text": turns}]}]
+        else:
+            converse_messages = [
+                {"role": m["role"], "content": [{"text": m["content"]}]} for m in turns
+            ]
         kwargs: dict = {
             "modelId": model_id,
-            "messages": [{"role": "user", "content": [{"text": prompt}]}],
+            "messages": converse_messages,
             "inferenceConfig": inference_config,
         }
         if system:

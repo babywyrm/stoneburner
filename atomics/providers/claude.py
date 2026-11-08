@@ -14,7 +14,7 @@ from atomics.providers._tool_dialects import (
     injected_history,
     parse_anthropic_tool_calls,
 )
-from atomics.providers.base import BaseProvider, ProviderResponse, compute_tps
+from atomics.providers.base import BaseProvider, ChatMessage, ProviderResponse, compute_tps
 from atomics.providers.effort import claude_request, normalize_effort
 from atomics.providers.toolcalls import ToolStep
 
@@ -96,9 +96,33 @@ class ClaudeProvider(BaseProvider):
         effort: str | None = None,
         reasoning_mode: str | None = None,
     ) -> ProviderResponse:
+        return await self.generate_chat(
+            [{"role": "user", "content": prompt}],
+            system=system,
+            model=model,
+            max_tokens=max_tokens,
+            thinking=thinking,
+            thinking_budget=thinking_budget,
+            temperature=temperature,
+            effort=effort,
+            reasoning_mode=reasoning_mode,
+        )
+
+    async def generate_chat(
+        self,
+        messages: Sequence[ChatMessage],
+        *,
+        system: str = "",
+        model: str | None = None,
+        max_tokens: int = 1024,
+        thinking: bool | None = None,
+        thinking_budget: int | None = None,
+        temperature: float | None = None,
+        effort: str | None = None,
+        reasoning_mode: str | None = None,
+    ) -> ProviderResponse:
         model = model or self._default_model
         _ = reasoning_mode
-        messages = [{"role": "user", "content": prompt}]
         thinking_block, extra = claude_request(
             model=model,
             thinking=thinking,
@@ -110,7 +134,7 @@ class ClaudeProvider(BaseProvider):
 
         kwargs: dict = {
             "model": model,
-            "messages": messages,
+            "messages": list(messages),
         }
         kwargs.update(extra)
 

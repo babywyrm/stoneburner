@@ -10,11 +10,12 @@ Auth: none (local server).
 from __future__ import annotations
 
 import time
+from collections.abc import Sequence
 
 import httpx
 
 from atomics.providers._openai_compat import OpenAICompatibleTools
-from atomics.providers.base import BaseProvider, ProviderResponse, compute_tps
+from atomics.providers.base import BaseProvider, ChatMessage, ProviderResponse, compute_tps
 from atomics.providers.effort import apply_chat_effort, normalize_effort
 
 
@@ -84,15 +85,40 @@ class LlamaCppProvider(OpenAICompatibleTools, BaseProvider):
         effort: str | None = None,
         reasoning_mode: str | None = None,
     ) -> ProviderResponse:
+        return await self.generate_chat(
+            [{"role": "user", "content": prompt}],
+            system=system,
+            model=model,
+            max_tokens=max_tokens,
+            thinking=thinking,
+            thinking_budget=thinking_budget,
+            temperature=temperature,
+            effort=effort,
+            reasoning_mode=reasoning_mode,
+        )
+
+    async def generate_chat(
+        self,
+        messages: Sequence[ChatMessage],
+        *,
+        system: str = "",
+        model: str | None = None,
+        max_tokens: int = 1024,
+        thinking: bool | None = None,
+        thinking_budget: int | None = None,
+        temperature: float | None = None,
+        effort: str | None = None,
+        reasoning_mode: str | None = None,
+    ) -> ProviderResponse:
         model = model or self._default_model
 
-        messages = [
+        chat_messages = [
             {"role": "system", "content": system or "You are a helpful assistant."},
-            {"role": "user", "content": prompt},
+            *messages,
         ]
 
         body: dict = {
-            "messages": messages,
+            "messages": chat_messages,
             "max_tokens": max_tokens,
             "stream": False,
         }

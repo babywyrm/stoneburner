@@ -88,6 +88,139 @@ async def test_ollama_sends_turns_as_chat_messages() -> None:
 
 
 @pytest.mark.asyncio
+async def test_claude_sends_turns_as_chat_messages() -> None:
+    from atomics.providers.claude import ClaudeProvider
+
+    text_block = MagicMock()
+    text_block.type = "text"
+    text_block.text = "Alex"
+    usage = MagicMock()
+    usage.input_tokens = 25
+    usage.output_tokens = 2
+    usage.thinking_tokens = 0
+    mock_response = MagicMock()
+    mock_response.content = [text_block]
+    mock_response.usage = usage
+    mock_response.model_dump.return_value = {}
+    mock_client = AsyncMock()
+    mock_client.messages.create = AsyncMock(return_value=mock_response)
+
+    provider = ClaudeProvider(api_key="test", client=mock_client)
+    resp = await provider.generate_chat(HISTORY, system="Be brief.", max_tokens=64, temperature=0.0)
+
+    kwargs = mock_client.messages.create.call_args.kwargs
+    assert kwargs["system"] == "Be brief."
+    assert kwargs["messages"] == HISTORY
+    assert kwargs["extra_body"] == {"temperature": 0.0}
+    assert resp.text == "Alex"
+
+
+@pytest.mark.asyncio
+async def test_openai_completions_sends_turns_as_chat_messages() -> None:
+    from atomics.providers.openai import OpenAIProvider
+    from tests.test_providers_openai import FakeOpenAIClient
+
+    client = FakeOpenAIClient()
+    provider = OpenAIProvider(api_key="fake", client=client)
+    await provider.generate_chat(HISTORY, system="Be brief.", max_tokens=64, temperature=0.0)
+
+    call = client.chat.completions.create_calls[0]
+    assert call["messages"] == [{"role": "system", "content": "Be brief."}, *HISTORY]
+    assert call["temperature"] == 0.0
+
+
+@pytest.mark.asyncio
+async def test_openai_responses_sends_turns_as_input_items() -> None:
+    from atomics.providers.openai import OpenAIProvider
+    from tests.test_providers_openai import FakeAuth, FakeOAuthClient
+
+    client = FakeOAuthClient()
+    provider = OpenAIProvider(client=client, auth=FakeAuth())
+    await provider.generate_chat(HISTORY, system="Be brief.", max_tokens=64)
+
+    call = client.responses.create_calls[0]
+    assert call["input"] == [{"role": "system", "content": "Be brief."}, *HISTORY]
+    assert call["instructions"] == "Be brief."
+
+
+@pytest.mark.asyncio
+async def test_bedrock_sends_turns_as_converse_messages() -> None:
+    from atomics.providers.bedrock import BedrockProvider
+
+    mock_client = MagicMock()
+    mock_client.converse.return_value = {
+        "output": {"message": {"content": [{"text": "Alex"}]}},
+        "usage": {"inputTokens": 20, "outputTokens": 2},
+    }
+    provider = BedrockProvider(client=mock_client)
+    resp = await provider.generate_chat(HISTORY, system="Be brief.", max_tokens=64, temperature=0.0)
+
+    kwargs = mock_client.converse.call_args.kwargs
+    assert kwargs["system"] == [{"text": "Be brief."}]
+    assert kwargs["messages"] == [
+        {"role": "user", "content": [{"text": "My name is Alex."}]},
+        {"role": "assistant", "content": [{"text": "Hi Alex."}]},
+        {"role": "user", "content": [{"text": "What is my name?"}]},
+    ]
+    assert kwargs["inferenceConfig"]["temperature"] == 0.0
+    assert resp.text == "Alex"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("cls_path", "init_kwargs", "reply_json"),
+    [
+        (
+            "atomics.providers.vllm:VllmProvider",
+            {"default_model": "qwen2.5:3b"},
+            {"choices": [{"message": {"content": "Alex"}}], "usage": {"prompt_tokens": 10}},
+        ),
+        (
+            "atomics.providers.llamacpp:LlamaCppProvider",
+            {"default_model": "local"},
+            {"choices": [{"message": {"content": "Alex"}}], "usage": {"prompt_tokens": 10}},
+        ),
+        (
+            "atomics.providers.gemini:GeminiProvider",
+            {"api_key": "fake"},
+            {"choices": [{"message": {"content": "Alex"}}], "usage": {"prompt_tokens": 10}},
+        ),
+        (
+            "atomics.providers.groq:GroqProvider",
+            {"api_key": "fake"},
+            {"choices": [{"message": {"content": "Alex"}}], "usage": {"prompt_tokens": 10}},
+        ),
+        (
+            "atomics.providers.together:TogetherProvider",
+            {"api_key": "fake"},
+            {"choices": [{"message": {"content": "Alex"}}], "usage": {"prompt_tokens": 10}},
+        ),
+    ],
+)
+async def test_openai_compat_providers_send_turns_as_chat_messages(
+    cls_path: str, init_kwargs: dict, reply_json: dict
+) -> None:
+    import importlib
+
+    mod_name, cls_name = cls_path.split(":")
+    cls = getattr(importlib.import_module(mod_name), cls_name)
+
+    reply = MagicMock()
+    reply.raise_for_status = MagicMock()
+    reply.json.return_value = reply_json
+    client = AsyncMock()
+    client.post = AsyncMock(return_value=reply)
+    provider = cls(client=client, **init_kwargs)
+
+    resp = await provider.generate_chat(HISTORY, system="Be brief.", max_tokens=64, temperature=0.0)
+
+    body = client.post.call_args.kwargs["json"]
+    assert body["messages"] == [{"role": "system", "content": "Be brief."}, *HISTORY]
+    assert body["temperature"] == 0.0
+    assert resp.text == "Alex"
+
+
+@pytest.mark.asyncio
 async def test_budget_guard_meters_chat_calls() -> None:
     rec = _Recorder()
     guard = EvalBudget(budget_limit_usd=1.0).new_guard()

@@ -137,11 +137,9 @@ class BaseProvider(ABC):
         """Continue a conversation; `messages` alternate user/assistant and end on user.
 
         Adapters with a native chat path override this. The default pastes
-        earlier turns into one prompt, which is what every adapter received
-        before this method existed.
+        earlier turns into one prompt for single-string RPCs (such as
+        brain-gateway) and test doubles that only implement `generate()`.
         """
-        # ponytail: only Ollama overrides this; OpenAI-compatible and cloud
-        # adapters still get pasted history until each grows a messages path.
         *earlier, last = messages
         prompt = last["content"]
         if earlier:

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Added
+- `generate_chat` now sends multi-turn history as native message turns
+  across `claude`, `openai` (Chat Completions and Responses API),
+  `bedrock`, `vllm`, `llamacpp`, `gemini`, `groq`, and `together`,
+  instead of pasting earlier turns into a single prompt.
+
 ### Fixed
 - `brain-gateway` refuses a generate when `temperature` is set, and does
   not call the gateway. Sampling is server-side, so a `--temperature 0`

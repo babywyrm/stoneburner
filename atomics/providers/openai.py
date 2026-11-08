@@ -17,7 +17,7 @@ from atomics.providers._tool_dialects import (
     openai_tool_payload,
     parse_openai_tool_calls,
 )
-from atomics.providers.base import BaseProvider, ProviderResponse, compute_tps
+from atomics.providers.base import BaseProvider, ChatMessage, ProviderResponse, compute_tps
 from atomics.providers.effort import (
     normalize_effort,
     normalize_reasoning_mode,
@@ -150,6 +150,31 @@ class OpenAIProvider(BaseProvider):
         effort: str | None = None,
         reasoning_mode: str | None = None,
     ) -> ProviderResponse:
+        return await self.generate_chat(
+            [{"role": "user", "content": prompt}],
+            system=system,
+            model=model,
+            max_tokens=max_tokens,
+            thinking=thinking,
+            thinking_budget=thinking_budget,
+            temperature=temperature,
+            effort=effort,
+            reasoning_mode=reasoning_mode,
+        )
+
+    async def generate_chat(
+        self,
+        messages: Sequence[ChatMessage],
+        *,
+        system: str = "",
+        model: str | None = None,
+        max_tokens: int = 1024,
+        thinking: bool | None = None,
+        thinking_budget: int | None = None,
+        temperature: float | None = None,
+        effort: str | None = None,
+        reasoning_mode: str | None = None,
+    ) -> ProviderResponse:
         model = model or self._default_model
         resolved_mode = normalize_reasoning_mode(reasoning_mode)
 
@@ -162,7 +187,7 @@ class OpenAIProvider(BaseProvider):
         # Pro mode is Responses-only. API-key clients still have that surface.
         if self._use_responses_api or resolved_mode == "pro":
             return await self._generate_responses(
-                prompt,
+                messages,
                 system=system,
                 model=model,
                 max_tokens=max_tokens,
@@ -173,7 +198,7 @@ class OpenAIProvider(BaseProvider):
                 reasoning_mode=reasoning_mode,
             )
         return await self._generate_completions(
-            prompt,
+            messages,
             system=system,
             model=model,
             max_tokens=max_tokens,
@@ -186,7 +211,7 @@ class OpenAIProvider(BaseProvider):
 
     async def _generate_completions(
         self,
-        prompt: str,
+        turns: Sequence[ChatMessage],
         *,
         system: str,
         model: str,
@@ -198,12 +223,10 @@ class OpenAIProvider(BaseProvider):
         reasoning_mode: str | None = None,
     ) -> ProviderResponse:
         """Chat Completions API — used with static API keys."""
-        messages: list[dict[str, str]] = []
-        if system:
-            messages.append({"role": "system", "content": system})
-        else:
-            messages.append({"role": "system", "content": "You are a helpful assistant."})
-        messages.append({"role": "user", "content": prompt})
+        messages: list[dict[str, str]] = [
+            {"role": "system", "content": system or "You are a helpful assistant."},
+            *({"role": m["role"], "content": m["content"]} for m in turns),
+        ]
 
         is_reasoning = _is_reasoning_model(model)
         token_param: dict[str, Any]
@@ -410,7 +433,7 @@ class OpenAIProvider(BaseProvider):
 
     async def _generate_responses(
         self,
-        prompt: str,
+        turns: Sequence[ChatMessage],
         *,
         system: str,
         model: str,
@@ -425,7 +448,7 @@ class OpenAIProvider(BaseProvider):
         input_items: list[dict[str, str]] = []
         if system:
             input_items.append({"role": "system", "content": system})
-        input_items.append({"role": "user", "content": prompt})
+        input_items.extend({"role": m["role"], "content": m["content"]} for m in turns)
 
         is_reasoning = _is_reasoning_model(model)
         if is_reasoning and thinking is not False:
