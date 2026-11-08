@@ -17,6 +17,7 @@ from atomics.providers.base import BaseProvider
 from atomics.providers.llamacpp import LlamaCppProvider
 from atomics.providers.ollama import DEFAULT_NUM_CTX, OllamaProvider
 from atomics.providers.vllm import VllmProvider
+from atomics.validation import validate_endpoint_url
 
 _TIMEOUT = 10.0
 
@@ -208,6 +209,7 @@ async def take_inventory(
 ) -> Inventory:
     """Read every host at once. Within a host, probes run one model at a time:
     a host serves one generate at once, so parallel probes would only queue."""
+    validated_urls = [validate_endpoint_url(u, label="inventory host") for u in urls]
     async with new_client() as client:
         taken = await asyncio.gather(
             *(
@@ -222,7 +224,7 @@ async def take_inventory(
                     judge=probe_judge,
                     on_model=on_model,
                 )
-                for url, label in zip(urls, unique_labels(urls))
+                for url, label in zip(validated_urls, unique_labels(validated_urls))
             )
         )
     hosts = [h for h, _ in taken]

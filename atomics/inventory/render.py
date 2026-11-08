@@ -63,7 +63,10 @@ def _notes(m: ModelRecord) -> list[str]:
 def render(inv: Inventory, console: Console) -> None:
     multi = len(inv.hosts) > 1
     for host in inv.hosts:
-        line = f"[bold]{escape(host.label)}[/bold] {host.provider} {host.version or ''}".rstrip()
+        line = (
+            f"[bold]{escape(host.label)}[/bold] "
+            f"{escape(host.provider)} {escape(host.version or '')}"
+        ).rstrip()
         if host.loaded:
             line += " — loaded: " + ", ".join(f"{escape(n)} ({c})" for n, c in host.loaded)
         console.print(f"{line} [red]{escape(host.error)}[/red]" if host.error else line)
@@ -93,10 +96,10 @@ def render(inv: Inventory, console: Console) -> None:
         row += [
             escape(m.name),
             f"{m.size_bytes / 1e9:.1f} GB" if m.size_bytes else "",
-            m.parameter_size or "",
-            m.quantization or "",
+            escape(m.parameter_size or ""),
+            escape(m.quantization or ""),
             _context_cell(m),
-            f"[{style}]{m.model_class}[/{style}]",
+            f"[{style}]{escape(m.model_class)}[/{style}]",
             *(_cap_cell(m.capability(c)) for c in _SHOWN),
         ]
         if probed:

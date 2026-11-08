@@ -279,3 +279,48 @@ def test_worker_npm_pool_runs_multiple_workers(monkeypatch):
     assert started == [4]
     fake_pool.start.assert_awaited_once()
     fake_pool.run.assert_awaited_once()
+
+
+def test_npm_worker_rejects_bad_coordinator_url_and_handles_quoted_worker_cmd(tmp_path):
+    if not shutil.which("node"):
+        pytest.skip("node not installed")
+
+    env = os.environ.copy()
+    env["ATOMICS_COORDINATOR_URL"] = "file:///etc/passwd"
+    env["ATOMICS_WORKER_API_KEY"] = "npm-key"
+    bad = subprocess.run(
+        ["node", "worker.js"],
+        cwd=str(NPM_DIR),
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+    assert bad.returncode != 0
+    assert "http" in (bad.stderr + bad.stdout).lower()
+
+    # Quoted path with spaces in --worker-cmd must tokenize without invoking a shell.
+    spaced_dir = tmp_path / "dir with space"
+    spaced_dir.mkdir()
+    runner_script = spaced_dir / "task-runner.js"
+    runner_script.write_text(
+        'process.stdin.resume(); process.stdin.on("end", () => '
+        'console.log(JSON.stringify({status: "ok", quoted: true})));\n'
+    )
+    check = subprocess.run(
+        [
+            "node",
+            "-e",
+            (
+                "const w = require('./worker.js'); "
+                f"const parts = w.parseCmd('node \"{runner_script}\"'); "
+                "console.log(JSON.stringify(parts));"
+            ),
+        ],
+        cwd=str(NPM_DIR),
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+    assert check.returncode == 0, check.stderr
+    assert json.loads(check.stdout.strip()) == ["node", str(runner_script)]

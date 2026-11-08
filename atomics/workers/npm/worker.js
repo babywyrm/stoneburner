@@ -77,9 +77,68 @@ function buildLabels(pairs) {
   return labels;
 }
 
+function validateHttpUrl(rawUrl, label = "URL") {
+  let parsed;
+  try {
+    parsed = new URL(rawUrl);
+  } catch (err) {
+    throw new Error(`${label}: invalid URL ${rawUrl}`);
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw new Error(`${label}: unsupported scheme ${parsed.protocol} — only http/https allowed`);
+  }
+  if (parsed.username || parsed.password) {
+    throw new Error(`${label}: embedded credentials not allowed`);
+  }
+  if (parsed.pathname.includes("..")) {
+    throw new Error(`${label}: path traversal ('..') not allowed`);
+  }
+  return parsed;
+}
+
+function parseCmd(cmd) {
+  const tokens = [];
+  let current = "";
+  let quote = null;
+  for (let i = 0; i < cmd.length; i++) {
+    const ch = cmd[i];
+    if (quote) {
+      if (ch === "\\" && i + 1 < cmd.length && (cmd[i + 1] === quote || cmd[i + 1] === "\\")) {
+        current += cmd[++i];
+      } else if (ch === quote) {
+        quote = null;
+      } else {
+        current += ch;
+      }
+    } else if (ch === '"' || ch === "'") {
+      quote = ch;
+    } else if (/\s/.test(ch)) {
+      if (current) {
+        tokens.push(current);
+        current = "";
+      }
+    } else {
+      current += ch;
+    }
+  }
+  if (quote) {
+    throw new Error(`unterminated quote in workerCmd: ${cmd}`);
+  }
+  if (current) {
+    tokens.push(current);
+  }
+  return tokens;
+}
+
 function request(url, options = {}) {
   return new Promise((resolve, reject) => {
-    const parsed = new URL(url);
+    let parsed;
+    try {
+      parsed = validateHttpUrl(url);
+    } catch (err) {
+      reject(err);
+      return;
+    }
     const client = parsed.protocol === "https:" ? https : http;
     const body = options.body ? JSON.stringify(options.body) : null;
     const headers = {
@@ -127,17 +186,17 @@ async function register(coordinator, apiKey, config) {
 }
 
 async function heartbeat(coordinator, apiKey, workerId) {
-  const url = `${coordinator}/api/v1/workers/${workerId}/heartbeat`;
+  const url = `${coordinator}/api/v1/workers/${encodeURIComponent(workerId)}/heartbeat`;
   return request(url, { method: "POST", headers: { "X-API-Key": apiKey } });
 }
 
 async function poll(coordinator, apiKey, workerId) {
-  const url = `${coordinator}/api/v1/workers/${workerId}/jobs/next`;
+  const url = `${coordinator}/api/v1/workers/${encodeURIComponent(workerId)}/jobs/next`;
   return request(url, { method: "GET", headers: { "X-API-Key": apiKey } });
 }
 
 async function submitResult(coordinator, apiKey, workerId, assignmentId, result) {
-  const url = `${coordinator}/api/v1/workers/${workerId}/jobs/${assignmentId}/result`;
+  const url = `${coordinator}/api/v1/workers/${encodeURIComponent(workerId)}/jobs/${encodeURIComponent(assignmentId)}/result`;
   return request(url, {
     method: "POST",
     headers: { "X-API-Key": apiKey },
@@ -147,7 +206,17 @@ async function submitResult(coordinator, apiKey, workerId, assignmentId, result)
 
 function executeViaBridge(cmd, taskSpec, timeoutMs) {
   return new Promise((resolve) => {
-    const parts = cmd.split(" ");
+    let parts;
+    try {
+      parts = parseCmd(cmd);
+    } catch (err) {
+      resolve({ status: "failed", error: err.message });
+      return;
+    }
+    if (!parts.length) {
+      resolve({ status: "failed", error: "empty workerCmd" });
+      return;
+    }
     const child = spawn(parts[0], parts.slice(1), {
       stdio: ["pipe", "pipe", "pipe"],
     });
@@ -219,6 +288,10 @@ async function main() {
   }
 
   const coordinator = config.coordinator.replace(/\/$/, "");
+  validateHttpUrl(coordinator, "coordinator");
+  if (config.endpoint) {
+    validateHttpUrl(config.endpoint, "endpoint");
+  }
   logger.info("registering with coordinator", coordinator);
   const workerId = await register(coordinator, config.apiKey, config);
   logger.info("registered worker", workerId);
@@ -260,7 +333,17 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-main().catch((err) => {
-  logger.error("fatal", err);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((err) => {
+    logger.error("fatal", err);
+    process.exit(1);
+  });
+}
+
+module.exports = {
+  parseArgs,
+  parseCmd,
+  validateHttpUrl,
+  buildLabels,
+  executeViaBridge,
+};

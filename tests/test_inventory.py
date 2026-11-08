@@ -707,3 +707,33 @@ def test_render_shows_failed_probes_and_unparsed_judges(monkeypatch):
     assert "a:1b probe: Cannot connect" in text
     assert "error" in text and "empty" in text
     assert "unfit ?/0.20" in text
+
+
+async def test_take_inventory_validates_host_urls_and_render_escapes_markup(monkeypatch):
+    from rich.console import Console
+
+    from atomics.inventory import HostRecord, Inventory
+    from atomics.inventory.render import render
+
+    with pytest.raises(ValueError, match="scheme"):
+        await take_inventory("ollama", ["file:///etc/passwd"])
+    with pytest.raises(ValueError, match="embedded credentials"):
+        await take_inventory("ollama", ["http://user:pass@laptop:11434"])
+
+    monkeypatch.setenv("TERM", "xterm")
+    rec = ModelRecord(
+        host="laptop",
+        name="m:1b",
+        parameter_size="3B[red]X[/red]",
+        quantization="Q4[bold]Y[/bold]",
+        declared=frozenset({"completion"}),
+    )
+    console = Console(width=200, record=True)
+    render(
+        Inventory("t", [HostRecord("laptop", "ollama", version="1.0[red]Z[/red]")], [rec]),
+        console,
+    )
+    text = console.export_text()
+    assert "1.0[red]Z[/red]" in text
+    assert "3B[red]X[/red]" in text
+    assert "Q4[bold]Y[/bold]" in text
