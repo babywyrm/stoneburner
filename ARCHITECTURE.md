@@ -100,13 +100,18 @@ class BaseProvider(ABC):
                        effort: str | None = None,
                        reasoning_mode: str | None = None,
                        temperature: float | None = None) -> ProviderResponse: ...
+    async def generate_chat(self, messages: Sequence[ChatMessage], *,
+                            system: str = "", model: str | None = None, ...) -> ProviderResponse: ...
     async def health_check(self) -> bool: ...
 ```
 
 `ProviderResponse` carries text, token counts (incl. thinking + cache), latency,
 cost, `tps_basis`, and the operator dial (`effort`, `reasoning_mode`) plus the
 native payload (`reasoning_request`). Adapters live in
-`providers/{claude,openai,bedrock,ollama, vllm,brain_gateway}.py`. Pricing is
+`providers/{claude,openai,bedrock,ollama, vllm,brain_gateway}.py` (plus
+`llamacpp`, `gemini`, `groq`, and `together`). Every chat-capable adapter
+overrides `generate_chat` to send native message turns; `BaseProvider.generate_chat`
+pastes earlier turns only for single-string RPCs (`brain-gateway`). Pricing is
 centralized in `providers/pricing.py`. The shared mapper is
 `providers/effort.py`. vLLM `generate()` and `generate_with_tools` dual-write
 Qwen `chat_template_kwargs` and optional SGLang `custom_params`. Other
