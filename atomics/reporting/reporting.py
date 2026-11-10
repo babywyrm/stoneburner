@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from rich.console import Console
+from rich.markup import escape
 from rich.table import Table
 
 from atomics.storage.repository import MetricsRepository
@@ -30,11 +31,11 @@ def print_recent_runs(repo: MetricsRepository, limit: int = 10) -> None:
 
     for r in runs:
         table.add_row(
-            r["run_id"],
-            r["started_at"][:19] if r["started_at"] else "—",
-            r.get("provider", "—"),
-            r.get("tier", "—"),
-            r.get("trigger", "—"),
+            escape(str(r["run_id"])),
+            escape(str(r["started_at"])[:19]) if r["started_at"] else "—",
+            escape(str(r.get("provider", "—"))),
+            escape(str(r.get("tier", "—"))),
+            escape(str(r.get("trigger", "—"))),
             str(r["total_tasks"]),
             str(r["successful_tasks"]),
             str(r["failed_tasks"]),
@@ -88,7 +89,7 @@ def print_category_breakdown(repo: MetricsRepository) -> None:
 
     for r in rows:
         table.add_row(
-            r["category"],
+            escape(str(r["category"])),
             str(r["task_count"]),
             f"{r['total_tokens']:,}",
             f"${r['total_cost']:.4f}",
@@ -115,7 +116,7 @@ def print_provider_summary(repo: MetricsRepository, *, since_hours: float | None
 
     for r in rows:
         table.add_row(
-            r["provider"],
+            escape(str(r["provider"])),
             str(r["run_count"]),
             str(r["total_tasks"]),
             str(r["successful_tasks"]),

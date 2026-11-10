@@ -235,6 +235,15 @@ def test_provider_from_target_unknown_backend_raises():
         inference.provider_from_target(t, client=object())
 
 
+def test_provider_from_target_validates_url():
+    t = inference.InferenceTarget(backend="ollama", url="file:///etc/passwd", model="m")
+    with pytest.raises(ValueError, match="scheme"):
+        inference.provider_from_target(t, client=object())
+    t2 = inference.InferenceTarget(backend="vllm", url="http://u:p@gpu:8000/v1", model="m")
+    with pytest.raises(ValueError, match="embedded credentials"):
+        inference.provider_from_target(t2, client=object())
+
+
 # ── inspect / overlay (CLI + factory consumers) ───────────────────────────────
 
 

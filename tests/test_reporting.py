@@ -108,3 +108,51 @@ def test_print_provider_summary_empty(capsys):
     captured = capsys.readouterr()
     assert "No provider" in captured.out
     repo.close()
+
+
+def test_reporting_and_compare_escape_rich_markup_in_model_and_run_fields(capsys, monkeypatch):
+    from click.testing import CliRunner
+
+    from atomics.cli import cli
+
+    monkeypatch.setenv("TERM", "xterm")
+    monkeypatch.setenv("COLUMNS", "200")
+    db_file = Path(tempfile.mkdtemp()) / "markup.db"
+    repo = MetricsRepository(db_file)
+    repo.create_run(
+        "r-[red]1[/]",
+        tier="ez",
+        provider="ollama",
+        model="m-[bold red]INJECTED[/bold red]",
+    )
+    repo.save_task_result(
+        TaskResult(
+            task_id="t1",
+            run_id="r-[red]1[/]",
+            category=TaskCategory.RESEARCH,
+            task_name="task_1",
+            provider="ollama",
+            model="m-[bold red]INJECTED[/bold red]",
+            status=TaskStatus.SUCCESS,
+            input_tokens=10,
+            output_tokens=10,
+            total_tokens=20,
+            latency_ms=100.0,
+            estimated_cost_usd=0.0,
+            accuracy_score=0.9,
+            started_at=datetime.now(UTC),
+            completed_at=datetime.now(UTC),
+        )
+    )
+    repo.complete_run("r-[red]1[/]")
+    print_recent_runs(repo, limit=5)
+    out = capsys.readouterr().out
+    assert "r-[red]1[/]" in out
+    repo.close()
+
+    monkeypatch.setenv("ATOMICS_DB_PATH", str(db_file))
+    res = CliRunner().invoke(
+        cli, ["compare", "--by", "model", "--narrative"], env={"COLUMNS": "200"}
+    )
+    assert res.exit_code == 0, res.output
+    assert "m-[bold red]INJECTED[/bold red]" in res.output

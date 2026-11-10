@@ -245,3 +245,24 @@ def test_send_webhook_refuses_invalid_url():
     client = FakeHttpClient(200)
     assert send_webhook("file:///tmp/x", _make_summary(), client=client) is False
     assert client.calls == []
+
+
+def test_send_webhook_does_not_log_secret_webhook_path(caplog):
+    import logging
+
+    secret_token = "T00000000/B00000000/SuperSecretWebhookToken999"
+    url = f"https://hooks.slack.com/services/{secret_token}"
+    summary = _make_summary()
+
+    with caplog.at_level(logging.INFO, logger="atomics.webhooks"):
+        send_webhook(url, summary, client=FakeHttpClient(200))
+        send_webhook(url, summary, client=FakeHttpClient(500))
+
+        class BoomClient(FakeHttpClient):
+            def post(self, u, **kwargs):
+                raise RuntimeError(f"failed posting to {u}")
+
+        send_webhook(url, summary, client=BoomClient())
+
+    assert "SuperSecretWebhookToken999" not in caplog.text
+    assert "hooks.slack.com" in caplog.text

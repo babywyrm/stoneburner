@@ -51,13 +51,15 @@
   and `run_request.iterations` / `interval` to match `/api/v1/runs`,
   `WorkerClient`, `WorkerRegisterRequest`, `AtomicsApiClient`,
   `distributed`, `worker-npm`, `workers/npm/worker.js`, `login
-  --issuer`, and `take_inventory` validate coordinator/API/worker/host
-  URLs, `workers/npm/worker.js` parses `--worker-cmd` with quote-aware
-  argv splitting and URL-encodes worker/assignment IDs,
-  `WorkerClient.run()` closes its HTTP client on exit, `distributed
-  status`, `whoami`, and `inventory` renderers escape Rich markup in
-  remote fields, `export --format csv` unions heterogeneous row keys and
-  prefixes leading formula characters (`=`, `+`, `-`, `@`, `\t`, `\r`),
+  --issuer`, `provider_from_target`, and `take_inventory` validate
+  coordinator/API/worker/host URLs, `workers/npm/worker.js` parses
+  `--worker-cmd` with quote-aware argv splitting and URL-encodes
+  worker/assignment IDs, `WorkerClient.run()` closes its HTTP client on
+  exit, `send_webhook` logs only the webhook host rather than the secret
+  webhook path, `distributed status`, `whoami`, `report`, `compare`, and
+  `inventory` renderers escape Rich markup in remote/stored fields,
+  `export --format csv` unions heterogeneous row keys and prefixes
+  leading formula characters (`=`, `+`, `-`, `@`, `\t`, `\r`),
   `execute_full_run` uses a private `TemporaryDirectory` and
   `MetricsRepository.get_run_task_results()`, and `WorkerPool.run()`
   removes its `SIGINT`/`SIGTERM` handlers on exit.

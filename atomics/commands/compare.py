@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import click
 from rich.console import Console
+from rich.markup import escape
 from rich.table import Table
 
 from atomics.commands.benchmark import TIER_CHOICES
@@ -107,15 +108,15 @@ def compare(
             val = r.get("value_score")
             value_label = f"{val:.1f}" if val is not None else "—"
             cells = [
-                r["group_key"],
-                r.get("models_used", "—") or "—",
-                cls_label,
+                escape(str(r["group_key"])),
+                escape(str(r.get("models_used", "—") or "—")),
+                escape(cls_label),
                 str(r["task_count"]),
                 quality_label,
                 f"{r['p50_latency_ms']:.0f}ms",
                 f"{r['p95_latency_ms']:.0f}ms",
                 tps_label,
-                basis_label,
+                escape(basis_label),
             ]
             if any_thinking:
                 think = r.get("avg_thinking_tokens") or 0
@@ -180,7 +181,7 @@ def _print_narrative(console: Console, rows: list[dict], by: str) -> None:
 
     best_acc = best["avg_accuracy_score"] * 100
     console.print(
-        f"\n[bold]{best['group_key']}[/bold] leads on quality at "
+        f"\n[bold]{escape(str(best['group_key']))}[/bold] leads on quality at "
         f"[green]{best_acc:.1f}%[/green] accuracy "
         f"(cost: [yellow]${best['cost_per_1k_tokens']:.4f}/1K tokens[/yellow])."
     )
@@ -195,10 +196,10 @@ def _print_narrative(console: Console, rows: list[dict], by: str) -> None:
 
         console.print(
             f"\n[bold]Self-hosted vs API:[/bold] "
-            f"[cyan]{best_free['group_key']}[/cyan] achieves "
+            f"[cyan]{escape(str(best_free['group_key']))}[/cyan] achieves "
             f"[green]{free_acc:.1f}%[/green] quality "
             f"at [green]$0 marginal cost[/green], "
-            f"versus [magenta]{best_paid['group_key']}[/magenta] at "
+            f"versus [magenta]{escape(str(best_paid['group_key']))}[/magenta] at "
             f"[green]{paid_acc:.1f}%[/green] for "
             f"[yellow]${paid_cost:.4f}[/yellow] total spend."
         )

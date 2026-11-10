@@ -315,13 +315,15 @@ def provider_from_target(target: InferenceTarget, *, client: Any | None = None):
     backend = target.backend
     if backend == "ollama":
         from atomics.providers.ollama import OllamaProvider
+        from atomics.validation import validate_endpoint_url
 
-        url = target.url or "http://localhost:11434"
+        url = validate_endpoint_url(target.url or "http://localhost:11434", label="INFERENCE_URL")
         return OllamaProvider(host=url, default_model=target.model, client=client)
     if backend == "vllm":
         from atomics.providers.vllm import VllmProvider
+        from atomics.validation import validate_endpoint_url
 
-        url = target.url or "http://localhost:8000/v1"
+        url = validate_endpoint_url(target.url or "http://localhost:8000/v1", label="INFERENCE_URL")
         return VllmProvider(
             base_url=url,
             default_model=target.model,
