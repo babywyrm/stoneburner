@@ -276,6 +276,9 @@ runs such as a local model judged by a paid one.
 | `atomics server --worker-absent-after N` | Seconds of worker silence before it is marked offline (default: 120) |
 | `atomics server --with-dashboard` | Serve an optional web dashboard at `/dashboard` (default: off) |
 | `atomics server --db-path PATH` | SQLite database path (default: atomics state directory) |
+| `atomics server --max-active-jobs N` | Maximum concurrent active API jobs (default: 16) |
+| `atomics server --max-retained-jobs N` | Maximum finished jobs retained for polling (default: 256) |
+| `atomics server --max-active-jobs-per-caller N` | Maximum concurrent active jobs per API key (default: 4) |
 | `atomics worker` | Start a distributed worker (polls coordinator for tasks) |
 | `atomics worker-npm` | Start a Node.js worker bridge for distributed task execution |
 | `atomics distributed run` | Submit a distributed run (split, fleet, or full mode) |

@@ -11,9 +11,11 @@ from atomics.commands.common import (
     PROVIDER_CHOICES,
     _make_provider,
     budget_option,
+    effective_model,
     eval_budget_from,
     extra_judges_option,
     parse_extra_judges,
+    print_judge_calibration,
     run_async,
     setup_logging,
     write_summary_json,
@@ -214,6 +216,9 @@ def archreview(
 
     judge_label = (
         f"{judge_provider_name}:{judge_model or judge_provider.default_model or 'default'}"
+    )
+    print_judge_calibration(
+        console, judge_provider_name, effective_model(judge_model, judge_provider)
     )
 
     table = Table(title=f"archreview — {spec.name} ({tier})", show_lines=True)

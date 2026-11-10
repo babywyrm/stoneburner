@@ -24,6 +24,7 @@ from atomics.commands.common import (
     extra_judges_option,
     integrity_exit_code,
     parse_extra_judges,
+    print_judge_calibration,
     run_async,
     temperature_option,
     write_summary_json,
@@ -260,6 +261,8 @@ def toolcall(
         f"[dim]{len(fixtures)} fixtures · channel={channel} · runs={runs}{pinned} · "
         f"judge={judge_provider_name or 'none'} · calls are never executed[/dim]\n"
     )
+    if judge is not None and judge_provider_name:
+        print_judge_calibration(console, judge_provider_name, effective_model(judge_model, judge))
     if judge is None and channel != "tools":
         console.print(
             "[yellow]No judge: prose stays unjudged and channel divergence "

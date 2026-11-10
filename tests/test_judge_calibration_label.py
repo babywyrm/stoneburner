@@ -78,13 +78,17 @@ def test_an_unreadable_db_labels_uncalibrated_and_the_run_still_passes(monkeypat
 @pytest.mark.parametrize(
     "module",
     [
+        "atomics.commands.archreview",
         "atomics.commands.eval",
         "atomics.commands.probe",
+        "atomics.commands.rag",
         "atomics.commands.security.cmd_adversarial",
         "atomics.commands.security.cmd_codereview",
         "atomics.commands.security.cmd_multiturn",
         "atomics.commands.security.cmd_redblue",
         "atomics.commands.security.cmd_refusal",
+        "atomics.commands.sweep",
+        "atomics.commands.toolcall",
     ],
 )
 def test_every_judged_suite_prints_its_judge_calibration(module):

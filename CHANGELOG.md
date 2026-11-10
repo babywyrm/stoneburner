@@ -7,6 +7,11 @@
   across `claude`, `openai` (Chat Completions and Responses API),
   `bedrock`, `vllm`, `llamacpp`, `gemini`, `groq`, and `together`,
   instead of pasting earlier turns into a single prompt.
+- `rag`, `archreview`, `sweep`, and `toolcall` (when a judge is set) now
+  print the judge's stored calibration status, `POST /api/v1/sweeps`
+  includes `judge_calibration` in its result, and `atomics server`
+  exposes `--max-active-jobs`, `--max-retained-jobs`, and
+  `--max-active-jobs-per-caller`.
 
 ### Fixed
 - `brain-gateway` refuses a generate when `temperature` is set, and does

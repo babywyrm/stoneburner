@@ -104,7 +104,7 @@ class GuardedProvider(BaseProvider):
 
     @property
     def default_model(self) -> str | None:
-        return self._inner.default_model
+        return getattr(self._inner, "default_model", None)
 
     @property
     def supports_tools(self) -> bool:  # type: ignore[override]

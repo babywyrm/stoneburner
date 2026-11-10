@@ -178,6 +178,7 @@ async def test_run_sweep_meters_every_model_against_one_budget():
     assert result["fail"] == 1
     assert result["jobs"][0]["headline"] == 0.9
     assert result["budget_usd"] == 3.0
+    assert "judge_calibration" in result
 
 
 @pytest.mark.asyncio

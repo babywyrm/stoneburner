@@ -13,8 +13,10 @@ from atomics.commands.common import (
     PROVIDER_CHOICES,
     _make_provider,
     budget_option,
+    effective_model,
     effort_options,
     eval_budget_from,
+    print_judge_calibration,
     run_async,
     setup_logging,
     temperature_option,
@@ -333,6 +335,9 @@ def sweep(
             settings,
             vllm_host=vllm_host,
         )
+    )
+    print_judge_calibration(
+        console, judge_provider_name, effective_model(judge_model, judge_provider)
     )
 
     if suite_list != ["eval"] or status_path or log_path:

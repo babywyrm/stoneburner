@@ -20,9 +20,13 @@ from atomics.commands.common import (
     extra_judges_option,
     integrity_exit_code,
     parse_extra_judges,
+    print_judge_calibration,
     run_async,
     setup_logging,
     write_summary_json,
+)
+from atomics.commands.common import (
+    effective_model as resolve_effective_model,
 )
 from atomics.commands.suite_run import finalize_task_run, suite_run
 from atomics.config import load_settings
@@ -178,6 +182,9 @@ def rag(
         f"judge: [cyan]{judge_provider_name}:{judge_model or 'default'}[/cyan]\n"
         f"Fixtures: [bold]{fixture_count}[/bold] | "
         f"Results saved: [bold]{'yes' if save_results else 'no'}[/bold]\n"
+    )
+    print_judge_calibration(
+        console, judge_provider_name, resolve_effective_model(judge_model, judge_provider)
     )
 
     rag_run_id = uuid.uuid4().hex[:12]

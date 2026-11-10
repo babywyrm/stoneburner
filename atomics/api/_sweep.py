@@ -12,7 +12,7 @@ from typing import Any
 
 from fastapi import HTTPException
 
-from atomics.api._runners import _provider_for
+from atomics.api._runners import _judge_calibration, _provider_for
 from atomics.api.job_progress import SweepJobReporter, sweep_job_total
 from atomics.api.jobs import Job
 from atomics.api.models import SweepRequest
@@ -50,6 +50,7 @@ async def run_sweep_from_request(payload: SweepRequest, job: Job | None = None) 
 
     try:
         judge_provider = meter.wrap(_provider_for("ollama", payload.judge_model, judge_host))
+        judge_cal = _judge_calibration(payload.judge_model, judge_provider)
         inner = make_suite_runner(
             provider_factory=provider_factory,
             judge_provider=judge_provider,
@@ -92,6 +93,7 @@ async def run_sweep_from_request(payload: SweepRequest, job: Job | None = None) 
         "suites": list(payload.suites),
         "runs": payload.runs,
         "budget_usd": payload.budget_usd,
+        "judge_calibration": judge_cal,
         "ok": sum(1 for row in results if row.ok),
         "fail": sum(1 for row in results if not row.ok),
         "jobs": jobs,

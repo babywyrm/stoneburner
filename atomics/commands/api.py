@@ -51,6 +51,27 @@ from rich.console import Console
     type=click.Path(path_type=Path),
     help="SQLite database path (default: atomics default state directory)",
 )
+@click.option(
+    "--max-active-jobs",
+    default=16,
+    show_default=True,
+    type=int,
+    help="Maximum concurrent in-memory API jobs before returning 429.",
+)
+@click.option(
+    "--max-retained-jobs",
+    default=256,
+    show_default=True,
+    type=int,
+    help="Maximum finished jobs retained for polling before evicting the oldest.",
+)
+@click.option(
+    "--max-active-jobs-per-caller",
+    default=4,
+    show_default=True,
+    type=int,
+    help="Maximum concurrent active jobs allowed for a single API key.",
+)
 def server(
     host: str,
     port: int,
@@ -61,6 +82,9 @@ def server(
     worker_absent_after: float,
     with_dashboard: bool,
     db_path: Path | None,
+    max_active_jobs: int,
+    max_retained_jobs: int,
+    max_active_jobs_per_caller: int,
 ) -> None:
     """Run the atomics API server."""
     console = Console()
@@ -89,6 +113,9 @@ def server(
             worker_absent_after_seconds=worker_absent_after,
             with_dashboard=with_dashboard,
             db_path=db_path or ServerSettings().db_path,
+            max_active_jobs=max_active_jobs,
+            max_retained_jobs=max_retained_jobs,
+            max_active_jobs_per_caller=max_active_jobs_per_caller,
         )
     except ValueError as exc:
         console.print(f"[red]Error:[/red] {exc}")

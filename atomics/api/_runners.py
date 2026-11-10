@@ -97,7 +97,7 @@ def _judge_calibration(
     judge_model: str | None, judge_provider: BaseProvider
 ) -> dict[str, object] | None:
     """The API judge is always Ollama (`_guarded_providers`); advisory, never raises."""
-    model = judge_model or judge_provider.default_model or "default"
+    model = judge_model or getattr(judge_provider, "default_model", None) or "default"
     status = judge_calibration_status(load_settings().db_path, "ollama", model)
     return asdict(status) if status is not None else None
 
