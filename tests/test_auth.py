@@ -428,6 +428,63 @@ def test_cli_login_help():
     assert "--issuer" in result.output
 
 
+def test_cli_login_validates_issuer_url_and_requires_both_flags(monkeypatch):
+    from unittest.mock import AsyncMock
+
+    from click.testing import CliRunner
+
+    from atomics.cli import cli
+
+    monkeypatch.setattr(
+        "atomics.auth.oauth.OAuthPKCEAuth.login",
+        AsyncMock(return_value=CachedTokens(access_token="x")),
+    )
+    runner = CliRunner()
+    bad_scheme = runner.invoke(
+        cli, ["login", "--issuer", "file:///etc/passwd", "--client-id", "cid"]
+    )
+    assert bad_scheme.exit_code != 0
+    assert "scheme" in bad_scheme.output.lower()
+
+    half = runner.invoke(cli, ["login", "--issuer", "https://idp.example.com"])
+    assert half.exit_code != 0
+    assert "--client-id" in half.output
+
+
+def test_cli_whoami_escapes_rich_markup_in_jwt_claims(tmp_path, monkeypatch):
+    import base64
+
+    from click.testing import CliRunner
+
+    from atomics.cli import cli
+
+    monkeypatch.setenv("OPENAI_API_KEY", "")
+    monkeypatch.setattr("atomics.secrets.get_secret", lambda _key: None)
+    monkeypatch.setattr(
+        "atomics.auth.codex._default_codex_auth_path",
+        lambda: tmp_path / "nonexistent.json",
+    )
+    monkeypatch.setattr("atomics.auth.store._default_auth_dir", lambda: tmp_path)
+
+    claims = json.dumps({"name": "Alice [bold red]FAKE[/]", "email": "a@[red]b[/].com"}).encode()
+    jwt_payload = base64.urlsafe_b64encode(claims).decode().rstrip("=")
+    id_token = f"eyJhbGciOiJub25lIn0.{jwt_payload}.sig"
+    store = TokenStore(tmp_path / "auth.json")
+    store.save(
+        CachedTokens(
+            access_token="tok",
+            id_token=id_token,
+            expires_at=time.time() + 3600,
+            profile_name="prof-[red]X[/]",
+        )
+    )
+    result = CliRunner().invoke(cli, ["whoami"])
+    assert result.exit_code == 0, result.output
+    assert "prof-[red]X[/]" in result.output
+    assert "Alice [bold red]FAKE[/]" in result.output
+    assert "a@[red]b[/].com" in result.output
+
+
 # ── OAuthPKCEAuth — flow coverage ───────────────────────────────────────────
 
 

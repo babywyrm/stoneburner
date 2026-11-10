@@ -195,3 +195,25 @@ def test_write_csv_nonempty():
     content = out.getvalue()
     assert "a" in content
     assert "1" in content
+
+
+def test_export_all_csv_handles_heterogeneous_schemas_and_neutralizes_formulas(
+    tmp_path, monkeypatch
+):
+    from click.testing import CliRunner
+
+    from atomics.cli import cli
+
+    repo = _tmp_repo_with_data(tmp_path)
+    repo.close()
+    monkeypatch.setenv("ATOMICS_DB_PATH", str(tmp_path / "db.sqlite"))
+
+    res = CliRunner().invoke(cli, ["export", "--suite", "all", "--format", "csv"])
+    assert res.exit_code == 0, res.output
+    assert "peak_tps" in res.output and "quality" in res.output
+
+    buf = io.StringIO()
+    write_csv([{"response": "=cmd|' /C calc'!A0", "safe": "plain", "num": -5}], buf)
+    csv_out = buf.getvalue()
+    assert "'=cmd|' /C calc'!A0" in csv_out
+    assert "-5" in csv_out

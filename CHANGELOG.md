@@ -50,13 +50,15 @@
 - `DistributedRunRequest` now bounds `timeout_seconds`, `max_retries`,
   and `run_request.iterations` / `interval` to match `/api/v1/runs`,
   `WorkerClient`, `WorkerRegisterRequest`, `AtomicsApiClient`,
-  `distributed`, `worker-npm`, `workers/npm/worker.js`, and
-  `take_inventory` validate coordinator/API/worker/host URLs,
-  `workers/npm/worker.js` parses `--worker-cmd` with quote-aware argv
-  splitting and URL-encodes worker/assignment IDs, `WorkerClient.run()`
-  closes its HTTP client on exit, `distributed status` and `inventory`
-  renderers escape Rich markup in remote fields, `execute_full_run` uses
-  a private `TemporaryDirectory` and
+  `distributed`, `worker-npm`, `workers/npm/worker.js`, `login
+  --issuer`, and `take_inventory` validate coordinator/API/worker/host
+  URLs, `workers/npm/worker.js` parses `--worker-cmd` with quote-aware
+  argv splitting and URL-encodes worker/assignment IDs,
+  `WorkerClient.run()` closes its HTTP client on exit, `distributed
+  status`, `whoami`, and `inventory` renderers escape Rich markup in
+  remote fields, `export --format csv` unions heterogeneous row keys and
+  prefixes leading formula characters (`=`, `+`, `-`, `@`, `\t`, `\r`),
+  `execute_full_run` uses a private `TemporaryDirectory` and
   `MetricsRepository.get_run_task_results()`, and `WorkerPool.run()`
   removes its `SIGINT`/`SIGTERM` handlers on exit.
 

@@ -483,19 +483,10 @@ def export(
 
 
 def _write_generic_export(rows: list[dict], fmt: str, out_file) -> None:
-    """Write arbitrary row dicts to jsonl or csv."""
-    import csv as _csv
-    import json as _json
+    """Write arbitrary row dicts to jsonl or csv via the shared exporter."""
+    from atomics.reporting.exporters import write_tasks_export
 
-    if not rows:
-        return
-    if fmt == "jsonl":
-        for row in rows:
-            out_file.write(_json.dumps(row, default=str) + "\n")
-    elif fmt == "csv":
-        writer = _csv.DictWriter(out_file, fieldnames=list(rows[0].keys()))
-        writer.writeheader()
-        writer.writerows(rows)
+    write_tasks_export(rows, fmt, out_file)
 
 
 @click.command("models")
@@ -590,6 +581,8 @@ def models(
                 on_model=lambda m: click.echo(f"probed {m.host} {m.name}", err=True),
             )
         )
+    except ValueError as exc:
+        raise click.BadParameter(str(exc), param_hint="--host") from exc
     except ConnectionError as exc:
         click.echo(str(exc), err=True)
         raise SystemExit(1)

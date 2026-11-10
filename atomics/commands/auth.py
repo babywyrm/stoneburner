@@ -6,8 +6,10 @@ import asyncio
 
 import click
 from rich.console import Console
+from rich.markup import escape
 
 from atomics.config import load_settings
+from atomics.validation import validate_endpoint_url
 
 
 @click.command("login")
@@ -36,13 +38,19 @@ def login(
 
     console = Console()
 
+    if bool(issuer) != bool(client_id):
+        raise click.UsageError("Pass both --issuer and --client-id for a custom OIDC provider.")
     if issuer and client_id:
+        try:
+            issuer = validate_endpoint_url(issuer, label="--issuer")
+        except ValueError as exc:
+            raise click.BadParameter(str(exc), param_hint="--issuer") from exc
         profile = OIDCProfile(
             name="custom",
             issuer=issuer,
-            authorization_endpoint=f"{issuer.rstrip('/')}/authorize",
-            token_endpoint=f"{issuer.rstrip('/')}/oauth/token",
-            device_authorization_endpoint=f"{issuer.rstrip('/')}/oauth/device/code",
+            authorization_endpoint=f"{issuer}/authorize",
+            token_endpoint=f"{issuer}/oauth/token",
+            device_authorization_endpoint=f"{issuer}/oauth/device/code",
             client_id=client_id,
             scopes=scopes.split() if scopes else ["openid", "profile", "email"],
         )
@@ -100,7 +108,8 @@ def whoami() -> None:
     store = TokenStore()
     tokens = store.load()
     if tokens.access_token and not tokens.expired:
-        console.print(f"[cyan]Auth mode:[/cyan] OAuth ({tokens.profile_name or 'unknown'})")
+        profile_label = escape(tokens.profile_name or "unknown")
+        console.print(f"[cyan]Auth mode:[/cyan] OAuth ({profile_label})")
         # Decode identity from id_token if available
         if tokens.id_token:
             try:
@@ -110,8 +119,8 @@ def whoami() -> None:
                 parts = tokens.id_token.split(".")
                 payload = parts[1] + "=" * (4 - len(parts[1]) % 4)
                 claims = json.loads(base64.urlsafe_b64decode(payload))
-                email = claims.get("email", "")
-                name = claims.get("name", "")
+                email = escape(str(claims.get("email", "")))
+                name = escape(str(claims.get("name", "")))
                 if name or email:
                     console.print(
                         f"[dim]Identity:[/dim] {name} ({email})"
