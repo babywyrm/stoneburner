@@ -265,4 +265,4 @@ def test_send_webhook_does_not_log_secret_webhook_path(caplog):
         send_webhook(url, summary, client=BoomClient())
 
     assert "SuperSecretWebhookToken999" not in caplog.text
-    assert "hooks.slack.com" in caplog.text
+    assert "Webhook delivered (status 200)" in caplog.text

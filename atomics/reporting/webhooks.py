@@ -149,18 +149,16 @@ def send_webhook(
     else:
         payload = _build_generic_payload(summary, tier=tier, provider=provider, alert=alert)
 
-    parts = urlsplit(url)
-    host_label = parts.netloc or parts.hostname or "webhook"
     http = client or httpx.Client()
     try:
         resp = http.post(url, json=payload, timeout=timeout)
         if resp.status_code < 300:
-            logger.info("Webhook sent to %s (status %d)", host_label, resp.status_code)
+            logger.info("Webhook delivered (status %d)", resp.status_code)
             return True
-        logger.warning("Webhook failed: %s returned %d", host_label, resp.status_code)
+        logger.warning("Webhook failed (status %d)", resp.status_code)
         return False
     except Exception as exc:
-        logger.warning("Webhook delivery to %s failed: %s", host_label, type(exc).__name__)
+        logger.warning("Webhook delivery failed: %s", type(exc).__name__)
         return False
     finally:
         if client is None:

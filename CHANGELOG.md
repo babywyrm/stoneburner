@@ -60,8 +60,8 @@
   coordinator/API/worker/host URLs, `workers/npm/worker.js` parses
   `--worker-cmd` with quote-aware argv splitting and URL-encodes
   worker/assignment IDs, `WorkerClient.run()` closes its HTTP client on
-  exit, `send_webhook` logs only the webhook host rather than the secret
-  webhook path, `distributed status`, `whoami`, `report`, `compare`, and
+  exit, `send_webhook` omits the webhook URL from log messages,
+  `distributed status`, `whoami`, `report`, `compare`, and
   `inventory` renderers escape Rich markup in remote/stored fields,
   `export --format csv` unions heterogeneous row keys and prefixes
   leading formula characters (`=`, `+`, `-`, `@`, `\t`, `\r`),
