@@ -289,6 +289,10 @@ class SecurityMixin(RepositoryBase):
             for f in r.findings
         ]
 
+        error_message = r.error_message or ""
+        if error_message and "[REDACTED]" not in error_message:
+            error_message = sanitize_error(Exception(error_message))
+
         self._conn.execute(
             """
             INSERT INTO archreview_results
@@ -325,7 +329,7 @@ class SecurityMixin(RepositoryBase):
                 _json.dumps(findings_data),
                 _json.dumps(r.matched_categories),
                 r.error_class or "",
-                r.error_message or "",
+                error_message,
                 now,
             ),
         )

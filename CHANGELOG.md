@@ -19,6 +19,12 @@
 - The `codegen` sandbox now blocks `_socket.socket` and
   `socket.socketpair`, points `HOME`/`TMPDIR`/`TEMP`/`TMP` at the
   ephemeral scratch directory, and caps serialized return values at 64 KB.
+- `MetricsRepository.save_task_result()` and `save_archreview_result()`
+  now sanitize `error_message` at the repository boundary, and
+  `get_hourly_token_rate()`, `query_task_results()`,
+  `compare_providers()`, and `get_runs_by_provider()` compare `started_at`
+  against an ISO-8601 `T` cutoff rather than space-delimited
+  `datetime('now', ...)`.
 
 ## 0.32.0 (2026-11-17) — Native chat turns, gateway honesty, security hardening
 

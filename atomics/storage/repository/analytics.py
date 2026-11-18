@@ -76,7 +76,7 @@ class AnalyticsMixin(RepositoryBase):
             """
             SELECT COALESCE(SUM(total_tokens), 0)
             FROM task_results
-            WHERE started_at >= datetime('now', '-1 hour')
+            WHERE started_at >= strftime('%Y-%m-%dT%H:%M:%S', 'now', '-1 hours')
             """
         ).fetchone()
         return float(row[0])
@@ -98,8 +98,8 @@ class AnalyticsMixin(RepositoryBase):
         clauses: list[str] = []
         params: list = []
         if since_hours is not None:
-            clauses.append("started_at >= datetime('now', ?)")
-            params.append(f"-{since_hours} hours")
+            clauses.append("started_at >= strftime('%Y-%m-%dT%H:%M:%S', 'now', ? || ' hours')")
+            params.append(f"-{since_hours}")
         if suite is not None:
             clauses.append("suite = ?")
             params.append(suite)
@@ -133,8 +133,8 @@ class AnalyticsMixin(RepositoryBase):
         clauses: list[str] = []
         params: list = []
         if since_hours is not None:
-            clauses.append("started_at >= datetime('now', ?)")
-            params.append(f"-{since_hours} hours")
+            clauses.append("started_at >= strftime('%Y-%m-%dT%H:%M:%S', 'now', ? || ' hours')")
+            params.append(f"-{since_hours}")
         if tier is not None:
             clauses.append("run_id IN (SELECT run_id FROM runs WHERE tier = ?)")
             params.append(tier)

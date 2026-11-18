@@ -4,10 +4,14 @@ from __future__ import annotations
 
 from atomics.models import TaskResult
 from atomics.storage.repository._base import RepositoryBase
+from atomics.validation import sanitize_error
 
 
 class TasksMixin(RepositoryBase):
     def save_task_result(self, result: TaskResult, *, suite: str = "eval") -> None:
+        error_message = result.error_message
+        if error_message and "[REDACTED]" not in error_message:
+            error_message = sanitize_error(Exception(error_message))
         self._conn.execute(
             """
             INSERT OR REPLACE INTO task_results (
@@ -49,7 +53,7 @@ class TasksMixin(RepositoryBase):
                 result.tps_basis,
                 int(result.thinking_enabled),
                 result.error_class,
-                result.error_message,
+                error_message,
                 result.started_at.isoformat(),
                 result.completed_at.isoformat() if result.completed_at else None,
                 result.accuracy_score,

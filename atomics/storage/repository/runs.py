@@ -103,8 +103,8 @@ class RunsMixin(RepositoryBase):
         clauses: list[str] = []
         params: list = []
         if since_hours is not None:
-            clauses.append("started_at >= datetime('now', ?)")
-            params.append(f"-{since_hours} hours")
+            clauses.append("started_at >= strftime('%Y-%m-%dT%H:%M:%S', 'now', ? || ' hours')")
+            params.append(f"-{since_hours}")
         where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
         # clauses are literals; every caller value is bound in params.
         sql = f"""

@@ -1477,3 +1477,73 @@ def test_save_agreement_study_row(tmp_path):
     repo.close()
     assert rows[0]["flipped"] == 1
     assert rows[0]["agreement"] == pytest.approx(2 / 3)
+
+
+def test_save_task_and_archreview_results_sanitize_error_messages_and_use_iso_cutoffs(tmp_path):
+    from datetime import UTC, datetime, timedelta
+
+    from atomics.archreview.models import ArchReviewResult
+
+    repo = MetricsRepository(tmp_path / "san.db")
+    repo.create_run("r-san", tier="ez", provider="ollama", model="qwen")
+    secret = "sk-ant-api03-secretcredential987654321"
+    repo.save_task_result(
+        TaskResult(
+            task_id="t-san",
+            run_id="r-san",
+            category=TaskCategory.GENERAL_QA,
+            task_name="q1",
+            provider="ollama",
+            model="qwen",
+            status=TaskStatus.FAILED,
+            error_class="RuntimeError",
+            error_message=f"failed with Authorization: Bearer {secret}",
+            started_at=datetime.now(UTC),
+            completed_at=datetime.now(UTC),
+        )
+    )
+    repo.save_archreview_result(
+        ArchReviewResult(
+            run_id="r-san",
+            repo="juice-shop",
+            tier="small",
+            model="qwen",
+            provider="ollama",
+            round=1,
+            findings=[],
+            pack_hash="abc",
+            judge_model="j",
+            error_class="RuntimeError",
+            error_message=f"api_key={secret}",
+        )
+    )
+    task_row = repo.query_task_results(limit=1)[0]
+    arch_row = repo._conn.execute(
+        "SELECT error_message FROM archreview_results WHERE run_id = ?", ("r-san",)
+    ).fetchone()
+    assert secret not in task_row["error_message"]
+    assert "[REDACTED]" in task_row["error_message"]
+    assert secret not in arch_row["error_message"]
+    assert "[REDACTED]" in arch_row["error_message"]
+
+    # ISO-8601 'T' cutoff check: a timestamp 30 minutes ago on the same UTC day
+    # must be excluded by since_hours=0.1 (6 minutes), whereas SQLite's space-delimited
+    # datetime('now', '-0.1 hours') sorted before 'YYYY-MM-DDTHH:MM:SS' on the same day.
+    now = datetime.now(UTC)
+    same_day_30m_ago = (now - timedelta(minutes=30)).strftime("%Y-%m-%dT%H:%M:%S+00:00")
+    cutoff_6m_ago = (now - timedelta(minutes=6)).strftime("%Y-%m-%d")
+    if same_day_30m_ago.startswith(cutoff_6m_ago):
+        repo._conn.execute(
+            "UPDATE runs SET started_at = ? WHERE run_id = ?",
+            (same_day_30m_ago, "r-san"),
+        )
+        repo._conn.execute(
+            "UPDATE task_results SET started_at = ?, status = 'success', total_tokens = 50 "
+            "WHERE task_id = 't-san'",
+            (same_day_30m_ago,),
+        )
+        repo._conn.commit()
+        assert repo.query_task_results(since_hours=0.1) == []
+        assert repo.compare_providers(since_hours=0.1) == []
+        assert repo.get_runs_by_provider(since_hours=0.1) == []
+    repo.close()
