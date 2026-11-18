@@ -100,14 +100,26 @@ def _database_check(request: Request) -> ReadinessCheck:
 
 @router.post("/runs", response_model=JobResponse, status_code=status.HTTP_202_ACCEPTED)
 async def start_run(
+    request: Request,
     payload: RunRequest,
     job_manager: JobManager = Depends(get_job_manager),
     caller: str = Depends(require_auth),
 ) -> JobResponse:
+    import inspect
+
+    db_path = request.app.state.settings.db_path
+    accepts_db = "db_path" in inspect.signature(run_benchmark_from_request).parameters
+
+    def _work(jid: str):
+        job_obj = job_manager.jobs[jid]
+        if accepts_db:
+            return run_benchmark_from_request(payload, job=job_obj, db_path=db_path)
+        return run_benchmark_from_request(payload, job=job_obj)
+
     try:
         job_id = await job_manager.submit(
             "run",
-            lambda jid: run_benchmark_from_request(payload, job=job_manager.jobs[jid]),
+            _work,
             owner=caller,
             request=payload_request(payload, load_settings()),
             progress=initial_run_progress(payload),

@@ -108,3 +108,30 @@ def test_arguments_are_passed_through_faithfully(args, expected):
     outcome = sandbox.execute("def f(x=None):\n    return x", "f", args)
     assert outcome.status == "ok"
     assert outcome.result == expected
+
+
+def test_codegen_sandbox_blocks_c_socket_and_isolates_home_and_caps_return_size():
+    from pathlib import Path
+
+    c_sock = sandbox.execute(
+        "import _socket\ndef f():\n    return _socket.socket()",
+        "f",
+        (),
+    )
+    assert c_sock.status == "runtime_error"
+    assert "network access is disabled" in c_sock.detail
+
+    home_out = sandbox.execute(
+        "import os, tempfile\nfrom pathlib import Path\n"
+        "def f():\n    return (os.getcwd(), str(Path.home()), tempfile.gettempdir())",
+        "f",
+        (),
+    )
+    assert home_out.status == "ok"
+    cwd_path, home_path, tmp_dir = (Path(p).resolve() for p in home_out.result)
+    assert cwd_path == home_path == tmp_dir
+    assert str(Path.home().resolve()) != str(home_path)
+
+    huge = sandbox.execute("def f():\n    return 'x' * 200000", "f", ())
+    assert huge.status == "unrepresentable"
+    assert "result too large" in huge.detail

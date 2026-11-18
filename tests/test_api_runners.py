@@ -1000,3 +1000,38 @@ async def test_run_eval_suite_rethrows_http_exception_from_runner():
             await runners.run_eval_suite(payload)
 
     assert exc_info.value.detail == "inner"
+
+
+@pytest.mark.asyncio
+async def test_run_benchmark_from_request_honors_explicit_db_path(tmp_path):
+    custom_db = tmp_path / "custom-server.db"
+    payload = RunRequest(provider="ollama", model="llama3", iterations=1)
+    summary = SimpleNamespace(
+        run_id="run-custom",
+        total_tasks=1,
+        successful_tasks=1,
+        failed_tasks=0,
+        total_tokens=10,
+        total_cost_usd=0.0,
+    )
+    engine = MagicMock()
+    engine.run = AsyncMock(return_value=summary)
+    seen_db: list = []
+
+    def fake_repo(path):
+        seen_db.append(path)
+        return MagicMock()
+
+    with (
+        patch.object(runners, "load_settings", return_value=_settings(db_path=tmp_path / "env.db")),
+        patch.object(runners, "_provider_for", return_value=MagicMock()),
+        patch("atomics.core.engine.LoopEngine", return_value=engine),
+        patch("atomics.storage.repository.MetricsRepository", side_effect=fake_repo),
+        patch(
+            "atomics.benchmark.tiers.get_tier_profile",
+            return_value=SimpleNamespace(preferred_model=None),
+        ),
+    ):
+        await runners.run_benchmark_from_request(payload, db_path=custom_db)
+
+    assert seen_db == [custom_db]

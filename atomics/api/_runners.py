@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict
+from pathlib import Path
 from typing import Any
 
 from fastapi import HTTPException
@@ -237,7 +238,12 @@ def _overall_score_ci(summary: Any) -> dict[str, object] | None:
     return None
 
 
-async def run_benchmark_from_request(payload: RunRequest, job: Job | None = None) -> dict[str, Any]:
+async def run_benchmark_from_request(
+    payload: RunRequest,
+    job: Job | None = None,
+    *,
+    db_path: Path | None = None,
+) -> dict[str, Any]:
     from atomics.benchmark.tiers import get_tier_profile
     from atomics.core.engine import LoopEngine
     from atomics.storage.repository import MetricsRepository
@@ -250,7 +256,7 @@ async def run_benchmark_from_request(payload: RunRequest, job: Job | None = None
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     profile = get_tier_profile(tier)
-    repo = MetricsRepository(settings.db_path)
+    repo = MetricsRepository(db_path or settings.db_path)
     reporter = None
     request: dict[str, Any] = {}
     if job is not None:

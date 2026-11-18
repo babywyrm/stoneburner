@@ -10,12 +10,15 @@
   reaches their limit.
 
 ### Fixed
-- `/api/v1/compare` and `/api/v1/reports/recent-runs` now read
-  `ServerSettings.db_path` (matching `/api/v1/runs/{run_id}` and
+- `/api/v1/compare`, `/api/v1/reports/recent-runs`, and `POST /api/v1/runs`
+  now use `ServerSettings.db_path` (matching `/api/v1/runs/{run_id}` and
   `/api/v1/reports/trends`) instead of `load_settings().db_path`.
 - `init_db()`, schema migration `.bak` snapshots, and
   `write_summary_json()` (`--json-out`) now enforce `0o600` file
   permissions on disk.
+- The `codegen` sandbox now blocks `_socket.socket` and
+  `socket.socketpair`, points `HOME`/`TMPDIR`/`TEMP`/`TMP` at the
+  ephemeral scratch directory, and caps serialized return values at 64 KB.
 
 ## 0.32.0 (2026-11-17) — Native chat turns, gateway honesty, security hardening
 

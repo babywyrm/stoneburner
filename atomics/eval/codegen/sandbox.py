@@ -24,6 +24,7 @@ from dataclasses import dataclass
 
 DEFAULT_MEMORY_BYTES = 512 * 1024 * 1024
 DEFAULT_TIMEOUT_SECONDS = 5.0
+MAX_RESULT_REPR_CHARS = 65_536
 
 # Runs in the child with no atomics imports, so it stays independent of how the
 # parent was installed. Results go out as a repr so tuples and sets survive the
@@ -63,15 +64,18 @@ try:
 except ImportError:
     pass
 
-# Blocks casual exfiltration. A determined escape can reach the syscall another
-# way; the wall-clock kill and scrubbed environment are the real containment.
+# Blocks casual exfiltration, including direct _socket.socket / socketpair calls.
+# A determined escape can reach the syscall another way; the wall-clock kill and
+# scrubbed environment are the real containment.
 try:
-    import socket
+    import _socket, socket
 
     def _no_network(*args, **kwargs):
         raise OSError("network access is disabled in the codegen sandbox")
 
+    _socket.socket = _no_network
     socket.socket = _no_network
+    socket.socketpair = _no_network
     socket.create_connection = _no_network
 except ImportError:
     pass
@@ -96,6 +100,9 @@ try:
 except BaseException as exc:
     _emit({"status": "unrepresentable", "detail": type(exc).__name__ + ": " + str(exc)})
 
+if len(encoded) > payload["max_result_chars"]:
+    _emit({"status": "unrepresentable", "detail": "result too large"})
+
 _emit({"status": "ok", "result_repr": encoded})
 """
 
@@ -109,9 +116,14 @@ class SandboxOutcome:
     detail: str = ""
 
 
-def _child_env() -> dict[str, str]:
+def _child_env(scratch: str | None = None) -> dict[str, str]:
     """A minimal environment. Notably absent: every provider credential."""
     env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "PYTHONIOENCODING": "utf-8"}
+    if scratch:
+        env["HOME"] = scratch
+        env["TMPDIR"] = scratch
+        env["TEMP"] = scratch
+        env["TMP"] = scratch
     # Keeps the child using the same interpreter's stdlib under a venv.
     for passthrough in ("SYSTEMROOT", "LD_LIBRARY_PATH"):
         if passthrough in os.environ:
@@ -126,6 +138,7 @@ def execute(
     *,
     timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
     memory_bytes: int = DEFAULT_MEMORY_BYTES,
+    max_result_chars: int = MAX_RESULT_REPR_CHARS,
 ) -> SandboxOutcome:
     """Run `function_name(*args)` from `code` in a child interpreter."""
     payload = json.dumps(
@@ -137,6 +150,7 @@ def execute(
             # A CPU limit below the wall clock would fire first and mask real
             # timeouts, so give it headroom and let the kill below be decisive.
             "cpu_seconds": max(1, int(timeout_seconds) + 1),
+            "max_result_chars": max_result_chars,
         }
     )
 
@@ -147,7 +161,7 @@ def execute(
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                env=_child_env(),
+                env=_child_env(scratch),
                 cwd=scratch,
                 text=True,
                 # Its own process group, so a snippet that spawns children
