@@ -1,6 +1,19 @@
 # Changelog
 
-## Unreleased
+## 0.32.0 (2026-11-17) — Native chat turns, gateway honesty, security hardening
+
+### Upgrade notes
+- No schema change. An existing database needs no migration.
+- `brain-gateway` now refuses a generate when `temperature`, `effort`,
+  `reasoning_mode`, or `thinking` is set, rather than scoring a pin the
+  RPC cannot apply. Leave those dials unset when evaluating
+  `brain-gateway`, and do not use `brain-gateway` as a judge (judges
+  always request `temperature=0.0`).
+- `generate_chat` now sends native `user`/`assistant` message turns on
+  `claude`, `openai`, `bedrock`, `vllm`, `llamacpp`, `gemini`, `groq`,
+  and `together` instead of pasting earlier turns into a single prompt.
+- `export --format csv` prefixes leading spreadsheet formula characters
+  (`=`, `+`, `-`, `@`, `\t`, `\r`) with `'` on string cells.
 
 ### Added
 - `generate_chat` now sends multi-turn history as native message turns

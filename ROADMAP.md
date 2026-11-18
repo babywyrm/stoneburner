@@ -7,28 +7,16 @@ stoneburner and [mcpnuke](https://github.com/babywyrm/mcpnuke) meet at the
 agent: stoneburner grades the model, mcpnuke scans the MCP server. An
 endpoint-scanning idea belongs in mcpnuke, not here.
 
-## 0.32.0 — next release
+## 0.33.0 — next release
 
-Current package is **0.31.0** — quickstart, sweep intervals, gateway
-errors. Git history was rewritten on 2026-10-21 to remove private lab
-hosts; every tag was re-pointed once for that, and only for that.
+Current package is **0.32.0** — native chat turns, gateway honesty,
+security hardening. Git history was rewritten on 2026-10-21 to remove
+private lab hosts; every tag was re-pointed once for that, and only for
+that.
 
 - [ ] A live brain-gateway generate on record. It cannot carry a
-      temperature pin: the provider refuses one rather than scoring it.
-- [x] `brain-gateway` refuses a generate when `temperature` is set.
-      Sampling is server-side, and the RPC has no per-call field.
-- [x] `brain-gateway` puts a system prompt in front of the question,
-      and refuses `--effort` and `--reasoning-mode`.
-- [x] `brain-gateway` refuses a generate when thinking is set. A
-      budget with thinking left unset still generates, and CLI commands
-      do not auto-enable thinking from the model name on `brain-gateway`.
-- [x] A live suite sweep that ranks a repeated `toolcall` on its any-run
-      rate. 2026-10-29, four models, `--runs 3`, judge `qwen3:14b`, 31
-      fixtures, all four jobs `complete`. `ministral-3:8b` was `best`
-      (45.2% any-run). `llama3.2:3b` (51.6%) and `granite4.1:8b` (67.7%)
-      were `tied`. `qwen2.5:7b` was `behind` at the same 67.7% as granite:
-      the paired test separates two equal rates when the leaks fall on
-      different fixtures.
+      temperature, effort, reasoning-mode, or thinking pin: the provider
+      refuses those rather than scoring them.
 - Anthropic 2.x stays held. Its API version rejects `temperature`, which
   the judge and `--temperature 0` rely on. 1.x is live (2026-10-28).
 
