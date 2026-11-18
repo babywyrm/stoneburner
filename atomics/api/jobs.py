@@ -61,6 +61,35 @@ class CallerQuotaExceededError(TooManyActiveJobsError):
     """
 
 
+class CallerSpendQuotaExceededError(CallerQuotaExceededError):
+    """One caller has exhausted their cumulative dollar ceiling across jobs."""
+
+
+def _result_cost_usd(result: Any) -> float:
+    """Extract total dollar spend from a finished job's result payload."""
+    if not isinstance(result, dict):
+        return 0.0
+    direct = result.get("total_cost_usd")
+    if isinstance(direct, int | float) and not isinstance(direct, bool):
+        return max(0.0, float(direct))
+    steps = result.get("steps")
+    if isinstance(steps, list):
+        total = 0.0
+        for step in steps:
+            if not isinstance(step, dict):
+                continue
+            step_cost = step.get("cost_usd")
+            if isinstance(step_cost, int | float) and not isinstance(step_cost, bool):
+                total += max(0.0, float(step_cost))
+            nested = step.get("result")
+            if isinstance(nested, dict):
+                nested_cost = nested.get("total_cost_usd")
+                if isinstance(nested_cost, int | float) and not isinstance(nested_cost, bool):
+                    total += max(0.0, float(nested_cost))
+        return total
+    return 0.0
+
+
 class JobManager:
     """In-memory async job manager.
 
@@ -85,6 +114,7 @@ class JobManager:
         max_active: int = DEFAULT_MAX_ACTIVE,
         max_retained: int = DEFAULT_MAX_RETAINED,
         max_active_per_caller: int = DEFAULT_MAX_ACTIVE_PER_CALLER,
+        max_spend_usd_per_caller: float | None = None,
     ) -> None:
         if max_active < 1:
             raise ValueError(f"max_active must be positive, got {max_active}")
@@ -92,10 +122,16 @@ class JobManager:
             raise ValueError(f"max_retained must be positive, got {max_retained}")
         if max_active_per_caller < 1:
             raise ValueError(f"max_active_per_caller must be positive, got {max_active_per_caller}")
+        if max_spend_usd_per_caller is not None and max_spend_usd_per_caller <= 0:
+            raise ValueError(
+                f"max_spend_usd_per_caller must be positive, got {max_spend_usd_per_caller}"
+            )
         self.jobs: dict[str, Job] = {}
         self.max_active = max_active
         self.max_retained = max_retained
         self.max_active_per_caller = max_active_per_caller
+        self.max_spend_usd_per_caller = max_spend_usd_per_caller
+        self._caller_spend: dict[str, float] = {}
 
     @staticmethod
     def _is_active(job: Job) -> bool:
@@ -116,6 +152,10 @@ class JobManager:
     def active_count_for(self, owner: str) -> int:
         """Concurrent jobs currently held by one caller."""
         return sum(1 for job in self.jobs.values() if job.owner == owner and self._is_active(job))
+
+    def caller_spend_usd(self, owner: str) -> float:
+        """Cumulative USD spent by one caller across finished jobs in this process."""
+        return round(self._caller_spend.get(owner, 0.0), 6)
 
     async def submit(
         self,
@@ -138,6 +178,13 @@ class JobManager:
                 f"caller already has {held} jobs running "
                 f"(per-caller limit {self.max_active_per_caller})"
             )
+        if self.max_spend_usd_per_caller is not None:
+            spent = self.caller_spend_usd(owner)
+            if spent >= self.max_spend_usd_per_caller:
+                raise CallerSpendQuotaExceededError(
+                    f"caller has spent ${spent:.4f} "
+                    f"(per-caller spend limit ${self.max_spend_usd_per_caller:.2f})"
+                )
         job_id = uuid.uuid4().hex
         job = Job(
             job_id=job_id,
@@ -198,6 +245,9 @@ class JobManager:
             job.error = {"type": exc.__class__.__name__, "message": sanitize_error(exc)}
             job.status = JobStatus.FAILED
         finally:
+            cost = _result_cost_usd(job.result)
+            if cost > 0:
+                self._caller_spend[job.owner] = self._caller_spend.get(job.owner, 0.0) + cost
             job.completed_at = time.time()
             logger.info(
                 "job_finished job_id=%s kind=%s caller=%s request_id=%s status=%s duration_ms=%.1f",

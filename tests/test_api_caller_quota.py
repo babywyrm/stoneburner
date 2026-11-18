@@ -200,3 +200,52 @@ class TestJobVisibility:
                 j["job_id"] for j in client.get("/api/v1/jobs", headers=alice).json()["jobs"]
             ] == ["j-alice"]
             assert client.get("/api/v1/jobs", headers=bob).json()["jobs"] == []
+
+
+class TestPerCallerSpendCeiling:
+    @pytest.mark.asyncio
+    async def test_caller_is_blocked_after_reaching_cumulative_spend_ceiling(self):
+        from atomics.api.jobs import CallerSpendQuotaExceededError
+
+        async def expensive(_job_id: str) -> dict[str, float]:
+            return {"total_cost_usd": 3.5}
+
+        manager = JobManager(max_spend_usd_per_caller=5.0)
+        j1 = await manager.submit("eval", expensive, owner="alice")
+        await manager.wait_for(j1)
+        assert manager.caller_spend_usd("alice") == pytest.approx(3.5)
+
+        j2 = await manager.submit("eval", expensive, owner="alice")
+        await manager.wait_for(j2)
+        assert manager.caller_spend_usd("alice") == pytest.approx(7.0)
+
+        with pytest.raises(CallerSpendQuotaExceededError, match="per-caller spend limit"):
+            await manager.submit("eval", expensive, owner="alice")
+
+        # Bob is unaffected by Alice exhausting her cumulative budget.
+        j_bob = await manager.submit("eval", expensive, owner="bob")
+        await manager.wait_for(j_bob)
+        assert manager.caller_spend_usd("bob") == pytest.approx(3.5)
+
+    @pytest.mark.asyncio
+    async def test_battery_step_costs_count_toward_caller_spend(self):
+        async def battery_work(_job_id: str) -> dict[str, object]:
+            return {
+                "steps": [
+                    {"suite": "provider-test", "cost_usd": 0.25},
+                    {"suite": "redblue", "result": {"total_cost_usd": 1.75}},
+                ]
+            }
+
+        manager = JobManager(max_spend_usd_per_caller=2.0)
+        jid = await manager.submit("battery", battery_work, owner="alice")
+        await manager.wait_for(jid)
+        assert manager.caller_spend_usd("alice") == pytest.approx(2.0)
+        with pytest.raises(TooManyActiveJobsError, match="spend"):
+            await manager.submit("battery", battery_work, owner="alice")
+
+    def test_non_positive_caller_spend_ceiling_is_rejected(self, tmp_path):
+        with pytest.raises(ValueError, match="max_spend_usd_per_caller"):
+            JobManager(max_spend_usd_per_caller=0.0)
+        with pytest.raises(ValueError, match="max_spend_usd_per_caller"):
+            ServerSettings(db_path=tmp_path / "q.db", max_spend_usd_per_caller=-1.0)

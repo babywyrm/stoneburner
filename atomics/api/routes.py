@@ -300,6 +300,7 @@ async def get_run(
 
 @router.get("/compare", response_model=CompareResponse)
 async def compare(
+    request: Request,
     by: str = "provider",
     since_hours: float | None = None,
     tier: str | None = None,
@@ -311,7 +312,7 @@ async def compare(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="by must be 'provider' or 'model'",
         )
-    settings = load_settings()
+    settings = request.app.state.settings
     repo = MetricsRepository(settings.db_path)
     try:
         rows = repo.compare_providers(
@@ -327,10 +328,11 @@ async def compare(
 
 @router.get("/reports/recent-runs", response_model=ReportResponse)
 async def recent_runs(
+    request: Request,
     limit: int = Query(default=10, ge=1, le=100),
     _: None = Depends(require_auth),
 ) -> ReportResponse:
-    settings = load_settings()
+    settings = request.app.state.settings
     repo = MetricsRepository(settings.db_path)
     try:
         rows = repo.get_recent_runs(limit=limit)

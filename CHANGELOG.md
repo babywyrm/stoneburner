@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- `atomics server --max-caller-spend-usd` (and
+  `ServerSettings.max_spend_usd_per_caller` /
+  `JobManager.max_spend_usd_per_caller`) enforces an optional cumulative
+  dollar ceiling per API key across runs, returning `429` once a caller
+  reaches their limit.
+
+### Fixed
+- `/api/v1/compare` and `/api/v1/reports/recent-runs` now read
+  `ServerSettings.db_path` (matching `/api/v1/runs/{run_id}` and
+  `/api/v1/reports/trends`) instead of `load_settings().db_path`.
+- `init_db()`, schema migration `.bak` snapshots, and
+  `write_summary_json()` (`--json-out`) now enforce `0o600` file
+  permissions on disk.
+
 ## 0.32.0 (2026-11-17) — Native chat turns, gateway honesty, security hardening
 
 ### Upgrade notes

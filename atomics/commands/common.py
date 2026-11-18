@@ -302,6 +302,7 @@ def write_summary_json(summary: SerializableSummary, path: Path) -> None:
     try:
         with path.open("w", encoding="utf-8") as handle:
             json.dump({**summary.to_dict(), "provenance": provenance()}, handle, indent=2)
+        path.chmod(0o600)
     except (OSError, TypeError, ValueError) as exc:
         raise click.ClickException(f"Unable to write JSON output: {sanitize_error(exc)}") from exc
 

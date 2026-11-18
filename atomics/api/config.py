@@ -48,6 +48,9 @@ class ServerSettings:
     # One caller's share of the active budget. Without it the global limit is
     # first-come-first-served, so one impatient script starves every other key.
     max_active_jobs_per_caller: int = 4
+    # Optional cumulative dollar ceiling per caller across runs in this server
+    # process. None leaves per-run budgets as the only spend bound.
+    max_spend_usd_per_caller: float | None = None
 
     def __post_init__(self) -> None:
         if self.port < 1 or self.port > 65535:
@@ -65,6 +68,10 @@ class ServerSettings:
             raise ValueError(
                 "max_active_jobs_per_caller must be positive, got "
                 f"{self.max_active_jobs_per_caller}"
+            )
+        if self.max_spend_usd_per_caller is not None and self.max_spend_usd_per_caller <= 0:
+            raise ValueError(
+                f"max_spend_usd_per_caller must be positive, got {self.max_spend_usd_per_caller}"
             )
         if self.no_auth and not is_loopback_host(self.host):
             raise ValueError(

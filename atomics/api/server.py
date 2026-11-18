@@ -33,6 +33,7 @@ async def lifespan(app: FastAPI):
         max_active=settings.max_active_jobs,
         max_retained=settings.max_retained_jobs,
         max_active_per_caller=settings.max_active_jobs_per_caller,
+        max_spend_usd_per_caller=settings.max_spend_usd_per_caller,
     )
     if settings.no_auth:
         logger.warning(

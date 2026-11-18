@@ -72,6 +72,12 @@ from rich.console import Console
     type=int,
     help="Maximum concurrent active jobs allowed for a single API key.",
 )
+@click.option(
+    "--max-caller-spend-usd",
+    default=None,
+    type=float,
+    help="Optional cumulative USD spend ceiling per API key across runs.",
+)
 def server(
     host: str,
     port: int,
@@ -85,6 +91,7 @@ def server(
     max_active_jobs: int,
     max_retained_jobs: int,
     max_active_jobs_per_caller: int,
+    max_caller_spend_usd: float | None,
 ) -> None:
     """Run the atomics API server."""
     console = Console()
@@ -116,6 +123,7 @@ def server(
             max_active_jobs=max_active_jobs,
             max_retained_jobs=max_retained_jobs,
             max_active_jobs_per_caller=max_active_jobs_per_caller,
+            max_spend_usd_per_caller=max_caller_spend_usd,
         )
     except ValueError as exc:
         console.print(f"[red]Error:[/red] {exc}")

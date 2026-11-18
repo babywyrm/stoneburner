@@ -350,3 +350,20 @@ def test_not_null_column_with_default_is_added_without_wipe(tmp_path: Path, monk
         assert [row[0] for row in conn.execute("SELECT run_id FROM runs")] == ["keep-me"]
     finally:
         conn.close()
+
+
+def test_init_db_and_write_summary_json_enforce_0600_permissions(tmp_path: Path) -> None:
+    from atomics.commands.common import write_summary_json
+
+    db_path = tmp_path / "restricted.db"
+    conn = init_db(db_path)
+    conn.close()
+    assert oct(db_path.stat().st_mode & 0o777) == "0o600"
+
+    class _DummySummary:
+        def to_dict(self) -> dict[str, object]:
+            return {"ok": True}
+
+    out_json = tmp_path / "export.json"
+    write_summary_json(_DummySummary(), out_json)
+    assert oct(out_json.stat().st_mode & 0o777) == "0o600"

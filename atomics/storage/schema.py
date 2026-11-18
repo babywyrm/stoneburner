@@ -414,6 +414,18 @@ def _get_schema_version(conn: sqlite3.Connection) -> int:
         return 0
 
 
+def _restrict_file_mode(path: Path) -> None:
+    """Best-effort 0o600 on local DB/backup files; no-op for :memory: or missing files."""
+    if str(path) == ":memory:":
+        return
+    for candidate in (path, Path(f"{path}-wal"), Path(f"{path}-shm")):
+        try:
+            if candidate.is_file():
+                candidate.chmod(0o600)
+        except OSError:
+            pass
+
+
 def _backup_before_wipe(conn: sqlite3.Connection, db_path: Path, current: int) -> Path:
     """WAL-safe snapshot of the DB before an in-place schema migration.
 
@@ -435,6 +447,7 @@ def _backup_before_wipe(conn: sqlite3.Connection, db_path: Path, current: int) -
             backup_conn.close()
     finally:
         source_conn.close()
+    _restrict_file_mode(backup_path)
     return backup_path
 
 
@@ -660,6 +673,7 @@ def init_db(db_path: Path) -> sqlite3.Connection:
         )
         conn.commit()
         conn.execute("PRAGMA foreign_keys=ON")
+        _restrict_file_mode(db_path)
         return conn
     except Exception:
         conn.rollback()

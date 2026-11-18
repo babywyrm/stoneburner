@@ -149,3 +149,46 @@ def test_trends_includes_eval_tokens_and_omits_prompts(tmp_path):
 
 def test_recent_runs_limit_is_bounded(client):
     assert client.get("/api/v1/reports/recent-runs?limit=100000").status_code == 422
+
+
+def test_compare_and_recent_runs_use_server_settings_db_path(tmp_path, monkeypatch):
+    from datetime import UTC, datetime
+
+    from atomics.models import TaskCategory, TaskResult, TaskStatus
+    from atomics.storage.repository import MetricsRepository
+
+    # Point env at an empty DB while ServerSettings points at the seeded DB.
+    monkeypatch.setenv("ATOMICS_DB_PATH", str(tmp_path / "wrong-env.db"))
+    custom_db = tmp_path / "server-custom.db"
+    repo = MetricsRepository(custom_db)
+    repo.create_run("srv-run-1", tier="ez", provider="ollama", model="qwen2.5:7b")
+    repo.save_task_result(
+        TaskResult(
+            task_id="t1",
+            run_id="srv-run-1",
+            category=TaskCategory.GENERAL_QA,
+            task_name="q1",
+            provider="ollama",
+            model="qwen2.5:7b",
+            status=TaskStatus.SUCCESS,
+            input_tokens=10,
+            output_tokens=20,
+            total_tokens=30,
+            latency_ms=50.0,
+            estimated_cost_usd=0.0,
+            accuracy_score=0.9,
+            started_at=datetime.now(UTC),
+            completed_at=datetime.now(UTC),
+        )
+    )
+    repo.complete_run("srv-run-1")
+    repo.close()
+
+    app = create_app(settings=ServerSettings(no_auth=True, db_path=custom_db))
+    with TestClient(app, base_url="http://127.0.0.1") as tc:
+        runs_resp = tc.get("/api/v1/reports/recent-runs")
+        cmp_resp = tc.get("/api/v1/compare?by=provider")
+    assert runs_resp.status_code == 200
+    assert [r["run_id"] for r in runs_resp.json()["runs"]] == ["srv-run-1"]
+    assert cmp_resp.status_code == 200
+    assert [r["group_key"] for r in cmp_resp.json()["rows"]] == ["ollama"]

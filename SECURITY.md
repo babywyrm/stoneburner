@@ -209,6 +209,7 @@ Resource bounds, all configurable on `ServerSettings`:
 | `fixtures` | 500 | An oversized eval request |
 | `budget_usd` | 10.0 | One eval spending without limit; capped at 1000 |
 | `max_active_jobs_per_caller` | 4 | One key taking every slot and starving the rest |
+| `max_spend_usd_per_caller` | `None` | Optional cumulative dollar ceiling per key across jobs (`--max-caller-spend-usd`) |
 
 These cap how much *one server* will do at once. The per-caller bound is the
 one that makes the others fair: a global limit alone is first-come-first-served,
@@ -288,9 +289,11 @@ request pressure is waited out instead, since it clears on its own.
 
 Two limits worth stating plainly:
 
-- This bounds a **single run**. It is not per-caller accounting across runs: an
-  authenticated caller can still submit repeatedly, and each submission gets its
-  own ceiling. Per-caller budget accounting remains unimplemented.
+- `budget_usd` bounds a **single run**. To cap a caller's cumulative spend
+  across submissions in a server process, pass `--max-caller-spend-usd` (or set
+  `ServerSettings.max_spend_usd_per_caller`), which rejects further job
+  submissions from that key with `429` once their finished jobs reach the
+  ceiling.
 - A dollar ceiling only binds where calls cost money. Local providers (Ollama,
   vLLM, llama.cpp) report `$0.00`, so `budget_usd` never trips for them. The
   guard's request-rate and hourly-token limits still apply, but if your threat
@@ -335,7 +338,8 @@ code-review persist the same canonical evidence in
 generated secrets, personal data, source code, or other sensitive content.
 
 Treat evaluation exports and the Stoneburner metrics database as sensitive.
-Store them with restrictive file permissions, limit access to trusted
-operators, and avoid committing or uploading them to public systems. Use
-`--no-save` when durable local evidence is unnecessary; this does not redact
+`init_db()`, schema backups, and `write_summary_json()` (`--json-out`) set
+`0o600` file permissions automatically; keep directory access restricted to
+trusted operators, and avoid committing or uploading exports to public systems.
+Use `--no-save` when durable local evidence is unnecessary; this does not redact
 explicit `--json-out` output.
