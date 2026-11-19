@@ -25,6 +25,9 @@
   `compare_providers()`, and `get_runs_by_provider()` compare `started_at`
   against an ISO-8601 `T` cutoff rather than space-delimited
   `datetime('now', ...)`.
+- `WorkerClient.poll_and_execute()`, `score_rag_response()`,
+  `score_turn()`, and `score_conversation()` now log `sanitize_error(exc)`
+  instead of raw tracebacks on provider or executor exceptions.
 
 ## 0.32.0 (2026-11-17) — Native chat turns, gateway honesty, security hardening
 

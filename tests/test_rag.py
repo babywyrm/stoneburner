@@ -795,3 +795,24 @@ def test_cli_rag_extra_judges_option():
     result = CliRunner().invoke(cli, ["rag", "--help"])
     assert result.exit_code == 0
     assert "--extra-judges" in result.output
+
+
+@pytest.mark.asyncio
+async def test_score_rag_sanitizes_exception_in_logs(caplog):
+    import logging
+
+    from atomics.eval.rag.judge import score_rag_response
+
+    judge = AsyncMock()
+    judge.generate = AsyncMock(side_effect=RuntimeError("Bearer sk-ant-secret1234567890"))
+    fixture = RAGFixture(
+        id="rag-sec",
+        complexity=TaskComplexity.LIGHT,
+        question="What?",
+        context_chunks=[RAGChunk(content="ctx", label="relevant", source="x.md")],
+    )
+    with caplog.at_level(logging.WARNING, logger="atomics.eval.rag.judge"):
+        res = await score_rag_response("answer", fixture, judge)
+
+    assert res.parse_failed is True
+    assert "sk-ant-secret1234567890" not in caplog.text

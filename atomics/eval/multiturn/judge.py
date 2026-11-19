@@ -19,6 +19,7 @@ from dataclasses import dataclass
 
 from atomics.eval.judge import JUDGE_MAX_TOKENS
 from atomics.providers.base import BaseProvider
+from atomics.validation import sanitize_error
 
 logger = logging.getLogger("atomics.eval.multiturn.judge")
 
@@ -181,8 +182,8 @@ async def score_turn(
             temperature=0.0,
             thinking=False,
         )
-    except Exception:
-        logger.warning("Turn judge call failed", exc_info=True)
+    except Exception as exc:
+        logger.warning("Turn judge call failed: %s", sanitize_error(exc))
         return TurnJudgeResult(0, 0, 0, 0.5, "judge call failed", parse_failed=True)
 
     parsed = _parse_turn_rubric(resp.text.strip())
@@ -215,8 +216,8 @@ async def score_conversation(
             temperature=0.0,
             thinking=False,
         )
-    except Exception:
-        logger.warning("Conversation judge call failed", exc_info=True)
+    except Exception as exc:
+        logger.warning("Conversation judge call failed: %s", sanitize_error(exc))
         return ConversationJudgeResult(0, 0, 0, 0.5, "judge call failed", parse_failed=True)
 
     parsed = _parse_conv_rubric(resp.text.strip())

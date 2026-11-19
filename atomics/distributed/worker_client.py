@@ -103,10 +103,11 @@ class WorkerClient:
                 json={"status": "completed", "result_json": json.dumps(result)},
             )
         except Exception as exc:
-            logger.exception("Assignment %s failed", assignment.assignment_id)
+            err = sanitize_error(exc)
+            logger.warning("Assignment %s failed: %s", assignment.assignment_id, err)
             await self._client.post(
                 f"{self.coordinator_url}/api/v1/workers/{self._worker_id}/jobs/{assignment.assignment_id}/result",
-                json={"status": "failed", "error": sanitize_error(exc)},
+                json={"status": "failed", "error": err},
             )
         return True
 

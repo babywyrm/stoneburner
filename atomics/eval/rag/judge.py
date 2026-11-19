@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING
 from atomics.eval.consensus import NumericVote, combine_numeric
 from atomics.eval.judge import JUDGE_MAX_TOKENS
 from atomics.providers.base import BaseProvider
+from atomics.validation import sanitize_error
 
 if TYPE_CHECKING:
     from atomics.eval.rag import RAGFixture
@@ -181,8 +182,8 @@ async def score_rag_response(
             temperature=0.0,
             thinking=False,
         )
-    except Exception:
-        logger.warning("RAG judge call failed", exc_info=True)
+    except Exception as exc:
+        logger.warning("RAG judge call failed: %s", sanitize_error(exc))
         return RAGJudgeResult(
             grounding=0,
             faithfulness=0,

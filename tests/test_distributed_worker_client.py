@@ -140,7 +140,9 @@ async def test_poll_and_execute_reports_failure(mock_httpx_client):
 
 
 @pytest.mark.asyncio
-async def test_poll_and_execute_sanitizes_failure(mock_httpx_client):
+async def test_poll_and_execute_sanitizes_failure(mock_httpx_client, caplog):
+    import logging
+
     assignment = {
         "assignment_id": "a-3",
         "job_id": "j-3",
@@ -155,10 +157,12 @@ async def test_poll_and_execute_sanitizes_failure(mock_httpx_client):
     )
     worker._worker_id = "w-1"
 
-    await worker.poll_and_execute()
+    with caplog.at_level(logging.WARNING, logger="atomics.distributed.worker_client"):
+        await worker.poll_and_execute()
 
     error = mock_httpx_client.post.await_args.kwargs["json"]["error"]
     assert "sk-abcdefghijklmnop" not in error
+    assert "sk-abcdefghijklmnop" not in caplog.text
     await worker.close()
 
 

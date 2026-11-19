@@ -660,3 +660,22 @@ async def test_conversation_cut_short_has_no_score(monkeypatch, caplog):
     assert cr.task_result.status is TaskStatus.FAILED
     assert summary.integrity.fixtures_scored == 0
     assert "Turn 2 of 3 in mt-test-02 not judged: thinking_budget" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_multiturn_judges_sanitize_exception_in_logs(caplog):
+    import logging
+    from unittest.mock import AsyncMock
+
+    from atomics.eval.multiturn.judge import score_conversation, score_turn
+
+    judge = AsyncMock()
+    judge.generate = AsyncMock(side_effect=RuntimeError("Bearer sk-ant-secret1234567890"))
+
+    with caplog.at_level(logging.WARNING, logger="atomics.eval.multiturn.judge"):
+        turn_res = await score_turn("transcript", "hi", "reply", "hello", judge)
+        conv_res = await score_conversation("transcript", ["coherent"], judge)
+
+    assert turn_res.parse_failed is True
+    assert conv_res.parse_failed is True
+    assert "sk-ant-secret1234567890" not in caplog.text
