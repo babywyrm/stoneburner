@@ -35,9 +35,10 @@ from atomics.eval.budget import share_budget
 from atomics.eval.toolcall.fixtures import (
     ALL_FIXTURES,
     GROUP_ALIASES,
+    ToolCallFixture,
     select_fixtures,
 )
-from atomics.eval.toolcall.runner import ERROR_OUTCOME, run_toolcall_suite
+from atomics.eval.toolcall.runner import ERROR_OUTCOME, ToolCallSummary, run_toolcall_suite
 from atomics.eval.toolcall.scorer import ToolOutcome
 from atomics.storage.records import EvaluationResultRecord
 
@@ -280,13 +281,15 @@ def toolcall(
     def _called(record: dict) -> str:
         return ", ".join(c.get("name", "") for c in record.get("calls") or []) or "none"
 
-    def on_start(index: int, fixture) -> None:
+    def on_start(index: int, fixture: ToolCallFixture) -> None:
         progress.on_start(index, fixture.id, fixture.category)
         console.print(
             f"  [{index + 1}/{len(fixtures)}] {fixture.id} ({fixture.category}) — generating..."
         )
 
-    def on_run(index: int, fixture, run_number: int, run_count: int, record: dict) -> None:
+    def on_run(
+        index: int, fixture: ToolCallFixture, run_number: int, run_count: int, record: dict
+    ) -> None:
         if run_count <= 1:
             return
         style, label = _OUTCOME_STYLE.get(record.get("tool_outcome"), ("white", "?"))
@@ -295,7 +298,7 @@ def toolcall(
             f"— [{style}]{label}[/{style}]  called={_called(record)}"
         )
 
-    def on_done(index: int, fixture, aggregated: dict) -> None:
+    def on_done(index: int, fixture: ToolCallFixture, aggregated: dict) -> None:
         progress.on_done(index)
         style, label = _OUTCOME_STYLE.get(aggregated.get("tool_outcome"), ("white", "?"))
         prose = aggregated.get("prose_label") or "—"
@@ -366,7 +369,7 @@ def toolcall(
         raise click.exceptions.Exit(1)
 
 
-def _render_results(summary, *, verbose: bool) -> None:
+def _render_results(summary: ToolCallSummary, *, verbose: bool) -> None:
     table = Table(show_header=True, header_style="bold", show_lines=False)
     table.add_column("fixture", style="dim", no_wrap=True)
     table.add_column("category", no_wrap=True)
@@ -415,7 +418,7 @@ def _render_results(summary, *, verbose: bool) -> None:
                 console.print(f"  [dim]said: {escape(result['tool_text'][:200])}[/dim]")
 
 
-def _render_summary(summary) -> None:
+def _render_summary(summary: ToolCallSummary) -> None:
     payload = summary.to_dict()
     console.print("\n[bold]Summary[/bold]")
     console.print(f"  tool-capable: {'yes' if summary.tool_capable else 'no'}")
@@ -485,7 +488,7 @@ def _render_summary(summary) -> None:
     console.print(f"  cost: ${payload['total_cost_usd']:.4f}\n")
 
 
-def _save(summary, *, db_path) -> None:
+def _save(summary: ToolCallSummary, *, db_path: Path) -> None:
     with suite_run(
         suite="toolcall",
         db_path=db_path,

@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING
 
 import click
 from rich.console import Console
 
 from atomics.benchmark.labcompare import (
+    HostSpec,
     parity_verdict,
     parse_host_specs,
     run_labcompare,
@@ -15,22 +17,51 @@ from atomics.benchmark.labcompare import (
 )
 from atomics.commands.common import _make_provider, run_async, temperature_option
 from atomics.config import load_settings
-from atomics.providers.base import aclose_providers
+from atomics.providers.base import BaseProvider, aclose_providers
 
 if TYPE_CHECKING:
     from atomics.benchmark.labcompare import CellResult
 
 
-def _run_labcompare_sync(**kwargs) -> list[CellResult]:
+def _run_labcompare_sync(
+    *,
+    hosts: list[HostSpec],
+    models: list[str],
+    dimensions: list[str],
+    quality_suite: str,
+    judge_host: str | None,
+    judge_model: str | None,
+    prompts: int,
+    provider_factory: Callable[[str], BaseProvider],
+    quality_fn: Callable[[BaseProvider, str | None, str | None, str], Awaitable[float | None]],
+    ps_fetcher_factory: Callable[[str], Callable[[], Awaitable[dict]]],
+    on_cell: Callable[[str, str], None] | None = None,
+) -> list[CellResult]:
     """Sync wrapper around the async orchestrator (patch target in tests)."""
-    return run_async(run_labcompare(**kwargs))
+    return run_async(
+        run_labcompare(
+            hosts=hosts,
+            models=models,
+            dimensions=dimensions,
+            quality_suite=quality_suite,
+            judge_host=judge_host,
+            judge_model=judge_model,
+            prompts=prompts,
+            provider_factory=provider_factory,
+            quality_fn=quality_fn,
+            ps_fetcher_factory=ps_fetcher_factory,
+            on_cell=on_cell,
+        )
+    )
 
 
-def _render_labcompare(console, cells, hosts, dims) -> None:
+def _render_labcompare(
+    console: Console, cells: list[CellResult], hosts: list[HostSpec], dims: list[str]
+) -> None:
     """Print a per-model side-by-side block with speedup and parity verdicts."""
     by_model: dict[str, dict[str, CellResult]] = {}
-    for c in cells:
-        by_model.setdefault(c.model, {})[c.host_name] = c
+    for cell in cells:
+        by_model.setdefault(cell.model, {})[cell.host_name] = cell
 
     host_names = [h.name for h in hosts]
     for model, host_cells in by_model.items():
@@ -105,17 +136,17 @@ def _render_labcompare(console, cells, hosts, dims) -> None:
 @click.option("--save/--no-save", "save_results", default=True, show_default=True)
 @click.option("-o", "--json-out", "json_out", type=click.Path(), default=None)
 def labcompare(
-    hosts_raw,
-    models_csv,
-    quality_suite,
-    dimensions,
-    judge_host,
-    judge_model,
-    prompts,
+    hosts_raw: tuple[str, ...],
+    models_csv: str,
+    quality_suite: str,
+    dimensions: str,
+    judge_host: str | None,
+    judge_model: str | None,
+    prompts: int,
     temperature: float | None,
-    save_results,
-    json_out,
-):
+    save_results: bool,
+    json_out: str | None,
+) -> None:
     """Compare two+ inference hosts on throughput and quality parity."""
     console = Console()
     settings = load_settings()
@@ -133,40 +164,44 @@ def labcompare(
     from atomics.eval.redblue.runner import run_redblue
     from atomics.eval.runner import run_eval
 
-    def provider_factory(url):
+    def provider_factory(url: str) -> BaseProvider:
         return _make_provider("ollama", None, url, settings)
 
-    def ps_fetcher_factory(url):
-        async def _ps():
+    def ps_fetcher_factory(url: str) -> Callable[[], Awaitable[dict]]:
+        async def _ps() -> dict:
             import httpx
 
             async with httpx.AsyncClient(timeout=10.0) as client:
                 r = await client.get(f"{url}/api/ps")
                 r.raise_for_status()
-                return r.json()
+                return dict(r.json())
 
         return _ps
 
-    async def quality_fn(provider, jhost, jmodel, model):
-        judge = _make_provider("ollama", jmodel, jhost or provider._host, settings)
+    async def quality_fn(
+        provider: BaseProvider, jhost: str | None, jmodel: str | None, model: str
+    ) -> float | None:
+        judge = _make_provider(
+            "ollama", jmodel, jhost or getattr(provider, "_host", None), settings
+        )
         try:
             if quality_suite == "redblue":
-                summary = await run_redblue(
+                rb_summary = await run_redblue(
                     provider,
                     judge_provider=judge,
                     model=model,
                     judge_model=jmodel,
                     temperature=temperature,
                 )
-                return summary.overall_quality
-            summary = await run_eval(
+                return rb_summary.overall_quality
+            eval_summary = await run_eval(
                 provider,
                 judge_provider=judge,
                 model=model,
                 judge_model=jmodel,
                 temperature=temperature,
             )
-            return summary.overall_accuracy
+            return eval_summary.overall_accuracy
         finally:
             await aclose_providers(judge)
 

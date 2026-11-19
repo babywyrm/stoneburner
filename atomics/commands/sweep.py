@@ -4,6 +4,10 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from atomics.eval.runner import FixtureResult
 
 import click
 from rich.console import Console
@@ -314,7 +318,7 @@ def sweep(
 
     created: list[BaseProvider] = []
 
-    def provider_factory(model_name: str):
+    def provider_factory(model_name: str) -> BaseProvider:
         wrapped = meter.wrap(
             _make_provider(provider_name, model_name, ollama_host, settings, vllm_host=vllm_host)
         )
@@ -401,7 +405,7 @@ def sweep(
     result_table.add_column("Cost", justify="right", style="yellow")
     result_table.add_column("Fixtures", justify="right", style="dim")
 
-    def on_fixture_done_verbose(fr) -> None:
+    def on_fixture_done_verbose(fr: FixtureResult) -> None:
         if not verbose:
             return
         from atomics.eval.display import format_eval_verbose_block

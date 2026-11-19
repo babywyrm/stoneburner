@@ -15,7 +15,10 @@ import datetime
 import os
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from atomics.providers.base import BaseProvider
 
 # Canonical backend names == atomics provider names.
 CANONICAL_BACKENDS: frozenset[str] = frozenset(
@@ -304,7 +307,7 @@ def resolve(machine: dict, profile: dict, difficulty: str, pool: str, resolved_b
 # ── provider auto-load integration point ──────────────────────────────────────
 
 
-def provider_from_target(target: InferenceTarget, *, client: Any | None = None):
+def provider_from_target(target: InferenceTarget, *, client: Any | None = None) -> BaseProvider:
     """Build the matching ``atomics`` provider for a resolved target.
 
     Lazy-imports providers so importing this module stays cheap and free of
@@ -340,7 +343,7 @@ def provider_from_target(target: InferenceTarget, *, client: Any | None = None):
     )
 
 
-def load_provider(path: str | None = None, *, client: object | None = None):
+def load_provider(path: str | None = None, *, client: object | None = None) -> BaseProvider | None:
     """Convenience: load the control file and build its provider, or ``None``."""
     target = load_control_file(path)
     return provider_from_target(target, client=client) if target else None

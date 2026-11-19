@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 
 from atomics.api._battery import run_battery_from_request
@@ -110,11 +112,11 @@ async def start_run(
     db_path = request.app.state.settings.db_path
     accepts_db = "db_path" in inspect.signature(run_benchmark_from_request).parameters
 
-    def _work(jid: str):
+    async def _work(jid: str) -> dict[str, Any]:
         job_obj = job_manager.jobs[jid]
         if accepts_db:
-            return run_benchmark_from_request(payload, job=job_obj, db_path=db_path)
-        return run_benchmark_from_request(payload, job=job_obj)
+            return await run_benchmark_from_request(payload, job=job_obj, db_path=db_path)
+        return await run_benchmark_from_request(payload, job=job_obj)
 
     try:
         job_id = await job_manager.submit(

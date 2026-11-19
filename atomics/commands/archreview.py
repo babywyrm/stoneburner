@@ -23,7 +23,7 @@ from atomics.commands.common import (
 from atomics.commands.suite_run import finalize_archreview_run, suite_run
 from atomics.config import load_settings
 from atomics.eval.budget import BudgetMeter
-from atomics.providers.base import aclose_providers
+from atomics.providers.base import BaseProvider, aclose_providers
 
 
 @click.command()
@@ -142,7 +142,7 @@ def archreview(
         mdl: str | None,
         host: str | None,
         context_tokens: int | None = None,
-    ):
+    ) -> BaseProvider:
         return meter.wrap(
             _make_provider(
                 name,

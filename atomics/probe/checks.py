@@ -13,8 +13,8 @@ from collections.abc import Callable
 _HANDLERS: dict[str, Callable[[str], dict]] = {}
 
 
-def _register(artifact_type: str):
-    def decorator(fn: Callable[[str], dict]):
+def _register(artifact_type: str) -> Callable[[Callable[[str], dict]], Callable[[str], dict]]:
+    def decorator(fn: Callable[[str], dict]) -> Callable[[str], dict]:
         _HANDLERS[artifact_type] = fn
         return fn
 

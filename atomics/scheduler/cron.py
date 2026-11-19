@@ -7,7 +7,23 @@ import plistlib
 import shutil
 import subprocess
 import sys
+from collections.abc import Callable
 from pathlib import Path
+from typing import Protocol
+
+
+class _CmdResult(Protocol):
+    @property
+    def returncode(self) -> int: ...
+
+    @property
+    def stdout(self) -> str: ...
+
+    @property
+    def stderr(self) -> str: ...
+
+
+_RunCmd = Callable[..., _CmdResult]
 
 
 def generate_crontab_entry(
@@ -106,7 +122,7 @@ def generate_launchd_plist(
 # ── Installation helpers ──────────────────────────────────
 
 
-def install_crontab(entry: str, *, run_cmd=subprocess.run) -> str:
+def install_crontab(entry: str, *, run_cmd: _RunCmd = subprocess.run) -> str:
     """Append an atomics crontab entry, avoiding duplicates."""
     result = run_cmd(["crontab", "-l"], capture_output=True, text=True)
     existing = result.stdout if result.returncode == 0 else ""
@@ -122,7 +138,7 @@ def install_crontab(entry: str, *, run_cmd=subprocess.run) -> str:
     return "Crontab entry installed"
 
 
-def uninstall_crontab(*, run_cmd=subprocess.run) -> str:
+def uninstall_crontab(*, run_cmd: _RunCmd = subprocess.run) -> str:
     """Remove all atomics-managed crontab entries."""
     result = run_cmd(["crontab", "-l"], capture_output=True, text=True)
     if result.returncode != 0:
@@ -141,7 +157,7 @@ def install_launchd(
     label: str = "com.babywyrm.atomics",
     tier: str = "baseline",
     *,
-    run_cmd=subprocess.run,
+    run_cmd: _RunCmd = subprocess.run,
     home_dir: Path | None = None,
 ) -> str:
     """Write plist and load it via launchctl."""
@@ -170,7 +186,7 @@ def uninstall_launchd(
     label: str = "com.babywyrm.atomics",
     tier: str = "baseline",
     *,
-    run_cmd=subprocess.run,
+    run_cmd: _RunCmd = subprocess.run,
     home_dir: Path | None = None,
 ) -> str:
     """Unload and remove launchd plist."""
@@ -189,7 +205,7 @@ def install_systemd(
     timer_content: str,
     tier: str = "baseline",
     *,
-    run_cmd=subprocess.run,
+    run_cmd: _RunCmd = subprocess.run,
     home_dir: Path | None = None,
 ) -> str:
     """Write systemd user units and enable the timer."""
@@ -216,7 +232,7 @@ def install_systemd(
 def uninstall_systemd(
     tier: str = "baseline",
     *,
-    run_cmd=subprocess.run,
+    run_cmd: _RunCmd = subprocess.run,
     home_dir: Path | None = None,
 ) -> str:
     """Disable and remove systemd user units."""
@@ -234,7 +250,11 @@ def uninstall_systemd(
     return f"Systemd units removed: atomics-{tier}"
 
 
-def detect_best_scheduler(*, system_name=platform.system, which=shutil.which) -> str:
+def detect_best_scheduler(
+    *,
+    system_name: Callable[[], str] = platform.system,
+    which: Callable[[str], str | None] = shutil.which,
+) -> str:
     """Auto-detect the best scheduler for this platform."""
     if system_name() == "Darwin":
         return "launchd"
@@ -248,7 +268,7 @@ def check_schedule_health(
     tier: str,
     *,
     label: str = "com.babywyrm.atomics",
-    run_cmd=subprocess.run,
+    run_cmd: _RunCmd = subprocess.run,
     home_dir: Path | None = None,
 ) -> bool:
     """Check whether the OS-level schedule is actually active."""

@@ -7,9 +7,10 @@ never modifies them. Persists only to the labcompare_results table.
 from __future__ import annotations
 
 import logging
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
-from atomics.providers.base import aclose_providers
+from atomics.providers.base import BaseProvider, aclose_providers
 from atomics.validation import sanitize_error
 
 logger = logging.getLogger("atomics.labcompare")
@@ -96,10 +97,10 @@ class ThroughputResult:
 
 
 async def probe_throughput(
-    provider,
+    provider: BaseProvider,
     model: str,
     *,
-    ps_fetcher,
+    ps_fetcher: Callable[[], Awaitable[dict]],
     prompts: list[str],
 ) -> ThroughputResult:
     """Run fixed prompts through provider.generate and average the metrics.
@@ -178,10 +179,10 @@ async def run_labcompare(
     judge_host: str | None,
     judge_model: str | None,
     prompts: int,
-    provider_factory,
-    quality_fn,
-    ps_fetcher_factory,
-    on_cell=None,
+    provider_factory: Callable[[str], BaseProvider],
+    quality_fn: Callable[[BaseProvider, str | None, str | None, str], Awaitable[float | None]],
+    ps_fetcher_factory: Callable[[str], Callable[[], Awaitable[dict]]],
+    on_cell: Callable[[str, str], None] | None = None,
 ) -> list[CellResult]:
     """Run throughput and/or quality for every host × model.
 

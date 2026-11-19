@@ -86,7 +86,11 @@ def scenario(
       atomics scenario -w "gate:YOUR_MODEL:3" -d 30
     """
     from atomics.load.scenario import run_scenario
-    from atomics.load.scenario_models import load_scenario_yaml, parse_workload_flag
+    from atomics.load.scenario_models import (
+        WorkloadResult,
+        load_scenario_yaml,
+        parse_workload_flag,
+    )
 
     settings = load_settings()
     setup_logging(settings.log_level)
@@ -121,7 +125,7 @@ def scenario(
     def on_baseline(name: str, p50: float) -> None:
         console.print(f"  [dim]baseline[/dim] {name}: P50 = {p50 / 1000:.2f}s")
 
-    def on_workload(wr) -> None:
+    def on_workload(wr: WorkloadResult) -> None:
         pass
 
     if not skip_baseline:

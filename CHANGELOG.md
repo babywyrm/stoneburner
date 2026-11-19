@@ -8,6 +8,9 @@
   `JobManager.max_spend_usd_per_caller`) enforces an optional cumulative
   dollar ceiling per API key across runs, returning `429` once a caller
   reaches their limit.
+- `[tool.mypy]` now enforces `check_untyped_defs`,
+  `disallow_incomplete_defs`, `no_implicit_optional`,
+  `warn_redundant_casts`, and `warn_unused_ignores` across `atomics/`.
 
 ### Fixed
 - `/api/v1/compare`, `/api/v1/reports/recent-runs`, and `POST /api/v1/runs`

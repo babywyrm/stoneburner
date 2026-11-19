@@ -191,6 +191,10 @@ class BaseProvider(ABC):
             "Check provider.supports_tools before calling this."
         )
 
+    async def list_models(self) -> list[dict[str, str | float | bool]]:
+        """List models served by this backend when supported."""
+        raise NotImplementedError(f"{type(self).__name__} does not support listing models.")
+
     async def aclose(self) -> None:
         """Close the async HTTP client on this loop. No-op if there is none.
 

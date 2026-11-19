@@ -6,6 +6,7 @@ import asyncio
 import json
 import sys
 from pathlib import Path
+from typing import TextIO
 
 import click
 from rich.console import Console
@@ -404,7 +405,7 @@ def export(
     since_hours: float | None,
     limit: int | None,
     fmt: str,
-    out_file,
+    out_file: TextIO,
 ) -> None:
     """Export stored metrics as JSON lines or CSV.
 
@@ -482,7 +483,7 @@ def export(
         repo.close()
 
 
-def _write_generic_export(rows: list[dict], fmt: str, out_file) -> None:
+def _write_generic_export(rows: list[dict], fmt: str, out_file: TextIO) -> None:
     """Write arbitrary row dicts to jsonl or csv via the shared exporter."""
     from atomics.reporting.exporters import write_tasks_export
 

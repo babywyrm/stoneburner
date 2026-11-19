@@ -13,7 +13,7 @@ __all__ = [
 ]
 
 
-def __getattr__(name: str):
+def __getattr__(name: str) -> type[BaseProvider]:
     if name == "BedrockProvider":
         from atomics.providers.bedrock import BedrockProvider
 

@@ -39,7 +39,7 @@ async def run_sweep_from_request(payload: SweepRequest, job: Job | None = None) 
     created: list[BaseProvider] = []
     judge_provider: BaseProvider | None = None
 
-    def provider_factory(model_name: str):
+    def provider_factory(model_name: str) -> BaseProvider:
         wrapped = meter.wrap(_provider_for(payload.provider, model_name, payload.host))
         created.append(wrapped)
         return wrapped

@@ -5,8 +5,13 @@ from __future__ import annotations
 import sys
 import uuid
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import click
+
+if TYPE_CHECKING:
+    from atomics.eval.runner import FixtureResult
+    from atomics.providers.base import BaseProvider
 from rich.console import Console
 from rich.markup import escape as _rich_escape
 from rich.panel import Panel
@@ -150,7 +155,7 @@ def eval(
         mdl: str | None,
         host: str | None,
         context_tokens: int | None = None,
-    ):
+    ) -> BaseProvider:
         return _make_provider(
             name,
             mdl,
@@ -253,7 +258,7 @@ def eval(
         )
         repo = run.repository
 
-        def on_done(fr) -> None:
+        def on_done(fr: FixtureResult) -> None:
             judge = fr.judge
             tr = fr.task_result
             if tr.status.value == "failed":

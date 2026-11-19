@@ -155,7 +155,7 @@ def secrets_group():
 @click.option(
     "--force", is_flag=True, default=False, help="Allow storing keys not in the standard set."
 )
-def secrets_set(key: str, force: bool):
+def secrets_set(key: str, force: bool) -> None:
     """Store a secret in the OS keychain.
 
     The value is prompted interactively (hidden input — not echoed to terminal).
@@ -194,7 +194,7 @@ def secrets_set(key: str, force: bool):
     help="Print the secret value to stdout. Off by default so keys are "
     "not exposed in terminal scrollback, logs, or shell history.",
 )
-def secrets_get(key: str, show: bool):
+def secrets_get(key: str, show: bool) -> None:
     """Check a secret in the OS keychain. Prints the value only with --show.
 
     By default this reports whether the key is present (and a masked preview)
@@ -240,7 +240,7 @@ def secrets_list():
 
 @secrets_group.command("delete")
 @click.argument("key")
-def secrets_delete(key: str):
+def secrets_delete(key: str) -> None:
     """Remove a secret from the OS keychain.
 
     Example: atomics secrets delete ANTHROPIC_API_KEY

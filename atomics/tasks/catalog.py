@@ -21,6 +21,7 @@ from atomics.models import (
     TaskDefinition,
 )
 from atomics.tasks.randomizer import (
+    RecencyTracker,
     build_combinatoric_prompt,
     build_modified_prompt,
     get_recency_tracker,
@@ -266,7 +267,7 @@ TASK_CATALOG: list[TaskDefinition] = [
 ]
 
 
-def _pick_topic(category: TaskCategory, tracker) -> str:
+def _pick_topic(category: TaskCategory, tracker: RecencyTracker) -> str:
     """Pick a topic that hasn't been used recently."""
     pool = TOPIC_POOLS.get(category, ["general software engineering"])
     random.shuffle(pool)

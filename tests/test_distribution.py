@@ -148,3 +148,18 @@ def test_readme_links_the_operator_manuals():
         "docs/LEADERBOARD.md",
     ):
         assert f"{root}{path}" in text, path
+
+
+def test_mypy_strictness_flags_stay_enabled():
+    """Guard against relaxing [tool.mypy] once a check is green across atomics/."""
+    import tomllib
+
+    cfg = tomllib.loads(Path("pyproject.toml").read_text())["tool"]["mypy"]
+    for flag in (
+        "check_untyped_defs",
+        "disallow_incomplete_defs",
+        "no_implicit_optional",
+        "warn_redundant_casts",
+        "warn_unused_ignores",
+    ):
+        assert cfg.get(flag) is True, f"[tool.mypy] {flag} must remain true"

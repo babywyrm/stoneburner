@@ -212,7 +212,7 @@ class LoopEngine:
         for sig in (signal.SIGINT, signal.SIGTERM):
             loop.add_signal_handler(sig, self.stop)
 
-    def _log_result(self, iteration: int, result) -> None:
+    def _log_result(self, iteration: int, result: TaskResult) -> None:
         if result.status == TaskStatus.SUCCESS:
             logger.info(
                 "[iter %d] OK — tokens=%d (in=%d out=%d) latency=%.0fms cost=$%.6f",

@@ -13,7 +13,7 @@ from fastapi import HTTPException, status
 
 from atomics.api.models import ProviderTestRequest
 from atomics.config import load_settings
-from atomics.providers.base import aclose_providers
+from atomics.providers.base import BaseProvider, aclose_providers
 from atomics.providers.factory import ProviderConfigError, make_provider
 from atomics.validation import sanitize_error
 
@@ -22,7 +22,7 @@ PROVIDER_TEST_PROMPT = "What is 2+2? Reply with just the number."
 PROVIDER_TEST_MAX_TOKENS = 256
 
 
-def _provider(name: str, model: str | None, host: str | None):
+def _provider(name: str, model: str | None, host: str | None) -> BaseProvider:
     settings = load_settings()
     try:
         if name == "vllm":
