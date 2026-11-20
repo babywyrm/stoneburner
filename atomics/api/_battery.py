@@ -73,9 +73,9 @@ async def _run_qa_step(payload: BatteryRequest, step: Any) -> dict[str, Any]:
     if not step.qa_file and not payload.profile:
         return {"suite": "qa", "skipped": True, "reason": "no qa_file or profile"}
     if payload.profile:
-        from atomics.load.profiles import load_profile
+        from atomics.load.profiles import load_confined_profile
 
-        profile = load_profile(payload.profile)
+        profile = load_confined_profile(payload.profile)
         suite = await run_qa_suite(
             model="",
             host="",

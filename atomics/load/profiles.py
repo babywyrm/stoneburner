@@ -11,6 +11,7 @@ Supports two modes:
 from __future__ import annotations
 
 import json
+import os
 import re
 import time
 from dataclasses import dataclass, field
@@ -73,7 +74,42 @@ class TargetProfile:
             self.http_url = cleaned
 
 
-def load_profile(path: str) -> TargetProfile:
+def _confined_profile_catalog(root_dir: Path | None = None) -> dict[str, Path]:
+    base = (root_dir or Path("profiles")).resolve()
+    real_base = os.path.realpath(base)
+    catalog: dict[str, Path] = {}
+    if not base.is_dir():
+        return catalog
+    for dirpath, dirnames, filenames in os.walk(base, followlinks=False):
+        dirnames[:] = [d for d in dirnames if not (Path(dirpath) / d).is_symlink()]
+        for fname in filenames:
+            if not fname.lower().endswith((".yaml", ".yml")):
+                continue
+            candidate = Path(dirpath) / fname
+            if candidate.is_symlink():
+                continue
+            real_candidate = os.path.realpath(candidate)
+            if not real_candidate.startswith(real_base + os.sep):
+                continue
+            rel = candidate.relative_to(base).as_posix()
+            safe_path = Path(real_candidate)
+            catalog[rel] = safe_path
+            catalog[f"profiles/{rel}"] = safe_path
+    return catalog
+
+
+def load_confined_profile(profile_ref: str, *, root_dir: Path | None = None) -> TargetProfile:
+    """Resolve `profile_ref` via a catalog of non-symlink YAML files under `profiles/`."""
+    key = profile_ref.strip().replace("\\", "/").lstrip("./")
+    if not key or ".." in key.split("/") or not key.lower().endswith((".yaml", ".yml")):
+        raise ProfileError("profile must be a relative .yaml/.yml path under profiles/")
+    matched = _confined_profile_catalog(root_dir).get(key)
+    if matched is None:
+        raise ProfileError(f"Profile not found under profiles/: {profile_ref}")
+    return load_profile(matched)
+
+
+def load_profile(path: str | Path) -> TargetProfile:
     """Load and validate a target profile from a YAML file."""
     p = Path(path)
     if not p.exists():
@@ -122,10 +158,15 @@ def load_profile(path: str) -> TargetProfile:
 
     prompts_file = kwargs.get("prompts_file")
     if prompts_file and not kwargs["prompts"]:
-        pf = (p.parent / prompts_file).resolve()
-        if not pf.is_relative_to(p.parent.resolve()):
+        if not isinstance(prompts_file, str):
+            raise ProfileError(f"{p}: prompts_file must be a string path")
+        raw_pf = p.parent / prompts_file
+        real_parent = os.path.realpath(p.parent)
+        real_pf = os.path.realpath(raw_pf)
+        if raw_pf.is_symlink() or not real_pf.startswith(real_parent + os.sep):
             raise ProfileError(f"{p}: prompts_file must stay inside the profile's directory")
-        if pf.exists():
+        pf = Path(real_pf)
+        if pf.is_file():
             kwargs["prompts"] = [
                 line.strip()
                 for line in pf.read_text().splitlines()

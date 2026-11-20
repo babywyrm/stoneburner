@@ -537,3 +537,62 @@ class TestOutboundAllowedHosts:
                 ).status_code
                 == 400
             )
+
+
+class TestConfinedProfileLoading:
+    """Server profile loading must reject symlinks, non-YAML files, and escaping prompts_file."""
+
+    def test_load_confined_profile_rejects_escape_symlink_and_non_yaml(self, tmp_path):
+        from pydantic import ValidationError
+
+        from atomics.api.models import BatteryRequest
+        from atomics.load.profiles import ProfileError, load_confined_profile
+
+        outside = tmp_path / "outside.yaml"
+        outside.write_text(
+            "name: leak\ntype: ollama\nmodel: m\nollama:\n  host: http://127.0.0.1:11434\n"
+        )
+
+        profiles_dir = tmp_path / "profiles" / "local"
+        profiles_dir.mkdir(parents=True)
+        escape_link = profiles_dir / "escape.yaml"
+        escape_link.symlink_to(outside)
+
+        env_file = profiles_dir / ".env"
+        env_file.write_text("SECRET=1\n")
+
+        valid_file = profiles_dir / "gate.yaml"
+        valid_file.write_text(
+            "name: gate\ntype: ollama\nmodel: m\nollama:\n  host: http://127.0.0.1:11434\n"
+            "prompts:\n  - hello\n"
+        )
+
+        with pytest.raises(ProfileError):
+            load_confined_profile("profiles/local/escape.yaml", root_dir=tmp_path / "profiles")
+
+        with pytest.raises(ProfileError):
+            load_confined_profile("profiles/local/.env", root_dir=tmp_path / "profiles")
+
+        with pytest.raises(ValidationError, match="profiles/"):
+            BatteryRequest(
+                name="desk-pass",
+                provider="ollama",
+                model="x",
+                budget_usd=1.0,
+                profile="profiles/examples/README.md",
+            )
+
+        loaded = load_confined_profile("profiles/local/gate.yaml", root_dir=tmp_path / "profiles")
+        assert loaded.name == "gate"
+
+        # Symlinked prompts_file escaping the profile directory must also fail.
+        secret_txt = tmp_path / "secret.txt"
+        secret_txt.write_text("top-secret-prompt\n")
+        (profiles_dir / "prompts_link.txt").symlink_to(secret_txt)
+        bad_prompts_profile = profiles_dir / "bad_prompts.yaml"
+        bad_prompts_profile.write_text(
+            "name: bad\ntype: ollama\nmodel: m\nollama:\n  host: http://127.0.0.1:11434\n"
+            "prompts_file: prompts_link.txt\n"
+        )
+        with pytest.raises(ProfileError, match="prompts_file"):
+            load_confined_profile("profiles/local/bad_prompts.yaml", root_dir=tmp_path / "profiles")

@@ -224,8 +224,12 @@ class BatteryRequest(BaseModel):
             return None
         root = Path("profiles").resolve()
         path = Path(value)
-        if path.is_absolute() or not path.resolve().is_relative_to(root):
-            raise ValueError("profile must be a relative path under profiles/")
+        if (
+            path.is_absolute()
+            or path.suffix.lower() not in {".yaml", ".yml"}
+            or not path.resolve().is_relative_to(root)
+        ):
+            raise ValueError("profile must be a relative .yaml/.yml path under profiles/")
         return value
 
     @field_validator("effort")

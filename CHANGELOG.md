@@ -38,6 +38,9 @@
 - `WorkerClient.poll_and_execute()`, `score_rag_response()`,
   `score_turn()`, and `score_conversation()` now log `sanitize_error(exc)`
   instead of raw tracebacks on provider or executor exceptions.
+- Server battery `profile` loading now resolves against an enumerated catalog
+  of non-symlink `.yaml`/`.yml` files under `profiles/` and rejects symlinked
+  `prompts_file` escapes.
 
 ## 0.32.0 (2026-11-17) — Native chat turns, gateway honesty, security hardening
 
