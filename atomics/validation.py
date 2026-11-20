@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import ipaddress
 import re
+from collections.abc import Collection
+from dataclasses import dataclass
 from urllib.parse import urlparse
 
 
@@ -33,6 +36,76 @@ def validate_endpoint_url(url: str, *, label: str = "URL") -> str:
         raise ValueError(f"{label}: path traversal ('..') not allowed")
 
     return url
+
+
+@dataclass(frozen=True)
+class AllowedEndpoint:
+    """Normalized outbound HTTP(S) origin plus optional path boundary."""
+
+    scheme: str
+    host: str
+    port: int
+    path_prefix: str = ""
+
+
+def parse_allowed_endpoint(url: str, *, label: str = "endpoint") -> AllowedEndpoint:
+    """Validate and canonicalize an HTTP(S) endpoint URL for origin/path matching."""
+    raw = url.strip()
+    if "?" in raw or "#" in raw:
+        raise ValueError(f"{label}: query strings and fragments are not allowed in endpoint URLs")
+    cleaned = validate_endpoint_url(raw, label=label)
+    parsed = urlparse(cleaned)
+    try:
+        explicit_port = parsed.port
+    except ValueError as exc:
+        raise ValueError(f"{label}: invalid port in endpoint URL") from exc
+    port = explicit_port if explicit_port is not None else (443 if parsed.scheme == "https" else 80)
+    if port < 1 or port > 65535:
+        raise ValueError(f"{label}: port out of range 1..65535")
+
+    raw_host = (parsed.hostname or "").lower().rstrip(".")
+    if not raw_host:
+        raise ValueError(f"{label}: missing hostname")
+    try:
+        ip = ipaddress.ip_address(raw_host)
+    except ValueError:
+        canonical_host = raw_host
+    else:
+        if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
+            ip = ip.ipv4_mapped
+        canonical_host = str(ip)
+
+    path_prefix = parsed.path.rstrip("/")
+    return AllowedEndpoint(
+        scheme=parsed.scheme,
+        host=canonical_host,
+        port=port,
+        path_prefix=path_prefix,
+    )
+
+
+def is_endpoint_allowed(
+    url: str,
+    allowed: Collection[AllowedEndpoint],
+    *,
+    label: str = "host",
+) -> bool:
+    """Return True if `url` matches one of the normalized `allowed` origins/prefixes."""
+    candidate = parse_allowed_endpoint(url, label=label)
+    for rule in allowed:
+        if (
+            candidate.scheme != rule.scheme
+            or candidate.host != rule.host
+            or candidate.port != rule.port
+        ):
+            continue
+        if not rule.path_prefix:
+            return True
+        if candidate.path_prefix == rule.path_prefix or candidate.path_prefix.startswith(
+            rule.path_prefix + "/"
+        ):
+            return True
+    return False
 
 
 _TOKEN_PATTERNS = re.compile(

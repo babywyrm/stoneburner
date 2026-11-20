@@ -78,6 +78,14 @@ from rich.console import Console
     type=float,
     help="Optional cumulative USD spend ceiling per API key across runs.",
 )
+@click.option(
+    "--allowed-host",
+    "--allowed-hosts",
+    "allowed_hosts",
+    multiple=True,
+    help="Allowlisted outbound inference/judge origin or URL prefix "
+    "(repeatable or comma-separated). Rejects non-matching caller hosts with 403.",
+)
 def server(
     host: str,
     port: int,
@@ -92,6 +100,7 @@ def server(
     max_retained_jobs: int,
     max_active_jobs_per_caller: int,
     max_caller_spend_usd: float | None,
+    allowed_hosts: tuple[str, ...],
 ) -> None:
     """Run the atomics API server."""
     console = Console()
@@ -109,6 +118,12 @@ def server(
         console.print("[red]Error: supply --api-key or --no-auth[/red]")
         raise SystemExit(1)
 
+    allowed_set: set[str] | None = (
+        {part.strip() for raw in allowed_hosts for part in raw.split(",") if part.strip()}
+        if allowed_hosts
+        else None
+    )
+
     try:
         settings = ServerSettings(
             host=host,
@@ -124,6 +139,7 @@ def server(
             max_retained_jobs=max_retained_jobs,
             max_active_jobs_per_caller=max_active_jobs_per_caller,
             max_spend_usd_per_caller=max_caller_spend_usd,
+            allowed_hosts=allowed_set,
         )
     except ValueError as exc:
         console.print(f"[red]Error:[/red] {exc}")

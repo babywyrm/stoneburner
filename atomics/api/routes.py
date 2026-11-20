@@ -15,6 +15,7 @@ from atomics.api._runners import (
     validate_eval_suite,
 )
 from atomics.api._sweep import run_sweep_from_request
+from atomics.api.config import DisallowedHostError
 from atomics.api.dependencies import require_auth
 from atomics.api.job_progress import (
     initial_battery_progress,
@@ -100,6 +101,17 @@ def _database_check(request: Request) -> ReadinessCheck:
     return ReadinessCheck(name="database", ok=error is None, detail=error)
 
 
+def _check_payload_hosts(request: Request, *pairs: tuple[str, str | None]) -> None:
+    settings = request.app.state.settings
+    try:
+        for label, url in pairs:
+            settings.check_outbound_host(url, label=label)
+    except DisallowedHostError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
 @router.post("/runs", response_model=JobResponse, status_code=status.HTTP_202_ACCEPTED)
 async def start_run(
     request: Request,
@@ -109,6 +121,7 @@ async def start_run(
 ) -> JobResponse:
     import inspect
 
+    _check_payload_hosts(request, ("host", payload.host))
     db_path = request.app.state.settings.db_path
     accepts_db = "db_path" in inspect.signature(run_benchmark_from_request).parameters
 
@@ -134,10 +147,12 @@ async def start_run(
 
 @router.post("/evals", response_model=JobResponse, status_code=status.HTTP_202_ACCEPTED)
 async def start_eval(
+    request: Request,
     payload: EvalRequest,
     job_manager: JobManager = Depends(get_job_manager),
     caller: str = Depends(require_auth),
 ) -> JobResponse:
+    _check_payload_hosts(request, ("host", payload.host), ("judge_host", payload.judge_host))
     try:
         validate_eval_suite(payload.suite)
     except ValueError as exc:
@@ -162,11 +177,13 @@ async def start_eval(
 
 @router.post("/sweeps", response_model=JobResponse, status_code=status.HTTP_202_ACCEPTED)
 async def start_sweep(
+    request: Request,
     payload: SweepRequest,
     job_manager: JobManager = Depends(get_job_manager),
     caller: str = Depends(require_auth),
 ) -> JobResponse:
     """Start a bounded multi-model, multi-suite campaign. Budget is required."""
+    _check_payload_hosts(request, ("host", payload.host), ("judge_host", payload.judge_host))
     try:
         job_id = await job_manager.submit(
             "sweep",
@@ -183,11 +200,22 @@ async def start_sweep(
 
 @router.post("/batteries", response_model=JobResponse, status_code=status.HTTP_202_ACCEPTED)
 async def start_battery(
+    request: Request,
     payload: BatteryRequest,
     job_manager: JobManager = Depends(get_job_manager),
     caller: str = Depends(require_auth),
 ) -> JobResponse:
     """Run a named battery as one metered job. Budget is required."""
+    _check_payload_hosts(request, ("host", payload.host), ("judge_host", payload.judge_host))
+    if payload.profile is not None and request.app.state.settings.allowed_hosts is not None:
+        from atomics.load.profiles import load_profile
+
+        try:
+            prof = load_profile(payload.profile)
+        except (ValueError, OSError) as exc:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        prof_url = prof.ollama_host if prof.type == "ollama" else prof.http_url
+        _check_payload_hosts(request, ("profile target", prof_url))
     try:
         job_id = await job_manager.submit(
             "battery",
@@ -204,11 +232,13 @@ async def start_battery(
 
 @router.post("/stress", response_model=JobResponse, status_code=status.HTTP_202_ACCEPTED)
 async def start_stress(
+    request: Request,
     payload: StressRequest,
     job_manager: JobManager = Depends(get_job_manager),
     caller: str = Depends(require_auth),
 ) -> JobResponse:
     """Ramp concurrency to find saturation. One model, required budget, capped."""
+    _check_payload_hosts(request, ("host", payload.host))
     try:
         job_id = await job_manager.submit(
             "stress",
@@ -225,11 +255,13 @@ async def start_stress(
 
 @router.post("/soak", response_model=JobResponse, status_code=status.HTTP_202_ACCEPTED)
 async def start_soak(
+    request: Request,
     payload: SoakRequest,
     job_manager: JobManager = Depends(get_job_manager),
     caller: str = Depends(require_auth),
 ) -> JobResponse:
     """Hold concurrency and classify drift. Duration is seconds, max 300."""
+    _check_payload_hosts(request, ("host", payload.host))
     try:
         job_id = await job_manager.submit(
             "soak",
@@ -272,22 +304,26 @@ async def get_job(
 
 @router.get("/models", response_model=ModelsResponse)
 async def get_models(
+    request: Request,
     provider: str = "ollama",
     host: str | None = None,
     _: None = Depends(require_auth),
 ) -> ModelsResponse:
     """List tags on an Ollama or vLLM instance. Does not generate."""
+    _check_payload_hosts(request, ("host", host))
     body = await list_models(provider, host)
     return ModelsResponse(**body)
 
 
 @router.post("/provider-test", response_model=ProviderTestResponse)
 async def provider_test(
+    request: Request,
     payload: ProviderTestRequest,
     job_manager: JobManager = Depends(get_job_manager),
     caller: str = Depends(require_auth),
 ) -> ProviderTestResponse:
     """Health-check a provider and generate a fixed 2+2 probe. Spends tokens."""
+    _check_payload_hosts(request, ("host", payload.host))
     try:
         job_manager.check_caller_spend(caller)
     except TooManyActiveJobsError as exc:

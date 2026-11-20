@@ -10,6 +10,11 @@
   schema v23) across server restarts and job eviction, covering completed jobs,
   budget-aborted jobs, sweeps, and `/api/v1/provider-test`, returning `429`
   once a caller reaches their limit.
+- `atomics server --allowed-host` / `--allowed-hosts` (and
+  `ServerSettings.allowed_hosts`) restricts caller-supplied outbound `host`,
+  `judge_host`, battery `profile` targets, and distributed host overrides to
+  approved HTTP(S) origins or path prefixes, rejecting unauthorized targets
+  with `403`.
 - `[tool.mypy]` now enforces `check_untyped_defs`,
   `disallow_incomplete_defs`, `no_implicit_optional`,
   `warn_redundant_casts`, and `warn_unused_ignores` across `atomics/`.

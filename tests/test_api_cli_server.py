@@ -54,3 +54,48 @@ def test_server_cli_forwards_job_bounds_to_server_settings(monkeypatch, tmp_path
     assert s.max_active_jobs == 8
     assert s.max_retained_jobs == 64
     assert s.max_active_jobs_per_caller == 2
+
+
+def test_server_cli_forwards_allowed_hosts_and_fails_closed_on_empty(monkeypatch, tmp_path):
+    captured: dict = {}
+
+    def fake_create_app(settings=None, **_kwargs):
+        captured["settings"] = settings
+        return object()
+
+    monkeypatch.setattr("atomics.api.server.create_app", fake_create_app)
+    monkeypatch.setattr("uvicorn.run", lambda *_a, **_k: None)
+
+    res = CliRunner().invoke(
+        cli,
+        [
+            "server",
+            "--no-auth",
+            "--db-path",
+            str(tmp_path / "srv.db"),
+            "--allowed-host",
+            "http://127.0.0.1:11434",
+            "--allowed-hosts",
+            "https://example.com:8000/v1,http://localhost:8080",
+        ],
+    )
+    assert res.exit_code == 0, res.output
+    assert captured["settings"].allowed_hosts == {
+        "http://127.0.0.1:11434",
+        "https://example.com:8000/v1",
+        "http://localhost:8080",
+    }
+
+    # Empty string (e.g. unset shell var in --allowed-hosts "$ALLOW") must fail closed.
+    bad = CliRunner().invoke(
+        cli,
+        [
+            "server",
+            "--no-auth",
+            "--db-path",
+            str(tmp_path / "srv.db"),
+            "--allowed-hosts",
+            "   ",
+        ],
+    )
+    assert bad.exit_code != 0

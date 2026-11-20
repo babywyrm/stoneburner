@@ -54,6 +54,10 @@ Keys are isolated from each other in two ways. `/api/v1/jobs` and
 capacity holds each key to its share. Saved reports and the worker list are
 shared across keys. Battery `profile`
 paths must be relative and resolve under the server's `profiles/` directory.
+To lock callers to approved inference and judge endpoints only, pass repeatable
+`--allowed-host` (or comma-separated `--allowed-hosts`) with exact HTTP(S)
+origins or URL prefixes; non-matching `host`, `judge_host`, battery `profile`,
+or distributed host overrides are rejected at request admission with `403`.
 
 ### Separate worker keys
 

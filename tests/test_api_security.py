@@ -294,3 +294,246 @@ class TestApiDocsStayLocal:
             assert {path: client.get(path).status_code for path in self.DOCS} == dict.fromkeys(
                 self.DOCS, 200
             )
+
+
+class TestOutboundAllowedHosts:
+    """When --allowed-hosts is set, callers cannot steer inference or judge traffic elsewhere."""
+
+    @pytest.mark.parametrize(
+        "bad",
+        [
+            set(),
+            {"ftp://127.0.0.1:11434"},
+            {"http://user:pass@127.0.0.1:11434"},
+            {"http://127.0.0.1:11434?leak=1"},
+            {"http://127.0.0.1:11434#frag"},
+            {"http://127.0.0.1:99999"},
+        ],
+    )
+    def test_empty_or_malformed_allowed_hosts_rejected_at_startup(self, bad):
+        with pytest.raises(ValueError):
+            ServerSettings(api_keys={"k"}, allowed_hosts=bad)
+
+    def test_origin_and_path_matching_blocks_port_scheme_and_prefix_bypasses(self):
+        from atomics.api.config import DisallowedHostError
+
+        settings = ServerSettings(
+            api_keys={"k"},
+            allowed_hosts={
+                "http://10.0.0.5:11434",
+                "https://vllm.example.com/v1",
+                "http://[::1]:11434",
+            },
+        )
+        for valid in (
+            None,
+            "http://10.0.0.5:11434",
+            "http://10.0.0.5:11434/",
+            "http://[::ffff:10.0.0.5]:11434",
+            "https://VLLM.EXAMPLE.COM:443/v1",
+            "https://vllm.example.com/v1/chat",
+            "http://[0:0:0:0:0:0:0:1]:11434",
+        ):
+            settings.check_outbound_host(valid, label="host")
+
+        for blocked in (
+            "http://10.0.0.5:8000",
+            "https://10.0.0.5:11434",
+            "http://10.0.0.5.evil.example:11434",
+            "https://vllm.example.com/v10",
+            "https://vllm.example.com/admin",
+            "https://vllm.example.com",
+            "http://169.254.169.254/latest/meta-data",
+        ):
+            with pytest.raises(DisallowedHostError) as excinfo:
+                settings.check_outbound_host(blocked, label="host")
+            # Never enumerate the server's internal allowlist in error details.
+            assert "10.0.0.5" not in str(excinfo.value)
+            assert "vllm.example.com" not in str(excinfo.value)
+
+    def test_every_outbound_route_enforces_allowed_hosts(
+        self, tmp_path, jobs_never_run, monkeypatch
+    ):
+        async def fake_list_models(provider: str, host: str | None) -> dict[str, object]:
+            return {"provider": provider, "models": []}
+
+        async def fake_pt(payload: object) -> dict[str, object]:
+            return {"ok": True, "health": True, "provider": "ollama", "response": "4"}
+
+        monkeypatch.setattr("atomics.api.routes.list_models", fake_list_models)
+        monkeypatch.setattr("atomics.api.routes.run_provider_test", fake_pt)
+
+        allowed_url = "http://127.0.0.1:11434"
+        forbidden_url = "http://10.99.0.9:11434"
+        settings = ServerSettings(
+            api_keys={"secret-key"},
+            db_path=tmp_path / "allow.db",
+            allowed_hosts={allowed_url},
+        )
+        headers = {"X-API-Key": "secret-key"}
+
+        with TestClient(create_app(settings), base_url="http://127.0.0.1") as client:
+            # 1. Runs
+            assert (
+                client.post(
+                    "/api/v1/runs",
+                    json={"provider": "ollama", "host": forbidden_url},
+                    headers=headers,
+                ).status_code
+                == 403
+            )
+            assert (
+                client.post(
+                    "/api/v1/runs",
+                    json={"provider": "ollama", "host": allowed_url},
+                    headers=headers,
+                ).status_code
+                == 202
+            )
+
+            # 2. Evals (both host and judge_host)
+            r_eval = client.post(
+                "/api/v1/evals",
+                json={"suite": "accuracy", "provider": "ollama", "judge_host": forbidden_url},
+                headers=headers,
+            )
+            assert r_eval.status_code == 403
+            assert allowed_url not in r_eval.text
+
+            # 3. Sweeps (host and judge_host)
+            assert (
+                client.post(
+                    "/api/v1/sweeps",
+                    json={
+                        "provider": "ollama",
+                        "models": ["m"],
+                        "suites": ["eval"],
+                        "budget_usd": 1.0,
+                        "judge_host": forbidden_url,
+                    },
+                    headers=headers,
+                ).status_code
+                == 403
+            )
+
+            # 4. Batteries (host, judge_host, and profile target)
+            assert (
+                client.post(
+                    "/api/v1/batteries",
+                    json={
+                        "name": "desk-pass",
+                        "provider": "ollama",
+                        "budget_usd": 1.0,
+                        "host": forbidden_url,
+                    },
+                    headers=headers,
+                ).status_code
+                == 403
+            )
+            assert (
+                client.post(
+                    "/api/v1/batteries",
+                    json={
+                        "name": "desk-pass",
+                        "provider": "ollama",
+                        "budget_usd": 1.0,
+                        "profile": "profiles/examples/http-flask-endpoint.yaml",
+                    },
+                    headers=headers,
+                ).status_code
+                == 403
+            )
+
+            # 5. Stress & 6. Soak
+            assert (
+                client.post(
+                    "/api/v1/stress",
+                    json={
+                        "provider": "ollama",
+                        "model": "m",
+                        "budget_usd": 1.0,
+                        "host": forbidden_url,
+                    },
+                    headers=headers,
+                ).status_code
+                == 403
+            )
+            assert (
+                client.post(
+                    "/api/v1/soak",
+                    json={
+                        "provider": "ollama",
+                        "model": "m",
+                        "budget_usd": 1.0,
+                        "host": forbidden_url,
+                    },
+                    headers=headers,
+                ).status_code
+                == 403
+            )
+
+            # 7. Models & 8. Provider-test
+            assert (
+                client.get(
+                    "/api/v1/models",
+                    params={"provider": "ollama", "host": forbidden_url},
+                    headers=headers,
+                ).status_code
+                == 403
+            )
+            assert (
+                client.get(
+                    "/api/v1/models",
+                    params={"provider": "ollama", "host": allowed_url},
+                    headers=headers,
+                ).status_code
+                == 200
+            )
+            assert (
+                client.post(
+                    "/api/v1/provider-test",
+                    json={"provider": "ollama", "host": forbidden_url},
+                    headers=headers,
+                ).status_code
+                == 403
+            )
+            assert (
+                client.post(
+                    "/api/v1/provider-test",
+                    json={"provider": "ollama", "host": allowed_url},
+                    headers=headers,
+                ).status_code
+                == 200
+            )
+
+            # 9. Distributed full run host overrides
+            assert (
+                client.post(
+                    "/api/v1/distributed/runs",
+                    json={
+                        "mode": "full",
+                        "run_request": {
+                            "provider": "ollama",
+                            "iterations": 1,
+                            "ollama_host": forbidden_url,
+                        },
+                    },
+                    headers=headers,
+                ).status_code
+                == 403
+            )
+            assert (
+                client.post(
+                    "/api/v1/distributed/runs",
+                    json={
+                        "mode": "full",
+                        "run_request": {
+                            "provider": "ollama",
+                            "iterations": 1,
+                            "ollama_host": "ftp://bad",
+                        },
+                    },
+                    headers=headers,
+                ).status_code
+                == 400
+            )

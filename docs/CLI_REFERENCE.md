@@ -279,7 +279,8 @@ runs such as a local model judged by a paid one.
 | `atomics server --max-active-jobs N` | Maximum concurrent active API jobs (default: 16) |
 | `atomics server --max-retained-jobs N` | Maximum finished jobs retained for polling (default: 256) |
 | `atomics server --max-active-jobs-per-caller N` | Maximum concurrent active jobs per API key (default: 4) |
-| `atomics server --max-caller-spend-usd USD` | Optional cumulative USD spend ceiling per API key across runs |
+| `atomics server --max-caller-spend-usd USD` | Optional cumulative USD spend ceiling per API key across runs (SQLite-persisted) |
+| `atomics server --allowed-host URL` | Restrict caller-supplied outbound `host` / `judge_host` targets to approved HTTP(S) origins or URL prefixes (repeatable; alias `--allowed-hosts`) |
 | `atomics worker` | Start a distributed worker (polls coordinator for tasks) |
 | `atomics worker-npm` | Start a Node.js worker bridge for distributed task execution |
 | `atomics distributed run` | Submit a distributed run (split, fleet, or full mode) |

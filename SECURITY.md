@@ -210,6 +210,7 @@ Resource bounds, all configurable on `ServerSettings`:
 | `budget_usd` | 10.0 | One eval spending without limit; capped at 1000 |
 | `max_active_jobs_per_caller` | 4 | One key taking every slot and starving the rest |
 | `max_spend_usd_per_caller` | `None` | Optional cumulative dollar ceiling per key across jobs (`--max-caller-spend-usd`) |
+| `allowed_hosts` | `None` | Optional outbound origin/URL-prefix allowlist for caller `host` / `judge_host` / battery `profile` / distributed runs (`--allowed-host` / `--allowed-hosts`); non-matching targets get `403` |
 
 These cap how much *one server* will do at once. The per-caller bound is the
 one that makes the others fair: a global limit alone is first-come-first-served,

@@ -4,6 +4,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
+from atomics.api.config import DisallowedHostError
 from atomics.api.dependencies import require_auth, require_worker_auth
 from atomics.distributed.coordinator import AssignmentRejectedError, Coordinator
 from atomics.distributed.models import (
@@ -17,6 +18,7 @@ from atomics.distributed.models import (
 )
 from atomics.models import BurnTier
 from atomics.tasks import get_weighted_task
+from atomics.validation import validate_endpoint_url
 
 router = APIRouter(prefix="/api/v1")
 
@@ -126,16 +128,48 @@ async def submit_result(
     return {"status": assignment.status.value}
 
 
+def _check_distributed_hosts(request: Request, payload: DistributedRunRequest) -> None:
+    settings = request.app.state.settings
+    sections: tuple[tuple[str, dict[str, Any] | None, tuple[str, ...]], ...] = (
+        ("run_request", payload.run_request, ("host", "ollama_host", "vllm_host", "gateway_url")),
+        ("eval_request", payload.eval_request, ("host", "judge_host")),
+    )
+    for prefix, mapping, keys in sections:
+        if not mapping:
+            continue
+        for key in keys:
+            value = mapping.get(key)
+            if value is None:
+                continue
+            label = f"{prefix}.{key}"
+            if not isinstance(value, str):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"{label} must be a URL string",
+                )
+            try:
+                validate_endpoint_url(value, label=label)
+                settings.check_outbound_host(value, label=label)
+            except DisallowedHostError as exc:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+            except ValueError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+                ) from exc
+
+
 @router.post(
     "/distributed/runs",
     response_model=DistributedJob,
     status_code=status.HTTP_202_ACCEPTED,
 )
 async def start_distributed_run(
+    request: Request,
     payload: DistributedRunRequest,
     coordinator: Coordinator = Depends(get_coordinator),
     caller: str = Depends(require_auth),
 ) -> DistributedJob:
+    _check_distributed_hosts(request, payload)
     if payload.mode not in (JobMode.SPLIT, JobMode.FLEET, JobMode.FULL):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

@@ -3,10 +3,16 @@
 from __future__ import annotations
 
 import ipaddress
+import math
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from atomics.paths import default_db_path
+from atomics.validation import AllowedEndpoint, is_endpoint_allowed, parse_allowed_endpoint
+
+
+class DisallowedHostError(PermissionError):
+    """Raised when a caller-supplied outbound endpoint is not in `ServerSettings.allowed_hosts`."""
 
 
 def is_loopback_host(host: str) -> bool:
@@ -51,6 +57,12 @@ class ServerSettings:
     # Optional cumulative dollar ceiling per caller across runs in this server
     # process. None leaves per-run budgets as the only spend bound.
     max_spend_usd_per_caller: float | None = None
+    # Optional allowlist of outbound HTTP(S) origins or URL prefixes callers may
+    # target via `host`, `judge_host`, battery profiles, or distributed runs.
+    allowed_hosts: set[str] | None = None
+    _compiled_allowed_hosts: tuple[AllowedEndpoint, ...] | None = field(
+        default=None, init=False, repr=False, compare=False
+    )
 
     def __post_init__(self) -> None:
         if self.port < 1 or self.port > 65535:
@@ -69,15 +81,37 @@ class ServerSettings:
                 "max_active_jobs_per_caller must be positive, got "
                 f"{self.max_active_jobs_per_caller}"
             )
-        if self.max_spend_usd_per_caller is not None and self.max_spend_usd_per_caller <= 0:
+        if self.max_spend_usd_per_caller is not None and (
+            isinstance(self.max_spend_usd_per_caller, bool)
+            or not math.isfinite(self.max_spend_usd_per_caller)
+            or self.max_spend_usd_per_caller <= 0
+        ):
             raise ValueError(
                 f"max_spend_usd_per_caller must be positive, got {self.max_spend_usd_per_caller}"
+            )
+        if self.allowed_hosts is not None:
+            if not self.allowed_hosts:
+                raise ValueError(
+                    "allowed_hosts must not be empty when set; omit it to allow any valid endpoint"
+                )
+            self._compiled_allowed_hosts = tuple(
+                parse_allowed_endpoint(item, label="allowed_hosts")
+                for item in sorted(self.allowed_hosts)
             )
         if self.no_auth and not is_loopback_host(self.host):
             raise ValueError(
                 f"no_auth cannot be combined with the non-loopback host {self.host!r}: "
                 "that exposes every endpoint, including eval submission, to the "
                 "network unauthenticated. Bind to 127.0.0.1 or supply an API key."
+            )
+
+    def check_outbound_host(self, url: str | None, *, label: str = "host") -> None:
+        """Validate a caller-supplied outbound endpoint against `allowed_hosts` when configured."""
+        if url is None or self._compiled_allowed_hosts is None:
+            return
+        if not is_endpoint_allowed(url, self._compiled_allowed_hosts, label=label):
+            raise DisallowedHostError(
+                f"{label} is not permitted by the server's outbound host allowlist"
             )
 
     @property

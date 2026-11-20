@@ -25,7 +25,7 @@ major tag moved by the publish workflow.
       `warn_redundant_casts` / `warn_unused_ignores`.
 - [x] Persist per-caller cumulative spend in SQLite so `--max-caller-spend-usd`
       survives `atomics server` restarts and finished-job eviction.
-- [ ] Optional outbound host allowlists (`--allowed-hosts`) on `atomics server`
+- [x] Optional outbound host allowlists (`--allowed-hosts`) on `atomics server`
       so authenticated callers can only route inference and judge traffic to
       operator-approved hosts.
 - [ ] Live `brain-gateway` generate on record. It cannot carry a `temperature`,
