@@ -395,3 +395,48 @@ async def test_get_config_rejects_non_object_json() -> None:
 
     with pytest.raises(RuntimeError, match="JSON object"):
         await provider.get_config()
+
+
+@pytest.mark.parametrize(
+    "sentinel",
+    [
+        "[ollama-unavailable]",
+        "[cloud-stub]",
+        "[cloud-error]",
+        "[openai-stub]",
+        "[openai-error]",
+        "[bedrock-stub]",
+        "[bedrock-error]",
+    ],
+)
+@pytest.mark.asyncio
+async def test_gateway_stub_or_backend_error_sentinel_is_not_scored_as_generate(
+    sentinel: str,
+) -> None:
+    """camazotz brain-gateway returns HTTP 200 with sentinel prefixes when its
+    upstream LLM is unconfigured or unreachable; scoring that echo as a model
+    completion would forge a complete run."""
+    mock_response = MagicMock()
+    mock_response.raise_for_status = MagicMock()
+    mock_response.json.return_value = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+            "content": [
+                {
+                    "type": "text",
+                    "text": json.dumps({"answer": f"{sentinel} sk-secret-prompt"}),
+                }
+            ]
+        },
+    }
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock(return_value=mock_response)
+    provider = BrainGatewayProvider(url="http://fake:8080", client=mock_client)
+
+    with pytest.raises(RuntimeError, match=r"brain-gateway backend unavailable") as raised:
+        await provider.generate("sk-secret-prompt")
+    msg = str(raised.value)
+    assert "sk-secret-prompt" not in msg
+    assert sentinel.strip("[]") in msg
+    assert "[" not in msg

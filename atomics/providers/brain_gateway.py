@@ -15,6 +15,19 @@ import httpx
 
 from atomics.providers.base import BaseProvider, ProviderResponse, compute_tps
 
+# camazotz brain-gateway returns HTTP 200 with these sentinel prefixes inside
+# answer when its upstream LLM lacks credentials or fails; scoring them would
+# treat a stubbed or broken gateway as a valid model response.
+_BACKEND_UNAVAILABLE_PREFIXES: tuple[str, ...] = (
+    "[ollama-unavailable]",
+    "[cloud-stub]",
+    "[cloud-error]",
+    "[openai-stub]",
+    "[openai-error]",
+    "[bedrock-stub]",
+    "[bedrock-error]",
+)
+
 
 class BrainGatewayProvider(BaseProvider):
     """Benchmark against a camazotz brain-gateway instance via MCP JSON-RPC."""
@@ -114,6 +127,12 @@ class BrainGatewayProvider(BaseProvider):
         except json.JSONDecodeError as exc:
             raise RuntimeError("brain-gateway returned unreadable content") from exc
         text = inner.get("answer", inner.get("ai_analysis", inner.get("summary", "")))
+        if isinstance(text, str):
+            stripped = text.lstrip()
+            for prefix in _BACKEND_UNAVAILABLE_PREFIXES:
+                if stripped.startswith(prefix):
+                    tag = prefix.strip("[]")
+                    raise RuntimeError(f"brain-gateway backend unavailable ({tag})")
 
         usage = inner.get("_usage", {})
         inp = usage.get("input_tokens", 0)

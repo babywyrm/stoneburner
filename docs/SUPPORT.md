@@ -41,7 +41,7 @@ incapable instead of scoring it.
 | `groq` | yes, OpenAI-compatible | no |
 | `together` | yes, OpenAI-compatible | no |
 | `gemini` | yes, OpenAI-compatible | no |
-| `brain-gateway` | no | no |
+| `brain-gateway` | no | yes: 2026-11-20, `camazotz` 0.2.0 (`granite4.2:3b`) |
 
 `vllm` was also run against Ollama's `/v1` (2026-10-04). That proves the
 OpenAI-compatible wire path, not vLLM itself. See `ROADMAP.md` for the
@@ -90,4 +90,7 @@ Endpoints are listed in [API_SERVER.md](API_SERVER.md).
   question, because that field does not exist either.
 - `--thinking` and `--no-thinking` on `brain-gateway`. The gateway
   cannot turn thinking on or off, so a set value is refused. Leaving
-  thinking unset still generates. `max_tokens` is not applied.
+  thinking unset still generates. `max_tokens` is not applied. Set
+  `CAMAZOTZ_SHOW_TOKENS=true` on the gateway to populate token counts,
+  and remember `config.ask_agent` wraps every prompt in `ConfigLab`'s
+  system prompt rather than evaluating bare weights.

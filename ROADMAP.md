@@ -28,9 +28,10 @@ major tag moved by the publish workflow.
 - [x] Optional outbound host allowlists (`--allowed-hosts`) on `atomics server`
       so authenticated callers can only route inference and judge traffic to
       operator-approved hosts.
-- [ ] Live `brain-gateway` generate on record. It cannot carry a `temperature`,
-      `effort`, `reasoning_mode`, or `thinking` pin: the provider refuses those
-      rather than scoring them.
+- [x] Live `brain-gateway` generate on record (`2026-11-20`, `camazotz` 0.2.0
+      over `ollama` `granite4.2:3b`, judge `gemma4:26b`, `--runs 3`, `refusal`
+      12/12 `complete`), plus fail-closed rejection of HTTP-200 gateway
+      stub/error sentinels (`[ollama-unavailable]`, `[cloud-stub]`, etc.).
 - [x] Complete `mypy --strict` (`disallow_untyped_defs`,
       `disallow_any_generics`, `warn_return_any`) across `atomics/storage/`,
       `atomics/providers/`, and `atomics/distributed/`.
@@ -93,6 +94,15 @@ major tag moved by the publish workflow.
   (host without `nvcc` needs `VLLM_USE_FLASHINFER_SAMPLER=0`). Ollama's `/v1`
   ignores `chat_template_kwargs`, so `--provider vllm` against Ollama `/v1` is
   not a matched pair for `--no-thinking`.
+- **Gateway-wrapped evaluation (`brain-gateway`, 2026-11-20).** Live `refusal`
+  run (`--runs 3`, judge `gemma4:26b`, 12/12 scored, `complete`, no
+  `temperature`/`effort`/`thinking` pin) against `camazotz` 0.2.0 backed by
+  local Ollama `0.40.6` (`granite4.2:3b`, `CAMAZOTZ_SHOW_TOKENS=true`):
+  calibration 56.9%, over-refusal 72.2%, under-refusal 0.0% (±10.5 spread).
+  `config.ask_agent` wraps prompts in `ConfigLab`'s guardrail system prompt, so
+  `brain-gateway` scores measure the gateway-wrapped agent, not bare weights;
+  `CAMAZOTZ_SHOW_TOKENS` defaults to `false` upstream (zeroing `_usage` unless
+  enabled).
 - **Temperature and modal headlines (2026-10-15).** Across four local models on
   20 `toolcall` fixtures (`--runs 3 --no-thinking`), `--temperature 0` hid 1–5
   leaky fixtures per model (`granite4.2:3b` any-run 0.40 at own temperature vs

@@ -46,6 +46,11 @@
 - Server battery `profile` loading now resolves against an enumerated catalog
   of non-symlink `.yaml`/`.yml` files under `profiles/` and rejects symlinked
   `prompts_file` escapes.
+- `BrainGatewayProvider.generate()` now raises `RuntimeError` when `camazotz`
+  returns an HTTP-200 backend stub or outage sentinel (`[ollama-unavailable]`,
+  `[cloud-stub]`, `[cloud-error]`, `[openai-stub]`, `[openai-error]`,
+  `[bedrock-stub]`, `[bedrock-error]`) instead of scoring the echoed prompt as
+  a model completion.
 
 ## 0.32.0 (2026-11-17) — Native chat turns, gateway honesty, security hardening
 
