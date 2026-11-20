@@ -31,7 +31,7 @@ major tag moved by the publish workflow.
 - [ ] Live `brain-gateway` generate on record. It cannot carry a `temperature`,
       `effort`, `reasoning_mode`, or `thinking` pin: the provider refuses those
       rather than scoring them.
-- [ ] Complete `mypy --strict` (`disallow_untyped_defs`,
+- [x] Complete `mypy --strict` (`disallow_untyped_defs`,
       `disallow_any_generics`, `warn_return_any`) across `atomics/storage/`,
       `atomics/providers/`, and `atomics/distributed/`.
 

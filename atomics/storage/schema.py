@@ -458,7 +458,10 @@ def _backup_before_wipe(conn: sqlite3.Connection, db_path: Path, current: int) -
     return backup_path
 
 
-def _scratch_schema() -> tuple[dict[str, list[tuple]], dict[str, str]]:
+_TableInfoRow = tuple[int, str, str, int, str | None, int]
+
+
+def _scratch_schema() -> tuple[dict[str, list[_TableInfoRow]], dict[str, str]]:
     """Columns and CREATE TABLE SQL SCHEMA_SQL would produce.
 
     Parsing the DDL by hand would mean maintaining a second description of the
@@ -496,7 +499,7 @@ def _rename_create_table(sql: str, old: str, new: str) -> str:
     raise sqlite3.OperationalError(f"unrecognized CREATE TABLE for {old}")
 
 
-def _same_column(existing: tuple, expected: tuple) -> bool:
+def _same_column(existing: _TableInfoRow, expected: _TableInfoRow) -> bool:
     """Type, NOT NULL, and primary-key flag. Defaults may differ without a rebuild."""
     return (
         (existing[2] or "").upper() == (expected[2] or "").upper()
@@ -505,7 +508,7 @@ def _same_column(existing: tuple, expected: tuple) -> bool:
     )
 
 
-def _can_alter_add(expected: tuple) -> bool:
+def _can_alter_add(expected: _TableInfoRow) -> bool:
     """SQLite can ADD a column that is not a PRIMARY KEY.
 
     NOT NULL is allowed when a DEFAULT is present, which is how SCHEMA_SQL
@@ -519,7 +522,7 @@ def _can_alter_add(expected: tuple) -> bool:
     return True
 
 
-def _rebuild_needed(existing: list[tuple], expected: list[tuple]) -> bool:
+def _rebuild_needed(existing: list[_TableInfoRow], expected: list[_TableInfoRow]) -> bool:
     exist_by = {row[1]: row for row in existing}
     exp_by = {row[1]: row for row in expected}
     if set(exist_by) - set(exp_by):
@@ -538,8 +541,8 @@ def _rebuild_table(
     conn: sqlite3.Connection,
     table: str,
     create_sql: str,
-    expected: list[tuple],
-    existing: list[tuple],
+    expected: list[_TableInfoRow],
+    existing: list[_TableInfoRow],
 ) -> None:
     """Copy shared columns into a new table that matches SCHEMA_SQL."""
     common = [row[1] for row in expected if row[1] in {item[1] for item in existing}]
@@ -556,7 +559,10 @@ def _rebuild_table(
 
 
 def _add_missing_columns(
-    conn: sqlite3.Connection, table: str, expected: list[tuple], existing_names: set[str]
+    conn: sqlite3.Connection,
+    table: str,
+    expected: list[_TableInfoRow],
+    existing_names: set[str],
 ) -> list[str]:
     added: list[str] = []
     for expected_col in expected:

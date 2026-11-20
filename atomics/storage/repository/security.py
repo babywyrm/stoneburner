@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import uuid
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from atomics.storage.repository._base import RepositoryBase
 from atomics.validation import sanitize_error
@@ -225,10 +225,10 @@ class SecurityMixin(RepositoryBase):
 
     def get_adversarial_results(
         self, *, limit: int | None = None, run_id: str | None = None
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]]:
         """Return adversarial result rows for export, newest first."""
         clauses: list[str] = []
-        params: list = []
+        params: list[object] = []
         if run_id is not None:
             clauses.append("run_id = ?")
             params.append(run_id)

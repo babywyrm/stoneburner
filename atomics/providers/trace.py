@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import itertools
 import json
-from collections.abc import Awaitable, Sequence
+from collections.abc import Awaitable, Mapping, Sequence
 from dataclasses import dataclass
 
 from rich import box
@@ -21,7 +21,13 @@ from rich.console import Console
 from rich.table import Table
 from rich.text import Text
 
-from atomics.providers.base import BaseProvider, ChatMessage, ProviderResponse, aclose_providers
+from atomics.providers.base import (
+    BaseProvider,
+    ChatMessage,
+    ProviderResponse,
+    ToolSchema,
+    aclose_providers,
+)
 from atomics.providers.outcomes import ProviderOutcomeKind
 from atomics.providers.toolcalls import ToolStep
 
@@ -178,8 +184,12 @@ def _est(text: str) -> int:
     return round(len(text) / 4) if text else 0
 
 
-def _tool_names(tools: Sequence[dict]) -> str:
-    names = [t.get("function", {}).get("name") or t.get("name") or "?" for t in tools]
+def _tool_names(tools: Sequence[ToolSchema]) -> str:
+    names: list[str] = []
+    for t in tools:
+        fn = t.get("function")
+        raw = (fn.get("name") if isinstance(fn, Mapping) else None) or t.get("name")
+        names.append(str(raw) if raw else "?")
     return ", ".join(names)
 
 
@@ -243,7 +253,7 @@ class TracedProvider(BaseProvider):
         self,
         prompt: str,
         *,
-        tools: Sequence[dict],
+        tools: Sequence[ToolSchema],
         system: str = "",
         model: str | None = None,
         max_tokens: int = 1024,
@@ -321,7 +331,7 @@ class TracedProvider(BaseProvider):
         call: Awaitable[ProviderResponse],
         model: str | None,
         parts: dict[str, str],
-        tools: Sequence[dict] | None,
+        tools: Sequence[ToolSchema] | None,
         max_tokens: int,
         thinking: bool | None,
         *,
@@ -348,7 +358,7 @@ class TracedProvider(BaseProvider):
         number: int,
         model: str | None,
         parts: dict[str, str],
-        tools: Sequence[dict] | None,
+        tools: Sequence[ToolSchema] | None,
         request: tuple[int, bool | None, int | None],
         response: ProviderResponse | None,
         error: Exception | None,

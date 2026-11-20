@@ -87,9 +87,13 @@ def _pinned_execution(task_spec: dict[str, Any]) -> tuple[str | None, str | None
 def _serialize_result(result: Any) -> dict[str, Any]:
     """Return a JSON-serializable dict from a TaskResult or similar object."""
     if hasattr(result, "model_dump"):
-        return result.model_dump(mode="json")
+        dumped = result.model_dump(mode="json")
+        if isinstance(dumped, dict):
+            return dumped
     if hasattr(result, "to_dict"):
-        return result.to_dict()
+        dumped = result.to_dict()
+        if isinstance(dumped, dict):
+            return dumped
     if isinstance(result, dict):
         return result
     raise TypeError(f"Cannot serialize result of type {type(result)!r}")

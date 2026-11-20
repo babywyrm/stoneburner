@@ -382,3 +382,16 @@ async def test_unreadable_gateway_content_hides_the_body() -> None:
     with pytest.raises(RuntimeError, match="unreadable") as raised:
         await provider.generate("hi")
     assert "sk-ant-secret" not in str(raised.value)
+
+
+@pytest.mark.asyncio
+async def test_get_config_rejects_non_object_json() -> None:
+    mock_response = MagicMock()
+    mock_response.raise_for_status = MagicMock()
+    mock_response.json.return_value = ["unexpected-list"]
+    mock_client = AsyncMock()
+    mock_client.get = AsyncMock(return_value=mock_response)
+    provider = BrainGatewayProvider(url="http://fake:8080", client=mock_client)
+
+    with pytest.raises(RuntimeError, match="JSON object"):
+        await provider.get_config()

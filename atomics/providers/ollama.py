@@ -15,7 +15,13 @@ from atomics.providers._tool_dialects import (
     openai_tool_payload,
     parse_ollama_tool_calls,
 )
-from atomics.providers.base import BaseProvider, ChatMessage, ProviderResponse, compute_tps
+from atomics.providers.base import (
+    BaseProvider,
+    ChatMessage,
+    ProviderResponse,
+    ToolSchema,
+    compute_tps,
+)
 from atomics.providers.effort import normalize_effort, ollama_think_value
 from atomics.providers.outcomes import ProviderOutcome, ProviderOutcomeKind
 from atomics.providers.toolcalls import ToolStep
@@ -69,7 +75,7 @@ def _strip_thinking(text: str) -> tuple[str, str]:
     """Separate <think> blocks and orphan closers from the visible answer."""
     thinking_parts: list[str] = []
 
-    def _collect(m: re.Match) -> str:
+    def _collect(m: re.Match[str]) -> str:
         thinking_parts.append(m.group(1).strip())
         return ""
 
@@ -147,7 +153,7 @@ class OllamaProvider(BaseProvider):
         think_field = ollama_think_value(thinking=auto, effort=effort, model=model)
         use_thinking = think_field is not False
 
-        options: dict = {}
+        options: dict[str, Any] = {}
         if temperature is not None:
             options["temperature"] = temperature
         if max_tokens:
@@ -156,7 +162,7 @@ class OllamaProvider(BaseProvider):
         if thinking_budget and use_thinking:
             options["num_predict"] = max_tokens + thinking_budget
 
-        body: dict = {
+        body: dict[str, Any] = {
             "model": model,
             "prompt": prompt,
             "stream": False,
@@ -236,7 +242,7 @@ class OllamaProvider(BaseProvider):
         self,
         prompt: str,
         *,
-        tools: Sequence[dict],
+        tools: Sequence[ToolSchema],
         system: str = "",
         model: str | None = None,
         max_tokens: int = 1024,
@@ -308,7 +314,7 @@ class OllamaProvider(BaseProvider):
         self,
         messages: Sequence[Mapping[str, Any]],
         *,
-        tools: Sequence[dict] | None,
+        tools: Sequence[ToolSchema] | None,
         model: str | None,
         max_tokens: int,
         thinking: bool | None,
@@ -426,7 +432,7 @@ class OllamaProvider(BaseProvider):
         for entry in data.get("models", []):
             name: str = entry.get("name", "")
             size_bytes: int = entry.get("size", 0)
-            details: dict = entry.get("details", {})
+            details: dict[str, Any] = entry.get("details", {})
             results.append(
                 {
                     "name": name,

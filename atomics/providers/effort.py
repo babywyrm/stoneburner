@@ -8,7 +8,7 @@ what was sent, not just what the operator typed.
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 EffortLevel = Literal["none", "minimal", "low", "medium", "high", "xhigh", "max"]
 ReasoningMode = Literal["standard", "pro"]
@@ -155,7 +155,7 @@ def ollama_think_value(
     return value
 
 
-def apply_chat_effort(body: dict, effort: str | None) -> dict[str, str] | None:
+def apply_chat_effort(body: dict[str, Any], effort: str | None) -> dict[str, Any] | None:
     """Set ``reasoning_effort`` on an OpenAI-compatible chat body."""
     value = openai_chat_effort(effort)
     if value is None:

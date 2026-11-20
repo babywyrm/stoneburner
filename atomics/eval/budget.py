@@ -27,7 +27,13 @@ from collections.abc import Awaitable, Sequence
 from dataclasses import dataclass
 
 from atomics.core.guard import GuardConfig, RateBudgetGuard
-from atomics.providers.base import BaseProvider, ChatMessage, ProviderResponse, aclose_providers
+from atomics.providers.base import (
+    BaseProvider,
+    ChatMessage,
+    ProviderResponse,
+    ToolSchema,
+    aclose_providers,
+)
 from atomics.providers.toolcalls import ToolStep
 
 logger = logging.getLogger(__name__)
@@ -184,7 +190,7 @@ class GuardedProvider(BaseProvider):
         self,
         prompt: str,
         *,
-        tools: Sequence[dict],
+        tools: Sequence[ToolSchema],
         system: str = "",
         model: str | None = None,
         max_tokens: int = 1024,

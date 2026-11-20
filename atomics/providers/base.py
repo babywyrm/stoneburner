@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from inspect import isawaitable
-from typing import Literal, TypedDict
+from typing import Any, Literal, TypedDict
 
 from atomics.providers.outcomes import ProviderOutcome
 from atomics.providers.toolcalls import ToolCall, ToolStep
+
+ToolSchema = Mapping[str, object]
 
 
 class ChatMessage(TypedDict):
@@ -40,7 +42,7 @@ class ProviderResponse:
     # cache_write_tokens: input tokens written to cache (billed at a premium).
     cache_read_tokens: int = 0
     cache_write_tokens: int = 0
-    raw: dict | None = field(default=None, repr=False)
+    raw: dict[str, Any] | None = field(default=None, repr=False)
     outcome: ProviderOutcome | None = None
     finish_reason: str | None = None
     # Structured calls the model asked to make. Empty for every text-only
@@ -50,7 +52,7 @@ class ProviderResponse:
     # when the call used provider defaults.
     effort: str | None = None
     reasoning_mode: str | None = None
-    reasoning_request: dict | None = field(default=None, repr=False)
+    reasoning_request: dict[str, Any] | None = field(default=None, repr=False)
 
     def __setattr__(self, name: str, value: object) -> None:
         if name == "finish_reason" and "finish_reason" in self.__dict__:
@@ -166,7 +168,7 @@ class BaseProvider(ABC):
         self,
         prompt: str,
         *,
-        tools: Sequence[dict],
+        tools: Sequence[ToolSchema],
         system: str = "",
         model: str | None = None,
         max_tokens: int = 1024,

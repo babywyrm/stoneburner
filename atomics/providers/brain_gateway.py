@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import time
+from typing import Any
 
 import httpx
 
@@ -144,11 +145,14 @@ class BrainGatewayProvider(BaseProvider):
         except Exception:
             return False
 
-    async def get_config(self) -> dict:
+    async def get_config(self) -> dict[str, Any]:
         """Fetch the current brain-gateway runtime config."""
         resp = await self._client.get(f"{self._url}/config", timeout=5.0)
         resp.raise_for_status()
-        return resp.json()
+        data = resp.json()
+        if not isinstance(data, dict):
+            raise RuntimeError("brain-gateway /config did not return a JSON object")
+        return data
 
     async def _switch_model(self, model: str) -> None:
         """Switch the active model. A failed switch must not be scored as that model."""

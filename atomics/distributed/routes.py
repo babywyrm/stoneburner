@@ -71,7 +71,10 @@ def _build_task_specs(run_request: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def get_coordinator(request: Request) -> Coordinator:
-    return request.app.state.coordinator
+    coordinator = request.app.state.coordinator
+    if not isinstance(coordinator, Coordinator):
+        raise RuntimeError("Distributed coordinator is not initialized")
+    return coordinator
 
 
 @router.post("/workers/register", response_model=WorkerRegisterResponse)
@@ -89,7 +92,7 @@ async def heartbeat(
     worker_id: str,
     coordinator: Coordinator = Depends(get_coordinator),
     _: None = Depends(require_worker_auth),
-) -> dict:
+) -> dict[str, str]:
     worker = coordinator.heartbeat(worker_id)
     if worker is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Worker not found")
@@ -113,7 +116,7 @@ async def submit_result(
     payload: TaskResultSubmission,
     coordinator: Coordinator = Depends(get_coordinator),
     _: None = Depends(require_worker_auth),
-) -> dict:
+) -> dict[str, str]:
     try:
         assignment = coordinator.submit_assignment(
             assignment_id,

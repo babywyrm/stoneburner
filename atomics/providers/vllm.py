@@ -12,7 +12,8 @@ inference backend, not the OpenAI company.
 from __future__ import annotations
 
 import time
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
+from typing import Any
 
 import httpx
 
@@ -32,7 +33,7 @@ def _is_qwen3(model: str) -> bool:
     return model.lower().startswith("qwen3")
 
 
-def _message_thinking_text(message: dict) -> str:
+def _message_thinking_text(message: Mapping[str, Any]) -> str:
     """CoT text from an OpenAI-compat chat message.
 
     SGLang uses ``reasoning_content``. Ollama ``/v1`` uses ``reasoning``.
@@ -45,7 +46,9 @@ def _message_thinking_text(message: dict) -> str:
     return ""
 
 
-def _usage_reasoning_tokens(usage: dict, thinking_text: str, text: str, out: int) -> int:
+def _usage_reasoning_tokens(
+    usage: Mapping[str, Any], thinking_text: str, text: str, out: int
+) -> int:
     reported = usage.get("reasoning_tokens")
     if reported is None:
         details = usage.get("completion_tokens_details") or {}
@@ -59,13 +62,13 @@ def _usage_reasoning_tokens(usage: dict, thinking_text: str, text: str, out: int
 
 
 def _qwen_thinking_extras(
-    body: dict,
+    body: dict[str, Any],
     *,
     model: str,
     use_thinking: bool,
     effort: str | None,
     thinking_budget: int | None,
-) -> dict[str, object]:
+) -> dict[str, Any]:
     """Write Qwen/SGLang thinking keys onto an OpenAI-compat chat body."""
     native: dict[str, object] = {}
     if not _model_supports_thinking(model):
@@ -129,13 +132,13 @@ class VllmProvider(OpenAICompatibleTools, BaseProvider):
 
     def _augment_tool_body(
         self,
-        body: dict,
+        body: dict[str, Any],
         *,
         model: str,
         thinking: bool | None,
         thinking_budget: int | None,
         effort: str | None,
-    ) -> dict[str, object] | None:
+    ) -> dict[str, Any] | None:
         use_thinking = thinking if thinking is not None else _model_supports_thinking(model)
         extra = _qwen_thinking_extras(
             body,
@@ -194,7 +197,7 @@ class VllmProvider(OpenAICompatibleTools, BaseProvider):
             *messages,
         ]
 
-        body: dict = {
+        body: dict[str, Any] = {
             "model": model,
             "messages": chat_messages,
             "max_tokens": max_tokens,

@@ -43,7 +43,7 @@ class ToolCall:
     name: str
     arguments: dict[str, Any] = field(default_factory=dict)
     malformed: bool = False
-    raw: dict | None = field(default=None, repr=False)
+    raw: dict[str, Any] | None = field(default=None, repr=False)
     # Wire id when this call is replayed into a later request. None means the
     # encoder generates one; a model's own emitted calls do not carry it.
     id: str | None = None

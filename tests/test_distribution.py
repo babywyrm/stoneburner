@@ -158,8 +158,32 @@ def test_mypy_strictness_flags_stay_enabled():
     for flag in (
         "check_untyped_defs",
         "disallow_incomplete_defs",
+        "disallow_subclassing_any",
+        "disallow_untyped_decorators",
+        "extra_checks",
         "no_implicit_optional",
+        "strict_equality",
         "warn_redundant_casts",
         "warn_unused_ignores",
     ):
         assert cfg.get(flag) is True, f"[tool.mypy] {flag} must remain true"
+
+    phase1_flags = (
+        "disallow_any_generics",
+        "disallow_untyped_calls",
+        "disallow_untyped_defs",
+        "no_implicit_reexport",
+        "warn_return_any",
+    )
+    strict_modules = {
+        mod
+        for entry in cfg.get("overrides", [])
+        if all(entry.get(f) is True for f in phase1_flags)
+        for mod in (
+            entry.get("module", [])
+            if isinstance(entry.get("module"), list)
+            else [entry.get("module")]
+        )
+    }
+    for required in ("atomics.storage.*", "atomics.providers.*", "atomics.distributed.*"):
+        assert required in strict_modules, f"mypy strict override missing for {required}"

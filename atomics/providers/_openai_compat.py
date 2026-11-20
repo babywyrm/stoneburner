@@ -25,7 +25,13 @@ from atomics.providers._tool_dialects import (
     openai_tool_payload,
     parse_openai_tool_calls,
 )
-from atomics.providers.base import BaseProvider, ChatMessage, ProviderResponse, compute_tps
+from atomics.providers.base import (
+    BaseProvider,
+    ChatMessage,
+    ProviderResponse,
+    ToolSchema,
+    compute_tps,
+)
 from atomics.providers.effort import apply_chat_effort, normalize_effort
 from atomics.providers.toolcalls import ToolStep
 
@@ -71,7 +77,7 @@ class OpenAICompatibleTools:
         self,
         prompt: str,
         *,
-        tools: Sequence[dict],
+        tools: Sequence[ToolSchema],
         system: str = "",
         model: str | None = None,
         max_tokens: int = 1024,
@@ -240,7 +246,7 @@ class HostedChatProvider(OpenAICompatibleTools, BaseProvider):
             *messages,
         ]
 
-        body: dict = {
+        body: dict[str, Any] = {
             "model": model,
             "messages": chat_messages,
             "max_tokens": max_tokens,

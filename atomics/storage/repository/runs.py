@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 from datetime import UTC, datetime
+from typing import Any
 
 from atomics.models import RunSummary, TaskStatus
 from atomics.storage.repository._base import RepositoryBase
@@ -79,17 +80,17 @@ class RunsMixin(RepositoryBase):
             avg_latency_ms=rows[7],
         )
 
-    def get_recent_runs(self, limit: int = 20) -> list[dict]:
+    def get_recent_runs(self, limit: int = 20) -> list[dict[str, Any]]:
         rows = self._conn.execute(
             "SELECT * FROM runs ORDER BY started_at DESC LIMIT ?", (limit,)
         ).fetchall()
         return [dict(r) for r in rows]
 
-    def get_run(self, run_id: str) -> dict | None:
+    def get_run(self, run_id: str) -> dict[str, Any] | None:
         row = self._conn.execute("SELECT * FROM runs WHERE run_id = ?", (run_id,)).fetchone()
         return dict(row) if row is not None else None
 
-    def get_run_tasks(self, run_id: str) -> list[dict]:
+    def get_run_tasks(self, run_id: str) -> list[dict[str, Any]]:
         rows = self._conn.execute(
             "SELECT * FROM task_results WHERE run_id = ? ORDER BY started_at", (run_id,)
         ).fetchall()
@@ -99,10 +100,10 @@ class RunsMixin(RepositoryBase):
         self,
         *,
         since_hours: float | None = None,
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]]:
         """Aggregate run-level metrics grouped by provider."""
         clauses: list[str] = []
-        params: list = []
+        params: list[object] = []
         if since_hours is not None:
             clauses.append("started_at >= strftime('%Y-%m-%dT%H:%M:%S', 'now', ? || ' hours')")
             params.append(f"-{since_hours}")

@@ -14,7 +14,13 @@ from atomics.providers._tool_dialects import (
     injected_history,
     parse_anthropic_tool_calls,
 )
-from atomics.providers.base import BaseProvider, ChatMessage, ProviderResponse, compute_tps
+from atomics.providers.base import (
+    BaseProvider,
+    ChatMessage,
+    ProviderResponse,
+    ToolSchema,
+    compute_tps,
+)
 from atomics.providers.effort import claude_request, normalize_effort
 from atomics.providers.toolcalls import ToolStep
 
@@ -132,7 +138,7 @@ class ClaudeProvider(BaseProvider):
         )
         reasoning_request = {**({"thinking": thinking_block} if thinking_block else {}), **extra}
 
-        kwargs: dict = {
+        kwargs: dict[str, Any] = {
             "model": model,
             "messages": list(messages),
         }
@@ -200,7 +206,7 @@ class ClaudeProvider(BaseProvider):
         self,
         prompt: str,
         *,
-        tools: Sequence[dict],
+        tools: Sequence[ToolSchema],
         system: str = "",
         model: str | None = None,
         max_tokens: int = 1024,
@@ -235,7 +241,7 @@ class ClaudeProvider(BaseProvider):
             thinking_budget=None,
             effort=effort,
         )
-        kwargs: dict = {
+        kwargs: dict[str, Any] = {
             "model": model,
             "messages": messages,
             "max_tokens": max_tokens,

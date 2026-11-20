@@ -12,7 +12,7 @@ parameters — because six of the ten providers consume it directly.
 from __future__ import annotations
 
 import json
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from atomics.providers.toolcalls import ToolCall, ToolStep, parse_arguments
@@ -126,9 +126,9 @@ def _field(block: Any, name: str, default: Any = None) -> Any:
     return getattr(block, name, default)
 
 
-def openai_tool_payload(schemas: list[dict]) -> list[dict]:
+def openai_tool_payload(schemas: Sequence[Mapping[str, object]]) -> list[dict[str, object]]:
     """Wrap catalog schemas in OpenAI's function envelope."""
-    return [{"type": "function", "function": schema} for schema in schemas]
+    return [{"type": "function", "function": dict(schema)} for schema in schemas]
 
 
 def parse_openai_tool_calls(message: dict[str, Any]) -> tuple[ToolCall, ...]:
@@ -157,7 +157,7 @@ def parse_ollama_tool_calls(message: dict[str, Any]) -> tuple[ToolCall, ...]:
     return parse_openai_tool_calls(message)
 
 
-def anthropic_tool_payload(schemas: list[dict]) -> list[dict]:
+def anthropic_tool_payload(schemas: Sequence[Mapping[str, object]]) -> list[dict[str, object]]:
     """Translate catalog schemas into Anthropic's tool shape.
 
     Anthropic names the schema key `input_schema` where OpenAI uses `parameters`.

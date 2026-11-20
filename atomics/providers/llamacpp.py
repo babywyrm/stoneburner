@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import time
 from collections.abc import Sequence
+from typing import Any
 
 import httpx
 
@@ -19,7 +20,7 @@ from atomics.providers.base import BaseProvider, ChatMessage, ProviderResponse, 
 from atomics.providers.effort import apply_chat_effort, normalize_effort
 
 
-def _thinking_switch(body: dict, thinking: bool | None) -> dict[str, object] | None:
+def _thinking_switch(body: dict[str, Any], thinking: bool | None) -> dict[str, Any] | None:
     """Set llama-server's per-request reasoning switch; None keeps its default.
 
     llama-server (``--jinja``) reads ``enable_thinking`` from
@@ -41,13 +42,13 @@ class LlamaCppProvider(OpenAICompatibleTools, BaseProvider):
 
     def _augment_tool_body(
         self,
-        body: dict,
+        body: dict[str, Any],
         *,
         model: str,
         thinking: bool | None,
         thinking_budget: int | None,
         effort: str | None,
-    ) -> dict[str, object] | None:
+    ) -> dict[str, Any] | None:
         del model, thinking_budget, effort
         return _thinking_switch(body, thinking)
 
@@ -117,7 +118,7 @@ class LlamaCppProvider(OpenAICompatibleTools, BaseProvider):
             *messages,
         ]
 
-        body: dict = {
+        body: dict[str, Any] = {
             "messages": chat_messages,
             "max_tokens": max_tokens,
             "stream": False,

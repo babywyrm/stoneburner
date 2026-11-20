@@ -4,6 +4,8 @@ Split along domain seams. Callers still import `MetricsRepository` from
 this package; the public method set is unchanged.
 """
 
+from typing import Any
+
 from atomics.reporting.stats import percentile as _percentile
 from atomics.storage.repository.analytics import AnalyticsMixin
 from atomics.storage.repository.evaluation import EvaluationMixin
@@ -27,7 +29,7 @@ class MetricsRepository(
 ):
     """SQLite metrics store. Mixins own domain methods; this class owns the connection."""
 
-    def get_run_detail(self, run_id: str) -> dict | None:
+    def get_run_detail(self, run_id: str) -> dict[str, Any] | None:
         """Parent run plus fixture rows, with prompts and raw JSON stripped.
 
         The dashboard and `GET /api/v1/runs/{id}` share this so a future

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import time
 from collections.abc import Sequence
+from typing import Any
 
 import httpx
 
@@ -116,7 +117,7 @@ class GeminiProvider(OpenAICompatibleTools, BaseProvider):
             *messages,
         ]
 
-        body: dict = {
+        body: dict[str, Any] = {
             "model": model,
             "messages": chat_messages,
             "max_tokens": max_tokens,

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import Any
 
 from atomics.storage.repository._base import RepositoryBase
 
@@ -35,7 +36,7 @@ class SchedulesMixin(RepositoryBase):
         self._conn.execute("DELETE FROM schedules WHERE schedule_id = ?", (schedule_id,))
         self._conn.commit()
 
-    def get_schedules(self) -> list[dict]:
+    def get_schedules(self) -> list[dict[str, Any]]:
         rows = self._conn.execute("SELECT * FROM schedules ORDER BY installed_at DESC").fetchall()
         return [dict(r) for r in rows]
 

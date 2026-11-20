@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from atomics.storage.repository._base import RepositoryBase
 
@@ -66,7 +66,7 @@ class LoadMixin(RepositoryBase):
         )
         self._conn.commit()
 
-    def get_stress_results(self, *, model: str | None = None) -> list[dict]:
+    def get_stress_results(self, *, model: str | None = None) -> list[dict[str, Any]]:
         """Retrieve stress results, optionally filtered by model."""
         if model:
             rows = self._conn.execute(
@@ -106,7 +106,7 @@ class LoadMixin(RepositoryBase):
         )
         self._conn.commit()
 
-    def get_sweep_results(self, *, model: str | None = None) -> list[dict]:
+    def get_sweep_results(self, *, model: str | None = None) -> list[dict[str, Any]]:
         """Retrieve sweep results, optionally filtered by model."""
         if model:
             rows = self._conn.execute(
@@ -183,7 +183,7 @@ class LoadMixin(RepositoryBase):
         )
         self._conn.commit()
 
-    def get_soak_results(self, *, model: str | None = None) -> list[dict]:
+    def get_soak_results(self, *, model: str | None = None) -> list[dict[str, Any]]:
         """Retrieve soak results, optionally filtered by model."""
         if model:
             rows = self._conn.execute(
@@ -292,7 +292,7 @@ class LoadMixin(RepositoryBase):
         )
         self._conn.commit()
 
-    def get_labcompare_run(self, comparison_run_id: str) -> list[dict]:
+    def get_labcompare_run(self, comparison_run_id: str) -> list[dict[str, Any]]:
         """Return all rows for one labcompare invocation, ordered model/host."""
         rows = self._conn.execute(
             "SELECT * FROM labcompare_results WHERE comparison_run_id = ? "

@@ -18,7 +18,7 @@ from atomics.providers.effort import claude_request, normalize_effort
 class _BedrockRuntimeClient(Protocol):
     """Structural type for the boto3 bedrock-runtime client (no stubs ship)."""
 
-    def converse(self, **kwargs: Any) -> dict: ...
+    def converse(self, **kwargs: Any) -> dict[str, Any]: ...
 
 
 # Pricing per 1M tokens (input / output). Sourced from the central pricing
@@ -166,8 +166,8 @@ class BedrockProvider(BaseProvider):
         thinking: bool | None = None,
         thinking_budget: int | None = None,
         effort: str | None = None,
-    ) -> dict:
-        inference_config: dict = {"maxTokens": max_tokens}
+    ) -> dict[str, Any]:
+        inference_config: dict[str, Any] = {"maxTokens": max_tokens}
         if temperature is not None:
             inference_config["temperature"] = temperature
         if isinstance(turns, str):
@@ -176,7 +176,7 @@ class BedrockProvider(BaseProvider):
             converse_messages = [
                 {"role": m["role"], "content": [{"text": m["content"]}]} for m in turns
             ]
-        kwargs: dict = {
+        kwargs: dict[str, Any] = {
             "modelId": model_id,
             "messages": converse_messages,
             "inferenceConfig": inference_config,

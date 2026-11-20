@@ -320,3 +320,22 @@ def test_distributed_run_uses_real_task_specs(client):
         assert spec["task_name"] in catalog_names
         assert "category" in spec
         assert "max_output_tokens" in spec
+
+
+def test_get_coordinator_rejects_uninitialized_state():
+    from types import SimpleNamespace
+
+    import pytest
+
+    from atomics.distributed.routes import get_coordinator
+
+    fake_req = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(coordinator=None)))
+    with pytest.raises(RuntimeError, match="coordinator is not initialized"):
+        get_coordinator(fake_req)  # type: ignore[arg-type]
+
+
+def test_trace_tool_names_handles_null_function_entry():
+    from atomics.providers.trace import _tool_names
+
+    tools = [{"function": None, "name": "ping"}, {"function": {"name": "exec"}}, {}]
+    assert _tool_names(tools) == "ping, exec, ?"

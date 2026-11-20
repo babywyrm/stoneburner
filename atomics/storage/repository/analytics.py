@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from atomics.reporting.stats import percentile as _percentile
 from atomics.storage.repository._base import RepositoryBase
 
 
 class AnalyticsMixin(RepositoryBase):
-    def get_token_usage_by_hour(self, hours: int = 24) -> list[dict]:
+    def get_token_usage_by_hour(self, hours: int = 24) -> list[dict[str, Any]]:
         """Hourly tokens across benchmark tasks and eval/adversarial fixtures.
 
         The window is an ISO `T` cutoff, not SQLite `datetime()`, so a stored
@@ -55,7 +57,7 @@ class AnalyticsMixin(RepositoryBase):
         ).fetchall()
         return [dict(r) for r in rows]
 
-    def get_usage_by_category(self) -> list[dict]:
+    def get_usage_by_category(self) -> list[dict[str, Any]]:
         rows = self._conn.execute(
             """
             SELECT
@@ -88,7 +90,7 @@ class AnalyticsMixin(RepositoryBase):
         limit: int | None = None,
         suite: str | None = None,
         suite_prefix: str | None = None,
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]]:
         """Return task rows for export, newest first.
 
         `suite` matches an exact suite value; `suite_prefix` matches with a
@@ -96,7 +98,7 @@ class AnalyticsMixin(RepositoryBase):
         so callers can isolate a suite instead of getting all task_results mixed.
         """
         clauses: list[str] = []
-        params: list = []
+        params: list[object] = []
         if since_hours is not None:
             clauses.append("started_at >= strftime('%Y-%m-%dT%H:%M:%S', 'now', ? || ' hours')")
             params.append(f"-{since_hours}")
@@ -124,14 +126,14 @@ class AnalyticsMixin(RepositoryBase):
         tier: str | None = None,
         category: str | None = None,
         group_by: str = "provider",
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]]:
         """Aggregate task metrics grouped by provider or model.
 
         Returns dicts with aggregates plus latency percentiles (p50, p95)
         and cost_per_1k_tokens for fairer cross-model comparison.
         """
         clauses: list[str] = []
-        params: list = []
+        params: list[object] = []
         if since_hours is not None:
             clauses.append("started_at >= strftime('%Y-%m-%dT%H:%M:%S', 'now', ? || ' hours')")
             params.append(f"-{since_hours}")

@@ -16,8 +16,13 @@
   approved HTTP(S) origins or path prefixes, rejecting unauthorized targets
   with `403`.
 - `[tool.mypy]` now enforces `check_untyped_defs`,
-  `disallow_incomplete_defs`, `no_implicit_optional`,
-  `warn_redundant_casts`, and `warn_unused_ignores` across `atomics/`.
+  `disallow_incomplete_defs`, `disallow_subclassing_any`,
+  `disallow_untyped_decorators`, `extra_checks`, `no_implicit_optional`,
+  `strict_equality`, `warn_redundant_casts`, and `warn_unused_ignores` across
+  `atomics/`, plus full `mypy --strict` (`disallow_any_generics`,
+  `disallow_untyped_calls`, `disallow_untyped_defs`, `no_implicit_reexport`,
+  `warn_return_any`) across `atomics/storage/`, `atomics/providers/`, and
+  `atomics/distributed/`.
 
 ### Fixed
 - `/api/v1/compare`, `/api/v1/reports/recent-runs`, and `POST /api/v1/runs`
