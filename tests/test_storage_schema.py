@@ -367,3 +367,68 @@ def test_init_db_and_write_summary_json_enforce_0600_permissions(tmp_path: Path)
     out_json = tmp_path / "export.json"
     write_summary_json(_DummySummary(), out_json)
     assert oct(out_json.stat().st_mode & 0o777) == "0o600"
+
+
+def test_v22_populated_db_migrates_to_v23_with_caller_spend_and_fk_rows_intact(
+    tmp_path: Path,
+) -> None:
+    import atomics.storage.schema as schema
+    from atomics.storage.repository import MetricsRepository
+
+    db_path = tmp_path / "v22_populated.db"
+    v22_sql = "\n".join(
+        line for line in schema.SCHEMA_SQL.splitlines() if "caller_spend" not in line
+    )
+    # Strip the caller_spend CREATE TABLE block when building the v22 fixture DB.
+    if "CREATE TABLE IF NOT EXISTS caller_spend" in schema.SCHEMA_SQL:
+        before, after = schema.SCHEMA_SQL.split("CREATE TABLE IF NOT EXISTS caller_spend", 1)
+        v22_sql = before + after.split(");", 1)[1]
+
+    raw = sqlite3.connect(str(db_path))
+    try:
+        raw.executescript(v22_sql)
+        raw.execute("INSERT INTO schema_version (version) VALUES (22)")
+        raw.execute(
+            "INSERT INTO runs (run_id, started_at, provider, model) VALUES (?, ?, ?, ?)",
+            ("r-parent", "2026-11-01T00:00:00+00:00", "ollama", "qwen2.5:3b"),
+        )
+        raw.execute(
+            """
+            INSERT INTO task_results
+                (task_id, run_id, category, task_name, provider, model, status, started_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "t-child",
+                "r-parent",
+                "general_qa",
+                "quick_question",
+                "ollama",
+                "qwen2.5:3b",
+                "success",
+                "2026-11-01T00:00:01+00:00",
+            ),
+        )
+        raw.execute(
+            """
+            INSERT INTO evaluation_results
+                (result_id, run_id, suite, fixture_id, status, timestamp)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            ("e-child", "r-parent", "eval", "fix-1", "scored", "2026-11-01T00:00:02+00:00"),
+        )
+        raw.commit()
+    finally:
+        raw.close()
+
+    repo = MetricsRepository(db_path)
+    try:
+        assert schema.SCHEMA_VERSION == 23
+        assert repo.get_run("r-parent") is not None
+        assert len(repo.get_run_tasks("r-parent")) == 1
+        assert len(repo.get_evaluation_results(run_id="r-parent")) == 1
+        assert repo.get_caller_spend("caller-a") == 0.0
+        assert repo.record_caller_spend("caller-a", 1.25) == 1.25
+        assert repo.record_caller_spend("caller-a", 2.50) == 3.75
+    finally:
+        repo.close()

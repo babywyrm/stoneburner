@@ -284,10 +284,16 @@ async def get_models(
 @router.post("/provider-test", response_model=ProviderTestResponse)
 async def provider_test(
     payload: ProviderTestRequest,
-    _: None = Depends(require_auth),
+    job_manager: JobManager = Depends(get_job_manager),
+    caller: str = Depends(require_auth),
 ) -> ProviderTestResponse:
     """Health-check a provider and generate a fixed 2+2 probe. Spends tokens."""
+    try:
+        job_manager.check_caller_spend(caller)
+    except TooManyActiveJobsError as exc:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)) from exc
     body = await run_provider_test(payload)
+    job_manager.record_spend(caller, float(body.get("cost_usd") or 0.0))
     return ProviderTestResponse(**body)
 
 

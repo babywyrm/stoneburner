@@ -178,7 +178,39 @@ async def test_run_sweep_meters_every_model_against_one_budget():
     assert result["fail"] == 1
     assert result["jobs"][0]["headline"] == 0.9
     assert result["budget_usd"] == 3.0
+    assert result["total_cost_usd"] == 0.0
     assert "judge_calibration" in result
+
+
+@pytest.mark.asyncio
+async def test_run_sweep_reports_total_cost_usd_from_shared_budget():
+    payload = SweepRequest(
+        provider="ollama",
+        models=["a"],
+        suites=["eval"],
+        budget_usd=3.0,
+    )
+    captured: dict = {}
+
+    def fake_provider(name, model, host=None):
+        return SimpleNamespace(name=name, model=model, host=host)
+
+    def store_factory(**kwargs):
+        captured.update(kwargs)
+        return AsyncMock()
+
+    async def fake_gauntlet(**_kwargs):
+        captured["judge_provider"].guard.record_request(100, 1.25, success=True)
+        return [SuiteJobResult(model="a", suite="eval", ok=True, headline=0.9)]
+
+    with (
+        patch("atomics.api._sweep._provider_for", side_effect=fake_provider),
+        patch("atomics.api._sweep.make_suite_runner", side_effect=store_factory),
+        patch("atomics.api._sweep.run_gauntlet", side_effect=fake_gauntlet),
+    ):
+        result = await run_sweep_from_request(payload)
+
+    assert result["total_cost_usd"] == pytest.approx(1.25)
 
 
 @pytest.mark.asyncio

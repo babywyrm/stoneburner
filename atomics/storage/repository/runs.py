@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from datetime import UTC, datetime
 
 from atomics.models import RunSummary, TaskStatus
@@ -122,3 +123,43 @@ class RunsMixin(RepositoryBase):
         """  # nosec B608
         rows = self._conn.execute(sql, params).fetchall()
         return [dict(r) for r in rows]
+
+    def get_caller_spend(self, caller_id: str) -> float:
+        """Return cumulative USD spent by one API caller, or 0.0 if none recorded."""
+        caller = caller_id.strip()
+        if not caller:
+            return 0.0
+        row = self._conn.execute(
+            "SELECT total_cost_usd FROM caller_spend WHERE caller_id = ?",
+            (caller,),
+        ).fetchone()
+        return round(float(row[0]), 6) if row is not None else 0.0
+
+    def record_caller_spend(self, caller_id: str, cost_usd: float) -> float:
+        """Atomically add positive finite USD spend for an API caller and return the new total."""
+        caller = caller_id.strip()
+        if not caller:
+            raise ValueError("caller_id must not be empty")
+        if (
+            isinstance(cost_usd, bool)
+            or not isinstance(cost_usd, int | float)
+            or not math.isfinite(cost_usd)
+            or cost_usd < 0.0
+        ):
+            raise ValueError(f"cost_usd must be a non-negative finite number, got {cost_usd!r}")
+        amount = float(cost_usd)
+        if amount == 0.0:
+            return self.get_caller_spend(caller)
+        now = datetime.now(UTC).isoformat()
+        self._conn.execute(
+            """
+            INSERT INTO caller_spend (caller_id, total_cost_usd, updated_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(caller_id) DO UPDATE SET
+                total_cost_usd = caller_spend.total_cost_usd + excluded.total_cost_usd,
+                updated_at = excluded.updated_at
+            """,
+            (caller, amount, now),
+        )
+        self._conn.commit()
+        return self.get_caller_spend(caller)

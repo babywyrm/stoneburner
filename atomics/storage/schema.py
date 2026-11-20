@@ -9,7 +9,7 @@ from pathlib import Path
 
 logger = logging.getLogger("atomics.schema")
 
-SCHEMA_VERSION = 22
+SCHEMA_VERSION = 23
 
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -383,9 +383,16 @@ CREATE TABLE IF NOT EXISTS distributed_assignments (
     started_at TEXT,
     completed_at TEXT
 );
+
+CREATE TABLE IF NOT EXISTS caller_spend (
+    caller_id       TEXT PRIMARY KEY,
+    total_cost_usd  REAL NOT NULL DEFAULT 0.0,
+    updated_at      TEXT NOT NULL
+);
 """
 
 RESET_SQL = """
+DROP TABLE IF EXISTS caller_spend;
 DROP TABLE IF EXISTS task_results;
 DROP TABLE IF EXISTS adversarial_results;
 DROP TABLE IF EXISTS evaluation_results;

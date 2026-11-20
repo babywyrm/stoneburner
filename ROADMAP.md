@@ -23,7 +23,7 @@ major tag moved by the publish workflow.
       and worker exception logs, and `[tool.mypy]` `check_untyped_defs` /
       `disallow_incomplete_defs` / `no_implicit_optional` /
       `warn_redundant_casts` / `warn_unused_ignores`.
-- [ ] Persist per-caller cumulative spend in SQLite so `--max-caller-spend-usd`
+- [x] Persist per-caller cumulative spend in SQLite so `--max-caller-spend-usd`
       survives `atomics server` restarts and finished-job eviction.
 - [ ] Optional outbound host allowlists (`--allowed-hosts`) on `atomics server`
       so authenticated callers can only route inference and judge traffic to

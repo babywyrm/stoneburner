@@ -35,6 +35,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         max_retained=settings.max_retained_jobs,
         max_active_per_caller=settings.max_active_jobs_per_caller,
         max_spend_usd_per_caller=settings.max_spend_usd_per_caller,
+        db_path=settings.db_path,
     )
     if settings.no_auth:
         logger.warning(
@@ -64,6 +65,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 await job._task
             except asyncio.CancelledError:
                 pass
+    manager.close()
     app.state.coordinator._conn.close()
 
 

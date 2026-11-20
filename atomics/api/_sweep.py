@@ -93,6 +93,7 @@ async def run_sweep_from_request(payload: SweepRequest, job: Job | None = None) 
         "suites": list(payload.suites),
         "runs": payload.runs,
         "budget_usd": payload.budget_usd,
+        "total_cost_usd": round(meter.guard.total_cost, 6) if meter.guard is not None else 0.0,
         "judge_calibration": judge_cal,
         "ok": sum(1 for row in results if row.ok),
         "fail": sum(1 for row in results if not row.ok),

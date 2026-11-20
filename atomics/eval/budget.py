@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import math
 from collections.abc import Awaitable, Sequence
 from dataclasses import dataclass
 
@@ -34,6 +35,16 @@ logger = logging.getLogger(__name__)
 
 class EvalBudgetExceededError(RuntimeError):
     """An eval suite hit a ceiling and stopped rather than keep spending."""
+
+    def __init__(self, message: str, *, spent_usd: float = 0.0) -> None:
+        super().__init__(message)
+        self.spent_usd = (
+            max(0.0, float(spent_usd))
+            if isinstance(spent_usd, int | float)
+            and not isinstance(spent_usd, bool)
+            and math.isfinite(spent_usd)
+            else 0.0
+        )
 
 
 @dataclass(frozen=True)
@@ -258,14 +269,16 @@ class GuardedProvider(BaseProvider):
                 return
             if not self._is_transient(reason):
                 raise EvalBudgetExceededError(
-                    f"eval stopped: {reason} (spent ${self._guard.total_cost:.4f})"
+                    f"eval stopped: {reason} (spent ${self._guard.total_cost:.4f})",
+                    spent_usd=self._guard.total_cost,
                 )
             wait = max(self._guard.seconds_until_allowed(), 0.0)
             wait += self.WAIT_MARGIN_SECONDS
             if waited + wait > self.MAX_WAIT_SECONDS:
                 raise EvalBudgetExceededError(
                     f"eval stopped: {reason}, and waiting for capacity would "
-                    f"exceed {self.MAX_WAIT_SECONDS:.0f}s"
+                    f"exceed {self.MAX_WAIT_SECONDS:.0f}s",
+                    spent_usd=self._guard.total_cost,
                 )
             logger.info("Eval guard: %s — waiting %.1fs", reason, wait)
             await asyncio.sleep(wait)

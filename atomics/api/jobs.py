@@ -4,15 +4,18 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import math
 import time
 import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from enum import Enum
+from pathlib import Path
 from typing import Any
 
 from atomics.api.callers import ANONYMOUS_CALLER
 from atomics.api.request_log import current_request_id
+from atomics.storage.repository import MetricsRepository
 from atomics.validation import sanitize_error
 
 logger = logging.getLogger(__name__)
@@ -65,27 +68,28 @@ class CallerSpendQuotaExceededError(CallerQuotaExceededError):
     """One caller has exhausted their cumulative dollar ceiling across jobs."""
 
 
+def _finite_nonneg(value: object) -> float:
+    if isinstance(value, int | float) and not isinstance(value, bool) and math.isfinite(value):
+        return max(0.0, float(value))
+    return 0.0
+
+
 def _result_cost_usd(result: Any) -> float:
     """Extract total dollar spend from a finished job's result payload."""
     if not isinstance(result, dict):
         return 0.0
-    direct = result.get("total_cost_usd")
-    if isinstance(direct, int | float) and not isinstance(direct, bool):
-        return max(0.0, float(direct))
+    if "total_cost_usd" in result:
+        return _finite_nonneg(result.get("total_cost_usd"))
     steps = result.get("steps")
     if isinstance(steps, list):
         total = 0.0
         for step in steps:
             if not isinstance(step, dict):
                 continue
-            step_cost = step.get("cost_usd")
-            if isinstance(step_cost, int | float) and not isinstance(step_cost, bool):
-                total += max(0.0, float(step_cost))
+            total += _finite_nonneg(step.get("cost_usd"))
             nested = step.get("result")
             if isinstance(nested, dict):
-                nested_cost = nested.get("total_cost_usd")
-                if isinstance(nested_cost, int | float) and not isinstance(nested_cost, bool):
-                    total += max(0.0, float(nested_cost))
+                total += _finite_nonneg(nested.get("total_cost_usd"))
         return total
     return 0.0
 
@@ -115,6 +119,7 @@ class JobManager:
         max_retained: int = DEFAULT_MAX_RETAINED,
         max_active_per_caller: int = DEFAULT_MAX_ACTIVE_PER_CALLER,
         max_spend_usd_per_caller: float | None = None,
+        db_path: Path | None = None,
     ) -> None:
         if max_active < 1:
             raise ValueError(f"max_active must be positive, got {max_active}")
@@ -122,7 +127,11 @@ class JobManager:
             raise ValueError(f"max_retained must be positive, got {max_retained}")
         if max_active_per_caller < 1:
             raise ValueError(f"max_active_per_caller must be positive, got {max_active_per_caller}")
-        if max_spend_usd_per_caller is not None and max_spend_usd_per_caller <= 0:
+        if max_spend_usd_per_caller is not None and (
+            isinstance(max_spend_usd_per_caller, bool)
+            or not math.isfinite(max_spend_usd_per_caller)
+            or max_spend_usd_per_caller <= 0
+        ):
             raise ValueError(
                 f"max_spend_usd_per_caller must be positive, got {max_spend_usd_per_caller}"
             )
@@ -132,6 +141,15 @@ class JobManager:
         self.max_active_per_caller = max_active_per_caller
         self.max_spend_usd_per_caller = max_spend_usd_per_caller
         self._caller_spend: dict[str, float] = {}
+        self._repo: MetricsRepository | None = (
+            MetricsRepository(db_path) if db_path is not None else None
+        )
+
+    def close(self) -> None:
+        """Close the backing SQLite repository when durable spend tracking is enabled."""
+        if self._repo is not None:
+            self._repo.close()
+            self._repo = None
 
     @staticmethod
     def _is_active(job: Job) -> bool:
@@ -154,8 +172,31 @@ class JobManager:
         return sum(1 for job in self.jobs.values() if job.owner == owner and self._is_active(job))
 
     def caller_spend_usd(self, owner: str) -> float:
-        """Cumulative USD spent by one caller across finished jobs in this process."""
+        """Cumulative USD spent by one caller across jobs (SQLite-backed when configured)."""
+        if self._repo is not None:
+            return self._repo.get_caller_spend(owner)
         return round(self._caller_spend.get(owner, 0.0), 6)
+
+    def record_spend(self, owner: str, cost_usd: float) -> float:
+        """Record positive finite USD spend against `owner` and return their cumulative total."""
+        cost = _finite_nonneg(cost_usd)
+        if cost <= 0.0:
+            return self.caller_spend_usd(owner)
+        if self._repo is not None:
+            return self._repo.record_caller_spend(owner, cost)
+        self._caller_spend[owner] = self._caller_spend.get(owner, 0.0) + cost
+        return round(self._caller_spend[owner], 6)
+
+    def check_caller_spend(self, owner: str) -> None:
+        """Raise CallerSpendQuotaExceededError when `owner` has reached their spend ceiling."""
+        if self.max_spend_usd_per_caller is None:
+            return
+        spent = self.caller_spend_usd(owner)
+        if spent >= self.max_spend_usd_per_caller:
+            raise CallerSpendQuotaExceededError(
+                f"caller has spent ${spent:.4f} "
+                f"(per-caller spend limit ${self.max_spend_usd_per_caller:.2f})"
+            )
 
     async def submit(
         self,
@@ -178,13 +219,7 @@ class JobManager:
                 f"caller already has {held} jobs running "
                 f"(per-caller limit {self.max_active_per_caller})"
             )
-        if self.max_spend_usd_per_caller is not None:
-            spent = self.caller_spend_usd(owner)
-            if spent >= self.max_spend_usd_per_caller:
-                raise CallerSpendQuotaExceededError(
-                    f"caller has spent ${spent:.4f} "
-                    f"(per-caller spend limit ${self.max_spend_usd_per_caller:.2f})"
-                )
+        self.check_caller_spend(owner)
         job_id = uuid.uuid4().hex
         job = Job(
             job_id=job_id,
@@ -232,22 +267,27 @@ class JobManager:
     ) -> None:
         job.status = JobStatus.RUNNING
         job.started_at = time.time()
+        caught_exc: BaseException | None = None
         try:
             job.result = await work(job.job_id)
             job.status = JobStatus.COMPLETED
             if job.progress is not None:
                 job.progress = {**job.progress, "in_flight": None}
-        except asyncio.CancelledError:
+        except asyncio.CancelledError as exc:
+            caught_exc = exc
             job.error = {"type": "CancelledError", "message": "job cancelled"}
             job.status = JobStatus.FAILED
             raise
         except Exception as exc:
+            caught_exc = exc
             job.error = {"type": exc.__class__.__name__, "message": sanitize_error(exc)}
             job.status = JobStatus.FAILED
         finally:
             cost = _result_cost_usd(job.result)
-            if cost > 0:
-                self._caller_spend[job.owner] = self._caller_spend.get(job.owner, 0.0) + cost
+            if cost <= 0.0 and caught_exc is not None:
+                cost = _finite_nonneg(getattr(caught_exc, "spent_usd", 0.0))
+            if cost > 0.0:
+                self.record_spend(job.owner, cost)
             job.completed_at = time.time()
             logger.info(
                 "job_finished job_id=%s kind=%s caller=%s request_id=%s status=%s duration_ms=%.1f",

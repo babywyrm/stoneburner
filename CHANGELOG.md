@@ -6,8 +6,10 @@
 - `atomics server --max-caller-spend-usd` (and
   `ServerSettings.max_spend_usd_per_caller` /
   `JobManager.max_spend_usd_per_caller`) enforces an optional cumulative
-  dollar ceiling per API key across runs, returning `429` once a caller
-  reaches their limit.
+  dollar ceiling per API key across runs, persisted in SQLite (`caller_spend`,
+  schema v23) across server restarts and job eviction, covering completed jobs,
+  budget-aborted jobs, sweeps, and `/api/v1/provider-test`, returning `429`
+  once a caller reaches their limit.
 - `[tool.mypy]` now enforces `check_untyped_defs`,
   `disallow_incomplete_defs`, `no_implicit_optional`,
   `warn_redundant_casts`, and `warn_unused_ignores` across `atomics/`.

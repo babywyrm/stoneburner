@@ -290,10 +290,11 @@ request pressure is waited out instead, since it clears on its own.
 Two limits worth stating plainly:
 
 - `budget_usd` bounds a **single run**. To cap a caller's cumulative spend
-  across submissions in a server process, pass `--max-caller-spend-usd` (or set
-  `ServerSettings.max_spend_usd_per_caller`), which rejects further job
-  submissions from that key with `429` once their finished jobs reach the
-  ceiling.
+  across submissions, pass `--max-caller-spend-usd` (or set
+  `ServerSettings.max_spend_usd_per_caller`), which persists per-key spend in
+  SQLite (`caller_spend` table, schema v23) across server restarts and job
+  eviction and rejects further submissions or `provider-test` probes from that
+  key with `429` once the ceiling is reached.
 - A dollar ceiling only binds where calls cost money. Local providers (Ollama,
   vLLM, llama.cpp) report `$0.00`, so `budget_usd` never trips for them. The
   guard's request-rate and hourly-token limits still apply, but if your threat

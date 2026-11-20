@@ -249,3 +249,133 @@ class TestPerCallerSpendCeiling:
             JobManager(max_spend_usd_per_caller=0.0)
         with pytest.raises(ValueError, match="max_spend_usd_per_caller"):
             ServerSettings(db_path=tmp_path / "q.db", max_spend_usd_per_caller=-1.0)
+
+    def test_caller_spend_persists_across_server_restarts_and_job_eviction(
+        self, tmp_path, monkeypatch
+    ):
+        db_path = tmp_path / "spend.db"
+
+        async def fake_eval(*_args, **_kwargs):
+            return {"suite": "accuracy", "total_cost_usd": 3.0}
+
+        monkeypatch.setattr("atomics.api.routes.run_eval_suite", fake_eval)
+
+        settings1 = ServerSettings(
+            api_keys={ALICE, BOB},
+            db_path=db_path,
+            max_retained_jobs=1,
+            max_spend_usd_per_caller=5.0,
+        )
+        with TestClient(create_app(settings1), base_url="http://127.0.0.1") as client1:
+            r1 = client1.post(
+                "/api/v1/evals",
+                json={"suite": "accuracy", "provider": "ollama"},
+                headers={"X-API-Key": ALICE},
+            )
+            assert r1.status_code == 202
+            r2 = client1.post(
+                "/api/v1/evals",
+                json={"suite": "accuracy", "provider": "ollama"},
+                headers={"X-API-Key": ALICE},
+            )
+            assert r2.status_code == 202
+
+        # Fresh server instance on the same SQLite DB: j1 was evicted and RAM cleared,
+        # yet Alice's $6.00 cumulative spend remains enforced across restart.
+        settings2 = ServerSettings(
+            api_keys={ALICE, BOB},
+            db_path=db_path,
+            max_retained_jobs=1,
+            max_spend_usd_per_caller=5.0,
+        )
+        with TestClient(create_app(settings2), base_url="http://127.0.0.1") as client2:
+            blocked = client2.post(
+                "/api/v1/evals",
+                json={"suite": "accuracy", "provider": "ollama"},
+                headers={"X-API-Key": ALICE},
+            )
+            assert blocked.status_code == 429
+            assert "per-caller spend limit" in blocked.json()["detail"]
+
+            allowed = client2.post(
+                "/api/v1/evals",
+                json={"suite": "accuracy", "provider": "ollama"},
+                headers={"X-API-Key": BOB},
+            )
+            assert allowed.status_code == 202
+
+    @pytest.mark.asyncio
+    async def test_aborted_budget_exceeded_job_still_charges_caller_spend(self, tmp_path):
+        from atomics.eval.budget import EvalBudgetExceededError
+
+        async def aborted_work(_job_id: str) -> dict[str, object]:
+            raise EvalBudgetExceededError("eval stopped: budget exceeded", spent_usd=4.25)
+
+        manager = JobManager(max_spend_usd_per_caller=4.0, db_path=tmp_path / "abort.db")
+        try:
+            jid = await manager.submit("eval", aborted_work, owner="alice")
+            await manager.wait_for(jid)
+            assert manager.caller_spend_usd("alice") == pytest.approx(4.25)
+            with pytest.raises(TooManyActiveJobsError, match="spend"):
+                await manager.submit("eval", aborted_work, owner="alice")
+        finally:
+            manager.close()
+
+    def test_provider_test_and_sweep_count_toward_caller_spend(self, tmp_path, monkeypatch):
+        db_path = tmp_path / "pt_sweep.db"
+
+        async def fake_pt(_payload):
+            return {
+                "ok": True,
+                "health": True,
+                "provider": "claude",
+                "model": "claude-sonnet-4-6",
+                "response": "4",
+                "cost_usd": 0.60,
+            }
+
+        monkeypatch.setattr("atomics.api.routes.run_provider_test", fake_pt)
+
+        settings = ServerSettings(
+            api_keys={ALICE},
+            db_path=db_path,
+            max_spend_usd_per_caller=1.0,
+        )
+        with TestClient(create_app(settings), base_url="http://127.0.0.1") as client:
+            first = client.post(
+                "/api/v1/provider-test",
+                json={"provider": "claude"},
+                headers={"X-API-Key": ALICE},
+            )
+            assert first.status_code == 200
+            second = client.post(
+                "/api/v1/provider-test",
+                json={"provider": "claude"},
+                headers={"X-API-Key": ALICE},
+            )
+            assert second.status_code == 200
+            third = client.post(
+                "/api/v1/provider-test",
+                json={"provider": "claude"},
+                headers={"X-API-Key": ALICE},
+            )
+            assert third.status_code == 429
+            assert "per-caller spend limit" in third.json()["detail"]
+
+    def test_record_caller_spend_validates_inputs(self, tmp_path):
+        from atomics.storage.repository import MetricsRepository
+
+        repo = MetricsRepository(tmp_path / "val.db")
+        try:
+            with pytest.raises(ValueError, match="caller_id"):
+                repo.record_caller_spend("   ", 1.0)
+            with pytest.raises(ValueError, match="cost_usd"):
+                repo.record_caller_spend("alice", -0.01)
+            with pytest.raises(ValueError, match="cost_usd"):
+                repo.record_caller_spend("alice", float("nan"))
+            with pytest.raises(ValueError, match="cost_usd"):
+                repo.record_caller_spend("alice", float("inf"))
+            with pytest.raises(ValueError, match="cost_usd"):
+                repo.record_caller_spend("alice", True)  # type: ignore[arg-type]
+        finally:
+            repo.close()
