@@ -66,6 +66,63 @@ def _traced_when_enabled(fn: Callable[P, BaseProvider]) -> Callable[P, BaseProvi
     return wrapper
 
 
+def resolve_provider_endpoint(
+    name: str,
+    host: str | None,
+    settings: AtomicsSettings,
+    *,
+    vllm_host: str | None = None,
+    region: str = "us-east-1",
+    host_label: str = "host",
+    vllm_host_label: str = "vllm host",
+) -> str:
+    """Return the validated outbound HTTP(S) base URL ``make_provider`` targets."""
+    from atomics.inference import load_control_file, overlay_provider_defaults
+
+    name, _, host, vllm_host = overlay_provider_defaults(
+        name=name,
+        model=None,
+        host=host,
+        vllm_host=vllm_host,
+        target=load_control_file(),
+    )
+
+    def _validated(url: str, *, label: str) -> str:
+        try:
+            return validate_endpoint_url(url, label=label)
+        except ValueError as exc:
+            raise ProviderConfigError(str(exc)) from exc
+
+    if host is not None:
+        host = _validated(host, label=host_label)
+    if vllm_host is not None:
+        vllm_host = _validated(vllm_host, label=vllm_host_label)
+
+    if name == "claude":
+        return "https://api.anthropic.com"
+    if name == "bedrock":
+        return f"https://bedrock-runtime.{region}.amazonaws.com"
+    if name == "openai":
+        return "https://api.openai.com/v1"
+    if name == "groq":
+        return "https://api.groq.com/openai/v1"
+    if name == "together":
+        return "https://api.together.xyz/v1"
+    if name == "gemini":
+        return "https://generativelanguage.googleapis.com/v1beta/openai"
+    if name == "vllm":
+        raw = vllm_host if vllm_host is not None else (host or settings.vllm_host)
+        label = vllm_host_label if vllm_host is not None else host_label
+        return _validated(raw, label=label)
+    if name == "brain-gateway":
+        return _validated(host or settings.brain_gateway_url, label=host_label)
+    if name == "ollama":
+        return _validated(host or settings.ollama_host, label=host_label)
+    if name == "llamacpp":
+        return _validated(host or settings.llamacpp_host, label=host_label)
+    raise ProviderConfigError(f"Unknown provider: {name!r}. Valid: {', '.join(PROVIDER_NAMES)}")
+
+
 @_missing_sdk_is_config_error
 @_traced_when_enabled
 def make_provider(

@@ -452,6 +452,7 @@ def advisor(
     if json_out:
         import json as _json
 
-        with open(json_out, "w", encoding="utf-8") as fh:
-            _json.dump(summary.to_dict(), fh, indent=2)
+        from atomics.paths import write_private_text
+
+        write_private_text(Path(json_out), _json.dumps(summary.to_dict(), indent=2) + "\n")
         console.print(f"[dim]Wrote recommendations to {json_out}[/dim]")

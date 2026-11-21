@@ -221,7 +221,9 @@ def status(coordinator: str, api_key: str, job_id: str, json_out: Path | None) -
             summary = {}
 
     if json_out:
-        json_out.write_text(json.dumps({**job, "summary": summary}, indent=2))
+        from atomics.paths import write_private_text
+
+        write_private_text(json_out, json.dumps({**job, "summary": summary}, indent=2) + "\n")
         Console().print(f"Wrote {json_out}")
         return
 

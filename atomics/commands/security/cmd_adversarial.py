@@ -555,8 +555,11 @@ def adversarial(
         if compare_summary is not None:
             payload["model_b"] = compare_summary.to_dict()
         payload["provenance"] = provenance()
-        with open(json_out, "w", encoding="utf-8") as fh:
-            _json.dump(payload, fh, indent=2)
+        from pathlib import Path
+
+        from atomics.paths import write_private_text
+
+        write_private_text(Path(json_out), _json.dumps(payload, indent=2) + "\n")
         console.print(f"\n[dim]Wrote JSON results to {json_out}[/dim]")
 
     exit_code = 0

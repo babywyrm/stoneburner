@@ -112,6 +112,40 @@ def _check_payload_hosts(request: Request, *pairs: tuple[str, str | None]) -> No
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
+def _check_provider_hosts(
+    request: Request,
+    provider: str,
+    host: str | None,
+    *,
+    include_judge: bool = False,
+    judge_host: str | None = None,
+) -> None:
+    """Enforce `allowed_hosts` against both explicit and default/vendor endpoints."""
+    _check_payload_hosts(request, ("host", host), ("judge_host", judge_host))
+    if request.app.state.settings.allowed_hosts is None:
+        return
+    from atomics.providers.factory import ProviderConfigError, resolve_provider_endpoint
+
+    app_settings = load_settings()
+    try:
+        eff_host = resolve_provider_endpoint(provider, host, app_settings, host_label="host")
+    except ProviderConfigError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    _check_payload_hosts(request, ("host", eff_host))
+
+    if include_judge:
+        eff_judge_in = (
+            judge_host if judge_host is not None else (host if provider == "ollama" else None)
+        )
+        try:
+            eff_judge = resolve_provider_endpoint(
+                "ollama", eff_judge_in, app_settings, host_label="judge_host"
+            )
+        except ProviderConfigError as exc:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        _check_payload_hosts(request, ("judge_host", eff_judge))
+
+
 @router.post("/runs", response_model=JobResponse, status_code=status.HTTP_202_ACCEPTED)
 async def start_run(
     request: Request,
@@ -121,7 +155,7 @@ async def start_run(
 ) -> JobResponse:
     import inspect
 
-    _check_payload_hosts(request, ("host", payload.host))
+    _check_provider_hosts(request, payload.provider, payload.host)
     db_path = request.app.state.settings.db_path
     accepts_db = "db_path" in inspect.signature(run_benchmark_from_request).parameters
 
@@ -152,19 +186,35 @@ async def start_eval(
     job_manager: JobManager = Depends(get_job_manager),
     caller: str = Depends(require_auth),
 ) -> JobResponse:
-    _check_payload_hosts(request, ("host", payload.host), ("judge_host", payload.judge_host))
+    import inspect
+
     try:
-        validate_eval_suite(payload.suite)
+        suite = validate_eval_suite(payload.suite)
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
         ) from exc
+    _check_provider_hosts(
+        request,
+        payload.provider,
+        payload.host,
+        include_judge=suite != "codegen",
+        judge_host=payload.judge_host,
+    )
+    db_path = request.app.state.settings.db_path
+    accepts_db = "db_path" in inspect.signature(run_eval_suite).parameters
+
+    async def _work(jid: str) -> dict[str, Any]:
+        job_obj = job_manager.jobs[jid]
+        if accepts_db:
+            return await run_eval_suite(payload, job=job_obj, db_path=db_path)
+        return await run_eval_suite(payload, job=job_obj)
 
     try:
         job_id = await job_manager.submit(
             "eval",
-            lambda jid: run_eval_suite(payload, job=job_manager.jobs[jid]),
+            _work,
             owner=caller,
             request=resolve_eval_request(payload, load_settings()),
             progress=initial_eval_progress(payload),
@@ -183,11 +233,28 @@ async def start_sweep(
     caller: str = Depends(require_auth),
 ) -> JobResponse:
     """Start a bounded multi-model, multi-suite campaign. Budget is required."""
-    _check_payload_hosts(request, ("host", payload.host), ("judge_host", payload.judge_host))
+    import inspect
+
+    _check_provider_hosts(
+        request,
+        payload.provider,
+        payload.host,
+        include_judge=True,
+        judge_host=payload.judge_host,
+    )
+    db_path = request.app.state.settings.db_path
+    accepts_db = "db_path" in inspect.signature(run_sweep_from_request).parameters
+
+    async def _work(jid: str) -> dict[str, Any]:
+        job_obj = job_manager.jobs[jid]
+        if accepts_db:
+            return await run_sweep_from_request(payload, job=job_obj, db_path=db_path)
+        return await run_sweep_from_request(payload, job=job_obj)
+
     try:
         job_id = await job_manager.submit(
             "sweep",
-            lambda jid: run_sweep_from_request(payload, job=job_manager.jobs[jid]),
+            _work,
             owner=caller,
             request=payload_request(payload, load_settings()),
             progress=initial_sweep_progress(payload),
@@ -206,7 +273,41 @@ async def start_battery(
     caller: str = Depends(require_auth),
 ) -> JobResponse:
     """Run a named battery as one metered job. Budget is required."""
-    _check_payload_hosts(request, ("host", payload.host), ("judge_host", payload.judge_host))
+    import inspect
+
+    from atomics.benchmark.qa_runner import load_qa_suite
+    from atomics.eval.batteries import get_battery, visible_steps
+
+    needs_judge = payload.judge_host is not None
+    qa_hosts: list[str] = []
+    if request.app.state.settings.allowed_hosts is not None:
+        try:
+            bat = get_battery(payload.name)
+            steps = (
+                *visible_steps(bat, provider=payload.provider, profile=payload.profile),
+                *bat.optional_steps,
+            )
+        except KeyError:
+            steps = ()
+        needs_judge = needs_judge or any(
+            s.suite not in {"provider-test", "qa", "archreview", "codegen"} for s in steps
+        )
+        if payload.profile is None:
+            for s in steps:
+                if s.suite == "qa" and s.qa_file:
+                    _fm, file_host, _ = load_qa_suite(s.qa_file)
+                    if payload.host or file_host:
+                        qa_hosts.append(payload.host or file_host)
+
+    _check_provider_hosts(
+        request,
+        payload.provider,
+        payload.host,
+        include_judge=needs_judge,
+        judge_host=payload.judge_host,
+    )
+    for qh in qa_hosts:
+        _check_payload_hosts(request, ("qa host", qh))
     if payload.profile is not None and request.app.state.settings.allowed_hosts is not None:
         from atomics.load.profiles import load_confined_profile
 
@@ -216,10 +317,20 @@ async def start_battery(
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
         prof_url = prof.ollama_host if prof.type == "ollama" else prof.http_url
         _check_payload_hosts(request, ("profile target", prof_url))
+
+    db_path = request.app.state.settings.db_path
+    accepts_db = "db_path" in inspect.signature(run_battery_from_request).parameters
+
+    async def _work(jid: str) -> dict[str, Any]:
+        job_obj = job_manager.jobs[jid]
+        if accepts_db:
+            return await run_battery_from_request(payload, job=job_obj, db_path=db_path)
+        return await run_battery_from_request(payload, job=job_obj)
+
     try:
         job_id = await job_manager.submit(
             "battery",
-            lambda jid: run_battery_from_request(payload, job=job_manager.jobs[jid]),
+            _work,
             owner=caller,
             request=payload_request(payload, load_settings()),
             progress=initial_battery_progress(payload),
@@ -238,7 +349,7 @@ async def start_stress(
     caller: str = Depends(require_auth),
 ) -> JobResponse:
     """Ramp concurrency to find saturation. One model, required budget, capped."""
-    _check_payload_hosts(request, ("host", payload.host))
+    _check_provider_hosts(request, payload.provider, payload.host)
     try:
         job_id = await job_manager.submit(
             "stress",
@@ -261,7 +372,7 @@ async def start_soak(
     caller: str = Depends(require_auth),
 ) -> JobResponse:
     """Hold concurrency and classify drift. Duration is seconds, max 300."""
-    _check_payload_hosts(request, ("host", payload.host))
+    _check_provider_hosts(request, payload.provider, payload.host)
     try:
         job_id = await job_manager.submit(
             "soak",
@@ -310,7 +421,12 @@ async def get_models(
     _: None = Depends(require_auth),
 ) -> ModelsResponse:
     """List tags on an Ollama or vLLM instance. Does not generate."""
-    _check_payload_hosts(request, ("host", host))
+    from atomics.api._discovery import LISTABLE_PROVIDERS
+
+    if provider.lower() in LISTABLE_PROVIDERS:
+        _check_provider_hosts(request, provider.lower(), host)
+    else:
+        _check_payload_hosts(request, ("host", host))
     body = await list_models(provider, host)
     return ModelsResponse(**body)
 
@@ -323,7 +439,7 @@ async def provider_test(
     caller: str = Depends(require_auth),
 ) -> ProviderTestResponse:
     """Health-check a provider and generate a fixed 2+2 probe. Spends tokens."""
-    _check_payload_hosts(request, ("host", payload.host))
+    _check_provider_hosts(request, payload.provider, payload.host)
     try:
         job_manager.check_caller_spend(caller)
     except TooManyActiveJobsError as exc:

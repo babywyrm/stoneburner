@@ -479,6 +479,16 @@ def export(
             if limit:
                 all_rows = all_rows[:limit]
             _write_generic_export(all_rows, fmt, out_file)
+        out_file.flush()
+        out_name = getattr(out_file, "name", None)
+        if isinstance(out_name, str) and out_name not in ("<stdout>", "-"):
+            import os
+
+            if os.path.isfile(out_name):
+                try:
+                    os.chmod(out_name, 0o600)
+                except OSError:
+                    pass
     finally:
         repo.close()
 
@@ -589,8 +599,11 @@ def models(
         raise SystemExit(1)
     render(inventory, Console())
     if json_out is not None:
-        json_out.parent.mkdir(parents=True, exist_ok=True)
-        json_out.write_text(json.dumps(inventory.to_dict(), indent=2) + "\n")
+        from atomics.paths import write_private_text
+
+        write_private_text(
+            json_out, json.dumps(inventory.to_dict(), indent=2) + "\n", mkdir_parents=True
+        )
         click.echo(f"Wrote {json_out}")
 
 
@@ -648,8 +661,11 @@ def cohorts(
         for job in plan_jobs(result):
             click.echo("atomics " + " ".join(job_argv(job)))
     if json_out is not None:
-        json_out.parent.mkdir(parents=True, exist_ok=True)
-        json_out.write_text(json.dumps(to_dict(result), indent=2) + "\n")
+        from atomics.paths import write_private_text
+
+        write_private_text(
+            json_out, json.dumps(to_dict(result), indent=2) + "\n", mkdir_parents=True
+        )
         click.echo(f"Wrote {json_out}")
     if result.needs_judge and any(c.judge is None for c in result.cohorts):
         raise SystemExit(1)

@@ -159,6 +159,36 @@ def _check_distributed_hosts(request: Request, payload: DistributedRunRequest) -
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
                 ) from exc
+        if settings.allowed_hosts is not None:
+            provider = mapping.get("provider")
+            if isinstance(provider, str) and provider:
+                from atomics.config import load_settings
+                from atomics.providers.factory import ProviderConfigError, resolve_provider_endpoint
+
+                explicit = next(
+                    (
+                        mapping[k]
+                        for k in keys
+                        if k != "judge_host" and isinstance(mapping.get(k), str) and mapping[k]
+                    ),
+                    None,
+                )
+                try:
+                    eff = resolve_provider_endpoint(
+                        provider,
+                        explicit,
+                        load_settings(),
+                        host_label=f"{prefix}.host",
+                    )
+                    settings.check_outbound_host(eff, label=f"{prefix}.host")
+                except DisallowedHostError as exc:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)
+                    ) from exc
+                except (ProviderConfigError, ValueError) as exc:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+                    ) from exc
 
 
 @router.post(

@@ -8,6 +8,7 @@ result. Discovering every tag on the host is a CLI flag and stays one.
 from __future__ import annotations
 
 from dataclasses import asdict
+from pathlib import Path
 from typing import Any
 
 from fastapi import HTTPException
@@ -21,7 +22,12 @@ from atomics.eval.gauntlet import SuiteJobResult, make_suite_runner, run_gauntle
 from atomics.providers.base import BaseProvider, aclose_providers
 
 
-async def run_sweep_from_request(payload: SweepRequest, job: Job | None = None) -> dict[str, Any]:
+async def run_sweep_from_request(
+    payload: SweepRequest,
+    job: Job | None = None,
+    *,
+    db_path: Path | None = None,
+) -> dict[str, Any]:
     """Run models × suites under one shared dollar ceiling."""
     meter = BudgetMeter(EvalBudget(budget_limit_usd=payload.budget_usd))
     reporter = None
@@ -50,7 +56,7 @@ async def run_sweep_from_request(payload: SweepRequest, job: Job | None = None) 
 
     try:
         judge_provider = meter.wrap(_provider_for("ollama", payload.judge_model, judge_host))
-        judge_cal = _judge_calibration(payload.judge_model, judge_provider)
+        judge_cal = _judge_calibration(payload.judge_model, judge_provider, db_path=db_path)
         inner = make_suite_runner(
             provider_factory=provider_factory,
             judge_provider=judge_provider,

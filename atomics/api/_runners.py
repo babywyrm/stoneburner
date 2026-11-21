@@ -95,11 +95,14 @@ def _guarded_providers(
 
 
 def _judge_calibration(
-    judge_model: str | None, judge_provider: BaseProvider
+    judge_model: str | None,
+    judge_provider: BaseProvider,
+    *,
+    db_path: Path | None = None,
 ) -> dict[str, object] | None:
     """The API judge is always Ollama (`_guarded_providers`); advisory, never raises."""
     model = judge_model or getattr(judge_provider, "default_model", None) or "default"
-    status = judge_calibration_status(load_settings().db_path, "ollama", model)
+    status = judge_calibration_status(db_path or load_settings().db_path, "ollama", model)
     return asdict(status) if status is not None else None
 
 
@@ -327,6 +330,7 @@ async def run_eval_from_request(
     job: Job | None = None,
     *,
     meter: BudgetMeter | None = None,
+    db_path: Path | None = None,
 ) -> dict[str, Any]:
     """Run the accuracy eval suite for an API request."""
     provider: BaseProvider | None = None
@@ -377,7 +381,9 @@ async def run_eval_from_request(
         "provider": payload.provider,
         "model": payload.model,
         "judge_model": payload.judge_model,
-        "judge_calibration": _judge_calibration(payload.judge_model, judge_provider),
+        "judge_calibration": _judge_calibration(
+            payload.judge_model, judge_provider, db_path=db_path
+        ),
         "host": host,
         "temperature": payload.temperature,
         "overall_accuracy": summary.overall_accuracy,
@@ -393,12 +399,13 @@ async def run_eval_suite(
     job: Job | None = None,
     *,
     meter: BudgetMeter | None = None,
+    db_path: Path | None = None,
 ) -> dict[str, Any]:
     """Dispatch eval request to the correct runner and normalize the response."""
     suite = validate_eval_suite(payload.suite)
 
     if suite == "accuracy":
-        result = await run_eval_from_request(payload, job=job, meter=meter)
+        result = await run_eval_from_request(payload, job=job, meter=meter, db_path=db_path)
         return {"suite": suite, **result}
 
     reporter = _eval_reporter(payload, job, suite)
@@ -562,7 +569,9 @@ async def run_eval_suite(
         "suite": suite,
         "provider": payload.provider,
         "model": payload.model,
-        "judge_calibration": _judge_calibration(payload.judge_model, judge_provider),
+        "judge_calibration": _judge_calibration(
+            payload.judge_model, judge_provider, db_path=db_path
+        ),
         "host": host,
         "temperature": payload.temperature,
         "overall_score": _overall_score(summary),

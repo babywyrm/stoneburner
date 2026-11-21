@@ -211,8 +211,9 @@ def mark_vs_best(results: Sequence[SuiteJobResult]) -> list[SuiteJobResult]:
 
 
 def write_status(path: Path, progress: GauntletProgress) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(progress.to_dict(), indent=2) + "\n", encoding="utf-8")
+    from atomics.paths import write_private_text
+
+    write_private_text(path, json.dumps(progress.to_dict(), indent=2) + "\n", mkdir_parents=True)
 
 
 def append_log(path: Path | None, line: str) -> None:

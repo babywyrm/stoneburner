@@ -154,7 +154,9 @@ def compare(
             import json as _json
             from pathlib import Path
 
-            Path(out_file).write_text(_json.dumps(rows, indent=2, default=str))
+            from atomics.paths import write_private_text
+
+            write_private_text(Path(out_file), _json.dumps(rows, indent=2, default=str) + "\n")
             console.print(f"\n[dim]Comparison written to {out_file}[/dim]")
     finally:
         repo.close()

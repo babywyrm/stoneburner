@@ -253,5 +253,9 @@ def labcompare(
         import json
         from pathlib import Path as _Path
 
-        _Path(json_out).write_text(json.dumps([c.__dict__ for c in cells], indent=2))
+        from atomics.paths import write_private_text
+
+        write_private_text(
+            _Path(json_out), json.dumps([c.__dict__ for c in cells], indent=2) + "\n"
+        )
         console.print(f"[dim]Wrote {json_out}[/dim]")

@@ -22,3 +22,25 @@ def default_data_dir() -> Path:
 
 def default_db_path() -> Path:
     return default_data_dir() / "atomics.db"
+
+
+def write_private_text(path: Path, data: str, *, mkdir_parents: bool = False) -> None:
+    """Write UTF-8 text to ``path`` with ``0o600`` owner-only permissions."""
+    if mkdir_parents:
+        path.parent.mkdir(parents=True, exist_ok=True)
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    try:
+        if hasattr(os, "fchmod"):
+            os.fchmod(fd, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(data)
+    except BaseException:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+        raise
+    try:
+        path.chmod(0o600)
+    except OSError:
+        pass

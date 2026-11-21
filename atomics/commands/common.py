@@ -297,12 +297,12 @@ def _attribution_model(provider: object, requested_model: str | None) -> str:
 
 def write_summary_json(summary: SerializableSummary, path: Path) -> None:
     """Write one summary through its canonical serializer, plus provenance."""
+    from atomics.paths import write_private_text
     from atomics.prompts import provenance
 
     try:
-        with path.open("w", encoding="utf-8") as handle:
-            json.dump({**summary.to_dict(), "provenance": provenance()}, handle, indent=2)
-        path.chmod(0o600)
+        payload = json.dumps({**summary.to_dict(), "provenance": provenance()}, indent=2) + "\n"
+        write_private_text(path, payload)
     except (OSError, TypeError, ValueError) as exc:
         raise click.ClickException(f"Unable to write JSON output: {sanitize_error(exc)}") from exc
 

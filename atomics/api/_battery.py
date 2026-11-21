@@ -9,6 +9,7 @@ repo pack and stays on the CLI.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from fastapi import HTTPException
@@ -119,7 +120,10 @@ def _eval_step_ok(result: dict[str, Any]) -> bool:
 
 
 async def run_battery_from_request(
-    payload: BatteryRequest, job: Job | None = None
+    payload: BatteryRequest,
+    job: Job | None = None,
+    *,
+    db_path: Path | None = None,
 ) -> dict[str, Any]:
     """Run the battery's steps in order under one budget."""
     import inspect
@@ -129,7 +133,9 @@ async def run_battery_from_request(
     steps_out: list[dict[str, Any]] = []
     visible = visible_steps(battery, provider=payload.provider, profile=payload.profile)
     all_steps = (*visible, *battery.optional_steps)
-    accepts_meter = "meter" in inspect.signature(run_eval_suite).parameters
+    sig_params = inspect.signature(run_eval_suite).parameters
+    accepts_meter = "meter" in sig_params
+    accepts_db = "db_path" in sig_params
     for step in all_steps:
         try:
             if step.suite == "provider-test":
@@ -148,10 +154,12 @@ async def run_battery_from_request(
                 # The step's reporter streams rows into job.result; start each step empty.
                 job.result = None
             eval_req = _step_to_eval(payload, step)
+            extra_kw: dict[str, Any] = {}
             if accepts_meter:
-                result = await run_eval_suite(eval_req, job=job, meter=meter)
-            else:
-                result = await run_eval_suite(eval_req, job=job)
+                extra_kw["meter"] = meter
+            if accepts_db:
+                extra_kw["db_path"] = db_path
+            result = await run_eval_suite(eval_req, job=job, **extra_kw)
         except EvalBudgetExceededError:
             raise
         except HTTPException:

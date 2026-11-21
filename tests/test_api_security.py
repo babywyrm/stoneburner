@@ -538,6 +538,126 @@ class TestOutboundAllowedHosts:
                 == 400
             )
 
+    def test_omitted_host_and_cloud_providers_enforce_allowed_hosts(
+        self, tmp_path, jobs_never_run, monkeypatch
+    ):
+        """Omitting `host`/`judge_host` or picking a hosted cloud provider must not
+        bypass `--allowed-hosts` via default settings or vendor URLs."""
+
+        async def fake_list_models(provider: str, host: str | None) -> dict[str, object]:
+            return {"provider": provider, "models": []}
+
+        async def fake_pt(payload: object) -> dict[str, object]:
+            return {"ok": True, "health": True, "provider": "ollama", "response": "4"}
+
+        monkeypatch.setattr("atomics.api.routes.list_models", fake_list_models)
+        monkeypatch.setattr("atomics.api.routes.run_provider_test", fake_pt)
+
+        approved = "http://10.0.0.5:11434"
+        settings = ServerSettings(
+            api_keys={"secret-key"},
+            db_path=tmp_path / "allow-defaults.db",
+            allowed_hosts={approved},
+        )
+        headers = {"X-API-Key": "secret-key"}
+
+        with TestClient(create_app(settings), base_url="http://127.0.0.1") as client:
+            # Default ollama_host (http://localhost:11434) is not in {approved}
+            assert (
+                client.post(
+                    "/api/v1/runs", json={"provider": "ollama"}, headers=headers
+                ).status_code
+                == 403
+            )
+            # Cloud provider (https://api.openai.com/v1) is not in {approved}
+            assert (
+                client.post(
+                    "/api/v1/runs",
+                    json={"provider": "openai", "model": "gpt-4o"},
+                    headers=headers,
+                ).status_code
+                == 403
+            )
+            # Subject host approved, but vllm omits judge_host -> defaults to localhost:11434
+            assert (
+                client.post(
+                    "/api/v1/evals",
+                    json={"suite": "refusal", "provider": "vllm", "host": approved},
+                    headers=headers,
+                ).status_code
+                == 403
+            )
+            assert (
+                client.post(
+                    "/api/v1/sweeps",
+                    json={
+                        "provider": "vllm",
+                        "models": ["m"],
+                        "suites": ["refusal"],
+                        "budget_usd": 1.0,
+                        "host": approved,
+                    },
+                    headers=headers,
+                ).status_code
+                == 403
+            )
+            assert (
+                client.post(
+                    "/api/v1/batteries",
+                    json={
+                        "name": "desk-pass",
+                        "provider": "vllm",
+                        "budget_usd": 1.0,
+                        "host": approved,
+                    },
+                    headers=headers,
+                ).status_code
+                == 403
+            )
+            assert (
+                client.get(
+                    "/api/v1/models", params={"provider": "ollama"}, headers=headers
+                ).status_code
+                == 403
+            )
+            assert (
+                client.post(
+                    "/api/v1/provider-test", json={"provider": "claude"}, headers=headers
+                ).status_code
+                == 403
+            )
+            assert (
+                client.post(
+                    "/api/v1/distributed/runs",
+                    json={"mode": "split", "run_request": {"provider": "openai", "iterations": 1}},
+                    headers=headers,
+                ).status_code
+                == 403
+            )
+
+            # Positive control: approved subject + judge host passes
+            assert (
+                client.post(
+                    "/api/v1/evals",
+                    json={
+                        "suite": "refusal",
+                        "provider": "vllm",
+                        "host": approved,
+                        "judge_host": approved,
+                    },
+                    headers=headers,
+                ).status_code
+                == 202
+            )
+            assert (
+                client.post(
+                    "/api/v1/evals",
+                    json={"suite": "refusal", "provider": "ollama", "host": approved},
+                    headers=headers,
+                ).status_code
+                == 202
+            )
+
 
 class TestConfinedProfileLoading:
     """Server profile loading must reject symlinks, non-YAML files, and escaping prompts_file."""
@@ -596,3 +716,66 @@ class TestConfinedProfileLoading:
         )
         with pytest.raises(ProfileError, match="prompts_file"):
             load_confined_profile("profiles/local/bad_prompts.yaml", root_dir=tmp_path / "profiles")
+
+
+def test_server_eval_judge_calibration_uses_server_db_path(tmp_path, monkeypatch):
+    """`_judge_calibration` must read `ServerSettings.db_path`, not `load_settings()`."""
+    from atomics.api._runners import _judge_calibration
+    from atomics.eval.calibration import ItemCalibration, JudgeCalibration, save_calibration
+    from atomics.providers.ollama import OllamaProvider
+    from atomics.storage.repository import MetricsRepository
+
+    server_db = tmp_path / "server_only.db"
+    repo = MetricsRepository(server_db)
+    try:
+        save_calibration(
+            repo,
+            "cal-srv-1",
+            JudgeCalibration(
+                set_name="blue-v1",
+                set_digest="deadbeef",
+                judge_provider="ollama",
+                judge_model="gemma4:26b",
+                max_error=0.20,
+                items=[ItemCalibration(id="c1", human=1.0, judge=0.95)],
+            ),
+        )
+    finally:
+        repo.close()
+
+    judge = OllamaProvider(host="http://127.0.0.1:11434", default_model="gemma4:26b")
+    # Default load_settings().db_path has no calibration record; server_db does.
+    assert _judge_calibration("gemma4:26b", judge) is None
+    cal = _judge_calibration("gemma4:26b", judge, db_path=server_db)
+    assert cal is not None
+    assert cal["passed"] is True
+
+
+def test_private_file_writers_enforce_0600_mode(tmp_path, monkeypatch):
+    """CLI exports, JSON outputs, and cached tokens must be written with mode 0o600."""
+    import os
+    import stat
+
+    from click.testing import CliRunner
+
+    from atomics.auth.store import CachedTokens, TokenStore
+    from atomics.cli import cli
+    from atomics.paths import write_private_text
+
+    # 1. write_private_text tightens both new files and pre-existing 0o644 files
+    preexisting = tmp_path / "preexisting.json"
+    preexisting.write_text("{}")
+    os.chmod(preexisting, 0o644)
+    write_private_text(preexisting, '{"ok": true}\n')
+    assert stat.S_IMODE(preexisting.stat().st_mode) == 0o600
+
+    # 2. TokenStore.save writes 0o600
+    tok_file = tmp_path / "tokens.json"
+    TokenStore(path=tok_file).save(CachedTokens(access_token="tok"))
+    assert stat.S_IMODE(tok_file.stat().st_mode) == 0o600
+
+    # 3. `atomics export -o` and `atomics compare -o` write 0o600
+    export_csv = tmp_path / "metrics.csv"
+    res_exp = CliRunner().invoke(cli, ["export", "--format", "csv", "-o", str(export_csv)])
+    assert res_exp.exit_code == 0, res_exp.output
+    assert stat.S_IMODE(export_csv.stat().st_mode) == 0o600

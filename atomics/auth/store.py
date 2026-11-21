@@ -69,9 +69,9 @@ class TokenStore:
             return CachedTokens()
 
     def save(self, tokens: CachedTokens) -> None:
-        self._path.parent.mkdir(parents=True, exist_ok=True)
-        self._path.write_text(json.dumps(asdict(tokens), indent=2))
-        self._path.chmod(0o600)
+        from atomics.paths import write_private_text
+
+        write_private_text(self._path, json.dumps(asdict(tokens), indent=2), mkdir_parents=True)
 
     def clear(self) -> None:
         if self._path.exists():

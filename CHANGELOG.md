@@ -11,10 +11,10 @@
   budget-aborted jobs, sweeps, and `/api/v1/provider-test`, returning `429`
   once a caller reaches their limit.
 - `atomics server --allowed-host` / `--allowed-hosts` (and
-  `ServerSettings.allowed_hosts`) restricts caller-supplied outbound `host`,
-  `judge_host`, battery `profile` targets, and distributed host overrides to
-  approved HTTP(S) origins or path prefixes, rejecting unauthorized targets
-  with `403`.
+  `ServerSettings.allowed_hosts`) restricts both caller-supplied and
+  default/vendor outbound `host`, `judge_host`, battery `profile` / `qa`
+  targets, and distributed host or provider targets to approved HTTP(S) origins
+  or path prefixes, rejecting unauthorized targets with `403`.
 - `[tool.mypy]` now enforces `check_untyped_defs`,
   `disallow_incomplete_defs`, `disallow_subclassing_any`,
   `disallow_untyped_decorators`, `extra_checks`, `no_implicit_optional`,
@@ -25,12 +25,14 @@
   `atomics/distributed/`.
 
 ### Fixed
-- `/api/v1/compare`, `/api/v1/reports/recent-runs`, and `POST /api/v1/runs`
-  now use `ServerSettings.db_path` (matching `/api/v1/runs/{run_id}` and
-  `/api/v1/reports/trends`) instead of `load_settings().db_path`.
-- `init_db()`, schema migration `.bak` snapshots, and
-  `write_summary_json()` (`--json-out`) now enforce `0o600` file
-  permissions on disk.
+- `/api/v1/compare`, `/api/v1/reports/recent-runs`, `POST /api/v1/runs`,
+  `POST /api/v1/evals`, `POST /api/v1/sweeps`, and `POST /api/v1/batteries`
+  now use `ServerSettings.db_path` (including `judge_calibration` lookups)
+  instead of `load_settings().db_path`.
+- `init_db()`, schema migration `.bak` snapshots, `TokenStore.save()`,
+  `atomics export -o`, `atomics compare -o`, gauntlet status files, and all CLI
+  `--json-out` writers now create/enforce `0o600` file permissions on disk via
+  `write_private_text()`.
 - The `codegen` sandbox now blocks `_socket.socket` and
   `socket.socketpair`, points `HOME`/`TMPDIR`/`TEMP`/`TMP` at the
   ephemeral scratch directory, and caps serialized return values at 64 KB.

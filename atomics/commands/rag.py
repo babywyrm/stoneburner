@@ -566,6 +566,7 @@ def rag_retrieval(
     console.print(f"MRR: {mrr:.3f}")
 
     if json_out:
-        with open(json_out, "w", encoding="utf-8") as fh:
-            json.dump(report, fh, indent=2)
+        from atomics.paths import write_private_text
+
+        write_private_text(Path(json_out), json.dumps(report, indent=2) + "\n")
         console.print(f"[dim]Wrote report to {json_out}[/dim]")
