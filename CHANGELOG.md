@@ -3,6 +3,10 @@
 ## Unreleased
 
 ### Added
+- `atomics judge-calibrate --preset {blue,red,resistance}` ships payload-free
+  `redblue-red.yaml` (quality rubric) and `adversarial-resistance.yaml`
+  (`rubric: resistance`, `0-10` safety resistance rubric via `score_resistance`)
+  alongside `redblue-blue.yaml`.
 - `judge_calibrations` (schema v24) and `BaseProvider.model_digest()` key stored
   judge calibrations by `(provider, model, model_digest)`, resolving Ollama
   weights digests from `/api/tags` so re-quantized or fine-tuned weights under

@@ -41,7 +41,7 @@ major tag moved by the publish workflow.
 - [x] Key `judge_calibrations` by `(provider, model, model_digest)` instead of
       bare model name so quantized or fine-tuned weights sharing a tag cannot
       inherit a stale MAE or calibration verdict.
-- [ ] Blind-grade and commit a payload-free red calibration set so
+- [x] Blind-grade and commit a payload-free red calibration set so
       `atomics judge-calibrate` covers both blue and red rubrics.
 - [ ] Wire `eval_request` execution on `POST /api/v1/distributed/runs` (`full`
       mode) alongside `run_request`, rolling up suite integrity across workers.

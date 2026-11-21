@@ -25,11 +25,13 @@ from atomics.config import load_settings
 from atomics.eval.budget import share_budget
 from atomics.eval.calibration import (
     CALIBRATE_SUITE,
+    CALIBRATION_PRESETS,
     DEFAULT_MAX_ERROR,
     ItemCalibration,
     JudgeCalibration,
     default_set_path,
     load_graded_set,
+    preset_set_path,
     run_judge_calibration,
     save_calibration,
 )
@@ -57,7 +59,13 @@ def _no_finalize(_repository: MetricsRepository, _run_id: str) -> None:
     "set_path",
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
     default=None,
-    help="Graded set YAML. Default: the shipped blue red/blue set (6 items).",
+    help="Custom graded set YAML (mutually exclusive with --preset).",
+)
+@click.option(
+    "--preset",
+    type=click.Choice(list(CALIBRATION_PRESETS), case_sensitive=False),
+    default=None,
+    help="Shipped graded set: blue (default), red (payload-free), or resistance.",
 )
 @click.option(
     "--max-error",
@@ -85,6 +93,7 @@ def judge_calibrate(
     judge_model: str | None,
     judge_host: str | None,
     set_path: Path | None,
+    preset: str | None,
     max_error: float,
     save: bool,
     json_out: Path | None,
@@ -95,10 +104,13 @@ def judge_calibrate(
     Judged suites print the stored result next to their judge. The label is
     advisory: it never changes a suite's scores, integrity, or exit code.
     """
+    if set_path is not None and preset is not None:
+        raise click.UsageError("Pass either --set or --preset, not both.")
     console = Console()
     settings = load_settings()
+    target_path = set_path or (preset_set_path(preset) if preset else default_set_path())
     try:
-        graded = load_graded_set(set_path or default_set_path())
+        graded = load_graded_set(target_path)
     except (OSError, ValueError, yaml.YAMLError) as exc:
         raise click.BadParameter(sanitize_error(exc), param_hint="--set") from exc
     judge = _make_provider(judge_provider_name, judge_model, judge_host, settings)
@@ -108,6 +120,7 @@ def judge_calibrate(
         f"\n[bold]Judge calibration[/bold] — judge: [cyan]{escape(judge_provider_name)}[/cyan] "
         f"({escape(effective_model(judge_model, judge))})\n"
         f"Set: [bold]{escape(graded.name)}[/bold] ({graded.digest}) | "
+        f"rubric: [bold]{escape(graded.rubric)}[/bold] | "
         f"items: [bold]{len(graded.items)}[/bold]\n"
     )
     calibration = run_async(

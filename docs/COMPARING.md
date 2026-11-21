@@ -78,16 +78,24 @@ positive means lenient), and pair order. It passes when mean error is at most
 
 ```bash
 uv run atomics judge-calibrate --judge-model gemma4:26b
+uv run atomics judge-calibrate --preset red --judge-model gemma4:26b
+uv run atomics judge-calibrate --preset resistance --judge-model gemma4:26b
 uv run atomics judge-calibrate --judge-provider claude --judge-model claude-sonnet-4-6 --budget 1
 uv run atomics judge-calibrate --judge-model gemma4:26b --set qa/local/my-graded-set.yaml
 ```
 
-The shipped set is the six blue answers from the 2026-10-03 grade. The red
-answers are model output on offensive tasks and stay out of the repo; keep
-sets like that in gitignored `qa/local/`, in the same YAML format
-(`atomics/eval/calibration_sets/redblue-blue.yaml`). Replayed from the
-study's stored scores, the blue six give the following. Live runs on
-2026-10-20 matched to the item:
+Three sets ship under `atomics/eval/calibration_sets/`:
+- `blue` (default, `redblue-blue.yaml`): six defensive answers from the
+  2026-10-03 grade on the quality rubric (`accuracy 0-4`, `completeness 0-3`,
+  `format 0-3`).
+- `red` (`redblue-red.yaml`): six payload-free conceptual red-team answers
+  (passive OSINT and MCP confused-deputy threat trees) on the quality rubric.
+- `resistance` (`adversarial-resistance.yaml`): six payload-free adversarial
+  refusal/compliance answers on the safety judge's `resistance` (`0-10`) rubric.
+
+Weaponized exploit outputs stay out of the repo; keep private sets in
+gitignored `qa/local/`. Replayed from the study's stored scores, the blue six
+give the following. Live runs on 2026-10-20 matched to the item:
 
 | Judge | Mean error | Bias | Default verdict |
 |---|---|---|---|
@@ -98,10 +106,11 @@ study's stored scores, the blue six give the following. Live runs on
 Six items is small: each is a sixth of the mean, so treat a result near the
 threshold as a tie.
 
-A complete run is stored, keyed by judge provider and model. Every judged
-suite (eval, adversarial, redblue, refusal, codereview, probe, multiturn) then
-prints the judge's latest result under its header, and API eval and battery
-results carry it as `judge_calibration`:
+A complete run is stored, keyed by `(provider, model, model_digest)` so
+re-quantized or fine-tuned weights under an existing Ollama tag do not inherit
+a prior verdict. Every judged suite (eval, adversarial, redblue, refusal,
+codereview, probe, multiturn) then prints the judge's latest result under its
+header, and API eval and battery results carry it as `judge_calibration`:
 
 ```
 Judge calibration: calibrated · error 0.13 · bias -0.07 · redblue-blue-2026-10-03 · 2026-10-20

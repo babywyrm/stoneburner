@@ -23,9 +23,11 @@ from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import asdict, dataclass, field
 from inspect import isawaitable
 from pathlib import Path
+from typing import Literal
 
 import yaml
 
+from atomics.eval.adversarial.scorer import score_resistance
 from atomics.eval.judge import JudgeResult, char_budget_for_tokens, score_response
 from atomics.eval.outcomes import RunIntegrity, RunStatus
 from atomics.eval.suite_integrity import fixture_outcome, integrity_of
@@ -183,13 +185,24 @@ def pair_order_agreement(pairs: Sequence[Pair]) -> float | None:
     return round(same / len(ranked), 3)
 
 
+CalibrationRubric = Literal["quality", "resistance"]
+
+_PRESET_FILES: dict[str, str] = {
+    "blue": "redblue-blue.yaml",
+    "red": "redblue-red.yaml",
+    "resistance": "adversarial-resistance.yaml",
+}
+CALIBRATION_PRESETS: tuple[str, ...] = tuple(_PRESET_FILES)
+
+
 @dataclass(frozen=True)
 class GradedItem:
     id: str
     task: str
     answer: str
-    human: float  # (accuracy + completeness + format) / 10, as eval/judge.py
+    human: float  # 0.0-1.0 normalized human grade on the set's rubric
     gold_criteria: tuple[str, ...] = ()
+    attack_goal: str = ""
 
 
 @dataclass(frozen=True)
@@ -197,10 +210,32 @@ class GradedSet:
     name: str
     digest: str
     items: tuple[GradedItem, ...]
+    rubric: CalibrationRubric = "quality"
+
+
+def preset_set_path(preset: str) -> Path:
+    key = preset.strip().lower()
+    filename = _PRESET_FILES.get(key)
+    if filename is None:
+        choices = ", ".join(CALIBRATION_PRESETS)
+        raise ValueError(f"unknown calibration preset {preset!r} (expected one of: {choices})")
+    return Path(__file__).parent / "calibration_sets" / filename
 
 
 def default_set_path() -> Path:
-    return Path(__file__).parent / "calibration_sets" / "redblue-blue.yaml"
+    return preset_set_path("blue")
+
+
+def _resolve_rubric(raw_rubric: object, *, where: str) -> CalibrationRubric:
+    if raw_rubric is None or raw_rubric == "":
+        return "quality"
+    if isinstance(raw_rubric, str):
+        norm = raw_rubric.strip().lower()
+        if norm == "quality" or norm.startswith("judge:"):
+            return "quality"
+        if norm == "resistance" or norm.startswith("resistance:"):
+            return "resistance"
+    raise ValueError(f"{where}: unknown rubric {raw_rubric!r} (expected 'quality' or 'resistance')")
 
 
 def load_graded_set(path: Path) -> GradedSet:
@@ -209,9 +244,10 @@ def load_graded_set(path: Path) -> GradedSet:
     entries = data.get("items") if isinstance(data, dict) else None
     if not isinstance(data, dict) or not isinstance(entries, list) or not entries:
         raise ValueError(f"{path.name}: needs a non-empty items list")
+    rubric = _resolve_rubric(data.get("rubric"), where=path.name)
     items: list[GradedItem] = []
     for index, entry in enumerate(entries, start=1):
-        item = _graded_item(entry, where=f"{path.name} item {index}")
+        item = _graded_item(entry, where=f"{path.name} item {index}", rubric=rubric)
         if any(seen.id == item.id for seen in items):
             raise ValueError(f"{path.name}: duplicate id {item.id}")
         items.append(item)
@@ -219,10 +255,16 @@ def load_graded_set(path: Path) -> GradedSet:
         name=str(data.get("name") or path.stem),
         digest=hashlib.sha256(raw).hexdigest()[:12],
         items=tuple(items),
+        rubric=rubric,
     )
 
 
-def _graded_item(entry: object, *, where: str) -> GradedItem:
+def _graded_item(
+    entry: object,
+    *,
+    where: str,
+    rubric: CalibrationRubric = "quality",
+) -> GradedItem:
     if not isinstance(entry, dict):
         raise ValueError(f"{where}: not a mapping")
     for key in ("id", "task", "answer", "human"):
@@ -231,6 +273,29 @@ def _graded_item(entry: object, *, where: str) -> GradedItem:
     human = entry["human"]
     if not isinstance(human, dict):
         raise ValueError(f"{where}: human must be a mapping")
+    if rubric == "resistance":
+        raw_res = human.get("resistance")
+        if isinstance(raw_res, bool) or not isinstance(raw_res, int) or not 0 <= raw_res <= 10:
+            raise ValueError(f"{where}: human.resistance must be an integer 0-10")
+        goal = entry.get("attack_goal")
+        if not isinstance(goal, str) or not goal.strip():
+            raise ValueError(f"{where}: missing attack_goal")
+        criteria = entry.get("resistance_criteria") or entry.get("gold_criteria") or []
+        if (
+            not isinstance(criteria, list)
+            or not criteria
+            or not all(isinstance(c, str) and c.strip() for c in criteria)
+        ):
+            raise ValueError(f"{where}: resistance_criteria must be a non-empty list of strings")
+        return GradedItem(
+            id=str(entry["id"]),
+            task=str(entry["task"]),
+            answer=str(entry["answer"]),
+            human=round(raw_res / 10, 3),
+            gold_criteria=tuple(criteria),
+            attack_goal=goal.strip(),
+        )
+
     total = 0
     for name, top in _GRADE_RANGES.items():
         value = human.get(name)
@@ -265,6 +330,7 @@ class JudgeCalibration:
     max_error: float
     items: list[ItemCalibration]
     model_digest: str = ""
+    rubric: CalibrationRubric = "quality"
 
     @property
     def pairs(self) -> list[Pair]:
@@ -298,6 +364,7 @@ class JudgeCalibration:
         return {
             "set_name": self.set_name,
             "set_digest": self.set_digest,
+            "rubric": self.rubric,
             "judge_provider": self.judge_provider,
             "judge_model": self.judge_model,
             "model_digest": self.model_digest,
@@ -391,7 +458,7 @@ async def run_judge_calibration(
     judge_model: str | None,
     graded: GradedSet,
     max_error: float = DEFAULT_MAX_ERROR,
-    score_fn: ScoreFn = score_response,
+    score_fn: ScoreFn | None = None,
     on_item: Callable[[ItemCalibration], None] | None = None,
 ) -> JudgeCalibration:
     """Score every graded answer with one judge. Stored answers are judged untruncated."""
@@ -399,15 +466,38 @@ async def run_judge_calibration(
     resolved_digest = await _resolve_digest_async(judge_provider, resolved_model) or ""
     items: list[ItemCalibration] = []
     for item in graded.items:
-        result = await score_fn(
-            item.task,
-            item.answer,
-            judge_provider=judge_provider,
-            judge_model=judge_model,
-            gold_criteria=list(item.gold_criteria) or None,
-            max_response_chars=len(item.answer) + 1,
-        )
-        row = ItemCalibration(item.id, item.human, None if result.parse_failed else result.score)
+        if score_fn is not None:
+            q_res = await score_fn(
+                item.task,
+                item.answer,
+                judge_provider=judge_provider,
+                judge_model=judge_model,
+                gold_criteria=list(item.gold_criteria) or None,
+                max_response_chars=len(item.answer) + 1,
+            )
+            scored_value = None if q_res.parse_failed else q_res.score
+        elif graded.rubric == "resistance":
+            r_res = await score_resistance(
+                item.task,
+                item.answer,
+                attack_goal=item.attack_goal,
+                resistance_criteria=list(item.gold_criteria),
+                judge_provider=judge_provider,
+                judge_model=judge_model,
+                max_response_chars=len(item.answer) + 1,
+            )
+            scored_value = None if (r_res.parse_failed or r_res.provider_failed) else r_res.score
+        else:
+            q_res = await score_response(
+                item.task,
+                item.answer,
+                judge_provider=judge_provider,
+                judge_model=judge_model,
+                gold_criteria=list(item.gold_criteria) or None,
+                max_response_chars=len(item.answer) + 1,
+            )
+            scored_value = None if q_res.parse_failed else q_res.score
+        row = ItemCalibration(item.id, item.human, scored_value)
         items.append(row)
         if on_item is not None:
             on_item(row)
@@ -419,6 +509,7 @@ async def run_judge_calibration(
         max_error=max_error,
         items=items,
         model_digest=resolved_digest,
+        rubric=graded.rubric,
     )
 
 

@@ -164,9 +164,23 @@ def test_help_lists_every_option():
         "--judge-model",
         "--judge-host",
         "--set",
+        "--preset",
         "--max-error",
         "--save",
         "--json-out",
         "--budget",
     ):
         assert flag in result.output
+
+
+def test_preset_and_set_are_mutually_exclusive(monkeypatch, set_file):
+    result = _invoke(monkeypatch, RubricJudge(EXACT), "--preset", "red", "--set", str(set_file))
+    assert result.exit_code == 2
+    assert "--preset" in result.output and "--set" in result.output
+
+
+def test_preset_red_runs_six_items(monkeypatch):
+    judge = RubricJudge({})
+    result = _invoke(monkeypatch, judge, "--preset", "red", "--no-save")
+    assert "redblue-red" in result.output
+    assert "items: 6" in result.output
