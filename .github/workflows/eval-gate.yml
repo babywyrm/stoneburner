@@ -57,7 +57,7 @@ jobs:
       # tests/test_distributed_*.py import fastapi at module scope, so without
       # it pytest errors during collection.
       - name: Install dependencies
-        run: uv sync --extra dev --extra api --extra mcp --extra claude --extra openai --extra bedrock
+        run: uv sync --frozen --extra dev --extra api --extra mcp --extra claude --extra openai --extra bedrock
 
       - name: Run tests
         run: uv run pytest -q --tb=short
@@ -76,7 +76,7 @@ jobs:
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           enable-cache: true
-      - run: uv sync --extra dev
+      - run: uv sync --frozen --extra dev
       - run: uv run atomics doctor
 
   eval-gate:
@@ -101,7 +101,7 @@ jobs:
           enable-cache: true
 
       - name: Install dependencies
-        run: uv sync --extra dev --extra claude --extra openai --extra bedrock
+        run: uv sync --frozen --extra dev --extra claude --extra openai --extra bedrock
 
       - name: Run eval suite
         run: |

@@ -40,6 +40,11 @@
   `[rag]` third-party stub skip.
 
 ### Changed
+- `.github/workflows/security.yml` now enforces `uv lock --check`,
+  `pip-audit --require-hashes --strict --disable-pip` across `pypi` and `osv`
+  on hashed lockfile exports, and checksum-verified `trufflehog --no-update`
+  history and working-tree scans alongside `zizmor`, `bandit`, and `gitleaks`;
+  `ci.yml` and `eval-gate.yml` sync strictly with `uv sync --frozen`.
 - `eval/judge.py`, `eval/rag/judge.py`, and `eval/multiturn/judge.py` now share
   `invoke_judge_text()`, `parse_three_part_rubric()`, and `strip_think_blocks()`,
   extending empty-reply thinking fallback, `<think>` stripping, and credential

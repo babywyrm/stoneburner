@@ -62,7 +62,7 @@ major tag moved by the publish workflow.
 - [x] Add multi-turn adversarial escalation fixtures (gradual context drift and
       turn-by-turn authority buildup) with per-turn and conversation-level
       breach scoring.
-- [ ] Enforce hash-verified dependency auditing in CI security gates alongside
+- [x] Enforce hash-verified dependency auditing in CI security gates alongside
       `pip-audit` (`pypi` + `osv`), `zizmor`, `bandit`, `gitleaks`, and
       `trufflehog`.
 

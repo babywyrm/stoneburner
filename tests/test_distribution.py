@@ -167,3 +167,52 @@ def test_mypy_strictness_flags_stay_enabled():
         assert not any(isinstance(m, str) and m.startswith("atomics") for m in mods), (
             f"Do not add per-module mypy overrides for atomics packages: {mods}"
         )
+
+
+def test_uv_lock_records_sha256_hashes_for_all_packages():
+    """Every resolved external distribution in uv.lock must carry sha256 digests."""
+    import tomllib
+
+    lock = tomllib.loads(Path("uv.lock").read_text())
+    packages = lock.get("package", [])
+    assert packages, "uv.lock must contain resolved packages"
+    missing: list[str] = []
+    for pkg in packages:
+        source = pkg.get("source", {})
+        if source.get("editable") or source.get("virtual"):
+            continue
+        sdist_hash = (pkg.get("sdist") or {}).get("hash", "")
+        wheel_hashes = [w.get("hash", "") for w in pkg.get("wheels", [])]
+        hashes = [h for h in [sdist_hash, *wheel_hashes] if h]
+        if not hashes or not all(h.startswith("sha256:") for h in hashes):
+            missing.append(str(pkg.get("name")))
+    assert missing == [], f"uv.lock packages missing sha256 digests: {missing}"
+
+
+def test_security_workflow_enforces_hash_verified_audit_and_all_gates():
+    """Guard CI security gates: hash-verified pip-audit, zizmor, bandit, gitleaks, trufflehog."""
+    import yaml
+
+    wf = yaml.safe_load(Path(".github/workflows/security.yml").read_text())
+    jobs = wf["jobs"]
+
+    dep_steps = "\n".join(step.get("run", "") for step in jobs["dependency-audit"]["steps"])
+    assert "uv lock --check" in dep_steps
+    assert "uv export --frozen" in dep_steps
+    assert "--no-hashes" not in dep_steps
+    assert "--require-hashes" in dep_steps
+    assert "--strict" in dep_steps
+    assert "--disable-pip" in dep_steps
+    assert "pypi" in dep_steps and "osv" in dep_steps
+
+    static_steps = "\n".join(step.get("run", "") for step in jobs["static-analysis"]["steps"])
+    assert "bandit" in static_steps
+    assert "zizmor" in static_steps
+
+    secret_steps = "\n".join(step.get("run", "") for step in jobs["secret-scan"]["steps"])
+    assert "gitleaks git" in secret_steps
+    assert "gitleaks dir" in secret_steps
+    assert "trufflehog" in secret_steps
+    assert "trufflehog --no-update git file://." in secret_steps
+    assert "trufflehog --no-update filesystem ." in secret_steps
+    assert "sha256sum --check --strict" in secret_steps

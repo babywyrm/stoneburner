@@ -42,7 +42,7 @@ jobs:
       # untested. All three are pure-Python trees. rag stays out: it pulls the
       # full torch stack, and its index tests skip without it.
       - name: Sync dependencies
-        run: uv sync --extra dev --extra api --extra mcp --extra claude --extra openai --extra bedrock
+        run: uv sync --frozen --extra dev --extra api --extra mcp --extra claude --extra openai --extra bedrock
 
       # scripts/ included: it was outside this scope and quietly accumulated six
       # errors, and the release tooling now lives there.

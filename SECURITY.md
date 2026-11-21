@@ -56,12 +56,13 @@ files such as `profiles/local/`, `qa/local/`, and `.env`.
 
 ```bash
 # Committed history
-trufflehog git file://. --results=verified,unknown --fail \
+trufflehog --no-update git file://. --results=verified,unknown --fail \
   --exclude-detectors=Polygon,Pastebin,URI,Lob
 gitleaks git --no-banner --config .gitleaks.toml
 
 # Working tree, including staged-but-uncommitted changes
-trufflehog filesystem . --exclude-paths=.trufflehogignore --fail \
+trufflehog --no-update filesystem . --exclude-paths=.trufflehogignore \
+  --results=verified,unknown --fail \
   --exclude-detectors=Polygon,Pastebin,URI,Lob
 gitleaks dir --no-banner --config .gitleaks.toml
 ```
@@ -116,6 +117,14 @@ CI also runs CodeQL (`.github/workflows/codeql.yml`) over Python, the npm
 worker's JavaScript, and the workflow files, on every push, pull request, and
 weekly. Findings land in the repository's code-scanning alerts; on a pull
 request, a new critical- or high-severity one fails the code-scanning check.
+
+## Dependency auditing
+
+`.github/workflows/security.yml` checks lockfile consistency (`uv lock --check`),
+exports every extra from `uv.lock` with SHA-256 digests (`uv export --frozen
+--all-extras`), and runs `pip-audit --require-hashes --strict --disable-pip`
+against both `pypi` (verifying artifact SHA-256 digests and PyPI advisories)
+and `osv` on every push, pull request, and weekly schedule.
 
 ## Post-run hooks (`--hook` / `ATOMICS_POST_RUN_HOOK`)
 
