@@ -7,6 +7,7 @@ import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from typing import TypedDict
 
 from atomics.eval.attempt_serialization import integrity_to_dict
 from atomics.eval.consensus import NumericVote, combine_numeric
@@ -28,6 +29,16 @@ from atomics.providers.base import BaseProvider, ChatMessage
 from atomics.validation import sanitize_error
 
 logger = logging.getLogger("atomics.eval.multiturn.runner")
+
+
+class _ChatKwargs(TypedDict, total=False):
+    system: str
+    model: str | None
+    max_tokens: int
+    thinking: bool
+    thinking_budget: int
+    effort: str
+    reasoning_mode: str
 
 
 @dataclass
@@ -160,7 +171,7 @@ class MultiturnRunSummary:
             ]
         )
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, object]:
         conversation_ci = self.conversation_ci
         return {
             "run_id": self.run_id,
@@ -269,7 +280,7 @@ async def run_multiturn(
                 messages.append({"role": "assistant", "content": assistant_msg})
             messages.append({"role": "user", "content": turn.user_message})
 
-            gen_kwargs: dict = {
+            gen_kwargs: _ChatKwargs = {
                 "system": fixture.system_prompt,
                 "model": model,
                 "max_tokens": fixture.max_output_tokens,

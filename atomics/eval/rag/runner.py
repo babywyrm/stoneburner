@@ -7,7 +7,7 @@ import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, TypedDict
 
 from atomics.eval.attempt_serialization import integrity_to_dict
 from atomics.eval.judge import detect_self_judge
@@ -24,6 +24,15 @@ from atomics.providers.base import BaseProvider
 from atomics.validation import sanitize_error
 
 logger = logging.getLogger("atomics.eval.rag.runner")
+
+
+class _GenKwargs(TypedDict, total=False):
+    model: str | None
+    max_tokens: int
+    thinking: bool
+    thinking_budget: int
+    effort: str
+    reasoning_mode: str
 
 
 @dataclass
@@ -139,7 +148,7 @@ class RAGRunSummary:
         """
         return round(self.integrity.judge_failure_rate, 3)
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, object]:
         return {
             "run_id": self.run_id,
             "provider": self.provider,
@@ -253,7 +262,7 @@ async def run_rag(
         task_id = uuid.uuid4().hex[:12]
         task_started = datetime.now(UTC)
 
-        gen_kwargs: dict = {
+        gen_kwargs: _GenKwargs = {
             "model": model,
             "max_tokens": fixture.max_output_tokens,
         }

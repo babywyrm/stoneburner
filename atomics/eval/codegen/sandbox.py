@@ -134,7 +134,7 @@ def _child_env(scratch: str | None = None) -> dict[str, str]:
 def execute(
     code: str,
     function_name: str,
-    args: tuple | list,
+    args: tuple[object, ...] | list[object],
     *,
     timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
     memory_bytes: int = DEFAULT_MEMORY_BYTES,
@@ -198,7 +198,7 @@ def execute(
     return SandboxOutcome("ok", result=value)
 
 
-def _terminate_group(proc: subprocess.Popen) -> None:
+def _terminate_group(proc: subprocess.Popen[str]) -> None:
     """Kill the child's whole process group, then reap it."""
     try:
         os.killpg(os.getpgid(proc.pid), signal.SIGKILL)

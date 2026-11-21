@@ -8,6 +8,7 @@ import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from typing import TypedDict
 
 from atomics.eval.attempt_serialization import integrity_to_dict
 from atomics.eval.codegen import CodegenFixture, CodeTestCase, sandbox
@@ -21,6 +22,17 @@ from atomics.providers.base import BaseProvider
 from atomics.validation import sanitize_error
 
 logger = logging.getLogger("atomics.eval.codegen.runner")
+
+
+class _GenKwargs(TypedDict, total=False):
+    system: str
+    model: str | None
+    max_tokens: int
+    thinking: bool
+    thinking_budget: int
+    effort: str
+    reasoning_mode: str
+
 
 _CODEGEN_SYSTEM = (
     "You are a Python programmer. Write ONLY the function implementation — "
@@ -96,10 +108,18 @@ def _is_valid_topo_order(order: list[int], fixture: CodegenFixture) -> bool:
     tc = fixture.test_cases[0]
     n = tc.input_args[0]
     edges = tc.input_args[1]
-    if len(order) != n:
+    if len(order) != n or not isinstance(edges, (list, tuple)):
         return False
     pos = {node: i for i, node in enumerate(order)}
-    return all(pos.get(u, -1) < pos.get(v, -1) for u, v in edges)
+    for edge in edges:
+        if not isinstance(edge, (list, tuple)) or len(edge) != 2:
+            return False
+        u, v = edge
+        if not isinstance(u, int) or not isinstance(v, int):
+            return False
+        if pos.get(u, -1) >= pos.get(v, -1):
+            return False
+    return True
 
 
 def run_test_case(
@@ -206,7 +226,7 @@ class CodegenRunSummary:
             ]
         )
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, object]:
         return {
             "run_id": self.run_id,
             "provider": self.provider,
@@ -264,7 +284,7 @@ async def run_codegen(
         )
         task_started = datetime.now(UTC)
 
-        gen_kwargs: dict = {
+        gen_kwargs: _GenKwargs = {
             "system": _CODEGEN_SYSTEM,
             "model": model,
             "max_tokens": fixture.max_output_tokens,

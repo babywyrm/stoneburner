@@ -9,6 +9,7 @@ Answers the question: "Can my GPU host / cloud endpoint handle N users?"
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 
 
@@ -57,7 +58,7 @@ def estimate_concurrency(
 
 def interpolate_latency(
     concurrency: float,
-    phases: list[dict],
+    phases: Sequence[Mapping[str, float]],
     percentile: str = "p50",
 ) -> float:
     """Interpolate latency from stress test phase data.
@@ -92,7 +93,7 @@ def interpolate_latency(
 def _solve_steady_state(
     users: float,
     think_time_s: float,
-    phases: list[dict],
+    phases: Sequence[Mapping[str, float]],
 ) -> float:
     """Find steady-state concurrency via fixed-point iteration.
 
@@ -131,7 +132,7 @@ def _verdict(p50_ms: float, peak_tps: float, concurrent: float) -> str:
 def project_capacity(
     *,
     profile: LoadProfile,
-    phases: list[dict],
+    phases: Sequence[Mapping[str, float]],
     peak_tps: float,
     model: str = "",
 ) -> CapacityProjection:

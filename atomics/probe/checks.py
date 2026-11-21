@@ -9,19 +9,29 @@ Each handler receives the raw artifact content and returns a dict with:
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import TypedDict
 
-_HANDLERS: dict[str, Callable[[str], dict]] = {}
+
+class ProbeCheck(TypedDict):
+    check_id: str
+    prompt: str
+    gold_criteria: list[str]
 
 
-def _register(artifact_type: str) -> Callable[[Callable[[str], dict]], Callable[[str], dict]]:
-    def decorator(fn: Callable[[str], dict]) -> Callable[[str], dict]:
+_HANDLERS: dict[str, Callable[[str], ProbeCheck]] = {}
+
+
+def _register(
+    artifact_type: str,
+) -> Callable[[Callable[[str], ProbeCheck]], Callable[[str], ProbeCheck]]:
+    def decorator(fn: Callable[[str], ProbeCheck]) -> Callable[[str], ProbeCheck]:
         _HANDLERS[artifact_type] = fn
         return fn
 
     return decorator
 
 
-def build_check(artifact_type: str, content: str) -> dict:
+def build_check(artifact_type: str, content: str) -> ProbeCheck:
     """Build a check task dict for the given artifact type and content."""
     handler = _HANDLERS.get(artifact_type)
     if handler is None:
@@ -41,7 +51,7 @@ def build_check(artifact_type: str, content: str) -> dict:
 
 
 @_register("access-log")
-def _access_log(content: str) -> dict:
+def _access_log(content: str) -> ProbeCheck:
     return {
         "check_id": "ioc_analysis",
         "prompt": (
@@ -65,7 +75,7 @@ def _access_log(content: str) -> dict:
 
 
 @_register("json-security-report")
-def _json_security_report(content: str) -> dict:
+def _json_security_report(content: str) -> ProbeCheck:
     return {
         "check_id": "finding_triage",
         "prompt": (
@@ -87,7 +97,7 @@ def _json_security_report(content: str) -> dict:
 
 
 @_register("inference-api")
-def _inference_api(content: str) -> dict:
+def _inference_api(content: str) -> ProbeCheck:
     return {
         "check_id": "inference_api_health",
         "prompt": (
@@ -112,7 +122,7 @@ def _inference_api(content: str) -> dict:
 
 
 @_register("k8s-audit-log")
-def _k8s_audit_log(content: str) -> dict:
+def _k8s_audit_log(content: str) -> ProbeCheck:
     return {
         "check_id": "k8s_audit_anomaly",
         "prompt": (
@@ -136,7 +146,7 @@ def _k8s_audit_log(content: str) -> dict:
 
 
 @_register("config-file")
-def _config_file(content: str) -> dict:
+def _config_file(content: str) -> ProbeCheck:
     return {
         "check_id": "config_security_review",
         "prompt": (
@@ -159,7 +169,7 @@ def _config_file(content: str) -> dict:
 
 
 @_register("api-response")
-def _api_response(content: str) -> dict:
+def _api_response(content: str) -> ProbeCheck:
     return {
         "check_id": "api_response_security",
         "prompt": (

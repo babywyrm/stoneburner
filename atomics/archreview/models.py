@@ -79,7 +79,7 @@ class ArchReviewSummary:
     tier: str
     results: list[ArchReviewResult]
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, object]:
         """Machine-readable view of the run for --json-out / dashboards / CI."""
         return {
             "repo": self.repo,

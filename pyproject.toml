@@ -131,6 +131,16 @@ module = [
     "atomics.providers.*",
     "atomics.distributed",
     "atomics.distributed.*",
+    "atomics.eval",
+    "atomics.eval.*",
+    "atomics.benchmark",
+    "atomics.benchmark.*",
+    "atomics.load",
+    "atomics.load.*",
+    "atomics.archreview",
+    "atomics.archreview.*",
+    "atomics.probe",
+    "atomics.probe.*",
 ]
 disallow_any_generics = true
 disallow_untyped_calls = true

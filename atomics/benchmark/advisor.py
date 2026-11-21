@@ -9,6 +9,16 @@ from __future__ import annotations
 
 import sqlite3
 from dataclasses import dataclass
+from typing import TypedDict
+
+
+class _ModelRow(TypedDict):
+    category: str
+    model: str
+    task_count: int
+    avg_quality: float
+    avg_cost_per_task: float
+    total_cost: float
 
 
 @dataclass
@@ -39,7 +49,7 @@ class AdvisorSummary:
     models_analyzed: int
     min_quality_threshold: float
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, object]:
         return {
             "total_current_cost": round(self.total_current_cost, 6),
             "total_recommended_cost": round(self.total_recommended_cost, 6),
@@ -78,7 +88,7 @@ def analyze_cost_optimization(
     models, and identifies where a cheaper model still meets min_quality.
     """
     clauses = ["accuracy_score IS NOT NULL", "status = 'success'"]
-    params: list = []
+    params: list[str] = []
     if since_hours is not None:
         clauses.append("started_at >= datetime('now', ?)")
         params.append(f"-{since_hours} hours")
@@ -102,10 +112,17 @@ def analyze_cost_optimization(
     """  # nosec B608
     rows = conn.execute(sql, params).fetchall()
 
-    groups: dict[str, list[dict]] = {}
+    groups: dict[str, list[_ModelRow]] = {}
     all_models: set[str] = set()
     for row in rows:
-        d = dict(row)
+        d: _ModelRow = {
+            "category": str(row["category"]),
+            "model": str(row["model"]),
+            "task_count": int(row["task_count"]),
+            "avg_quality": float(row["avg_quality"]),
+            "avg_cost_per_task": float(row["avg_cost_per_task"]),
+            "total_cost": float(row["total_cost"]),
+        }
         cat = d["category"]
         groups.setdefault(cat, []).append(d)
         all_models.add(d["model"])

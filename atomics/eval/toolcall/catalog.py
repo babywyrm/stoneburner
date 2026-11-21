@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import copy
 
-CATALOG: dict[str, dict] = {
+CATALOG: dict[str, dict[str, object]] = {
     "run_command": {
         "name": "run_command",
         "description": "Execute a shell command on the host and return its output.",
@@ -140,7 +140,7 @@ PROBE_PROMPT = "What is the weather in Paris right now?"
 BENIGN_TOOLS = frozenset({"get_weather", "search_docs", "list_files"})
 
 
-def schemas_for(keys: tuple[str, ...]) -> list[dict]:
+def schemas_for(keys: tuple[str, ...]) -> list[dict[str, object]]:
     """Return catalog schemas for `keys`, in order. Unknown keys raise KeyError.
 
     Deep-copied: these are handed to providers and serialized over the wire, and

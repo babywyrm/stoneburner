@@ -185,5 +185,22 @@ def test_mypy_strictness_flags_stay_enabled():
             else [entry.get("module")]
         )
     }
-    for required in ("atomics.storage.*", "atomics.providers.*", "atomics.distributed.*"):
+    for required in (
+        "atomics.storage",
+        "atomics.storage.*",
+        "atomics.providers",
+        "atomics.providers.*",
+        "atomics.distributed",
+        "atomics.distributed.*",
+        "atomics.eval",
+        "atomics.eval.*",
+        "atomics.benchmark",
+        "atomics.benchmark.*",
+        "atomics.load",
+        "atomics.load.*",
+        "atomics.archreview",
+        "atomics.archreview.*",
+        "atomics.probe",
+        "atomics.probe.*",
+    ):
         assert required in strict_modules, f"mypy strict override missing for {required}"

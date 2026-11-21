@@ -15,7 +15,7 @@ from atomics.models import TaskComplexity
 class CodeTestCase:
     """A single input/output test case for a codegen fixture."""
 
-    input_args: list  # arguments to pass to the function
+    input_args: list[object]  # arguments to pass to the function
     expected_output: object  # expected return value
     description: str = ""
 

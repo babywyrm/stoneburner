@@ -217,7 +217,7 @@ class AdversarialSummary:
             and fr.fixture.severity in ("HIGH", "CRITICAL")
         ]
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, object]:
         """Machine-readable view of the run for --json-out / dashboards / CI."""
         integrity = self.integrity
         resilience_ci = self.resilience_ci

@@ -124,42 +124,65 @@ def load_profile(path: str | Path) -> TargetProfile:
     if not isinstance(raw, dict):
         raise ProfileError(f"{path}: expected a YAML mapping at top level")
 
-    name = raw.get("name", p.stem)
-    profile_type = raw.get("type", "")
+    name = str(raw.get("name", p.stem))
+    profile_type = str(raw.get("type", ""))
+    model = str(raw.get("model", ""))
+    raw_prompts = raw.get("prompts")
+    prompts = [str(item) for item in raw_prompts] if isinstance(raw_prompts, list) else []
+    prompts_file = raw.get("prompts_file")
 
-    kwargs: dict = {"name": name, "type": profile_type}
-    kwargs["model"] = raw.get("model", "")
-    kwargs["prompts"] = raw.get("prompts", [])
-    kwargs["prompts_file"] = raw.get("prompts_file")
-
+    classify: dict[str, list[str]] | None = None
     classify_raw = raw.get("classify")
     if classify_raw and isinstance(classify_raw, dict):
-        kwargs["classify"] = {k: list(v) for k, v in classify_raw.items()}
+        classify = {
+            str(k): [str(item) for item in v] if isinstance(v, list) else []
+            for k, v in classify_raw.items()
+        }
+
+    ollama_host = ""
+    system_prompt = ""
+    temperature: float | None = None
+    num_predict = 2048
+    http_url = ""
+    http_method = "POST"
+    http_headers: dict[str, str] = {}
+    http_body_template = ""
+    http_timeout = 30
+    response_format = "json"
+    response_text_field = ""
+    response_latency_field = ""
 
     if profile_type == "ollama":
-        ollama = raw.get("ollama", {})
-        kwargs["ollama_host"] = ollama.get("host", "")
-        kwargs["model"] = kwargs["model"] or ollama.get("model", "")
-        kwargs["system_prompt"] = ollama.get("system_prompt", "")
-        kwargs["temperature"] = ollama.get("temperature")
-        kwargs["num_predict"] = ollama.get("num_predict", 2048)
+        ollama = raw.get("ollama")
+        if isinstance(ollama, dict):
+            ollama_host = str(ollama.get("host", ""))
+            model = model or str(ollama.get("model", ""))
+            system_prompt = str(ollama.get("system_prompt", ""))
+            raw_temp = ollama.get("temperature")
+            temperature = float(raw_temp) if isinstance(raw_temp, (int, float)) else None
+            raw_np = ollama.get("num_predict", 2048)
+            num_predict = int(raw_np) if isinstance(raw_np, (int, float)) else 2048
     elif profile_type == "http":
-        http = raw.get("http", {})
-        kwargs["http_url"] = http.get("url", "")
-        kwargs["http_method"] = http.get("method", "POST").upper()
-        kwargs["http_headers"] = http.get("headers", {})
-        kwargs["http_body_template"] = http.get("body_template", "")
-        kwargs["http_timeout"] = http.get("timeout", 30)
+        http = raw.get("http")
+        if isinstance(http, dict):
+            http_url = str(http.get("url", ""))
+            http_method = str(http.get("method", "POST")).upper()
+            raw_headers = http.get("headers")
+            if isinstance(raw_headers, dict):
+                http_headers = {str(k): str(v) for k, v in raw_headers.items()}
+            http_body_template = str(http.get("body_template", ""))
+            raw_timeout = http.get("timeout", 30)
+            http_timeout = int(raw_timeout) if isinstance(raw_timeout, (int, float)) else 30
 
-        resp = raw.get("response", {})
-        kwargs["response_format"] = resp.get("format", "json")
-        kwargs["response_text_field"] = resp.get("text_field", "")
-        kwargs["response_latency_field"] = resp.get("latency_field", "")
+        resp = raw.get("response")
+        if isinstance(resp, dict):
+            response_format = str(resp.get("format", "json"))
+            response_text_field = str(resp.get("text_field", ""))
+            response_latency_field = str(resp.get("latency_field", ""))
 
-    prompts_file = kwargs.get("prompts_file")
-    if prompts_file and not kwargs["prompts"]:
-        if not isinstance(prompts_file, str):
-            raise ProfileError(f"{p}: prompts_file must be a string path")
+    if prompts_file is not None and not isinstance(prompts_file, str):
+        raise ProfileError(f"{p}: prompts_file must be a string path")
+    if prompts_file and not prompts:
         raw_pf = p.parent / prompts_file
         real_parent = os.path.realpath(p.parent)
         real_pf = os.path.realpath(raw_pf)
@@ -167,13 +190,32 @@ def load_profile(path: str | Path) -> TargetProfile:
             raise ProfileError(f"{p}: prompts_file must stay inside the profile's directory")
         pf = Path(real_pf)
         if pf.is_file():
-            kwargs["prompts"] = [
+            prompts = [
                 line.strip()
                 for line in pf.read_text().splitlines()
                 if line.strip() and not line.strip().startswith("#")
             ]
 
-    return TargetProfile(**kwargs)
+    return TargetProfile(
+        name=name,
+        type=profile_type,
+        model=model,
+        prompts=prompts,
+        prompts_file=prompts_file,
+        classify=classify,
+        ollama_host=ollama_host,
+        system_prompt=system_prompt,
+        temperature=temperature,
+        num_predict=num_predict,
+        http_url=http_url,
+        http_method=http_method,
+        http_headers=http_headers,
+        http_body_template=http_body_template,
+        http_timeout=http_timeout,
+        response_format=response_format,
+        response_text_field=response_text_field,
+        response_latency_field=response_latency_field,
+    )
 
 
 _TEMPLATE_RE = re.compile(r"\{\{\s*(\w+)\s*\}\}")
@@ -200,11 +242,11 @@ def render_body(
     # starts otherwise gets raw values. Upgrade: a response.format-style flag.
     as_json = template.lstrip().startswith(("{", "["))
 
-    def _replace(m: re.Match) -> str:
+    def _replace(m: re.Match[str]) -> str:
         key = m.group(1)
         if key not in values:
             return m.group(0)
-        return json.dumps(values[key])[1:-1] if as_json else values[key]
+        return str(json.dumps(values[key])[1:-1]) if as_json else values[key]
 
     return _TEMPLATE_RE.sub(_replace, template)
 
@@ -261,16 +303,20 @@ async def _single_request_profile(
         from atomics.validation import validate_endpoint_url
 
         host = validate_endpoint_url(profile.ollama_host, label="ollama.host")
-        body: dict = {
+        options: dict[str, int | float] = {
+            "num_predict": profile.num_predict,
+            "num_ctx": DEFAULT_NUM_CTX,
+        }
+        if profile.temperature is not None:
+            options["temperature"] = profile.temperature
+        body: dict[str, object] = {
             "model": profile.model,
             "prompt": prompt,
             "stream": False,
-            "options": {"num_predict": profile.num_predict, "num_ctx": DEFAULT_NUM_CTX},
+            "options": options,
         }
         if profile.system_prompt:
             body["system"] = profile.system_prompt
-        if profile.temperature is not None:
-            body["options"]["temperature"] = profile.temperature
 
         resp = await client.post(
             f"{host}/api/generate",

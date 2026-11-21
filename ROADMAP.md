@@ -51,7 +51,7 @@ major tag moved by the publish workflow.
 - [x] Extract shared Click provider/judge option decorators in
       `atomics/commands/common.py` and retire unused legacy re-exports in
       `atomics/cli.py` without breaking CLI entry points.
-- [ ] Complete `mypy --strict` across `atomics/eval/`, `atomics/benchmark/`,
+- [x] Complete `mypy --strict` across `atomics/eval/`, `atomics/benchmark/`,
       `atomics/load/`, `atomics/archreview/`, and `atomics/probe/`.
 
 ## 0.35.0 — Full `mypy --strict`, multi-turn escalation, and lockfile hashes

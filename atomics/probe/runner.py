@@ -50,7 +50,7 @@ class ProbeSummary:
         scored = [r.score for r in self.results if r.score is not None]
         return round(sum(scored) / len(scored), 3) if scored else None
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, object]:
         """Machine-readable view of the run for --json-out / dashboards / CI."""
         return {
             "overall_score": self.overall_score,

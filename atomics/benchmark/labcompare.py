@@ -45,24 +45,30 @@ def parse_host_specs(raw: list[str]) -> list[HostSpec]:
     return specs
 
 
-def vram_fit_from_ps(ps_payload: dict, model: str) -> tuple[float | None, str | None]:
+def vram_fit_from_ps(ps_payload: dict[str, object], model: str) -> tuple[float | None, str | None]:
     """Compute VRAM fit ratio for a model from an Ollama /api/ps payload.
 
     Returns (fit_pct, gpu_name). fit_pct is size_vram/size in [0,1]; 1.0 means
     fully in GPU, <1.0 means CPU offload. Returns (None, None) when the model
     is not loaded or size is unavailable.
     """
-    for entry in ps_payload.get("models", []):
-        if entry.get("name") != model:
+    models_raw = ps_payload.get("models")
+    if not isinstance(models_raw, list):
+        return None, None
+    for entry in models_raw:
+        if not isinstance(entry, dict) or entry.get("name") != model:
             continue
-        size = entry.get("size", 0)
-        size_vram = entry.get("size_vram", 0)
+        size_raw = entry.get("size", 0)
+        size_vram_raw = entry.get("size_vram", 0)
+        size = float(size_raw) if isinstance(size_raw, (int, float)) else 0.0
+        size_vram = float(size_vram_raw) if isinstance(size_vram_raw, (int, float)) else 0.0
         if not size:
             return None, None
-        gpu = None
-        details = entry.get("details") or {}
+        gpu: str | None = None
+        details = entry.get("details")
         if isinstance(details, dict):
-            gpu = details.get("family") or None
+            family = details.get("family")
+            gpu = str(family) if family else None
         return round(size_vram / size, 4), gpu
     return None, None
 
@@ -100,7 +106,7 @@ async def probe_throughput(
     provider: BaseProvider,
     model: str,
     *,
-    ps_fetcher: Callable[[], Awaitable[dict]],
+    ps_fetcher: Callable[[], Awaitable[dict[str, object]]],
     prompts: list[str],
 ) -> ThroughputResult:
     """Run fixed prompts through provider.generate and average the metrics.
@@ -181,7 +187,7 @@ async def run_labcompare(
     prompts: int,
     provider_factory: Callable[[str], BaseProvider],
     quality_fn: Callable[[BaseProvider, str | None, str | None, str], Awaitable[float | None]],
-    ps_fetcher_factory: Callable[[str], Callable[[], Awaitable[dict]]],
+    ps_fetcher_factory: Callable[[str], Callable[[], Awaitable[dict[str, object]]]],
     on_cell: Callable[[str, str], None] | None = None,
 ) -> list[CellResult]:
     """Run throughput and/or quality for every host × model.

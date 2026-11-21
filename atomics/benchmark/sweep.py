@@ -70,7 +70,7 @@ async def run_model_sweep(
     effort: str | None = None,
     reasoning_mode: str | None = None,
     on_model_done: Callable[[ModelSweepResult], None] | None = None,
-    on_fixture_done: Callable | None = None,
+    on_fixture_done: Callable[..., object] | None = None,
 ) -> list[ModelSweepResult]:
     """Run eval fixtures against each model in sequence.
 

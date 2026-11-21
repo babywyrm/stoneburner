@@ -156,7 +156,7 @@ class ResistanceResult:
     judges_scored: int = 0
     judge_agreement: float | None = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.judges_expected == 0 and self.judges_scored == 0:
             self.judges_expected = 1
             self.judges_scored = 0 if self.parse_failed or self.provider_failed else 1

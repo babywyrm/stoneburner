@@ -197,7 +197,7 @@ async def _run_phase(
     start = time.monotonic()
     prompt_idx = 0
 
-    async def _worker():
+    async def _worker() -> None:
         nonlocal prompt_idx
         while time.monotonic() - start < duration_seconds:
             prompt = STRESS_PROMPTS[prompt_idx % len(STRESS_PROMPTS)]

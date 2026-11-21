@@ -46,7 +46,7 @@ class FixtureResult:
     thinking_text: str = ""
     effort: str | None = None
     reasoning_mode: str | None = None
-    reasoning_request: dict | None = None
+    reasoning_request: dict[str, object] | None = None
 
 
 @dataclass
@@ -109,7 +109,7 @@ class EvalRunSummary:
         eps = 0.001
         return round(acc / max(cost_per_1k, eps), 1)
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, object]:
         """Machine-readable view of the run for --json-out / dashboards / CI."""
         return {
             "run_id": self.run_id,
