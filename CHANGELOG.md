@@ -32,10 +32,17 @@
   `disallow_incomplete_defs`, `disallow_subclassing_any`,
   `disallow_untyped_decorators`, `extra_checks`, `no_implicit_optional`,
   `strict_equality`, `warn_redundant_casts`, and `warn_unused_ignores` across
-  `atomics/`, plus full `mypy --strict` (`disallow_any_generics`,
+  `atomics/`,   plus full `mypy --strict` (`disallow_any_generics`,
   `disallow_untyped_calls`, `disallow_untyped_defs`, `no_implicit_reexport`,
   `warn_return_any`) across `atomics/storage/`, `atomics/providers/`, and
   `atomics/distributed/`.
+
+### Changed
+- `eval/judge.py`, `eval/rag/judge.py`, and `eval/multiturn/judge.py` now share
+  `invoke_judge_text()`, `parse_three_part_rubric()`, and `strip_think_blocks()`,
+  extending empty-reply thinking fallback, `<think>` stripping, and credential
+  error sanitization to RAG and multi-turn judges while removing duplicated
+  rubric parsers.
 
 ### Fixed
 - `/api/v1/compare`, `/api/v1/reports/recent-runs`, `POST /api/v1/runs`,

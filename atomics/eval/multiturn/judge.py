@@ -17,9 +17,8 @@ import logging
 import re
 from dataclasses import dataclass
 
-from atomics.eval.judge import JUDGE_MAX_TOKENS
+from atomics.eval.judge import invoke_judge_text, parse_three_part_rubric
 from atomics.providers.base import BaseProvider
-from atomics.validation import sanitize_error
 
 logger = logging.getLogger("atomics.eval.multiturn.judge")
 
@@ -116,45 +115,23 @@ class ConversationJudgeResult:
 
 
 def _parse_turn_rubric(raw: str) -> tuple[int, int, int, str] | None:
-    match = _TURN_RE.search(raw)
-    if match:
-        rationale = " ".join(match.group(4).strip().splitlines()).strip()
-        return (
-            min(int(match.group(1)), 4),
-            min(int(match.group(2)), 3),
-            min(int(match.group(3)), 3),
-            rationale,
-        )
-
-    a = _ACC_RE.search(raw)
-    c = _CTX_RE.search(raw)
-    h = _COH_RE.search(raw)
-    if not (a and c and h):
-        return None
-    r = _RAT_RE.search(raw)
-    rat = " ".join(r.group(1).strip().splitlines()).strip() if r else "(no rationale)"
-    return (min(int(a.group(1)), 4), min(int(c.group(1)), 3), min(int(h.group(1)), 3), rat)
+    return parse_three_part_rubric(
+        raw,
+        strict_re=_TURN_RE,
+        field_res=(_ACC_RE, _CTX_RE, _COH_RE),
+        rationale_re=_RAT_RE,
+        default_rationale="(no rationale)",
+    )
 
 
 def _parse_conv_rubric(raw: str) -> tuple[int, int, int, str] | None:
-    match = _CONV_RE.search(raw)
-    if match:
-        rationale = " ".join(match.group(4).strip().splitlines()).strip()
-        return (
-            min(int(match.group(1)), 4),
-            min(int(match.group(2)), 3),
-            min(int(match.group(3)), 3),
-            rationale,
-        )
-
-    r = _RET_RE.search(raw)
-    c = _CON_RE.search(raw)
-    i = _INS_RE.search(raw)
-    if not (r and c and i):
-        return None
-    rat_m = _RAT_RE.search(raw)
-    rat = " ".join(rat_m.group(1).strip().splitlines()).strip() if rat_m else "(no rationale)"
-    return (min(int(r.group(1)), 4), min(int(c.group(1)), 3), min(int(i.group(1)), 3), rat)
+    return parse_three_part_rubric(
+        raw,
+        strict_re=_CONV_RE,
+        field_res=(_RET_RE, _CON_RE, _INS_RE),
+        rationale_re=_RAT_RE,
+        default_rationale="(no rationale)",
+    )
 
 
 async def score_turn(
@@ -173,20 +150,18 @@ async def score_turn(
         expected_behavior=expected_behavior,
         response=response[:3000],
     )
-    try:
-        resp = await judge.generate(
-            prompt,
-            system=_TURN_JUDGE_SYSTEM,
-            model=judge_model,
-            max_tokens=JUDGE_MAX_TOKENS,
-            temperature=0.0,
-            thinking=False,
-        )
-    except Exception as exc:
-        logger.warning("Turn judge call failed: %s", sanitize_error(exc))
-        return TurnJudgeResult(0, 0, 0, 0.5, "judge call failed", parse_failed=True)
+    reply = await invoke_judge_text(
+        prompt,
+        system=_TURN_JUDGE_SYSTEM,
+        judge_provider=judge,
+        judge_model=judge_model,
+        log=logger,
+        label="Turn judge",
+    )
+    if reply.error is not None:
+        return TurnJudgeResult(0, 0, 0, 0.5, f"Judge call failed: {reply.error}", parse_failed=True)
 
-    parsed = _parse_turn_rubric(resp.text.strip())
+    parsed = _parse_turn_rubric(reply.text)
     if parsed is None:
         return TurnJudgeResult(0, 0, 0, 0.5, "parse failed", parse_failed=True)
 
@@ -207,20 +182,20 @@ async def score_conversation(
         transcript=transcript,
         criteria=criteria_text,
     )
-    try:
-        resp = await judge.generate(
-            prompt,
-            system=_CONV_JUDGE_SYSTEM,
-            model=judge_model,
-            max_tokens=JUDGE_MAX_TOKENS,
-            temperature=0.0,
-            thinking=False,
+    reply = await invoke_judge_text(
+        prompt,
+        system=_CONV_JUDGE_SYSTEM,
+        judge_provider=judge,
+        judge_model=judge_model,
+        log=logger,
+        label="Conversation judge",
+    )
+    if reply.error is not None:
+        return ConversationJudgeResult(
+            0, 0, 0, 0.5, f"Judge call failed: {reply.error}", parse_failed=True
         )
-    except Exception as exc:
-        logger.warning("Conversation judge call failed: %s", sanitize_error(exc))
-        return ConversationJudgeResult(0, 0, 0, 0.5, "judge call failed", parse_failed=True)
 
-    parsed = _parse_conv_rubric(resp.text.strip())
+    parsed = _parse_conv_rubric(reply.text)
     if parsed is None:
         return ConversationJudgeResult(0, 0, 0, 0.5, "parse failed", parse_failed=True)
 

@@ -12,16 +12,16 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from atomics.eval.consensus import NumericVote, combine_numeric
-from atomics.eval.judge import JUDGE_MAX_TOKENS
+from atomics.eval.judge import invoke_judge_text, parse_three_part_rubric
 from atomics.providers.base import BaseProvider
-from atomics.validation import sanitize_error
 
 if TYPE_CHECKING:
-    from atomics.eval.rag import RAGFixture
+    from atomics.eval.rag import RAGChunk, RAGFixture
 
 logger = logging.getLogger("atomics.eval.rag.judge")
 
@@ -102,37 +102,15 @@ class RAGJudgeResult:
 
 def _parse_rag_rubric(raw: str) -> tuple[int, int, int, str] | None:
     """Parse a RAG judge reply into (grounding, faithfulness, abstention, rationale)."""
-    match = _SCORE_RE.search(raw)
-    if match:
-        rationale = " ".join(match.group(4).strip().splitlines()).strip()
-        return (
-            min(int(match.group(1)), 4),
-            min(int(match.group(2)), 3),
-            min(int(match.group(3)), 3),
-            rationale,
-        )
-
-    g_m = _GROUNDING_RE.search(raw)
-    f_m = _FAITHFUL_RE.search(raw)
-    a_m = _ABSTENTION_RE.search(raw)
-    if not (g_m and f_m and a_m):
-        return None
-
-    rat_m = _RATIONALE_RE.search(raw)
-    rationale = (
-        " ".join(rat_m.group(1).strip().splitlines()).strip()
-        if rat_m
-        else "(no rationale provided)"
-    )
-    return (
-        min(int(g_m.group(1)), 4),
-        min(int(f_m.group(1)), 3),
-        min(int(a_m.group(1)), 3),
-        rationale,
+    return parse_three_part_rubric(
+        raw,
+        strict_re=_SCORE_RE,
+        field_res=(_GROUNDING_RE, _FAITHFUL_RE, _ABSTENTION_RE),
+        rationale_re=_RATIONALE_RE,
     )
 
 
-def _format_context(chunks: list) -> str:
+def _format_context(chunks: Sequence[RAGChunk]) -> str:
     """Render context chunks for the judge prompt."""
     parts: list[str] = []
     for i, chunk in enumerate(chunks, 1):
@@ -173,27 +151,25 @@ async def score_rag_response(
         abstention_guidance=abstention_guidance,
     )
 
-    try:
-        judge_resp = await judge.generate(
-            prompt,
-            system=_RAG_JUDGE_SYSTEM,
-            model=judge_model,
-            max_tokens=JUDGE_MAX_TOKENS,
-            temperature=0.0,
-            thinking=False,
-        )
-    except Exception as exc:
-        logger.warning("RAG judge call failed: %s", sanitize_error(exc))
+    reply = await invoke_judge_text(
+        prompt,
+        system=_RAG_JUDGE_SYSTEM,
+        judge_provider=judge,
+        judge_model=judge_model,
+        log=logger,
+        label="RAG judge",
+    )
+    if reply.error is not None:
         return RAGJudgeResult(
             grounding=0,
             faithfulness=0,
             abstention=0,
             score=0.5,
-            rationale="judge call failed",
+            rationale=f"Judge call failed: {reply.error}",
             parse_failed=True,
         )
 
-    raw = judge_resp.text.strip()
+    raw = reply.text
     parsed = _parse_rag_rubric(raw)
 
     if parsed is None:

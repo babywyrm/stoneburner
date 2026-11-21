@@ -45,7 +45,7 @@ major tag moved by the publish workflow.
       `atomics judge-calibrate` covers both blue and red rubrics.
 - [x] Wire `eval_request` execution on `POST /api/v1/distributed/runs` (`full`
       mode) alongside `run_request`, rolling up suite integrity across workers.
-- [ ] Consolidate shared judge invocation, retry, and error-sanitization logic
+- [x] Consolidate shared judge invocation, retry, and error-sanitization logic
       across `eval/judge.py`, `eval/rag/judge.py`, and
       `eval/multiturn/judge.py`.
 - [ ] Extract shared Click provider/judge option decorators in

@@ -70,6 +70,7 @@ _ACC_RE = re.compile(r"accuracy\W{0,6}(\d+)", re.IGNORECASE)
 _COMP_RE = re.compile(r"complet\w*\W{0,6}(\d+)", re.IGNORECASE)
 _FMT_RE = re.compile(r"format\W{0,6}(\d+)", re.IGNORECASE)
 _RATIONALE_RE = re.compile(r"rationale\W{0,6}([\s\S]+)", re.IGNORECASE)
+_THINK_BLOCK_RE = re.compile(r"<think>[\s\S]*?</think>\s*", re.IGNORECASE)
 
 _REFORMAT_SYSTEM = (
     "You reformat a previous evaluation into the exact required format. "
@@ -89,40 +90,114 @@ Your previous reply was:
 """
 
 
-def _parse_rubric(raw: str) -> tuple[int, int, int, str] | None:
-    """Parse a judge reply into (accuracy, completeness, format, rationale).
+@dataclass(frozen=True)
+class JudgeReply:
+    """Normalized reply from a single judge invocation (including empty-thinking fallback)."""
 
-    Tries the strict line-oriented format first, then falls back to a lenient
-    field-by-field scan that tolerates markdown, reordering, and stray prose.
-    Returns None only when the three numeric scores cannot be recovered.
-    """
-    match = _SCORE_RE.search(raw)
+    text: str
+    model: str
+    error: str | None = None
+
+
+def strip_think_blocks(raw: str) -> str:
+    """Remove inline `<think>...</think>` blocks before rubric parsing."""
+    return _THINK_BLOCK_RE.sub("", raw).strip()
+
+
+def parse_three_part_rubric(
+    raw: str,
+    *,
+    strict_re: re.Pattern[str],
+    field_res: tuple[re.Pattern[str], re.Pattern[str], re.Pattern[str]],
+    rationale_re: re.Pattern[str] = _RATIONALE_RE,
+    caps: tuple[int, int, int] = (4, 3, 3),
+    default_rationale: str = "(no rationale provided)",
+) -> tuple[int, int, int, str] | None:
+    """Parse a 3-dimension 0-10 judge rubric reply into `(d1, d2, d3, rationale)`."""
+    cleaned = strip_think_blocks(raw)
+    match = strict_re.search(cleaned)
     if match:
         rationale = " ".join(match.group(4).strip().splitlines()).strip()
         return (
-            min(int(match.group(1)), 4),
-            min(int(match.group(2)), 3),
-            min(int(match.group(3)), 3),
+            min(int(match.group(1)), caps[0]),
+            min(int(match.group(2)), caps[1]),
+            min(int(match.group(3)), caps[2]),
             rationale,
         )
 
-    acc_m = _ACC_RE.search(raw)
-    comp_m = _COMP_RE.search(raw)
-    fmt_m = _FMT_RE.search(raw)
-    if not (acc_m and comp_m and fmt_m):
+    m1 = field_res[0].search(cleaned)
+    m2 = field_res[1].search(cleaned)
+    m3 = field_res[2].search(cleaned)
+    if not (m1 and m2 and m3):
         return None
 
-    rat_m = _RATIONALE_RE.search(raw)
+    rat_m = rationale_re.search(cleaned)
     rationale = (
-        " ".join(rat_m.group(1).strip().splitlines()).strip()
-        if rat_m
-        else "(no rationale provided)"
+        " ".join(rat_m.group(1).strip().splitlines()).strip() if rat_m else default_rationale
     )
     return (
-        min(int(acc_m.group(1)), 4),
-        min(int(comp_m.group(1)), 3),
-        min(int(fmt_m.group(1)), 3),
+        min(int(m1.group(1)), caps[0]),
+        min(int(m2.group(1)), caps[1]),
+        min(int(m3.group(1)), caps[2]),
         rationale,
+    )
+
+
+async def invoke_judge_text(
+    prompt: str,
+    *,
+    system: str,
+    judge_provider: BaseProvider,
+    judge_model: str | None = None,
+    log: logging.Logger = logger,
+    label: str = "Judge",
+) -> JudgeReply:
+    """Invoke a judge model with `thinking=False`, empty-reply fallback, and error sanitization."""
+    try:
+        resp = await judge_provider.generate(
+            prompt,
+            system=system,
+            model=judge_model,
+            max_tokens=JUDGE_MAX_TOKENS,
+            temperature=0.0,
+            thinking=False,
+        )
+        result_text = strip_think_blocks(resp.text)
+        if result_text:
+            return JudgeReply(text=result_text, model=resp.model)
+
+        log.info("%s returned empty with thinking=False; retrying with thinking enabled.", label)
+        resp = await judge_provider.generate(
+            prompt,
+            system=system,
+            model=judge_model,
+            max_tokens=512,
+            temperature=0.0,
+            thinking=True,
+            thinking_budget=256,
+        )
+        result_text = strip_think_blocks(resp.text)
+        if result_text:
+            return JudgeReply(text=result_text, model=resp.model)
+
+        thinking_text = getattr(resp, "thinking_text", "") or ""
+        if thinking_text:
+            log.info("%s visible response empty; attempting parse from thinking content.", label)
+            return JudgeReply(text=strip_think_blocks(thinking_text), model=resp.model)
+
+        return JudgeReply(text="", model=resp.model)
+    except Exception as exc:
+        err = sanitize_error(exc)
+        log.warning("%s call failed: %s", label, err)
+        return JudgeReply(text="", model=judge_model or "unknown", error=err)
+
+
+def _parse_rubric(raw: str) -> tuple[int, int, int, str] | None:
+    """Parse a judge reply into (accuracy, completeness, format, rationale)."""
+    return parse_three_part_rubric(
+        raw,
+        strict_re=_SCORE_RE,
+        field_res=(_ACC_RE, _COMP_RE, _FMT_RE),
     )
 
 
@@ -288,73 +363,27 @@ async def score_response(
         response=truncated,
     )
 
-    async def _ask(text: str, system: str) -> tuple[str, str]:
-        """Ask the judge model and return (text, model_name).
-
-        Strategy for thinking-capable models:
-        1. First attempt: thinking=False for a direct structured response.
-        2. If the response is empty (model requires thinking to produce output),
-           retry with thinking enabled and use the visible response.
-        3. If still empty but thinking_text has content, attempt to parse scores
-           from the thinking output as a last resort.
-
-        This handles qwen3.6, deepseek-r1, gemma4, and future thinking models
-        without hardcoding model-specific behavior.
-        """
-        resp = await judge_provider.generate(
-            text,
-            system=system,
-            model=judge_model,
-            max_tokens=JUDGE_MAX_TOKENS,
-            temperature=0.0,
-            thinking=False,
-        )
-        result_text = resp.text.strip()
-
-        if result_text:
-            return result_text, resp.model
-
-        # Fallback: response was empty — try with thinking enabled (some models
-        # need to "think" before they can produce any output at all).
-        logger.info("Judge returned empty with thinking=False; retrying with thinking enabled.")
-        resp = await judge_provider.generate(
-            text,
-            system=system,
-            model=judge_model,
-            max_tokens=512,
-            temperature=0.0,
-            thinking=True,
-            thinking_budget=256,
-        )
-        result_text = resp.text.strip()
-
-        if result_text:
-            return result_text, resp.model
-
-        # Last resort: check if scores are embedded in the thinking output.
-        thinking_text = getattr(resp, "thinking_text", "") or ""
-        if thinking_text:
-            logger.info("Judge visible response empty; attempting parse from thinking content.")
-            return thinking_text.strip(), resp.model
-
-        return "", resp.model
-
-    try:
-        raw, effective_model = await _ask(judge_prompt, _JUDGE_SYSTEM)
-    except Exception as exc:
-        err = sanitize_error(exc)
-        logger.warning("Judge call failed: %s", err)
+    reply = await invoke_judge_text(
+        judge_prompt,
+        system=_JUDGE_SYSTEM,
+        judge_provider=judge_provider,
+        judge_model=judge_model,
+        log=logger,
+        label="Judge",
+    )
+    if reply.error is not None:
         return JudgeResult(
             score=0.5,
             accuracy=0,
             completeness=0,
             format_score=0,
-            rationale=f"Judge call failed: {err}",
-            judge_model=judge_model or "unknown",
+            rationale=f"Judge call failed: {reply.error}",
+            judge_model=reply.model,
             parse_failed=True,
             criteria_coverage=criteria_coverage,
         )
 
+    raw, effective_model = reply.text, reply.model
     parsed = _parse_rubric(raw)
 
     # One reformat retry: the scores are often present but mis-formatted (markdown,
@@ -362,16 +391,19 @@ async def score_response(
     # before giving up.
     if parsed is None:
         logger.info("Judge reply unparseable; attempting one reformat retry.")
-        try:
-            retry_raw, effective_model = await _ask(
-                _REFORMAT_TEMPLATE.format(bad=raw[:500]),
-                _REFORMAT_SYSTEM,
-            )
-            parsed = _parse_rubric(retry_raw)
+        retry = await invoke_judge_text(
+            _REFORMAT_TEMPLATE.format(bad=raw[:500]),
+            system=_REFORMAT_SYSTEM,
+            judge_provider=judge_provider,
+            judge_model=judge_model,
+            log=logger,
+            label="Judge reformat retry",
+        )
+        if retry.error is None:
+            effective_model = retry.model
+            parsed = _parse_rubric(retry.text)
             if parsed is not None:
-                raw = retry_raw
-        except Exception as exc:
-            logger.warning("Judge reformat retry failed: %s", sanitize_error(exc))
+                raw = retry.text
 
     if parsed is None:
         logger.warning("Judge parse failed for response: %r", raw[:200])

@@ -174,3 +174,53 @@ async def test_judge_provider_exception_handled():
     assert result.parse_failed
     assert "Judge call failed" in result.rationale
     assert result.score == 0.5
+
+
+@pytest.mark.asyncio
+async def test_rag_and_multiturn_judges_share_empty_thinking_fallback_and_strip_think_tags():
+    """RAG and multiturn judges must share the empty->thinking retry and <think> stripping."""
+    from atomics.eval.multiturn.judge import score_conversation, score_turn
+    from atomics.eval.rag.fixtures import ALL_RAG_FIXTURES
+    from atomics.eval.rag.judge import score_rag_response
+
+    rag_judge = AsyncMock()
+    rag_judge.generate = AsyncMock(
+        side_effect=[
+            _make_provider_response(text=""),
+            _make_provider_response(
+                text=(
+                    "<think>GROUNDING: 0</think>\n"
+                    "GROUNDING: 4\nFAITHFULNESS: 3\nABSTENTION: 3\nRATIONALE: Grounded."
+                )
+            ),
+        ]
+    )
+    rag_res = await score_rag_response("ans", ALL_RAG_FIXTURES[0], rag_judge)
+    assert not rag_res.parse_failed
+    assert rag_res.score == 1.0
+    assert rag_judge.generate.call_count == 2
+
+    turn_judge = AsyncMock()
+    turn_judge.generate = AsyncMock(
+        side_effect=[
+            _make_provider_response(text=""),
+            _make_provider_response(
+                text="",
+                thinking_text="ACCURACY: 4\nCONTEXT_USE: 3\nCOHERENCE: 3\nRATIONALE: Coherent.",
+            ),
+        ]
+    )
+    turn_res = await score_turn("hist", "hi", "reply", "greet", turn_judge)
+    assert not turn_res.parse_failed
+    assert turn_res.score == 1.0
+
+    conv_judge = AsyncMock()
+    conv_judge.generate = AsyncMock(
+        return_value=_make_provider_response(
+            text="<think>RETENTION: 0\nCONSISTENCY: 0\nINSTRUCTION: 0\nRATIONALE: inner</think>\n"
+            "RETENTION: 4\nCONSISTENCY: 3\nINSTRUCTION: 3\nRATIONALE: Solid."
+        )
+    )
+    conv_res = await score_conversation("hist", ["c1"], conv_judge)
+    assert not conv_res.parse_failed
+    assert conv_res.score == 1.0
