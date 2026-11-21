@@ -11,13 +11,13 @@ from rich.console import Console
 from rich.table import Table
 
 from atomics.commands.common import (
-    PROVIDER_CHOICES,
     _make_provider,
     budget_option,
     effective_thinking,
     effort_options,
     eval_budget_from,
     integrity_exit_code,
+    provider_options,
     run_async,
     setup_logging,
     write_summary_json,
@@ -28,13 +28,7 @@ from atomics.eval.budget import share_budget
 
 
 @click.command("codegen")
-@click.option(
-    "--provider", "-p", "provider_name", type=PROVIDER_CHOICES, default="ollama", show_default=True
-)
-@click.option("--model", "-m", type=str, default=None, help="Model override.")
-@click.option("--ollama-host", type=str, default=None, help="Ollama base URL.")
-@click.option("--vllm-host", "vllm_host", type=str, default=None, help="vLLM base URL.")
-@click.option("--region", type=str, default="us-east-1", help="AWS region for Bedrock.")
+@provider_options(include_region=True)
 @click.option(
     "--fixtures",
     "fixtures_filter",

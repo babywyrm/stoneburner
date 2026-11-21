@@ -12,7 +12,6 @@ from rich.markup import escape
 from rich.table import Table
 
 from atomics.commands.common import (
-    PROVIDER_CHOICES,
     FixtureProgress,
     _make_provider,
     budget_option,
@@ -20,10 +19,11 @@ from atomics.commands.common import (
     effort_options,
     eval_budget_from,
     evaluation_record_from_fixture,
-    extra_judges_option,
     integrity_exit_code,
+    judge_options,
     parse_extra_judges,
     print_judge_calibration,
+    provider_options,
     run_async,
     temperature_option,
     write_summary_json,
@@ -41,27 +41,8 @@ if TYPE_CHECKING:
 
 
 @click.command("refusal")
-@click.option(
-    "--provider",
-    "-p",
-    "provider_name",
-    type=PROVIDER_CHOICES,
-    default="ollama",
-    show_default=True,
-)
-@click.option("--model", "-m", type=str, default=None)
-@click.option("--ollama-host", type=str, default=None)
-@click.option("--vllm-host", "vllm_host", type=str, default=None)
-@click.option(
-    "--judge-provider",
-    "judge_provider_name",
-    type=PROVIDER_CHOICES,
-    default="ollama",
-    show_default=True,
-)
-@click.option("--judge-model", type=str, default=None)
-@click.option("--judge-host", type=str, default=None)
-@extra_judges_option
+@provider_options
+@judge_options
 @click.option(
     "-o",
     "--json-out",

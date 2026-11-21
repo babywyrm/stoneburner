@@ -8,14 +8,14 @@ from rich.markup import escape as _rich_escape
 from rich.table import Table
 
 from atomics.commands.common import (
-    PROVIDER_CHOICES,
     _make_provider,
     budget_option,
     effective_model,
     eval_budget_from,
-    extra_judges_option,
+    judge_options,
     parse_extra_judges,
     print_judge_calibration,
+    provider_options,
     run_async,
     setup_logging,
     write_summary_json,
@@ -31,21 +31,8 @@ from atomics.providers.base import BaseProvider, aclose_providers
     "--repo", "repo_name", required=True, help="Repo spec under atomics/archreview/repos/"
 )
 @click.option("--models", "models_csv", required=True, help="Comma-separated models under test")
-@click.option(
-    "--provider", "provider_name", type=PROVIDER_CHOICES, default="ollama", show_default=True
-)
-@click.option("--ollama-host", type=str, default=None)
-@click.option("--vllm-host", "vllm_host", type=str, default=None)
-@click.option("--region", type=str, default="us-east-1", help="AWS region for Bedrock")
-@click.option(
-    "--judge-provider",
-    "judge_provider_name",
-    type=PROVIDER_CHOICES,
-    default="ollama",
-    show_default=True,
-)
-@click.option("--judge-model", type=str, default=None)
-@click.option("--judge-host", type=str, default=None)
+@provider_options(include_model=False, include_region=True)
+@judge_options
 @click.option(
     "--tier",
     type=click.Choice(["floor", "local", "wide", "expanded"]),
@@ -96,7 +83,6 @@ from atomics.providers.base import BaseProvider, aclose_providers
     default=None,
     help="Write the full run (per-round findings, scores, cost) as JSON to this file.",
 )
-@extra_judges_option
 @budget_option
 def archreview(
     repo_name,

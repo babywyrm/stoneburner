@@ -8,7 +8,7 @@ import logging
 import time
 from collections.abc import Awaitable, Callable
 from pathlib import Path
-from typing import Protocol, TypeVar, cast
+from typing import Protocol, TypeVar, cast, overload
 
 import click
 from rich.console import Console
@@ -31,6 +31,7 @@ from atomics.validation import sanitize_error
 PROVIDER_CHOICES = click.Choice(list(PROVIDER_NAMES), case_sensitive=False)
 
 _P = TypeVar("_P")
+_F = TypeVar("_F", bound=Callable[..., object])
 
 
 def run_async(coro: Awaitable[_P], *providers: BaseProvider | None) -> _P:
@@ -74,7 +75,125 @@ def _reasoning_mode_callback(
         raise click.BadParameter(str(exc), param_hint="--reasoning-mode") from exc
 
 
-def effort_options(fn: Callable) -> Callable:
+@overload
+def provider_options(fn: _F) -> _F: ...
+
+
+@overload
+def provider_options(
+    fn: None = None,
+    *,
+    include_model: bool = True,
+    include_region: bool = False,
+) -> Callable[[_F], _F]: ...
+
+
+def provider_options(
+    fn: _F | None = None,
+    *,
+    include_model: bool = True,
+    include_region: bool = False,
+) -> _F | Callable[[_F], _F]:
+    """Add canonical ``--provider``, ``--model``, ``--ollama-host``, and ``--vllm-host`` options."""
+
+    def _decorate(target: _F) -> _F:
+        out = target
+        if include_region:
+            out = click.option(
+                "--region",
+                type=str,
+                default="us-east-1",
+                show_default=True,
+                help="AWS region for Bedrock.",
+            )(out)
+        out = click.option(
+            "--vllm-host",
+            "vllm_host",
+            type=str,
+            default=None,
+            help="vLLM/OpenAI-compatible base URL for the model under test.",
+        )(out)
+        out = click.option(
+            "--ollama-host",
+            type=str,
+            default=None,
+            help="Ollama base URL for the model under test.",
+        )(out)
+        if include_model:
+            out = click.option(
+                "--model",
+                "-m",
+                type=str,
+                default=None,
+                help="Model override for the provider under test.",
+            )(out)
+        out = click.option(
+            "--provider",
+            "-p",
+            "provider_name",
+            type=PROVIDER_CHOICES,
+            default="ollama",
+            show_default=True,
+            help="Provider for the model under test.",
+        )(out)
+        return out
+
+    return _decorate if fn is None else _decorate(fn)
+
+
+@overload
+def judge_options(fn: _F) -> _F: ...
+
+
+@overload
+def judge_options(
+    fn: None = None,
+    *,
+    default_provider: str | None = "ollama",
+    include_extra_judges: bool = True,
+    provider_help: str | None = None,
+) -> Callable[[_F], _F]: ...
+
+
+def judge_options(
+    fn: _F | None = None,
+    *,
+    default_provider: str | None = "ollama",
+    include_extra_judges: bool = True,
+    provider_help: str | None = None,
+) -> _F | Callable[[_F], _F]:
+    """Add canonical judge flags (``--judge-provider``, ``--judge-model``, ``--judge-host``)."""
+
+    def _decorate(target: _F) -> _F:
+        out = target
+        if include_extra_judges:
+            out = extra_judges_option(out)
+        out = click.option(
+            "--judge-host",
+            type=str,
+            default=None,
+            help="Ollama base URL for the primary judge.",
+        )(out)
+        out = click.option(
+            "--judge-model",
+            type=str,
+            default=None,
+            help="Model override for the primary judge.",
+        )(out)
+        out = click.option(
+            "--judge-provider",
+            "judge_provider_name",
+            type=PROVIDER_CHOICES,
+            default=default_provider,
+            show_default=default_provider is not None,
+            help=provider_help or "Provider to use as primary judge.",
+        )(out)
+        return out
+
+    return _decorate if fn is None else _decorate(fn)
+
+
+def effort_options(fn: _F) -> _F:
     """Add ``--effort`` and ``--reasoning-mode`` next to thinking flags."""
     fn = click.option(
         "--reasoning-mode",
@@ -92,7 +211,7 @@ def effort_options(fn: Callable) -> Callable:
     return fn
 
 
-def temperature_option(fn: Callable) -> Callable:
+def temperature_option(fn: _F) -> _F:
     """Add ``--temperature`` for the model under test. Judges stay at 0."""
     return click.option(
         "--temperature",
@@ -104,7 +223,7 @@ def temperature_option(fn: Callable) -> Callable:
     )(fn)
 
 
-def extra_judges_option(fn: Callable) -> Callable:
+def extra_judges_option(fn: _F) -> _F:
     """Add `--extra-judges` for consensus scoring."""
     return click.option(
         "--extra-judges",
@@ -139,7 +258,7 @@ def parse_extra_judges(
     return pairs
 
 
-def budget_option(fn: Callable) -> Callable:
+def budget_option(fn: _F) -> _F:
     """Add `--budget` to an eval command.
 
     Defaults to None — no ceiling — so every existing invocation behaves

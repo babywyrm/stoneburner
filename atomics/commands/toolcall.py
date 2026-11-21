@@ -14,17 +14,17 @@ from rich.markup import escape
 from rich.table import Table
 
 from atomics.commands.common import (
-    PROVIDER_CHOICES,
     FixtureProgress,
     _make_provider,
     budget_option,
     effective_model,
     effort_options,
     eval_budget_from,
-    extra_judges_option,
     integrity_exit_code,
+    judge_options,
     parse_extra_judges,
     print_judge_calibration,
+    provider_options,
     run_async,
     temperature_option,
     write_summary_json,
@@ -75,42 +75,17 @@ def _rate(rate: float | None, numerator: int, denominator: int) -> str:
 
 
 @click.command("toolcall")
-@click.option(
-    "--provider",
-    "-p",
-    "provider_name",
-    type=PROVIDER_CHOICES,
-    default="ollama",
-    show_default=True,
-    help="Provider for the model under test. It must support tool calling.",
+@provider_options
+@judge_options(
+    default_provider=None,
+    provider_help=(
+        "Judge for the prose channel and the tool-channel text. "
+        "Defaults to ollama when --judge-model, --judge-host, or --extra-judges "
+        "is given. Omit all four to skip judging: the tool channel is scored "
+        "deterministically and needs no judge, but divergence against "
+        "the prose channel cannot be computed without one."
+    ),
 )
-@click.option(
-    "--model", "-m", type=str, default=None, help="Model override for the provider under test."
-)
-@click.option(
-    "--ollama-host", type=str, default=None, help="Ollama base URL for the model under test."
-)
-@click.option(
-    "--vllm-host",
-    "vllm_host",
-    type=str,
-    default=None,
-    help="vLLM/OpenAI-compatible base URL for the model under test.",
-)
-@click.option(
-    "--judge-provider",
-    "judge_provider_name",
-    type=PROVIDER_CHOICES,
-    default=None,
-    help="Judge for the prose channel and the tool-channel text. "
-    "Defaults to ollama when --judge-model, --judge-host, or --extra-judges "
-    "is given. Omit all four to skip judging: the tool channel is scored "
-    "deterministically and needs no judge, but divergence against "
-    "the prose channel cannot be computed without one.",
-)
-@click.option("--judge-model", type=str, default=None, help="Judge model override.")
-@click.option("--judge-host", type=str, default=None, help="Ollama base URL for the judge.")
-@extra_judges_option
 @click.option(
     "--runs",
     type=click.IntRange(min=1),

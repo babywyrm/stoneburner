@@ -11,17 +11,17 @@ from rich.console import Console
 from rich.table import Table
 
 from atomics.commands.common import (
-    PROVIDER_CHOICES,
     _attribution_model,
     _make_provider,
     budget_option,
     effective_thinking,
     effort_options,
     eval_budget_from,
-    extra_judges_option,
     integrity_exit_code,
+    judge_options,
     parse_extra_judges,
     print_judge_calibration,
+    provider_options,
     run_async,
     setup_logging,
     write_summary_json,
@@ -33,23 +33,8 @@ from atomics.eval.suite_integrity import format_headline_rate
 
 
 @click.command("multiturn")
-@click.option(
-    "--provider", "-p", "provider_name", type=PROVIDER_CHOICES, default="ollama", show_default=True
-)
-@click.option("--model", "-m", type=str, default=None, help="Model override.")
-@click.option("--ollama-host", type=str, default=None, help="Ollama base URL.")
-@click.option("--vllm-host", "vllm_host", type=str, default=None, help="vLLM base URL.")
-@click.option("--region", type=str, default="us-east-1", help="AWS region for Bedrock.")
-@click.option(
-    "--judge-provider",
-    "judge_provider_name",
-    type=PROVIDER_CHOICES,
-    default="ollama",
-    show_default=True,
-)
-@click.option("--judge-model", type=str, default=None, help="Model for the judge.")
-@click.option("--judge-host", type=str, default=None, help="Ollama host for the judge.")
-@extra_judges_option
+@provider_options(include_region=True)
+@judge_options
 @click.option(
     "--fixtures",
     "fixtures_filter",

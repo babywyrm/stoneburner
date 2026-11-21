@@ -115,15 +115,6 @@ cli.add_command(probe_commands.probe)
 cli.add_command(qa_commands.qa)
 cli.add_command(archreview_commands.archreview)
 cli.add_command(battery_commands.battery)
-
-# Re-export for tests/importers that still pull helpers from atomics.cli.
-_write_generic_export = admin_commands._write_generic_export
-_run_labcompare_sync = labcompare_commands._run_labcompare_sync
-_parse_model_spec = security_commands._parse_model_spec
-_make_provider = security_commands._make_provider
-refusal = security_commands.refusal
-codereview = security_commands.codereview
-
 cli.add_command(api_commands.server)
 cli.add_command(mcp_commands.mcp)
 cli.add_command(repl_commands.repl)

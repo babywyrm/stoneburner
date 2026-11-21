@@ -1820,14 +1820,14 @@ def test_cli_baselines_with_records(tmp_path, monkeypatch):
 
 def test_parse_model_spec_bare_ollama_model_with_colon():
     """Ollama model names contain colons and must not be mis-split as provider:model."""
-    from atomics.cli import _parse_model_spec
+    from atomics.commands.security.cmd_adversarial import _parse_model_spec
 
     assert _parse_model_spec("qwen3.5:0.8b", "ollama") == ("ollama", "qwen3.5:0.8b", None)
     assert _parse_model_spec("qwen2.5:7b", "ollama") == ("ollama", "qwen2.5:7b", None)
 
 
 def test_parse_model_spec_provider_prefixed():
-    from atomics.cli import _parse_model_spec
+    from atomics.commands.security.cmd_adversarial import _parse_model_spec
 
     assert _parse_model_spec("claude:claude-sonnet-4-6", "ollama") == (
         "claude",
@@ -1837,7 +1837,7 @@ def test_parse_model_spec_provider_prefixed():
 
 
 def test_parse_model_spec_with_host():
-    from atomics.cli import _parse_model_spec
+    from atomics.commands.security.cmd_adversarial import _parse_model_spec
 
     assert _parse_model_spec("ollama:qwen2.5:7b@http://h:11434", "ollama") == (
         "ollama",
@@ -1847,6 +1847,6 @@ def test_parse_model_spec_with_host():
 
 
 def test_parse_model_spec_bare_model_no_colon():
-    from atomics.cli import _parse_model_spec
+    from atomics.commands.security.cmd_adversarial import _parse_model_spec
 
     assert _parse_model_spec("gpt-4o", "openai") == ("openai", "gpt-4o", None)

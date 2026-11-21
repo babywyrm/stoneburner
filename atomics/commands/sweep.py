@@ -20,6 +20,7 @@ from atomics.commands.common import (
     effective_model,
     effort_options,
     eval_budget_from,
+    judge_options,
     print_judge_calibration,
     run_async,
     setup_logging,
@@ -138,15 +139,7 @@ def suite_persister(db_path: Path) -> Callable[[str, str, str, object], None]:
     default=None,
     help="vLLM/OpenAI-compatible base URL (default: ATOMICS_VLLM_HOST)",
 )
-@click.option(
-    "--judge-provider",
-    "judge_provider_name",
-    type=PROVIDER_CHOICES,
-    default="ollama",
-    help="Provider for quality judge (default: ollama — $0)",
-)
-@click.option("--judge-model", type=str, default=None, help="Judge model override")
-@click.option("--judge-host", type=str, default=None, help="Ollama host for judge")
+@judge_options(include_extra_judges=False)
 @click.option(
     "--fixtures", type=str, default=None, help="Comma-separated fixture IDs (default: all)"
 )

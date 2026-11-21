@@ -43,6 +43,9 @@
   extending empty-reply thinking fallback, `<think>` stripping, and credential
   error sanitization to RAG and multi-turn judges while removing duplicated
   rubric parsers.
+- Extracted `provider_options` and `judge_options` Click decorators in
+  `atomics/commands/common.py` across 12 evaluation and sweep commands and
+  retired legacy post-split helper/command re-exports from `atomics/cli.py`.
 
 ### Fixed
 - `/api/v1/compare`, `/api/v1/reports/recent-runs`, `POST /api/v1/runs`,

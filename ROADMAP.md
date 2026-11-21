@@ -48,7 +48,7 @@ major tag moved by the publish workflow.
 - [x] Consolidate shared judge invocation, retry, and error-sanitization logic
       across `eval/judge.py`, `eval/rag/judge.py`, and
       `eval/multiturn/judge.py`.
-- [ ] Extract shared Click provider/judge option decorators in
+- [x] Extract shared Click provider/judge option decorators in
       `atomics/commands/common.py` and retire unused legacy re-exports in
       `atomics/cli.py` without breaking CLI entry points.
 - [ ] Complete `mypy --strict` across `atomics/eval/`, `atomics/benchmark/`,

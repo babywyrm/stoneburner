@@ -9,16 +9,16 @@ from rich.console import Console
 from rich.table import Table
 
 from atomics.commands.common import (
-    PROVIDER_CHOICES,
     _make_provider,
     budget_option,
     effective_model,
     effective_thinking,
     effort_options,
     eval_budget_from,
-    extra_judges_option,
+    judge_options,
     parse_extra_judges,
     print_judge_calibration,
+    provider_options,
     run_async,
     write_summary_json,
 )
@@ -28,23 +28,8 @@ from atomics.eval.budget import share_budget
 
 
 @click.command("probe")
-@click.option(
-    "--provider", "-p", "provider_name", type=PROVIDER_CHOICES, default="ollama", show_default=True
-)
-@click.option("--model", "-m", type=str, default=None)
-@click.option("--ollama-host", type=str, default=None)
-@click.option(
-    "--vllm-host", "vllm_host", type=str, default=None, help="vLLM/OpenAI-compatible base URL."
-)
-@click.option(
-    "--judge-provider",
-    "judge_provider_name",
-    type=PROVIDER_CHOICES,
-    default="ollama",
-    show_default=True,
-)
-@click.option("--judge-model", type=str, default=None)
-@click.option("--judge-host", type=str, default=None)
+@provider_options
+@judge_options
 @click.option(
     "--probes-file",
     type=click.Path(exists=True),
@@ -90,7 +75,6 @@ from atomics.eval.budget import share_budget
     default=None,
     help="Write the full run (per-target scores, rationales, regressions) as JSON to this file.",
 )
-@extra_judges_option
 @budget_option
 def probe(
     provider_name: str,

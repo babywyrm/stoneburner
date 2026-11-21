@@ -70,7 +70,7 @@ def _tmp_repo_with_data(tmp_path):
 
 
 def test_write_generic_export_jsonl():
-    from atomics.cli import _write_generic_export
+    from atomics.commands.admin import _write_generic_export
 
     rows = [{"a": 1, "b": 2}, {"a": 3, "b": 4}]
     buf = io.StringIO()
@@ -83,7 +83,7 @@ def test_write_generic_export_jsonl():
 
 
 def test_write_generic_export_csv():
-    from atomics.cli import _write_generic_export
+    from atomics.commands.admin import _write_generic_export
 
     rows = [{"x": 10, "y": 20}]
     buf = io.StringIO()
@@ -93,7 +93,7 @@ def test_write_generic_export_csv():
 
 
 def test_write_generic_export_empty():
-    from atomics.cli import _write_generic_export
+    from atomics.commands.admin import _write_generic_export
 
     buf = io.StringIO()
     _write_generic_export([], "jsonl", buf)

@@ -204,3 +204,95 @@ def test_evaluation_record_from_fixture_copies_judge_agreement() -> None:
     )
 
     assert record.judge_agreement == pytest.approx(2 / 3)
+
+
+def test_provider_and_judge_option_decorators_bind_canonical_kwargs() -> None:
+    from click.testing import CliRunner
+
+    from atomics.commands.common import judge_options, provider_options
+
+    captured: dict[str, object] = {}
+
+    @click.command()
+    @provider_options(include_region=True)
+    @judge_options
+    def sample(**kwargs: object) -> None:
+        captured.update(kwargs)
+
+    runner = CliRunner()
+    default_res = runner.invoke(sample, [])
+    assert default_res.exit_code == 0, default_res.output
+    assert captured == {
+        "provider_name": "ollama",
+        "model": None,
+        "ollama_host": None,
+        "vllm_host": None,
+        "region": "us-east-1",
+        "judge_provider_name": "ollama",
+        "judge_model": None,
+        "judge_host": None,
+        "extra_judges": None,
+    }
+
+    override_res = runner.invoke(
+        sample,
+        [
+            "-p",
+            "bedrock",
+            "-m",
+            "claude-3",
+            "--region",
+            "us-west-2",
+            "--judge-provider",
+            "openai",
+            "--judge-model",
+            "gpt-4o",
+            "--extra-judges",
+            "ollama:gemma3:4b",
+        ],
+    )
+    assert override_res.exit_code == 0, override_res.output
+    assert captured["provider_name"] == "bedrock"
+    assert captured["model"] == "claude-3"
+    assert captured["region"] == "us-west-2"
+    assert captured["judge_provider_name"] == "openai"
+    assert captured["judge_model"] == "gpt-4o"
+    assert captured["extra_judges"] == "ollama:gemma3:4b"
+
+
+def test_provider_and_judge_option_variants() -> None:
+    from click.testing import CliRunner
+
+    from atomics.commands.common import judge_options, provider_options
+
+    captured: dict[str, object] = {}
+
+    @click.command()
+    @provider_options(include_model=False)
+    @judge_options(default_provider=None, include_extra_judges=False)
+    def multi_model(**kwargs: object) -> None:
+        captured.update(kwargs)
+
+    res = CliRunner().invoke(multi_model, [])
+    assert res.exit_code == 0, res.output
+    assert "model" not in captured
+    assert "region" not in captured
+    assert "extra_judges" not in captured
+    assert captured["provider_name"] == "ollama"
+    assert captured["judge_provider_name"] is None
+
+
+def test_cli_module_retires_legacy_private_reexports() -> None:
+    import atomics.cli as cli_mod
+
+    for retired in (
+        "_write_generic_export",
+        "_run_labcompare_sync",
+        "_parse_model_spec",
+        "_make_provider",
+        "refusal",
+        "codereview",
+    ):
+        assert not hasattr(cli_mod, retired), f"atomics.cli still exposes {retired}"
+    assert "refusal" in cli_mod.cli.commands
+    assert "codereview" in cli_mod.cli.commands

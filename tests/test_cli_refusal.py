@@ -210,10 +210,10 @@ def test_cli_refusal_passes_fixture_subset_to_runner(monkeypatch) -> None:
 
 def test_refusal_command_is_registered_and_reexported() -> None:
     from atomics import cli as cli_module
-    from atomics.commands.security import refusal
+    from atomics.commands.security import cmd_refusal, refusal
 
     assert cli_module.cli.commands["refusal"] is refusal
-    assert cli_module.refusal is refusal
+    assert cmd_refusal.refusal is refusal
 
 
 def test_refusal_invocation_preserves_output(monkeypatch) -> None:

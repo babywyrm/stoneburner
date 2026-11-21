@@ -18,16 +18,16 @@ from rich.panel import Panel
 from rich.table import Table
 
 from atomics.commands.common import (
-    PROVIDER_CHOICES,
     _attribution_model,
     _make_provider,
     budget_option,
     effective_thinking,
     effort_options,
     eval_budget_from,
-    extra_judges_option,
+    judge_options,
     parse_extra_judges,
     print_judge_calibration,
+    provider_options,
     run_async,
     setup_logging,
     temperature_option,
@@ -39,38 +39,8 @@ from atomics.eval.budget import share_budget
 
 
 @click.command()
-@click.option(
-    "--provider",
-    "-p",
-    "provider_name",
-    type=PROVIDER_CHOICES,
-    default="ollama",
-    help="Provider to evaluate (model under test)",
-)
-@click.option(
-    "--model", "-m", type=str, default=None, help="Model override for the provider under test"
-)
-@click.option("--ollama-host", type=str, default=None, help="Ollama endpoint for model under test")
-@click.option(
-    "--vllm-host",
-    "vllm_host",
-    type=str,
-    default=None,
-    help="vLLM/OpenAI-compatible base URL (default: ATOMICS_VLLM_HOST)",
-)
-@click.option("--region", type=str, default="us-east-1", help="AWS region for Bedrock")
-@click.option(
-    "--judge-provider",
-    "judge_provider_name",
-    type=PROVIDER_CHOICES,
-    default="ollama",
-    help="Provider to use as judge (default: ollama — $0 cost)",
-)
-@click.option("--judge-model", type=str, default=None, help="Model override for the judge")
-@click.option(
-    "--judge-host", type=str, default=None, help="Ollama host for the judge (if different)"
-)
-@extra_judges_option
+@provider_options(include_region=True)
+@judge_options
 @click.option(
     "--fixtures",
     "fixtures_filter",

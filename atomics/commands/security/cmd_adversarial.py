@@ -12,16 +12,16 @@ from rich.markup import escape as _rich_escape
 from rich.table import Table
 
 from atomics.commands.common import (
-    PROVIDER_CHOICES,
     FixtureProgress,
     _attribution_model,
     _make_provider,
     budget_option,
     effort_options,
     eval_budget_from,
-    extra_judges_option,
+    judge_options,
     parse_extra_judges,
     print_judge_calibration,
+    provider_options,
     run_async,
     temperature_option,
 )
@@ -52,32 +52,8 @@ def _parse_model_spec(spec: str, default_provider: str) -> tuple[str, str, str |
 
 
 @click.command("adversarial")
-@click.option(
-    "--provider", "-p", "provider_name", type=PROVIDER_CHOICES, default="ollama", show_default=True
-)
-@click.option(
-    "--model", "-m", type=str, default=None, help="Model override for the provider under test."
-)
-@click.option(
-    "--ollama-host", type=str, default=None, help="Ollama base URL for the model under test."
-)
-@click.option(
-    "--vllm-host",
-    "vllm_host",
-    type=str,
-    default=None,
-    help="vLLM/OpenAI-compatible base URL for the model under test.",
-)
-@click.option(
-    "--judge-provider",
-    "judge_provider_name",
-    type=PROVIDER_CHOICES,
-    default="ollama",
-    show_default=True,
-)
-@click.option("--judge-model", type=str, default=None, help="Primary judge model override.")
-@click.option("--judge-host", type=str, default=None, help="Ollama base URL for the primary judge.")
-@extra_judges_option
+@provider_options
+@judge_options
 @click.option(
     "--runs",
     type=click.IntRange(min=1),

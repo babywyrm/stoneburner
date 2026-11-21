@@ -214,10 +214,10 @@ def test_cli_codereview_passes_fixture_subset_to_runner(monkeypatch) -> None:
 
 def test_codereview_command_is_registered_and_reexported() -> None:
     from atomics import cli as cli_module
-    from atomics.commands.security import codereview
+    from atomics.commands.security import cmd_codereview, codereview
 
     assert cli_module.cli.commands["codereview"] is codereview
-    assert cli_module.codereview is codereview
+    assert cmd_codereview.codereview is codereview
 
 
 def test_codereview_invocation_preserves_output(monkeypatch) -> None:
