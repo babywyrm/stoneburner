@@ -20,7 +20,7 @@ from atomics.distributed.models import (
     WorkerRegisterRequest,
     WorkerStatus,
 )
-from atomics.distributed.rollup import AssignmentRecord, build_rollup
+from atomics.distributed.rollup import AssignmentRecord, FleetRollup, build_rollup
 
 
 class AssignmentRejectedError(Exception):
@@ -530,20 +530,21 @@ class Coordinator:
         ).fetchone()
         total, completed, failed = rows[0], rows[1] or 0, rows[2] or 0
         if total > 0 and completed + failed == total:
-            new_status = JobStatus.COMPLETED.value if failed == 0 else JobStatus.PARTIAL.value
+            rollup = self._build_rollup(job_id)
+            degraded_eval = bool(rollup.integrity and rollup.integrity.get("should_exit_nonzero"))
+            new_status = (
+                JobStatus.COMPLETED.value
+                if (failed == 0 and not degraded_eval)
+                else JobStatus.PARTIAL.value
+            )
             self._conn.execute(
                 "UPDATE distributed_jobs "
                 "SET status = ?, completed_at = ?, summary_json = ? WHERE job_id = ?",
-                (new_status, self._now(), self._build_summary_json(job_id), job_id),
+                (new_status, self._now(), json.dumps(rollup.to_dict()), job_id),
             )
             self._conn.commit()
 
-    def _build_summary_json(self, job_id: str) -> str:
-        """Summarize a finished job per worker.
-
-        summary_json has existed since phase 1 with nothing ever writing to it, so
-        a completed distributed job reported a status and no numbers.
-        """
+    def _build_rollup(self, job_id: str) -> FleetRollup:
         rows = self._conn.execute(
             "SELECT COALESCE(a.target_worker_id, a.worker_id) AS host, a.status, "
             "a.result_json, w.labels "
@@ -554,7 +555,7 @@ class Coordinator:
             "ORDER BY host, a.assignment_id",
             (job_id,),
         ).fetchall()
-        records = []
+        records: list[AssignmentRecord] = []
         for host, status_value, result_json, labels_json in rows:
             result = None
             if result_json:
@@ -571,7 +572,11 @@ class Coordinator:
                     result=result,
                 )
             )
-        return json.dumps(build_rollup(records).to_dict())
+        return build_rollup(records)
+
+    def _build_summary_json(self, job_id: str) -> str:
+        """Summarize a finished job per worker."""
+        return json.dumps(self._build_rollup(job_id).to_dict())
 
     def _timeout_seconds_for_job(self, request_json: str) -> int:
         try:

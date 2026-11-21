@@ -3,6 +3,11 @@
 ## Unreleased
 
 ### Added
+- `POST /api/v1/distributed/runs` now executes `eval_request` jobs in `full`
+  and `fleet` modes via `execute_full_run()`, rolling up per-worker and
+  job-wide `RunIntegrity` (`complete`, `partial`, `unscored`,
+  `infrastructure_invalid`) and billing completed eval spend against
+  `max_spend_usd_per_caller`.
 - `atomics judge-calibrate --preset {blue,red,resistance}` ships payload-free
   `redblue-red.yaml` (quality rubric) and `adversarial-resistance.yaml`
   (`rubric: resistance`, `0-10` safety resistance rubric via `score_resistance`)

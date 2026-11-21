@@ -222,6 +222,87 @@ def test_rollup_ignores_booleans_and_non_finite_numbers_and_reads_full_summary()
 
     assert assignment_cost_usd('{"estimated_cost_usd": 0.25}') == 0.25
     assert assignment_cost_usd('{"summary": {"total_cost_usd": 0.42}}') == 0.42
+    assert assignment_cost_usd('{"total_cost_usd": 0.19}') == 0.19
     assert assignment_cost_usd('{"estimated_cost_usd": true}') == 0.0
     assert assignment_cost_usd('{"estimated_cost_usd": -5.0}') == 0.0
     assert assignment_cost_usd("not-json") == 0.0
+
+
+def _eval_record(
+    worker_id: str,
+    *,
+    integrity_status: str = "complete",
+    score: float = 0.9,
+    cost: float = 0.05,
+    status: str = "completed",
+) -> AssignmentRecord:
+    if status != "completed":
+        return AssignmentRecord(worker_id=worker_id, status=status, result=None)
+    return AssignmentRecord(
+        worker_id=worker_id,
+        status="completed",
+        result={
+            "suite": "refusal",
+            "provider": "ollama",
+            "model": "gemma3:4b",
+            "overall_score": score,
+            "fixtures_run": 2,
+            "total_tokens": 120,
+            "total_cost_usd": cost,
+            "fixtures": [
+                {"id": "f1", "latency_ms": 40.0},
+                {"id": "f2", "latency_ms": 60.0},
+            ],
+            "integrity": {
+                "status": integrity_status,
+                "should_exit_nonzero": integrity_status != "complete",
+            },
+        },
+    )
+
+
+def test_rollup_aggregates_eval_assignments_and_integrity_across_workers():
+    complete = build_rollup([_eval_record("w1", integrity_status="complete")])
+    assert complete.integrity == {"status": "complete", "should_exit_nonzero": False}
+    assert complete.to_dict()["integrity"] == {
+        "status": "complete",
+        "should_exit_nonzero": False,
+    }
+    w1 = complete.workers[0]
+    assert (w1.suite, w1.overall_score, w1.integrity, w1.mean_latency_ms) == (
+        "refusal",
+        0.9,
+        "complete",
+        50.0,
+    )
+    assert complete.estimated_cost_usd == 0.05
+
+    mixed = build_rollup(
+        [
+            _eval_record("w1", integrity_status="complete"),
+            _eval_record("w2", integrity_status="partial"),
+        ]
+    )
+    assert mixed.integrity == {"status": "partial", "should_exit_nonzero": True}
+
+    one_crashed = build_rollup(
+        [
+            _eval_record("w1", integrity_status="complete"),
+            _eval_record("w2", status="failed"),
+        ]
+    )
+    assert one_crashed.integrity == {"status": "partial", "should_exit_nonzero": True}
+
+    none_scored_infra = build_rollup(
+        [
+            _eval_record("w1", integrity_status="unscored"),
+            _eval_record("w2", status="failed"),
+        ]
+    )
+    assert none_scored_infra.integrity == {
+        "status": "infrastructure_invalid",
+        "should_exit_nonzero": True,
+    }
+
+    all_unscored = build_rollup([_eval_record("w1", integrity_status="unscored")])
+    assert all_unscored.integrity == {"status": "unscored", "should_exit_nonzero": True}

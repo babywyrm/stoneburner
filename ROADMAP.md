@@ -43,7 +43,7 @@ major tag moved by the publish workflow.
       inherit a stale MAE or calibration verdict.
 - [x] Blind-grade and commit a payload-free red calibration set so
       `atomics judge-calibrate` covers both blue and red rubrics.
-- [ ] Wire `eval_request` execution on `POST /api/v1/distributed/runs` (`full`
+- [x] Wire `eval_request` execution on `POST /api/v1/distributed/runs` (`full`
       mode) alongside `run_request`, rolling up suite integrity across workers.
 - [ ] Consolidate shared judge invocation, retry, and error-sanitization logic
       across `eval/judge.py`, `eval/rag/judge.py`, and

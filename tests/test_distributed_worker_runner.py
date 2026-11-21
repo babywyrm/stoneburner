@@ -353,3 +353,46 @@ async def test_execute_full_run_cleans_up_temp_db_on_failure():
             await execute_full_run(assignment, provider_name="ollama")
 
     fake_repo.close.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_execute_full_run_executes_eval_request_with_worker_defaults():
+    assignment = TaskAssignment(
+        assignment_id="a8",
+        job_id="j8",
+        task_spec={
+            "mode": "full",
+            "eval_request": {"suite": "refusal", "runs": 1},
+        },
+    )
+    fake_eval_out = {
+        "suite": "refusal",
+        "provider": "ollama",
+        "model": "gemma3:4b",
+        "overall_score": 1.0,
+        "fixtures_run": 2,
+        "total_tokens": 80,
+        "total_cost_usd": 0.0,
+        "integrity": {"status": "complete", "should_exit_nonzero": False},
+    }
+    with patch(
+        "atomics.api._runners.run_eval_suite",
+        new_callable=AsyncMock,
+        return_value=fake_eval_out,
+    ) as run_suite:
+        result = await execute_full_run(
+            assignment,
+            provider_name="ollama",
+            model="gemma3:4b",
+            host="http://127.0.0.1:19999",
+        )
+
+    run_suite.assert_awaited_once()
+    req_arg = run_suite.await_args.args[0]
+    assert (req_arg.suite, req_arg.provider, req_arg.model, req_arg.host) == (
+        "refusal",
+        "ollama",
+        "gemma3:4b",
+        "http://127.0.0.1:19999",
+    )
+    assert result["integrity"] == {"status": "complete", "should_exit_nonzero": False}

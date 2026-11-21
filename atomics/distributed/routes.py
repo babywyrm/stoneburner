@@ -202,6 +202,52 @@ def _check_distributed_hosts(request: Request, payload: DistributedRunRequest) -
                     ) from exc
 
 
+def _validate_distributed_eval_request(
+    request: Request, eval_request: dict[str, Any]
+) -> dict[str, Any]:
+    """Validate `eval_request` upfront against `EvalRequest` and allowed hosts."""
+    from pydantic import ValidationError
+
+    from atomics.api._runners import validate_eval_suite
+    from atomics.api.models import EvalRequest
+    from atomics.config import load_settings
+    from atomics.providers.factory import ProviderConfigError, resolve_provider_endpoint
+
+    candidate = dict(eval_request)
+    if not candidate.get("provider"):
+        candidate["provider"] = "ollama"
+    try:
+        parsed = EvalRequest(**candidate)
+        validate_eval_suite(parsed.suite)
+    except ValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid eval_request: {exc.errors()[0].get('msg', str(exc))}",
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+    settings = request.app.state.settings
+    if settings.allowed_hosts is not None and not eval_request.get("judge_host"):
+        fallback_judge_host = parsed.host if parsed.provider == "ollama" and parsed.host else None
+        try:
+            judge_eff = resolve_provider_endpoint(
+                "ollama",
+                fallback_judge_host,
+                load_settings(),
+                host_label="eval_request.judge_host",
+            )
+            settings.check_outbound_host(judge_eff, label="eval_request.judge_host")
+        except DisallowedHostError as exc:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+        except (ProviderConfigError, ValueError) as exc:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return dict(eval_request)
+
+
 @router.post(
     "/distributed/runs",
     response_model=DistributedJob,
@@ -232,10 +278,15 @@ async def start_distributed_run(
                 "to target workers by label."
             ),
         )
-    if not payload.run_request:
+    if payload.run_request and payload.eval_request:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="run_request is required",
+            detail="Pass either run_request or eval_request, not both",
+        )
+    if not payload.run_request and not payload.eval_request:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="run_request or eval_request is required",
         )
     job_manager = getattr(request.app.state, "job_manager", None)
     if isinstance(job_manager, JobManager):
@@ -245,6 +296,45 @@ async def start_distributed_run(
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)
             ) from exc
+
+    if payload.eval_request is not None:
+        if payload.mode is JobMode.SPLIT:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="eval_request requires 'full' or 'fleet' mode",
+            )
+        validated_eval = _validate_distributed_eval_request(request, payload.eval_request)
+        eval_spec: dict[str, Any] = {
+            "mode": "full",
+            "eval_request": validated_eval,
+            "runtime": "python",
+        }
+        if payload.mode is JobMode.FULL:
+            if payload.worker_selector:
+                try:
+                    return coordinator.create_full_job_from_selector(
+                        payload, payload.worker_selector, task_spec=eval_spec, owner=caller
+                    )
+                except ValueError as exc:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=str(exc),
+                    ) from exc
+            return coordinator.create_full_job(payload, [], task_spec=eval_spec, owner=caller)
+        workers = coordinator.matching_workers(payload.worker_selector)
+        if not workers:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "No online workers match the selector "
+                    f"{payload.worker_selector or {}}. Register a worker with "
+                    "those labels, or omit the selector to broadcast to every "
+                    "online worker."
+                ),
+            )
+        return coordinator.create_fleet_job(payload, [eval_spec], workers, owner=caller)
+
+    assert payload.run_request is not None
     if payload.mode is JobMode.FULL:
         task_spec = {"mode": "full", "run_request": payload.run_request, "runtime": "python"}
         if payload.worker_selector:

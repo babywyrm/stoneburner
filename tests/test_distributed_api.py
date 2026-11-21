@@ -339,3 +339,84 @@ def test_trace_tool_names_handles_null_function_entry():
 
     tools = [{"function": None, "name": "ping"}, {"function": {"name": "exec"}}, {}]
     assert _tool_names(tools) == "ping, exec, ?"
+
+
+def test_distributed_eval_request_validation_and_integrity_rollup(tmp_path):
+    app = create_app(
+        ServerSettings(
+            no_auth=False,
+            api_keys={API_KEY},
+            db_path=tmp_path / "dist_eval.db",
+            max_spend_usd_per_caller=1.0,
+        )
+    )
+    with TestClient(app, base_url="http://127.0.0.1") as tc:
+        # Rejects both run_request and eval_request together
+        both = tc.post(
+            "/api/v1/distributed/runs",
+            json={
+                "mode": "full",
+                "run_request": {"iterations": 1},
+                "eval_request": {"suite": "refusal"},
+            },
+            headers=_auth(),
+        )
+        assert both.status_code == 400
+
+        # Rejects eval_request in split mode
+        split_eval = tc.post(
+            "/api/v1/distributed/runs",
+            json={"mode": "split", "eval_request": {"suite": "refusal"}},
+            headers=_auth(),
+        )
+        assert split_eval.status_code == 400
+
+        # Rejects unknown suite upfront
+        bad_suite = tc.post(
+            "/api/v1/distributed/runs",
+            json={"mode": "full", "eval_request": {"suite": "nonexistent"}},
+            headers=_auth(),
+        )
+        assert bad_suite.status_code == 400
+
+        # Valid full-mode eval_request flows to worker and rolls up partial integrity + spend
+        w_id = tc.post("/api/v1/workers/register", json={}, headers=_auth()).json()["worker_id"]
+        sub = tc.post(
+            "/api/v1/distributed/runs",
+            json={
+                "mode": "full",
+                "eval_request": {"suite": "refusal", "runs": 1},
+            },
+            headers=_auth(),
+        )
+        assert sub.status_code == 202, sub.text
+        job_id = sub.json()["job_id"]
+
+        claimed = tc.get(f"/api/v1/workers/{w_id}/jobs/next", headers=_auth()).json()
+        assert claimed["task_spec"]["mode"] == "full"
+        assert claimed["task_spec"]["eval_request"]["suite"] == "refusal"
+        # Omitted provider/model stays unpinned so worker defaults apply
+        assert "provider" not in claimed["task_spec"]["eval_request"]
+
+        eval_payload = {
+            "suite": "refusal",
+            "provider": "ollama",
+            "model": "gemma3:4b",
+            "overall_score": 0.75,
+            "fixtures_run": 4,
+            "total_tokens": 200,
+            "total_cost_usd": 0.35,
+            "integrity": {"status": "partial", "should_exit_nonzero": True},
+        }
+        done = tc.post(
+            f"/api/v1/workers/{w_id}/jobs/{claimed['assignment_id']}/result",
+            json={"status": "completed", "result_json": json.dumps(eval_payload)},
+            headers=_auth(),
+        )
+        assert done.status_code == 200
+
+        job = tc.get(f"/api/v1/distributed/runs/{job_id}", headers=_auth()).json()
+        assert job["status"] == "partial"
+        summary = json.loads(job["summary_json"])
+        assert summary["integrity"] == {"status": "partial", "should_exit_nonzero": True}
+        assert summary["estimated_cost_usd"] == 0.35

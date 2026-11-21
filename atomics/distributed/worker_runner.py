@@ -163,7 +163,25 @@ async def execute_full_run(
     host: str | None = None,
     settings: AtomicsSettings | None = None,
 ) -> dict[str, Any]:
-    """Execute a full benchmark run locally and return a serializable result."""
+    """Execute a full benchmark or eval run locally and return a serializable result."""
+    raw_eval = assignment.task_spec.get("eval_request")
+    if raw_eval is not None:
+        if not isinstance(raw_eval, dict):
+            raise TypeError("eval_request must be a dict")
+        from atomics.api._runners import run_eval_suite
+        from atomics.api.models import EvalRequest
+
+        eval_payload = dict(raw_eval)
+        eval_payload["provider"] = eval_payload.get("provider") or provider_name
+        if not eval_payload.get("model") and model is not None:
+            eval_payload["model"] = model
+        if not eval_payload.get("host") and host is not None:
+            eval_payload["host"] = host
+        eval_req = EvalRequest(**eval_payload)
+        eval_out = await run_eval_suite(eval_req)
+        eval_out.setdefault("suite", eval_req.suite)
+        return eval_out
+
     settings = settings or load_settings()
     run_request = assignment.task_spec.get("run_request", {})
     if not isinstance(run_request, dict):
