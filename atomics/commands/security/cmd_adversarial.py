@@ -66,10 +66,11 @@ def _parse_model_spec(spec: str, default_provider: str) -> tuple[str, str, str |
     type=str,
     default=None,
     help="Comma-separated categories or group aliases to run (default: all). "
-    "Group aliases: zerotrust, agentic, mcp, tool_safety, multiturn, "
-    "rag_poisoning, tool_desc_injection. "
+    "Group aliases: zerotrust, agentic, mcp, tool_safety, multiturn, escalation, "
+    "rag_poisoning, tool_desc_injection, encoding, many_shot. "
     "Base categories: prompt_injection, role_confusion, context_escape, "
-    "instruction_override, social_engineering, data_exfil_attempt.",
+    "instruction_override, social_engineering, data_exfil_attempt, "
+    "context_drift, authority_buildup.",
 )
 @click.option(
     "--fixtures",
@@ -310,6 +311,17 @@ def adversarial(
                 f" [{icon}] [bold]{fr.fixture.id}[/bold] ({fr.fixture.category}){run_tag} "
                 f"[{color}]{res.label}[/] ({res.score:.2f}){judge_tag}",
             )
+            if fr.turn_results:
+                turn_summary = " → ".join(
+                    f"t{t.turn}:{t.score:.2f}" if t.score is not None else f"t{t.turn}:n/a"
+                    for t in fr.turn_results
+                )
+                breach_note = (
+                    f" (first breach: turn {fr.first_breach_turn})"
+                    if fr.first_breach_turn is not None
+                    else ""
+                )
+                console.print(f"     [dim]turns: {turn_summary}{breach_note}[/dim]")
             # Rationale: full in verbose, first sentence otherwise
             if verbose:
                 console.print(f"     [dim]{_rich_escape(res.rationale)}[/dim]", soft_wrap=True)

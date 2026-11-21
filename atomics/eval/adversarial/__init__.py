@@ -11,7 +11,8 @@ from collections.abc import Iterable, Sequence
 
 from .agentic_reasoning import AGENTIC_REASONING_FIXTURES  # noqa: F401
 from .encoding_obfuscation import ENCODING_OBFUSCATION_FIXTURES  # noqa: F401
-from .fixtures import ADVERSARIAL_FIXTURES, AdversarialFixture  # noqa: F401
+from .escalation import ESCALATION_FIXTURES  # noqa: F401
+from .fixtures import ADVERSARIAL_FIXTURES, AdversarialFixture, AdversarialTurn  # noqa: F401
 from .many_shot import MANYSHOT_FIXTURES  # noqa: F401
 from .mcp_agentic import MCP_AGENTIC_FIXTURES, TOOL_SAFETY_FIXTURES  # noqa: F401
 from .multiturn import MULTITURN_FIXTURES  # noqa: F401
@@ -27,6 +28,7 @@ ALL_FIXTURES: list[AdversarialFixture] = (
     + MCP_AGENTIC_FIXTURES
     + TOOL_SAFETY_FIXTURES
     + MULTITURN_FIXTURES
+    + ESCALATION_FIXTURES
     + RAG_POISONING_FIXTURES
     + TOOL_DESC_INJECTION_FIXTURES
     + ENCODING_OBFUSCATION_FIXTURES
@@ -40,7 +42,8 @@ GROUP_ALIASES: dict[str, set[str]] = {
     "agentic": {f.category for f in AGENTIC_REASONING_FIXTURES},
     "mcp": {f.category for f in MCP_AGENTIC_FIXTURES},
     "tool_safety": {f.category for f in TOOL_SAFETY_FIXTURES},
-    "multiturn": {f.category for f in MULTITURN_FIXTURES},
+    "multiturn": {f.category for f in MULTITURN_FIXTURES + ESCALATION_FIXTURES},
+    "escalation": {f.category for f in ESCALATION_FIXTURES},
     "rag_poisoning": {f.category for f in RAG_POISONING_FIXTURES},
     "tool_desc_injection": {f.category for f in TOOL_DESC_INJECTION_FIXTURES},
     "encoding": {f.category for f in ENCODING_OBFUSCATION_FIXTURES},
@@ -88,12 +91,14 @@ def select_fixtures(
 
 __all__ = [
     "AdversarialFixture",
+    "AdversarialTurn",
     "ADVERSARIAL_FIXTURES",
     "ZEROTRUST_FIXTURES",
     "AGENTIC_REASONING_FIXTURES",
     "MCP_AGENTIC_FIXTURES",
     "TOOL_SAFETY_FIXTURES",
     "MULTITURN_FIXTURES",
+    "ESCALATION_FIXTURES",
     "RAG_POISONING_FIXTURES",
     "TOOL_DESC_INJECTION_FIXTURES",
     "ENCODING_OBFUSCATION_FIXTURES",

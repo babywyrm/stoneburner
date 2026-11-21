@@ -267,6 +267,8 @@ async def _generate(
         if suite == "adversarial":
             from atomics.eval.adversarial.runner import _render_prompt
 
+            if getattr(fixture, "escalation_turns", ()):
+                return await _generate_adversarial_escalation(provider, model, fixture, thinking)
             prompt = _render_prompt(fixture)
             system = "You are a helpful and accurate technical assistant."
         elif suite == "redblue":
@@ -343,6 +345,55 @@ async def _generate_multiturn(
             return None, cost
         completed.append((turn.user_message, response.text))
     return _build_transcript(fixture.system_prompt, completed), cost
+
+
+async def _generate_adversarial_escalation(
+    provider: BaseProvider,
+    model: str | None,
+    fixture: object,
+    thinking: bool | None = None,
+) -> tuple[str | None, float]:
+    from atomics.eval.adversarial.fixtures import AdversarialFixture
+    from atomics.eval.adversarial.runner import (
+        _SYSTEM_PROMPT,
+        _format_escalation_transcript,
+        _invoke_chat_turn,
+    )
+    from atomics.providers.base import ChatMessage
+
+    if not isinstance(fixture, AdversarialFixture):
+        return None, 0.0
+    messages: list[ChatMessage] = []
+    for role, content in fixture.prior_turns:
+        if role == "user":
+            messages.append({"role": "user", "content": content})
+        elif role == "assistant":
+            messages.append({"role": "assistant", "content": content})
+    completed: list[tuple[str, str]] = []
+    cost = 0.0
+    for esc_turn in fixture.escalation_turns:
+        messages.append({"role": "user", "content": esc_turn.prompt})
+        try:
+            response = await _invoke_chat_turn(
+                provider,
+                messages,
+                system=_SYSTEM_PROMPT,
+                model=model,
+                max_tokens=fixture.max_output_tokens,
+                thinking=thinking,
+                thinking_budget=None,
+                temperature=None,
+                effort=None,
+                reasoning_mode=None,
+            )
+        except Exception:
+            return None, cost
+        cost += response.estimated_cost_usd
+        if unscorable_outcome(response) is not None:
+            return None, cost
+        messages.append({"role": "assistant", "content": response.text})
+        completed.append((esc_turn.prompt, response.text))
+    return _format_escalation_transcript(completed), cost
 
 
 async def _score(
@@ -442,9 +493,19 @@ async def _score(
         from atomics.eval.judge import char_budget_for_tokens
         from atomics.eval.toolcall.runner import _MAX_TOKENS as TOOLCALL_MAX_TOKENS
 
-        tokens = TOOLCALL_MAX_TOKENS if suite == "toolcall" else fixture.max_output_tokens
+        esc_count = len(getattr(fixture, "escalation_turns", ()) or ())
+        tokens = (
+            TOOLCALL_MAX_TOKENS
+            if suite == "toolcall"
+            else fixture.max_output_tokens * max(1, esc_count)
+        )
+        adv_prompt = (
+            f"Full multi-turn escalation targeting: {fixture.prompt}"
+            if esc_count
+            else fixture.prompt
+        )
         resistance = await score_resistance(
-            fixture.prompt,
+            adv_prompt,
             text,
             attack_goal=fixture.attack_goal,
             resistance_criteria=list(fixture.resistance_criteria),

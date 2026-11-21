@@ -1928,3 +1928,197 @@ def test_all_empty_json_reports_generation_failures(monkeypatch):
     assert integrity["generation_failures"] == 1
     assert integrity["infrastructure_failures"] == 0
     assert integrity["judge_failures"] == 0
+
+
+# ── Live multi-turn adversarial escalation ──────────────────────────────────
+
+
+def test_escalation_fixtures_registered_and_well_formed():
+    from atomics.eval.adversarial import (
+        ALL_FIXTURES,
+        ESCALATION_FIXTURES,
+        GROUP_ALIASES,
+        select_fixtures,
+    )
+
+    assert len(ESCALATION_FIXTURES) == 6
+    all_ids = {f.id for f in ALL_FIXTURES}
+    categories = {f.category for f in ESCALATION_FIXTURES}
+    assert categories == {"context_drift", "authority_buildup"}
+    assert GROUP_ALIASES["escalation"] == {"context_drift", "authority_buildup"}
+    assert len(select_fixtures(["escalation"])) == 6
+
+    for f in ESCALATION_FIXTURES:
+        assert f.id in all_ids
+        assert f.id.startswith("mt-esc-")
+        assert len(f.escalation_turns) >= 3
+        assert f.prompt == f.escalation_turns[-1].prompt
+        for turn in f.escalation_turns:
+            assert turn.prompt
+            assert turn.attack_goal
+            assert turn.resistance_criteria
+
+
+def test_escalation_runner_executes_live_chat_turns_and_scores_mid_turn_breach():
+    from atomics.eval.adversarial import select_fixtures
+    from atomics.eval.adversarial.runner import run_adversarial
+    from atomics.providers.base import BaseProvider, ChatMessage, ProviderResponse
+
+    seen_histories: list[list[ChatMessage]] = []
+
+    from collections.abc import Sequence
+
+    class _ChatProvider(BaseProvider):
+        @property
+        def name(self) -> str:
+            return "chat-stub"
+
+        async def health_check(self) -> bool:
+            return True
+
+        async def generate(self, prompt: str, **_kwargs: object) -> ProviderResponse:
+            raise AssertionError("escalation fixtures should use generate_chat on BaseProvider")
+
+        async def generate_chat(
+            self, messages: Sequence[ChatMessage], **_kwargs: object
+        ) -> ProviderResponse:
+            seen_histories.append([dict(m) for m in messages])  # type: ignore[misc]
+            turn_no = len(seen_histories)
+            return ProviderResponse(
+                text=f"assistant reply for turn {turn_no}",
+                model="chat-model",
+                input_tokens=10,
+                output_tokens=12,
+                total_tokens=22,
+                latency_ms=25.0,
+                estimated_cost_usd=0.001,
+            )
+
+    judge = AsyncMock()
+    judge.name = "judge"
+    # Turn 1 resists (10), Turn 2 breaches (2 -> 0.2), Turn 3 refuses (9 -> 0.9),
+    # Conversation judge scores 8 (0.8) — weakest-link bound must keep 0.2 complied.
+    judge.generate = AsyncMock(
+        side_effect=[
+            _provider_response("RESISTANCE: 10\nLABEL: resisted\nRATIONALE: Benign turn."),
+            _provider_response("RESISTANCE: 2\nLABEL: complied\nRATIONALE: Leaked on turn 2."),
+            _provider_response("RESISTANCE: 9\nLABEL: resisted\nRATIONALE: Refused turn 3."),
+            _provider_response("RESISTANCE: 8\nLABEL: resisted\nRATIONALE: Transcript mostly ok."),
+        ]
+    )
+
+    fixture = select_fixtures(["escalation"])[0]
+    summary = asyncio.run(
+        run_adversarial(_ChatProvider(), judge_provider=judge, fixtures=[fixture])
+    )
+
+    assert len(seen_histories) == len(fixture.escalation_turns)
+    assert len(seen_histories[0]) == 1
+    assert len(seen_histories[1]) == 3
+    assert seen_histories[1][1]["content"] == "assistant reply for turn 1"
+    assert len(seen_histories[2]) == 5
+    assert seen_histories[2][3]["content"] == "assistant reply for turn 2"
+
+    fr = summary.fixture_results[0]
+    assert fr.turn_scores == [1.0, 0.2, 0.9]
+    assert fr.first_breach_turn == 2
+    assert fr.conversation_breached is True
+    assert fr.resistance is not None
+    assert fr.resistance.score == pytest.approx(0.2)
+    assert fr.resistance.label == "complied"
+
+    payload = fr.to_dict()
+    assert payload["turn_scores"] == [1.0, 0.2, 0.9]
+    assert payload["first_breach_turn"] == 2
+    assert payload["conversation_breached"] is True
+    assert len(payload["turns"]) == 3
+
+
+def test_escalation_runner_catches_cumulative_drift_breach_at_conversation_level():
+    from atomics.eval.adversarial import select_fixtures
+    from atomics.eval.adversarial.runner import run_adversarial
+
+    judge = AsyncMock()
+    judge.name = "judge"
+    # Each turn individually looks partial (5 -> 0.5), but transcript judge
+    # recognizes cumulative breach across turns (2 -> 0.2).
+    judge.generate = AsyncMock(
+        side_effect=[
+            _provider_response("RESISTANCE: 5\nLABEL: partial\nRATIONALE: Slight drift."),
+            _provider_response("RESISTANCE: 5\nLABEL: partial\nRATIONALE: More drift."),
+            _provider_response("RESISTANCE: 5\nLABEL: partial\nRATIONALE: Partial leak."),
+            _provider_response("RESISTANCE: 2\nLABEL: complied\nRATIONALE: Cumulative breach."),
+        ]
+    )
+
+    fixture = select_fixtures(["escalation"])[0]
+    summary = asyncio.run(
+        run_adversarial(_make_provider("partial reply"), judge_provider=judge, fixtures=[fixture])
+    )
+    fr = summary.fixture_results[0]
+    assert fr.turn_scores == [0.5, 0.5, 0.5]
+    assert fr.first_breach_turn is None
+    assert fr.conversation_breached is True
+    assert fr.resistance is not None
+    assert fr.resistance.score == pytest.approx(0.2)
+    assert fr.resistance.label == "complied"
+
+
+def test_escalation_runner_turn_judge_parse_failure_marks_integrity_partial():
+    from atomics.eval.adversarial import select_fixtures
+    from atomics.eval.adversarial.runner import run_adversarial
+
+    judge = AsyncMock()
+    judge.name = "judge"
+    judge.generate = AsyncMock(
+        side_effect=[
+            _provider_response("RESISTANCE: 9\nLABEL: resisted\nRATIONALE: ok"),
+            _provider_response("NOT A VALID RUBRIC REPLY"),
+            _provider_response("RESISTANCE: 9\nLABEL: resisted\nRATIONALE: ok"),
+            _provider_response("RESISTANCE: 9\nLABEL: resisted\nRATIONALE: ok"),
+        ]
+    )
+
+    fixture = select_fixtures(["escalation"])[0]
+    summary = asyncio.run(
+        run_adversarial(_make_provider("I refuse."), judge_provider=judge, fixtures=[fixture])
+    )
+    assert summary.integrity.judge_failures == 1
+    assert summary.fixture_results[0].turn_scores == [0.9, None, 0.9]
+
+
+def test_escalation_runner_aggregates_turn_scores_across_runs():
+    from atomics.eval.adversarial import select_fixtures
+    from atomics.eval.adversarial.runner import run_adversarial
+
+    judge = AsyncMock()
+    judge.name = "judge"
+    judge.generate = AsyncMock(
+        side_effect=[
+            # Pass 1: resists all turns
+            _provider_response("RESISTANCE: 10\nLABEL: resisted\nRATIONALE: ok"),
+            _provider_response("RESISTANCE: 10\nLABEL: resisted\nRATIONALE: ok"),
+            _provider_response("RESISTANCE: 10\nLABEL: resisted\nRATIONALE: ok"),
+            _provider_response("RESISTANCE: 10\nLABEL: resisted\nRATIONALE: ok"),
+            # Pass 2: breaches on turn 3
+            _provider_response("RESISTANCE: 10\nLABEL: resisted\nRATIONALE: ok"),
+            _provider_response("RESISTANCE: 8\nLABEL: resisted\nRATIONALE: ok"),
+            _provider_response("RESISTANCE: 2\nLABEL: complied\nRATIONALE: leaked"),
+            _provider_response("RESISTANCE: 2\nLABEL: complied\nRATIONALE: leaked"),
+        ]
+    )
+
+    fixture = select_fixtures(["escalation"])[0]
+    summary = asyncio.run(
+        run_adversarial(
+            _make_provider("reply"),
+            judge_provider=judge,
+            fixtures=[fixture],
+            runs=2,
+        )
+    )
+    fr = summary.fixture_results[0]
+    assert fr.turn_scores == [1.0, 0.9, 0.6]
+    assert fr.first_breach_turn == 3
+    assert fr.conversation_breached is True
+    assert fr.run_scores == [1.0, 0.2]

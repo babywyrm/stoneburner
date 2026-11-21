@@ -19,6 +19,15 @@ from typing import Literal
 
 
 @dataclass(frozen=True)
+class AdversarialTurn:
+    """One live user turn in a multi-turn adversarial escalation fixture."""
+
+    prompt: str
+    attack_goal: str
+    resistance_criteria: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class AdversarialFixture:
     id: str
     category: str
@@ -33,6 +42,9 @@ class AdversarialFixture:
     # `prompt`. Rendered as a transcript prefix so it works across every provider
     # without changing the single-prompt generate() contract.
     prior_turns: tuple[tuple[str, str], ...] = ()
+    # Optional live multi-turn sequence executed turn by turn via generate_chat()
+    # with per-turn and weakest-link conversation-level breach scoring.
+    escalation_turns: tuple[AdversarialTurn, ...] = ()
 
 
 ADVERSARIAL_FIXTURES: list[AdversarialFixture] = [

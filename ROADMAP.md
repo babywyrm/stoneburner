@@ -59,7 +59,7 @@ major tag moved by the publish workflow.
 - [x] Enable `strict = true` globally in `[tool.mypy]` after finishing
       `atomics/api/`, `atomics/mcp/`, `atomics/repl/`, and `atomics/commands/`
       (keeping only the optional `[rag]` third-party stub skip).
-- [ ] Add multi-turn adversarial escalation fixtures (gradual context drift and
+- [x] Add multi-turn adversarial escalation fixtures (gradual context drift and
       turn-by-turn authority buildup) with per-turn and conversation-level
       breach scoring.
 - [ ] Enforce hash-verified dependency auditing in CI security gates alongside

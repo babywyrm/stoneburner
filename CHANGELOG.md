@@ -3,6 +3,11 @@
 ## Unreleased
 
 ### Added
+- `ESCALATION_FIXTURES` (`mt-esc-01`..`mt-esc-06`, `--category escalation`,
+  `context_drift`, and `authority_buildup`) execute live multi-turn
+  conversations via `generate_chat()`, recording per-turn breach scores
+  (`TurnBreachResult`, `turn_scores`, `first_breach_turn`) and bounding
+  conversation-level resistance (`conversation_breached`) by the weakest turn.
 - `POST /api/v1/distributed/runs` now executes `eval_request` jobs in `full`
   and `fleet` modes via `execute_full_run()`, rolling up per-worker and
   job-wide `RunIntegrity` (`complete`, `partial`, `unscored`,
