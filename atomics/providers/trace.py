@@ -220,6 +220,9 @@ class TracedProvider(BaseProvider):
     async def health_check(self) -> bool:
         return await self._inner.health_check()
 
+    async def model_digest(self, model: str | None = None) -> str | None:
+        return await self._inner.model_digest(model)
+
     async def generate(
         self,
         prompt: str,

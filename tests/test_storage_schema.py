@@ -423,7 +423,7 @@ def test_v22_populated_db_migrates_to_v23_with_caller_spend_and_fk_rows_intact(
 
     repo = MetricsRepository(db_path)
     try:
-        assert schema.SCHEMA_VERSION == 23
+        assert schema.SCHEMA_VERSION == 24
         assert repo.get_run("r-parent") is not None
         assert len(repo.get_run_tasks("r-parent")) == 1
         assert len(repo.get_evaluation_results(run_id="r-parent")) == 1
@@ -432,3 +432,100 @@ def test_v22_populated_db_migrates_to_v23_with_caller_spend_and_fk_rows_intact(
         assert repo.record_caller_spend("caller-a", 2.50) == 3.75
     finally:
         repo.close()
+
+
+def test_v23_to_v24_migrates_populated_db_and_backfills_judge_calibrations(tmp_path: Path) -> None:
+    """Upgrading from v23 preserves FK rows and backfills `judge_calibrations`."""
+    import json
+
+    from atomics.eval.calibration import judge_calibration_status
+    from atomics.storage.repository import MetricsRepository
+
+    db_path = tmp_path / "v23_populated.db"
+    conn = init_db(db_path)
+    conn.close()
+
+    raw = sqlite3.connect(str(db_path))
+    try:
+        raw.execute("DROP TABLE IF EXISTS judge_calibrations")
+        raw.execute("DELETE FROM schema_version")
+        raw.execute("INSERT INTO schema_version (version) VALUES (23)")
+        raw.execute(
+            """
+            INSERT INTO runs (run_id, started_at, completed_at, tier, provider, model)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "cal-v23",
+                "2026-11-10T00:00:00+00:00",
+                "2026-11-10T00:00:05+00:00",
+                "judge-calibrate",
+                "ollama",
+                "legacy-judge:7b",
+            ),
+        )
+        for idx, (fid, human, judge_score) in enumerate(
+            [("A", 0.3, 0.3), ("B", 0.8, 0.85)], start=1
+        ):
+            raw.execute(
+                """
+                INSERT INTO evaluation_results (
+                    result_id, run_id, suite, fixture_id, status, score,
+                    provider, model, result_json, timestamp
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    f"er-{idx}",
+                    "cal-v23",
+                    "judge-calibrate",
+                    fid,
+                    "complete",
+                    judge_score,
+                    "ollama",
+                    "legacy-judge:7b",
+                    json.dumps(
+                        {
+                            "human": human,
+                            "set_name": "blue-v1",
+                            "set_digest": "abc123",
+                            "max_error": 0.15,
+                        }
+                    ),
+                    f"2026-11-10T00:00:0{idx}+00:00",
+                ),
+            )
+        raw.execute(
+            """
+            INSERT INTO task_results
+                (task_id, run_id, category, task_name, provider, model, status, started_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "task-fk",
+                "cal-v23",
+                "general_qa",
+                "q1",
+                "ollama",
+                "legacy-judge:7b",
+                "success",
+                "2026-11-10T00:00:01+00:00",
+            ),
+        )
+        raw.commit()
+    finally:
+        raw.close()
+
+    repo = MetricsRepository(db_path)
+    try:
+        assert repo.get_run("cal-v23") is not None
+        assert len(repo.get_run_tasks("cal-v23")) == 1
+        assert len(repo.get_evaluation_results(run_id="cal-v23")) == 2
+        cals = repo.get_judge_calibrations(provider="ollama", model="legacy-judge:7b")
+        assert len(cals) == 1
+        assert cals[0]["model_digest"] == ""
+        assert cals[0]["passed"] is True
+    finally:
+        repo.close()
+
+    status = judge_calibration_status(db_path, "ollama", "legacy-judge:7b")
+    assert status is not None and status.passed is True and status.set_name == "blue-v1"

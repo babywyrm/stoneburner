@@ -13,7 +13,7 @@ from typing import Any
 
 from fastapi import HTTPException
 
-from atomics.api._runners import _judge_calibration, _provider_for
+from atomics.api._runners import _judge_calibration_async, _provider_for
 from atomics.api.job_progress import SweepJobReporter, sweep_job_total
 from atomics.api.jobs import Job
 from atomics.api.models import SweepRequest
@@ -56,7 +56,9 @@ async def run_sweep_from_request(
 
     try:
         judge_provider = meter.wrap(_provider_for("ollama", payload.judge_model, judge_host))
-        judge_cal = _judge_calibration(payload.judge_model, judge_provider, db_path=db_path)
+        judge_cal = await _judge_calibration_async(
+            payload.judge_model, judge_provider, db_path=db_path
+        )
         inner = make_suite_runner(
             provider_factory=provider_factory,
             judge_provider=judge_provider,

@@ -153,7 +153,10 @@ def multiturn(
         f"Total turns: [bold]{total_turns}[/bold]\n"
     )
     print_judge_calibration(
-        console, judge_provider_name, _attribution_model(judge_provider, judge_model)
+        console,
+        judge_provider_name,
+        _attribution_model(judge_provider, judge_model),
+        judge_provider=judge_provider,
     )
 
     mt_run_id = uuid.uuid4().hex[:12]

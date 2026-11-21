@@ -197,6 +197,10 @@ class BaseProvider(ABC):
         """List models served by this backend when supported."""
         raise NotImplementedError(f"{type(self).__name__} does not support listing models.")
 
+    async def model_digest(self, model: str | None = None) -> str | None:
+        """Return an immutable content digest for `model` when the backend exposes one."""
+        return None
+
     async def aclose(self) -> None:
         """Close the async HTTP client on this loop. No-op if there is none.
 

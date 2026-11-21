@@ -341,7 +341,10 @@ def sweep(
         )
     )
     print_judge_calibration(
-        console, judge_provider_name, effective_model(judge_model, judge_provider)
+        console,
+        judge_provider_name,
+        effective_model(judge_model, judge_provider),
+        judge_provider=judge_provider,
     )
 
     if suite_list != ["eval"] or status_path or log_path:

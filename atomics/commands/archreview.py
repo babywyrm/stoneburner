@@ -218,7 +218,10 @@ def archreview(
         f"{judge_provider_name}:{judge_model or judge_provider.default_model or 'default'}"
     )
     print_judge_calibration(
-        console, judge_provider_name, effective_model(judge_model, judge_provider)
+        console,
+        judge_provider_name,
+        effective_model(judge_model, judge_provider),
+        judge_provider=judge_provider,
     )
 
     table = Table(title=f"archreview — {spec.name} ({tier})", show_lines=True)

@@ -14,11 +14,14 @@ judge's own rubric, reported as mean error and bias against the human.
 
 from __future__ import annotations
 
+import asyncio
+import concurrent.futures
 import hashlib
 import itertools
 import logging
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import asdict, dataclass, field
+from inspect import isawaitable
 from pathlib import Path
 
 import yaml
@@ -261,6 +264,7 @@ class JudgeCalibration:
     judge_model: str
     max_error: float
     items: list[ItemCalibration]
+    model_digest: str = ""
 
     @property
     def pairs(self) -> list[Pair]:
@@ -296,6 +300,7 @@ class JudgeCalibration:
             "set_digest": self.set_digest,
             "judge_provider": self.judge_provider,
             "judge_model": self.judge_model,
+            "model_digest": self.model_digest,
             "max_error": self.max_error,
             "mae": self.mae,
             "bias": self.bias,
@@ -304,6 +309,79 @@ class JudgeCalibration:
             "integrity": self.integrity.status.value,
             "items": [asdict(i) for i in self.items],
         }
+
+
+def _unwrap_provider(provider: object) -> object:
+    seen: set[int] = set()
+    cur = provider
+    while isinstance(cur, BaseProvider) and id(cur) not in seen:
+        seen.add(id(cur))
+        inner = vars(cur).get("_inner")
+        if inner is None:
+            break
+        cur = inner
+    return cur
+
+
+async def _resolve_digest_async(provider: object | None, model: str) -> str | None:
+    if provider is None:
+        return None
+    unwrapped = _unwrap_provider(provider)
+    if isinstance(unwrapped, BaseProvider) and (
+        type(unwrapped).model_digest is BaseProvider.model_digest
+    ):
+        return None
+    fn = getattr(unwrapped, "model_digest", None)
+    if not callable(fn):
+        return None
+    try:
+        raw = fn(model)
+        val = await raw if isawaitable(raw) else raw
+        return val.strip() if isinstance(val, str) and val.strip() else None
+    except Exception:  # noqa: BLE001 — advisory digest resolution
+        return None
+
+
+def _resolve_digest_sync(provider: object | None, model: str) -> str | None:
+    if provider is None:
+        return None
+    unwrapped = _unwrap_provider(provider)
+    if isinstance(unwrapped, BaseProvider) and (
+        type(unwrapped).model_digest is BaseProvider.model_digest
+    ):
+        return None
+    sync_fn = getattr(unwrapped, "model_digest_sync", None)
+    if callable(sync_fn):
+        try:
+            res = sync_fn(model)
+            if isinstance(res, str) and res.strip():
+                return res.strip()
+            # If no custom async client is present, sync lookup is authoritative.
+            if not getattr(unwrapped, "_custom_client", False):
+                return None
+        except Exception:  # noqa: BLE001
+            return None
+    async_fn = getattr(unwrapped, "model_digest", None)
+    if not callable(async_fn):
+        return None
+
+    async def _call() -> str | None:
+        raw = async_fn(model)
+        val = await raw if isawaitable(raw) else raw
+        return val.strip() if isinstance(val, str) and val.strip() else None
+
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        try:
+            return asyncio.run(_call())
+        except Exception:  # noqa: BLE001
+            return None
+    try:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            return pool.submit(asyncio.run, _call()).result(timeout=5.0)
+    except Exception:  # noqa: BLE001
+        return None
 
 
 async def run_judge_calibration(
@@ -317,6 +395,8 @@ async def run_judge_calibration(
     on_item: Callable[[ItemCalibration], None] | None = None,
 ) -> JudgeCalibration:
     """Score every graded answer with one judge. Stored answers are judged untruncated."""
+    resolved_model = judge_model or getattr(judge_provider, "default_model", None) or "default"
+    resolved_digest = await _resolve_digest_async(judge_provider, resolved_model) or ""
     items: list[ItemCalibration] = []
     for item in graded.items:
         result = await score_fn(
@@ -335,9 +415,10 @@ async def run_judge_calibration(
         set_name=graded.name,
         set_digest=graded.digest,
         judge_provider=provider_name,
-        judge_model=judge_model or judge_provider.default_model or "default",
+        judge_model=resolved_model,
         max_error=max_error,
         items=items,
+        model_digest=resolved_digest,
     )
 
 
@@ -350,6 +431,7 @@ class CalibrationStatus:
     set_name: str
     max_error: float
     calibrated_at: str
+    model_digest: str = ""
 
     def label(self) -> str:
         state = "calibrated" if self.passed else "failed calibration"
@@ -366,7 +448,7 @@ def calibration_label(status: CalibrationStatus | None) -> str:
 def save_calibration(
     repository: MetricsRepository, run_id: str, calibration: JudgeCalibration
 ) -> None:
-    """Store a calibration as a completed parent run with one row per item."""
+    """Store a calibration as a completed parent run and upsert `judge_calibrations`."""
     repository.create_run(
         run_id,
         tier=CALIBRATE_SUITE,
@@ -393,33 +475,113 @@ def save_calibration(
                     "human": item.human,
                     "set_name": calibration.set_name,
                     "set_digest": calibration.set_digest,
+                    "model_digest": calibration.model_digest,
                     "max_error": calibration.max_error,
                 },
             )
         )
-    repository.complete_evaluation_run(run_id)
+    summary = repository.complete_evaluation_run(run_id)
+    mae, bias = calibration.mae, calibration.bias
+    if mae is not None and bias is not None:
+        stamp = (
+            summary.completed_at.isoformat()
+            if summary.completed_at is not None
+            else summary.started_at.isoformat()
+        )
+        repository.save_judge_calibration(
+            provider=calibration.judge_provider,
+            model=calibration.judge_model,
+            model_digest=calibration.model_digest,
+            run_id=run_id,
+            set_name=calibration.set_name,
+            set_digest=calibration.set_digest,
+            mae=mae,
+            bias=bias,
+            pair_order=calibration.pair_order,
+            max_error=calibration.max_error,
+            passed=calibration.passed,
+            item_count=len(calibration.pairs),
+            calibrated_at=stamp,
+        )
 
 
-def judge_calibration_status(db_path: Path, provider: str, model: str) -> CalibrationStatus | None:
-    """The newest stored calibration for a judge. None when absent or unreadable; never raises."""
-    # ponytail: keyed by provider + model, not host or quantization, so one tag
-    # pulled at two quants shares a calibration. Add a digest to the key if they diverge.
+def _select_calibration_row(
+    rows: Sequence[dict[str, object]],
+    *,
+    target_digest: str,
+) -> CalibrationStatus | None:
+    for row in rows:
+        if str(row.get("model_digest", "")) == target_digest:
+            return CalibrationStatus(
+                passed=bool(row["passed"]),
+                mae=_number(row["mae"]),
+                bias=_number(row["bias"]),
+                n=int(_number(row["item_count"])),
+                set_name=str(row["set_name"]),
+                max_error=_number(row["max_error"]),
+                calibrated_at=str(row["calibrated_at"]),
+                model_digest=str(row.get("model_digest", "")),
+            )
+    return None
+
+
+def _load_candidate_rows(db_path: Path, provider: str, model: str) -> list[dict[str, object]]:
+    repository = MetricsRepository(db_path)
+    try:
+        return repository.get_judge_calibrations(provider=provider, model=model)
+    finally:
+        repository.close()
+
+
+def judge_calibration_status(
+    db_path: Path,
+    provider: str,
+    model: str,
+    *,
+    model_digest: str | None = None,
+    judge_provider: object | None = None,
+) -> CalibrationStatus | None:
+    """Newest stored calibration for `(provider, model, model_digest)`. Never raises."""
     if not db_path.exists():
         return None
     try:
-        repository = MetricsRepository(db_path)
-        try:
-            rows = [
-                row
-                for row in repository.get_evaluation_results(suite=CALIBRATE_SUITE)
-                if row["provider"] == provider and row["model"] == model
-            ]
-        finally:
-            repository.close()
+        rows = _load_candidate_rows(db_path, provider, model)
         if not rows:
             return None
-        newest = max(rows, key=lambda row: str(row["timestamp"]))["run_id"]
-        return _status_from_rows([row for row in rows if row["run_id"] == newest])
+        if model_digest is not None:
+            target = model_digest
+        elif any(bool(r.get("model_digest")) for r in rows):
+            target = _resolve_digest_sync(judge_provider, model) or ""
+        else:
+            target = ""
+        return _select_calibration_row(rows, target_digest=target)
+    except Exception as exc:  # noqa: BLE001 — a label must never fail the run it labels
+        logger.debug("judge calibration lookup failed: %s", sanitize_error(exc))
+        return None
+
+
+async def judge_calibration_status_async(
+    db_path: Path,
+    provider: str,
+    model: str,
+    *,
+    model_digest: str | None = None,
+    judge_provider: object | None = None,
+) -> CalibrationStatus | None:
+    """Async counterpart to `judge_calibration_status` for API/event-loop callers."""
+    if not db_path.exists():
+        return None
+    try:
+        rows = _load_candidate_rows(db_path, provider, model)
+        if not rows:
+            return None
+        if model_digest is not None:
+            target = model_digest
+        elif any(bool(r.get("model_digest")) for r in rows):
+            target = await _resolve_digest_async(judge_provider, model) or ""
+        else:
+            target = ""
+        return _select_calibration_row(rows, target_digest=target)
     except Exception as exc:  # noqa: BLE001 — a label must never fail the run it labels
         logger.debug("judge calibration lookup failed: %s", sanitize_error(exc))
         return None

@@ -184,7 +184,10 @@ def rag(
         f"Results saved: [bold]{'yes' if save_results else 'no'}[/bold]\n"
     )
     print_judge_calibration(
-        console, judge_provider_name, resolve_effective_model(judge_model, judge_provider)
+        console,
+        judge_provider_name,
+        resolve_effective_model(judge_model, judge_provider),
+        judge_provider=judge_provider,
     )
 
     rag_run_id = uuid.uuid4().hex[:12]

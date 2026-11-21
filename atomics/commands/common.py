@@ -258,12 +258,20 @@ class FixtureProgress:
         return f"{minutes}m{remaining_seconds:02d}s"
 
 
-def print_judge_calibration(console: Console, provider_name: str, model: str) -> None:
+def print_judge_calibration(
+    console: Console,
+    provider_name: str,
+    model: str,
+    *,
+    judge_provider: object | None = None,
+) -> None:
     """One dim line naming the judge's stored calibration. Advisory: never fails a run."""
     from atomics.config import load_settings
     from atomics.eval.calibration import calibration_label, judge_calibration_status
 
-    status = judge_calibration_status(load_settings().db_path, provider_name, model)
+    status = judge_calibration_status(
+        load_settings().db_path, provider_name, model, judge_provider=judge_provider
+    )
     console.print(f"[dim]Judge calibration: {escape(calibration_label(status))}[/dim]")
 
 

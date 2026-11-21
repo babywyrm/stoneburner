@@ -119,6 +119,7 @@ class OllamaProvider(BaseProvider):
         self._default_model = default_model
         self._timeout = timeout
         self._context_tokens = context_tokens
+        self._custom_client = client is not None
         self._client = client or httpx.AsyncClient()
 
     def _num_ctx(self) -> int:
@@ -441,9 +442,51 @@ class OllamaProvider(BaseProvider):
                     "family": details.get("family", ""),
                     "model_class": classify_model(name).value,
                     "thinking": supports_thinking(name),
+                    "digest": str(entry.get("digest", "")),
                 }
             )
         return results
+
+    @staticmethod
+    def _extract_model_digest(data: object, target: str) -> str | None:
+        if not isinstance(data, dict):
+            return None
+        models = data.get("models")
+        if not isinstance(models, list) or not target:
+            return None
+        candidates = {target, f"{target}:latest"} if ":" not in target else {target}
+        for entry in models:
+            if not isinstance(entry, dict):
+                continue
+            if entry.get("name") in candidates or entry.get("model") in candidates:
+                raw = entry.get("digest")
+                if isinstance(raw, str) and raw.strip():
+                    return raw.strip().lower().removeprefix("sha256:")
+        return None
+
+    async def model_digest(self, model: str | None = None) -> str | None:
+        """Resolve Ollama's immutable weights digest for `model` from `/api/tags`."""
+        target = model or self._default_model
+        try:
+            response = await self._client.get(f"{self._host}/api/tags", timeout=5.0)
+            if response.status_code != 200:
+                return None
+            return self._extract_model_digest(response.json(), target)
+        except Exception:
+            return None
+
+    def model_digest_sync(self, model: str | None = None) -> str | None:
+        """Synchronous `/api/tags` lookup for CLI paths without touching `self._client`."""
+        if self._custom_client:
+            return None
+        target = model or self._default_model
+        try:
+            response = httpx.get(f"{self._host}/api/tags", timeout=3.0)
+            if response.status_code != 200:
+                return None
+            return self._extract_model_digest(response.json(), target)
+        except Exception:
+            return None
 
     async def health_check(self) -> bool:
         try:

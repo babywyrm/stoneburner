@@ -265,3 +265,115 @@ def test_labels_for_each_state():
     assert calibration_label(passed) == "calibrated · error 0.13 · bias -0.07 · t · 2026-10-20"
     failed = CalibrationStatus(False, 0.2, 0.2, 6, "t", 0.15, "2026-10-20T01:02:03")
     assert failed.label() == "failed calibration · error 0.20 · bias +0.20 · t · 2026-10-20"
+
+
+@pytest.mark.asyncio
+async def test_ollama_provider_model_digest_resolves_tags_and_wrappers():
+    import httpx
+
+    from atomics.eval.budget import EvalBudget, share_budget
+    from atomics.providers.ollama import OllamaProvider
+    from atomics.providers.trace import TracedProvider
+
+    payload = {
+        "models": [
+            {"name": "qwen-4b-stable:latest", "digest": "sha256:AABBCC1122334455"},
+            {"name": "gemma4:26b", "digest": "ddeeff6677889900"},
+        ]
+    }
+    transport = httpx.MockTransport(lambda _req: httpx.Response(200, json=payload))
+    client = httpx.AsyncClient(transport=transport)
+    provider = OllamaProvider(
+        host="http://127.0.0.1:19999", default_model="gemma4:26b", client=client
+    )
+    try:
+        assert await provider.model_digest() == "ddeeff6677889900"
+        assert await provider.model_digest("qwen-4b-stable") == "aabbcc1122334455"
+        assert await provider.model_digest("missing:7b") is None
+
+        guarded = share_budget(EvalBudget(budget_limit_usd=5.0), provider)[0]
+        traced = TracedProvider(guarded)
+        assert await guarded.model_digest("gemma4:26b") == "ddeeff6677889900"
+        assert await traced.model_digest("qwen-4b-stable") == "aabbcc1122334455"
+    finally:
+        await client.aclose()
+
+
+@pytest.mark.asyncio
+async def test_calibrations_isolate_by_model_digest_and_invalidate_changed_weights(tmp_path):
+    from atomics.providers.base import BaseProvider, ProviderResponse
+
+    class _DigestJudge(BaseProvider):
+        def __init__(self, digest: str) -> None:
+            self._digest = digest
+
+        @property
+        def name(self) -> str:
+            return "ollama"
+
+        @property
+        def default_model(self) -> str | None:
+            return "gemma4:26b"
+
+        async def model_digest(self, model: str | None = None) -> str | None:
+            return self._digest
+
+        async def generate(self, prompt, **_kwargs):
+            return ProviderResponse(
+                text="",
+                input_tokens=0,
+                output_tokens=0,
+                total_tokens=0,
+                model="gemma4:26b",
+                latency_ms=1.0,
+                estimated_cost_usd=0.0,
+            )
+
+        async def health_check(self) -> bool:
+            return True
+
+    graded = load_graded_set(default_set_path())
+    q8_judge = _DigestJudge("digest-q8-weights")
+    q4_judge = _DigestJudge("digest-q4-weights")
+    rebuilt_judge = _DigestJudge("digest-unseen-weights")
+
+    q8_cal = await run_judge_calibration(
+        q8_judge,
+        provider_name="ollama",
+        judge_model="gemma4:26b",
+        graded=graded,
+        score_fn=_scores(*(STUDY["gemma4:26b"][i.id] for i in graded.items)),
+    )
+    assert q8_cal.model_digest == "digest-q8-weights"
+    assert q8_cal.to_dict()["model_digest"] == "digest-q8-weights"
+
+    db = tmp_path / "m.db"
+    repo = MetricsRepository(db)
+    save_calibration(repo, "run-q8", q8_cal)
+
+    # Matching digest is calibrated; different digest under same tag is uncalibrated
+    s_q8 = judge_calibration_status(db, "ollama", "gemma4:26b", model_digest="digest-q8-weights")
+    assert s_q8 is not None and s_q8.passed and s_q8.model_digest == "digest-q8-weights"
+    assert (
+        judge_calibration_status(db, "ollama", "gemma4:26b", model_digest="digest-q4-weights")
+        is None
+    )
+    assert (
+        judge_calibration_status(db, "ollama", "gemma4:26b", judge_provider=rebuilt_judge) is None
+    )
+
+    # Calibrating Q4 weights (failing) stores a separate row without clobbering Q8
+    q4_cal = await run_judge_calibration(
+        q4_judge,
+        provider_name="ollama",
+        judge_model="gemma4:26b",
+        graded=graded,
+        score_fn=_scores(*(STUDY["qwen3.8:27b"][i.id] for i in graded.items)),
+    )
+    save_calibration(repo, "run-q4", q4_cal)
+    repo.close()
+
+    s_q8_after = judge_calibration_status(db, "ollama", "gemma4:26b", judge_provider=q8_judge)
+    s_q4_after = judge_calibration_status(db, "ollama", "gemma4:26b", judge_provider=q4_judge)
+    assert s_q8_after is not None and s_q8_after.passed is True
+    assert s_q4_after is not None and s_q4_after.passed is False

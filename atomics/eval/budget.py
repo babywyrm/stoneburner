@@ -158,6 +158,9 @@ class GuardedProvider(BaseProvider):
         # Not metered: a health check is not model traffic and costs nothing.
         return await self._inner.health_check()
 
+    async def model_digest(self, model: str | None = None) -> str | None:
+        return await self._inner.model_digest(model)
+
     async def generate(
         self,
         prompt: str,

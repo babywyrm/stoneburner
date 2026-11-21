@@ -263,7 +263,12 @@ def toolcall(
         f"judge={judge_provider_name or 'none'} · calls are never executed[/dim]\n"
     )
     if judge is not None and judge_provider_name:
-        print_judge_calibration(console, judge_provider_name, effective_model(judge_model, judge))
+        print_judge_calibration(
+            console,
+            judge_provider_name,
+            effective_model(judge_model, judge),
+            judge_provider=judge,
+        )
     if judge is None and channel != "tools":
         console.print(
             "[yellow]No judge: prose stays unjudged and channel divergence "

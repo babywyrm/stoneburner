@@ -38,7 +38,7 @@ major tag moved by the publish workflow.
 
 ## 0.34.0 — Judge calibration identity, distributed evals, and CLI debloating
 
-- [ ] Key `judge_calibrations` by `(provider, model, model_digest)` instead of
+- [x] Key `judge_calibrations` by `(provider, model, model_digest)` instead of
       bare model name so quantized or fine-tuned weights sharing a tag cannot
       inherit a stale MAE or calibration verdict.
 - [ ] Blind-grade and commit a payload-free red calibration set so

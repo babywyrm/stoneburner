@@ -168,7 +168,12 @@ def redblue(
         f"Judge: [cyan]{judge_provider_name}[/cyan] | Mode: [bold]{mode}[/bold] | "
         f"Fixtures: [bold]{fixture_count}[/bold] | Runs per fixture: [bold]{runs}[/bold]\n"
     )
-    print_judge_calibration(console, judge_provider_name, effective_model(judge_model, judge))
+    print_judge_calibration(
+        console,
+        judge_provider_name,
+        effective_model(judge_model, judge),
+        judge_provider=judge,
+    )
 
     run_id = uuid.uuid4().hex[:12]
     ctx = click.get_current_context()

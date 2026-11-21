@@ -183,6 +183,92 @@ class EvaluationMixin(RepositoryBase):
             results.append(item)
         return results
 
+    def save_judge_calibration(
+        self,
+        *,
+        provider: str,
+        model: str,
+        model_digest: str,
+        run_id: str,
+        set_name: str,
+        set_digest: str,
+        mae: float,
+        bias: float,
+        pair_order: float | None,
+        max_error: float,
+        passed: bool,
+        item_count: int,
+        calibrated_at: str | None = None,
+    ) -> None:
+        """Upsert a judge calibration summary keyed by `(provider, model, model_digest)`."""
+        stamp = calibrated_at or datetime.now(UTC).isoformat()
+        self._conn.execute(
+            """
+            INSERT INTO judge_calibrations (
+                provider, model, model_digest, run_id, set_name, set_digest,
+                mae, bias, pair_order, max_error, passed, item_count, calibrated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(provider, model, model_digest) DO UPDATE SET
+                run_id = excluded.run_id,
+                set_name = excluded.set_name,
+                set_digest = excluded.set_digest,
+                mae = excluded.mae,
+                bias = excluded.bias,
+                pair_order = excluded.pair_order,
+                max_error = excluded.max_error,
+                passed = excluded.passed,
+                item_count = excluded.item_count,
+                calibrated_at = excluded.calibrated_at
+            """,
+            (
+                provider,
+                model,
+                model_digest,
+                run_id,
+                set_name,
+                set_digest,
+                mae,
+                bias,
+                pair_order,
+                max_error,
+                int(passed),
+                item_count,
+                stamp,
+            ),
+        )
+        self._conn.commit()
+
+    def get_judge_calibrations(
+        self,
+        *,
+        provider: str | None = None,
+        model: str | None = None,
+        model_digest: str | None = None,
+    ) -> list[dict[str, object]]:
+        """Return judge calibration rows newest-first."""
+        query = "SELECT * FROM judge_calibrations"
+        clauses: list[str] = []
+        params: list[object] = []
+        if provider is not None:
+            clauses.append("provider = ?")
+            params.append(provider)
+        if model is not None:
+            clauses.append("model = ?")
+            params.append(model)
+        if model_digest is not None:
+            clauses.append("model_digest = ?")
+            params.append(model_digest)
+        if clauses:
+            query += " WHERE " + " AND ".join(clauses)
+        query += " ORDER BY calibrated_at DESC"
+        rows = self._conn.execute(query, params).fetchall()
+        results: list[dict[str, object]] = []
+        for row in rows:
+            item = dict(row)
+            item["passed"] = bool(item["passed"])
+            results.append(item)
+        return results
+
     def complete_evaluation_run(self, run_id: str) -> RunSummary:
         """Finalize a generic evaluation parent from persisted fixture rows."""
         now = datetime.now(UTC).isoformat()

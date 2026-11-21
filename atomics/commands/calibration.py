@@ -164,5 +164,7 @@ def _render_summary(console: Console, calibration: JudgeCalibration, *, saved: b
     )
     console.print(f"  bias         {calibration.bias:+.3f}   (positive: the judge scores high)")
     console.print(f"  pair order   {'n/a' if order is None else f'{order:.3f}'}")
+    if calibration.model_digest:
+        console.print(f"  digest       {escape(calibration.model_digest[:12])}")
     verdict = "[green]PASS[/green]" if calibration.passed else "[red]FAIL[/red]"
     console.print(f"  {verdict}  {'stored' if saved else 'not stored (--no-save)'}")

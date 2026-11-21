@@ -243,7 +243,9 @@ def adversarial(
         f"Fixtures: [bold]{selected_count}[/bold] | "
         f"Categories: [bold]{category or 'all'}[/bold]\n"
     )
-    print_judge_calibration(console, judge_provider_name, effective_judge_model)
+    print_judge_calibration(
+        console, judge_provider_name, effective_judge_model, judge_provider=judge
+    )
 
     ctx = click.get_current_context()
     # Not the `suite_run` context manager: this command's body is long enough that

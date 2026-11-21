@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import sqlite3
 from datetime import UTC, datetime
@@ -9,7 +10,7 @@ from pathlib import Path
 
 logger = logging.getLogger("atomics.schema")
 
-SCHEMA_VERSION = 23
+SCHEMA_VERSION = 24
 
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -389,9 +390,31 @@ CREATE TABLE IF NOT EXISTS caller_spend (
     total_cost_usd  REAL NOT NULL DEFAULT 0.0,
     updated_at      TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS judge_calibrations (
+    provider        TEXT NOT NULL,
+    model           TEXT NOT NULL,
+    model_digest    TEXT NOT NULL DEFAULT '',
+    run_id          TEXT NOT NULL,
+    set_name        TEXT NOT NULL,
+    set_digest      TEXT NOT NULL,
+    mae             REAL NOT NULL,
+    bias            REAL NOT NULL,
+    pair_order      REAL,
+    max_error       REAL NOT NULL,
+    passed          INTEGER NOT NULL,
+    item_count      INTEGER NOT NULL,
+    calibrated_at   TEXT NOT NULL,
+    PRIMARY KEY (provider, model, model_digest),
+    FOREIGN KEY (run_id) REFERENCES runs(run_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_judge_calibrations_lookup
+    ON judge_calibrations(provider, model, calibrated_at DESC);
 """
 
 RESET_SQL = """
+DROP TABLE IF EXISTS judge_calibrations;
 DROP TABLE IF EXISTS caller_spend;
 DROP TABLE IF EXISTS task_results;
 DROP TABLE IF EXISTS adversarial_results;
@@ -642,6 +665,101 @@ def _execute_sql_statements(conn: sqlite3.Connection, script: str) -> None:
         raise sqlite3.OperationalError("incomplete SQL statement")
 
 
+def _backfill_judge_calibrations(conn: sqlite3.Connection) -> None:
+    """Populate `judge_calibrations` from pre-v24 `evaluation_results` calibration runs."""
+    rows = conn.execute(
+        """
+        SELECT run_id, provider, model, score, result_json, timestamp
+        FROM evaluation_results
+        WHERE suite = 'judge-calibrate'
+        ORDER BY timestamp, fixture_id
+        """
+    ).fetchall()
+    runs: dict[str, list[sqlite3.Row]] = {}
+    for row in rows:
+        runs.setdefault(str(row["run_id"]), []).append(row)
+
+    for run_id, group in runs.items():
+        pairs: list[tuple[float, float]] = []
+        set_name = "unknown"
+        set_digest = ""
+        model_digest = ""
+        max_error = 0.15
+        valid = True
+        for row in group:
+            raw_score = row["score"]
+            if isinstance(raw_score, bool) or not isinstance(raw_score, (int, float)):
+                valid = False
+                break
+            try:
+                meta = json.loads(str(row["result_json"] or "{}"))
+            except (TypeError, ValueError):
+                valid = False
+                break
+            if not isinstance(meta, dict):
+                valid = False
+                break
+            raw_human = meta.get("human")
+            raw_max = meta.get("max_error", 0.15)
+            if (
+                isinstance(raw_human, bool)
+                or not isinstance(raw_human, (int, float))
+                or isinstance(raw_max, bool)
+                or not isinstance(raw_max, (int, float))
+            ):
+                valid = False
+                break
+            pairs.append((float(raw_human), float(raw_score)))
+            set_name = str(meta.get("set_name", set_name))
+            set_digest = str(meta.get("set_digest", set_digest))
+            model_digest = str(meta.get("model_digest", model_digest))
+            max_error = float(raw_max)
+        if not valid or not pairs:
+            continue
+
+        n = len(pairs)
+        mae = round(sum(abs(j - h) for h, j in pairs) / n, 6)
+        bias = round(sum(j - h for h, j in pairs) / n, 6)
+        concordant = 0.0
+        comparable = 0
+        for idx, (h_a, j_a) in enumerate(pairs):
+            for h_b, j_b in pairs[idx + 1 :]:
+                if h_a == h_b:
+                    continue
+                comparable += 1
+                if j_a == j_b:
+                    concordant += 0.5
+                elif (j_a > j_b) == (h_a > h_b):
+                    concordant += 1.0
+        pair_order = round(concordant / comparable, 6) if comparable else None
+        provider = str(group[0]["provider"] or "")
+        model = str(group[0]["model"] or "")
+        calibrated_at = max(str(r["timestamp"] or "") for r in group)
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO judge_calibrations (
+                provider, model, model_digest, run_id, set_name, set_digest,
+                mae, bias, pair_order, max_error, passed, item_count, calibrated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                provider,
+                model,
+                model_digest,
+                run_id,
+                set_name,
+                set_digest,
+                mae,
+                bias,
+                pair_order,
+                max_error,
+                int(mae <= max_error),
+                n,
+                calibrated_at,
+            ),
+        )
+
+
 def init_db(db_path: Path) -> sqlite3.Connection:
     """Initialize the database, creating tables if needed.
 
@@ -680,6 +798,8 @@ def init_db(db_path: Path) -> sqlite3.Connection:
         # table may not yet have `provider`, and SCHEMA_SQL creates that index.
         _reconcile_schema(conn)
         _execute_sql_statements(conn, SCHEMA_SQL)
+        if current != 0 and current < 24:
+            _backfill_judge_calibrations(conn)
         conn.execute(
             "INSERT OR REPLACE INTO schema_version (version) VALUES (?)",
             (SCHEMA_VERSION,),

@@ -22,7 +22,10 @@ from atomics.api.models import EvalRequest, RunRequest
 from atomics.config import load_settings
 from atomics.eval.adversarial.runner import run_adversarial
 from atomics.eval.budget import BudgetMeter, EvalBudget, EvalBudgetExceededError, share_budget
-from atomics.eval.calibration import judge_calibration_status
+from atomics.eval.calibration import (
+    judge_calibration_status,
+    judge_calibration_status_async,
+)
 from atomics.eval.codegen.runner import run_codegen
 from atomics.eval.codereview.runner import run_codereview
 from atomics.eval.intervals import Interval
@@ -102,7 +105,29 @@ def _judge_calibration(
 ) -> dict[str, object] | None:
     """The API judge is always Ollama (`_guarded_providers`); advisory, never raises."""
     model = judge_model or getattr(judge_provider, "default_model", None) or "default"
-    status = judge_calibration_status(db_path or load_settings().db_path, "ollama", model)
+    status = judge_calibration_status(
+        db_path or load_settings().db_path,
+        "ollama",
+        model,
+        judge_provider=judge_provider,
+    )
+    return asdict(status) if status is not None else None
+
+
+async def _judge_calibration_async(
+    judge_model: str | None,
+    judge_provider: BaseProvider,
+    *,
+    db_path: Path | None = None,
+) -> dict[str, object] | None:
+    """Async counterpart to `_judge_calibration` for event-loop runners."""
+    model = judge_model or getattr(judge_provider, "default_model", None) or "default"
+    status = await judge_calibration_status_async(
+        db_path or load_settings().db_path,
+        "ollama",
+        model,
+        judge_provider=judge_provider,
+    )
     return asdict(status) if status is not None else None
 
 
@@ -381,7 +406,7 @@ async def run_eval_from_request(
         "provider": payload.provider,
         "model": payload.model,
         "judge_model": payload.judge_model,
-        "judge_calibration": _judge_calibration(
+        "judge_calibration": await _judge_calibration_async(
             payload.judge_model, judge_provider, db_path=db_path
         ),
         "host": host,
@@ -569,7 +594,7 @@ async def run_eval_suite(
         "suite": suite,
         "provider": payload.provider,
         "model": payload.model,
-        "judge_calibration": _judge_calibration(
+        "judge_calibration": await _judge_calibration_async(
             payload.judge_model, judge_provider, db_path=db_path
         ),
         "host": host,

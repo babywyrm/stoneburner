@@ -3,6 +3,10 @@
 ## Unreleased
 
 ### Added
+- `judge_calibrations` (schema v24) and `BaseProvider.model_digest()` key stored
+  judge calibrations by `(provider, model, model_digest)`, resolving Ollama
+  weights digests from `/api/tags` so re-quantized or fine-tuned weights under
+  an existing tag do not inherit a stale MAE or calibration verdict.
 - `atomics server --max-caller-spend-usd` (and
   `ServerSettings.max_spend_usd_per_caller` /
   `JobManager.max_spend_usd_per_caller`) enforces an optional cumulative

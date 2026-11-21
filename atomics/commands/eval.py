@@ -218,7 +218,10 @@ def eval(
         f"Results saved: [bold]{'yes' if save_results else 'no'}[/bold]\n"
     )
     print_judge_calibration(
-        console, judge_provider_name, _attribution_model(judge_provider, judge_model)
+        console,
+        judge_provider_name,
+        _attribution_model(judge_provider, judge_model),
+        judge_provider=judge_provider,
     )
 
     from atomics.eval.runner import run_eval
