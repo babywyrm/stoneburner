@@ -57,7 +57,9 @@ router = APIRouter(prefix="/api/v1")
 
 
 def get_job_manager(request: Request) -> JobManager:
-    return request.app.state.job_manager
+    from typing import cast
+
+    return cast(JobManager, request.app.state.job_manager)
 
 
 @router.get("/health", response_model=HealthResponse)
@@ -454,7 +456,7 @@ async def get_run(
     run_id: str,
     request: Request,
     _: None = Depends(require_auth),
-) -> dict:
+) -> dict[str, object]:
     """One persisted run and its fixtures. Prompts and raw JSON are omitted."""
     settings = request.app.state.settings
     repo = MetricsRepository(settings.db_path)

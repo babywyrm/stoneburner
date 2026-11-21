@@ -312,11 +312,11 @@ class JobResponse(BaseModel):
     created_at: str
     started_at: str | None = None
     completed_at: str | None = None
-    error: dict | None = None
+    error: dict[str, object] | None = None
     result_url: str | None = None
     result: Any | None = None
-    request: dict | None = None
-    progress: dict | None = None
+    request: dict[str, object] | None = None
+    progress: dict[str, object] | None = None
 
 
 class ErrorResponse(BaseModel):
@@ -354,16 +354,16 @@ class ReadinessResponse(BaseModel):
 
 class CompareResponse(BaseModel):
     by: str
-    rows: list[dict]
+    rows: list[dict[str, object]]
 
 
 class ReportResponse(BaseModel):
-    runs: list[dict]
+    runs: list[dict[str, object]]
 
 
 class TrendsResponse(BaseModel):
     hours: int
-    rows: list[dict]
+    rows: list[dict[str, object]]
 
 
 class JobSummary(BaseModel):
@@ -375,8 +375,8 @@ class JobSummary(BaseModel):
     created_at: str
     started_at: str | None = None
     completed_at: str | None = None
-    error: dict | None = None
-    request: dict | None = None
+    error: dict[str, object] | None = None
+    request: dict[str, object] | None = None
 
 
 class JobsListResponse(BaseModel):
@@ -385,7 +385,7 @@ class JobsListResponse(BaseModel):
 
 class ModelsResponse(BaseModel):
     provider: str
-    models: list[dict]
+    models: list[dict[str, object]]
 
 
 class ProviderTestRequest(BaseModel):

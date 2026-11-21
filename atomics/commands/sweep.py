@@ -2,12 +2,9 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from pathlib import Path
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from atomics.eval.runner import FixtureResult
+from typing import TYPE_CHECKING, TypeVar
 
 import click
 from rich.console import Console
@@ -29,6 +26,11 @@ from atomics.commands.common import (
 from atomics.config import load_settings
 from atomics.eval.budget import BudgetMeter
 from atomics.providers.base import BaseProvider, aclose_providers
+
+if TYPE_CHECKING:
+    from atomics.eval.runner import FixtureResult
+
+_S = TypeVar("_S")
 
 
 def suite_persister(db_path: Path) -> Callable[[str, str, str, object], None]:
@@ -318,7 +320,7 @@ def sweep(
         created.append(wrapped)
         return wrapped
 
-    async def _with_created(coro):
+    async def _with_created(coro: Awaitable[_S]) -> _S:
         try:
             return await coro
         finally:

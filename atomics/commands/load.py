@@ -152,7 +152,11 @@ def stress(
         f"{num_predict} max tokens/request\n"
     )
 
-    def _on_phase(phase):
+    from atomics.load.stress import ConcurrencyResult
+
+    phases_so_far: list[ConcurrencyResult] = []
+
+    def _on_phase(phase: ConcurrencyResult) -> None:
         uplift = ""
         if len(phases_so_far) > 0:
             base = phases_so_far[0].aggregate_tps
@@ -170,8 +174,6 @@ def stress(
             f"({phase.requests} reqs, {phase.total_output_tokens:,} tokens)"
             f"[dim]{uplift}[/dim]{cost_tag}{fail_tag}"
         )
-
-    phases_so_far: list = []
 
     console.print("[bold]Throughput by concurrency:[/bold]")
 
@@ -333,7 +335,7 @@ def capacity(
 
     settings = load_settings()
     console = Console()
-    phases: list[dict] = []
+    phases: list[dict[str, float]] = []
     effective_peak_tps = peak_tps or 0.0
     effective_model = model or ""
 

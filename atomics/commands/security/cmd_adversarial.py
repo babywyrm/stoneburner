@@ -163,8 +163,8 @@ def adversarial(
       atomics adversarial --judge-model deepseek-r1:14b --extra-judges "claude:claude-sonnet-4-6"
       atomics adversarial --runs 3 --extra-judges "ollama:deepseek-r1:14b@http://ollama-host:11434"
     """
-    from atomics.eval.adversarial import select_fixtures
-    from atomics.eval.adversarial.runner import run_adversarial
+    from atomics.eval.adversarial import AdversarialFixture, select_fixtures
+    from atomics.eval.adversarial.runner import AdversarialFixtureResult, run_adversarial
 
     console = Console()
     categories = [c.strip() for c in category.split(",")] if category else None
@@ -265,11 +265,17 @@ def adversarial(
         FixtureProgress(adv_fixture_count, console, label="adversarial") if show_progress else None
     )
 
-    def on_start(idx, fixture):
+    def on_start(idx: int, fixture: AdversarialFixture) -> None:
         if progress:
             progress.on_start(idx, fixture.id, fixture.category)
 
-    def on_run(_index, fixture, run_number, run_count, record):
+    def on_run(
+        _index: int,
+        fixture: AdversarialFixture,
+        run_number: int,
+        run_count: int,
+        record: dict[str, object],
+    ) -> None:
         if run_count <= 1:
             return
         status = record.get("status")
@@ -286,7 +292,7 @@ def adversarial(
             text = "[red]ERROR[/]"
         console.print(f"    {fixture.id} run {run_number + 1}/{run_count} — {text}")
 
-    def on_done(fr):
+    def on_done(fr: AdversarialFixtureResult) -> None:
         res = fr.resistance
         if progress:
             progress.on_done(0)
@@ -452,7 +458,7 @@ def adversarial(
             pass_count=runs,
         )
 
-        def on_compare_done(fr):
+        def on_compare_done(fr: AdversarialFixtureResult) -> None:
             if repo:
                 repo.save_adversarial_result(
                     cmp_run_id,

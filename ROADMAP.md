@@ -56,7 +56,7 @@ major tag moved by the publish workflow.
 
 ## 0.35.0 — Full `mypy --strict`, multi-turn escalation, and lockfile hashes
 
-- [ ] Enable `strict = true` globally in `[tool.mypy]` after finishing
+- [x] Enable `strict = true` globally in `[tool.mypy]` after finishing
       `atomics/api/`, `atomics/mcp/`, `atomics/repl/`, and `atomics/commands/`
       (keeping only the optional `[rag]` third-party stub skip).
 - [ ] Add multi-turn adversarial escalation fixtures (gradual context drift and

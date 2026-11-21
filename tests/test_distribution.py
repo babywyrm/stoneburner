@@ -151,56 +151,19 @@ def test_readme_links_the_operator_manuals():
 
 
 def test_mypy_strictness_flags_stay_enabled():
-    """Guard against relaxing [tool.mypy] once a check is green across atomics/."""
+    """Guard against relaxing [tool.mypy] once strict is green across atomics/."""
     import tomllib
 
     cfg = tomllib.loads(Path("pyproject.toml").read_text())["tool"]["mypy"]
-    for flag in (
-        "check_untyped_defs",
-        "disallow_incomplete_defs",
-        "disallow_subclassing_any",
-        "disallow_untyped_decorators",
-        "extra_checks",
-        "no_implicit_optional",
-        "strict_equality",
-        "warn_redundant_casts",
-        "warn_unused_ignores",
-    ):
-        assert cfg.get(flag) is True, f"[tool.mypy] {flag} must remain true"
+    assert cfg.get("strict") is True, "[tool.mypy] strict must remain true"
+    assert cfg.get("extra_checks") is True, "[tool.mypy] extra_checks must remain true"
 
-    phase1_flags = (
-        "disallow_any_generics",
-        "disallow_untyped_calls",
-        "disallow_untyped_defs",
-        "no_implicit_reexport",
-        "warn_return_any",
-    )
-    strict_modules = {
-        mod
-        for entry in cfg.get("overrides", [])
-        if all(entry.get(f) is True for f in phase1_flags)
-        for mod in (
+    for entry in cfg.get("overrides", []):
+        mods = (
             entry.get("module", [])
             if isinstance(entry.get("module"), list)
             else [entry.get("module")]
         )
-    }
-    for required in (
-        "atomics.storage",
-        "atomics.storage.*",
-        "atomics.providers",
-        "atomics.providers.*",
-        "atomics.distributed",
-        "atomics.distributed.*",
-        "atomics.eval",
-        "atomics.eval.*",
-        "atomics.benchmark",
-        "atomics.benchmark.*",
-        "atomics.load",
-        "atomics.load.*",
-        "atomics.archreview",
-        "atomics.archreview.*",
-        "atomics.probe",
-        "atomics.probe.*",
-    ):
-        assert required in strict_modules, f"mypy strict override missing for {required}"
+        assert not any(isinstance(m, str) and m.startswith("atomics") for m in mods), (
+            f"Do not add per-module mypy overrides for atomics packages: {mods}"
+        )

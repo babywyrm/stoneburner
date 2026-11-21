@@ -224,36 +224,41 @@ def overlay_provider_defaults(
 # ── resolver (agnostic intent -> resolved) ────────────────────────────────────
 
 
-def resolve_model(machine: dict, difficulty: str) -> str:
-    dm = machine.get("difficulty_models") or {}
+def resolve_model(machine: dict[str, object], difficulty: str) -> str:
+    raw_dm = machine.get("difficulty_models")
+    dm = raw_dm if isinstance(raw_dm, dict) else {}
     if difficulty not in dm:
-        have = ", ".join(sorted(dm)) or "(none)"
+        have = ", ".join(sorted(str(k) for k in dm)) or "(none)"
         raise ValueError(f"no model mapped for difficulty '{difficulty}' (have: {have})")
-    return dm[difficulty]
+    return str(dm[difficulty])
 
 
-def resolve_endpoint(profile: dict) -> dict:
-    ep = profile.get("endpoint") or {}
+def resolve_endpoint(profile: dict[str, object]) -> dict[str, str]:
+    raw_ep = profile.get("endpoint")
+    ep = raw_ep if isinstance(raw_ep, dict) else {}
     host = str(ep.get("host", ""))
     port = str(ep.get("port", ""))
-    url = ep.get("url") or (f"http://{host}:{port}" if host and port else "")
+    raw_url = ep.get("url")
+    url = str(raw_url) if raw_url else (f"http://{host}:{port}" if host and port else "")
     return {
         "host": host,
         "port": port,
         "url": url,
-        "backend": profile.get("backend", "ollama"),
-        "api_key": profile.get("api_key", "") or "",
+        "backend": str(profile.get("backend", "ollama")),
+        "api_key": str(profile.get("api_key", "") or ""),
     }
 
 
-def check_model_compat(machine: dict, model: str) -> tuple[str, str]:
-    compat = machine.get("model_compatibility", {}) or {}
+def check_model_compat(machine: dict[str, object], model: str) -> tuple[str, str]:
+    raw_compat = machine.get("model_compatibility")
+    compat = raw_compat if isinstance(raw_compat, dict) else {}
     incompatible: set[str] = set()
     compatible: set[str] = set()
     for key, val in compat.items():
         if not isinstance(val, list):
             continue
-        (incompatible if "incompat" in key else compatible).update(val)
+        target_set = incompatible if "incompat" in str(key) else compatible
+        target_set.update(str(item) for item in val)
     if model in incompatible:
         return ("INCOMPATIBLE", f"{model} is listed incompatible for this machine")
     if compatible and model not in compatible:
@@ -261,11 +266,15 @@ def check_model_compat(machine: dict, model: str) -> tuple[str, str]:
     return ("OK", "")
 
 
-def check_backend(machine: dict, backend: str) -> bool:
-    return backend in (machine.get("supported_backends") or ["ollama"])
+def check_backend(machine: dict[str, object], backend: str) -> bool:
+    raw_supported = machine.get("supported_backends")
+    supported = (
+        [str(item) for item in raw_supported] if isinstance(raw_supported, list) else ["ollama"]
+    )
+    return backend in supported
 
 
-def render_env(intent: dict, resolved: dict, resolved_by: str) -> str:
+def render_env(intent: dict[str, str], resolved: dict[str, str], resolved_by: str) -> str:
     ts = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     lines = [
         "# Inference control file — see docs/INFERENCE_ENV.md",
@@ -289,7 +298,13 @@ def render_env(intent: dict, resolved: dict, resolved_by: str) -> str:
     return "\n".join(lines)
 
 
-def resolve(machine: dict, profile: dict, difficulty: str, pool: str, resolved_by: str) -> dict:
+def resolve(
+    machine: dict[str, object],
+    profile: dict[str, object],
+    difficulty: str,
+    pool: str,
+    resolved_by: str,
+) -> dict[str, object]:
     model = resolve_model(machine, difficulty)
     ep = resolve_endpoint(profile)
     think = str(machine.get("think_default", "false")).lower()

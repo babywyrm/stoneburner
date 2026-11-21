@@ -67,14 +67,15 @@ class CodexTokenAuth(AuthStrategy):
     def description(self) -> str:
         return "Codex CLI API key (~/.codex/auth.json)"
 
-    def _read_file(self) -> dict:
-        return json.loads(self._path.read_text())
+    def _read_file(self) -> dict[str, object]:
+        loaded = json.loads(self._path.read_text())
+        return dict(loaded) if isinstance(loaded, dict) else {}
 
     def _ensure_loaded(self) -> None:
         if self._loaded:
             return
         data = self._read_file()
-        self._api_key = data.get("OPENAI_API_KEY") or ""
+        self._api_key = str(data.get("OPENAI_API_KEY") or "")
         if not self._api_key:
             raise RuntimeError(
                 "Codex CLI is installed but its auth tokens cannot access the "

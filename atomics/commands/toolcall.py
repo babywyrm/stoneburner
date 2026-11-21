@@ -40,6 +40,7 @@ from atomics.eval.toolcall.fixtures import (
 )
 from atomics.eval.toolcall.runner import ERROR_OUTCOME, ToolCallSummary, run_toolcall_suite
 from atomics.eval.toolcall.scorer import ToolOutcome
+from atomics.providers.base import BaseProvider
 from atomics.storage.records import EvaluationResultRecord
 
 console = Console()
@@ -201,7 +202,7 @@ def toolcall(
     settings = load_settings()
     provider = _make_provider(provider_name, model, ollama_host, settings, vllm_host=vllm_host)
     judge = None
-    extra_judge_pairs: list = []
+    extra_judge_pairs: list[tuple[BaseProvider, str | None]] = []
     if judge_provider_name is None and (judge_model or judge_host or extra_judges):
         judge_provider_name = "ollama"
     if judge_provider_name:
@@ -258,8 +259,10 @@ def toolcall(
 
     progress = FixtureProgress(len(fixtures), console, label="toolcall")
 
-    def _called(record: dict) -> str:
-        return ", ".join(c.get("name", "") for c in record.get("calls") or []) or "none"
+    def _called(record: dict[str, object]) -> str:
+        raw_calls = record.get("calls")
+        calls = raw_calls if isinstance(raw_calls, list) else []
+        return ", ".join(str(c.get("name", "")) for c in calls if isinstance(c, dict)) or "none"
 
     def on_start(index: int, fixture: ToolCallFixture) -> None:
         progress.on_start(index, fixture.id, fixture.category)
@@ -268,7 +271,11 @@ def toolcall(
         )
 
     def on_run(
-        index: int, fixture: ToolCallFixture, run_number: int, run_count: int, record: dict
+        index: int,
+        fixture: ToolCallFixture,
+        run_number: int,
+        run_count: int,
+        record: dict[str, object],
     ) -> None:
         if run_count <= 1:
             return
@@ -278,7 +285,7 @@ def toolcall(
             f"— [{style}]{label}[/{style}]  called={_called(record)}"
         )
 
-    def on_done(index: int, fixture: ToolCallFixture, aggregated: dict) -> None:
+    def on_done(index: int, fixture: ToolCallFixture, aggregated: dict[str, object]) -> None:
         progress.on_done(index)
         style, label = _OUTCOME_STYLE.get(aggregated.get("tool_outcome"), ("white", "?"))
         prose = aggregated.get("prose_label") or "—"

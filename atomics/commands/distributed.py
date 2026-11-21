@@ -101,7 +101,11 @@ def run(
     Console().print(f"Submitted distributed run: {data['job_id']}")
 
 
-def _render_fleet_table(job: dict, summary: dict) -> None:
+def _as_float(val: object) -> float:
+    return float(val) if isinstance(val, (int, float)) else 0.0
+
+
+def _render_fleet_table(job: dict[str, object], summary: dict[str, object]) -> None:
     """Print one row per host so the comparison is readable at a glance.
 
     Nine columns do not fit an 80-column terminal: Rich shrinks them until a
@@ -111,7 +115,10 @@ def _render_fleet_table(job: dict, summary: dict) -> None:
     the caption when every host ran the same one, which is the usual case for a
     comparison and buys a whole column back.
     """
-    workers = summary.get("workers", [])
+    raw_workers = summary.get("workers")
+    workers = (
+        [w for w in raw_workers if isinstance(w, dict)] if isinstance(raw_workers, list) else []
+    )
     # A host that completed nothing has no model to report, and must not be the
     # reason the column reappears: the run where one host died is exactly when
     # the remaining numbers most need the room.
@@ -139,7 +146,9 @@ def _render_fleet_table(job: dict, summary: dict) -> None:
     table.add_column("Cost", justify="right")
 
     for worker in workers:
-        labels = " ".join(f"{k}={v}" for k, v in (worker.get("labels") or {}).items())
+        raw_labels = worker.get("labels")
+        labels_dict = raw_labels if isinstance(raw_labels, dict) else {}
+        labels = " ".join(f"{k}={v}" for k, v in labels_dict.items())
         failed = worker.get("failed", 0)
         row = [
             escape(str(worker.get("worker_id", ""))),
@@ -150,13 +159,13 @@ def _render_fleet_table(job: dict, summary: dict) -> None:
         row += [
             str(worker.get("completed", 0)),
             f"[red]{failed}[/red]" if failed else "0",
-            f"{worker.get('mean_latency_ms', 0.0):.1f}",
-            f"{worker.get('p95_latency_ms', 0.0):.1f}",
+            f"{_as_float(worker.get('mean_latency_ms')):.1f}",
+            f"{_as_float(worker.get('p95_latency_ms')):.1f}",
             # No decimals: the fractional part of a tokens-per-second figure is
             # noise, and the two characters it costs pushed the table past 80
             # columns, which clipped the cost column off the right edge.
-            f"{worker.get('mean_tokens_per_second', 0.0):.0f}",
-            f"{worker.get('estimated_cost_usd', 0.0):.4f}",
+            f"{_as_float(worker.get('mean_tokens_per_second')):.0f}",
+            f"{_as_float(worker.get('estimated_cost_usd')):.4f}",
         ]
         table.add_row(*row)
 
@@ -170,9 +179,10 @@ def _render_fleet_table(job: dict, summary: dict) -> None:
     )
 
 
-def _render_full_table(job: dict, summary: dict) -> None:
+def _render_full_table(job: dict[str, object], summary: dict[str, object]) -> None:
     """Print a compact summary of a single full-run delegation."""
-    run_summary = summary.get("summary", summary)
+    nested = summary.get("summary")
+    run_summary = nested if isinstance(nested, dict) else summary
     job_label = escape(str(job.get("job_id", "")))
     status_label = escape(str(job.get("status", "")))
     table = Table(title=f"Full run {job_label} — {status_label}")
@@ -183,7 +193,7 @@ def _render_full_table(job: dict, summary: dict) -> None:
     table.add_row("Failed", str(run_summary.get("failed_tasks", 0)))
     table.add_row("Tokens", str(run_summary.get("total_tokens", 0)))
     table.add_row("Cost", f"${run_summary.get('total_cost_usd', 0.0)}")
-    table.add_row("Avg ms", f"{run_summary.get('avg_latency_ms', 0.0):.1f}")
+    table.add_row("Avg ms", f"{_as_float(run_summary.get('avg_latency_ms')):.1f}")
     Console().print(table)
 
 

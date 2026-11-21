@@ -85,26 +85,26 @@ from atomics.providers.base import BaseProvider, aclose_providers
 )
 @budget_option
 def archreview(
-    repo_name,
-    models_csv,
-    provider_name,
-    ollama_host,
-    vllm_host,
-    region,
-    judge_provider_name,
-    judge_model,
-    judge_host,
-    tier,
-    rounds,
-    max_output_tokens,
-    inference_timeout,
-    judge_only,
-    verbose,
-    save_results,
-    json_out,
-    extra_judges,
-    budget_usd,
-):
+    repo_name: str,
+    models_csv: str,
+    provider_name: str,
+    ollama_host: str | None,
+    vllm_host: str | None,
+    region: str,
+    judge_provider_name: str,
+    judge_model: str | None,
+    judge_host: str | None,
+    tier: str,
+    rounds: int,
+    max_output_tokens: int,
+    inference_timeout: float | None,
+    judge_only: bool,
+    verbose: bool,
+    save_results: bool,
+    json_out: str | None,
+    extra_judges: str | None,
+    budget_usd: float | None,
+) -> None:
     """Benchmark models on a security-architecture review of a repo."""
     import os
     from pathlib import Path
@@ -138,7 +138,7 @@ def archreview(
                 vllm_host=vllm_host,
                 region=region,
                 context_tokens=context_tokens,
-                inference_timeout=inference_timeout,
+                inference_timeout=int(inference_timeout) if inference_timeout is not None else None,
             )
         )
 
@@ -243,7 +243,7 @@ def archreview(
         repo = run.repository
 
         async def _run_all() -> None:
-            created: list = []
+            created: list[BaseProvider] = []
             try:
                 for mdl in models:
                     test_provider = _build_provider(
@@ -315,14 +315,17 @@ def archreview(
                     cat_sets = [{f.category for f in r.findings} for r in results]
                     recalls = [r.objective_recall for r in results]
                     stability, _sd = compute_robustness(cat_sets, recalls)
-                    avg = lambda xs: round(sum(xs) / len(xs), 3) if xs else 0.0  # noqa: E731
+
+                    def _avg(xs: list[float]) -> float:
+                        return round(sum(xs) / len(xs), 3) if xs else 0.0
+
                     judge_vals = [r.judge_score for r in results if r.judge_score is not None]
                     table.add_row(
                         mdl,
-                        str(avg(recalls)),
-                        str(avg([r.objective_precision for r in results])),
-                        str(avg([r.objective_f for r in results])),
-                        str(avg(judge_vals) if judge_vals else "—"),
+                        str(_avg(recalls)),
+                        str(_avg([r.objective_precision for r in results])),
+                        str(_avg([r.objective_f for r in results])),
+                        str(_avg(judge_vals) if judge_vals else "—"),
                         judge_label,
                         str(stability),
                         str(round(sum(len(r.findings) for r in results) / len(results), 1)),

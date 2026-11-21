@@ -171,7 +171,9 @@ def probe(
         )
         repo = run.repository
 
-        def on_result(r):
+        from atomics.probe.runner import ProbeResult
+
+        def on_result(r: ProbeResult) -> None:
             color = (
                 "green" if (r.score or 0) >= 0.8 else ("yellow" if (r.score or 0) >= 0.6 else "red")
             )

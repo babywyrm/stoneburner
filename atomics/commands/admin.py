@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import sys
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import TextIO
 
@@ -455,7 +456,7 @@ def export(
             rows = repo.get_evaluation_results(suite=suite, limit=limit)
             _write_generic_export(rows, fmt, out_file)
         elif suite == "all":
-            all_rows: list[dict] = []
+            all_rows: list[dict[str, object]] = []
             task_rows = repo.query_task_results(since_hours=since_hours, limit=limit)
             for r in task_rows:
                 r["_suite"] = "tasks"
@@ -493,7 +494,7 @@ def export(
         repo.close()
 
 
-def _write_generic_export(rows: list[dict], fmt: str, out_file: TextIO) -> None:
+def _write_generic_export(rows: Sequence[Mapping[str, object]], fmt: str, out_file: TextIO) -> None:
     """Write arbitrary row dicts to jsonl or csv via the shared exporter."""
     from atomics.reporting.exporters import write_tasks_export
 

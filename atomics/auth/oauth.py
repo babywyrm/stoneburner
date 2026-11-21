@@ -191,12 +191,13 @@ class OAuthPKCEAuth(AuthStrategy):
             self._store.save(new_tokens)
             return new_tokens
 
-    def _parse_token_response(self, body: dict) -> CachedTokens:
-        expires_in = body.get("expires_in", 3600)
+    def _parse_token_response(self, body: dict[str, object]) -> CachedTokens:
+        raw_exp = body.get("expires_in", 3600)
+        expires_in = float(raw_exp) if isinstance(raw_exp, (int, float)) else 3600.0
         return CachedTokens(
-            access_token=body["access_token"],
-            refresh_token=body.get("refresh_token", ""),
-            id_token=body.get("id_token", ""),
+            access_token=str(body["access_token"]),
+            refresh_token=str(body.get("refresh_token", "")),
+            id_token=str(body.get("id_token", "")),
             expires_at=time.time() + expires_in,
             profile_name=self._profile.name,
         )
@@ -252,7 +253,7 @@ def _start_callback_server(
             )
             loop.call_soon_threadsafe(_resolve_code, code)
 
-        def log_message(self, format, *args):
+        def log_message(self, format: str, *args: object) -> None:
             pass
 
     server = HTTPServer(("127.0.0.1", port), Handler)

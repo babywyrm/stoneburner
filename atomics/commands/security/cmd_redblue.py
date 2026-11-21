@@ -113,8 +113,8 @@ def redblue(
 
     Use --runs 3 for variance-aware scoring (mean ± stddev across passes).
     """
-    from atomics.eval.redblue.fixtures import select_fixtures
-    from atomics.eval.redblue.runner import run_redblue
+    from atomics.eval.redblue.fixtures import RedBlueFixture, select_fixtures
+    from atomics.eval.redblue.runner import RedBlueFixtureResult, run_redblue
 
     ids = None
     if fixtures_filter is not None:
@@ -183,11 +183,17 @@ def redblue(
         )
         repo = run.repository
 
-        def on_start(idx, fixture):
+        def on_start(idx: int, fixture: RedBlueFixture) -> None:
             if progress:
                 progress.on_start(idx, fixture.id, fixture.category)
 
-        def on_run(_index, fixture, run_number, run_count, record):
+        def on_run(
+            _index: int,
+            fixture: RedBlueFixture,
+            run_number: int,
+            run_count: int,
+            record: dict[str, object],
+        ) -> None:
             if run_count <= 1:
                 return
             status = record.get("status")
@@ -202,7 +208,7 @@ def redblue(
                 label = "[red]ERROR[/]"
             console.print(f"    {fixture.id} run {run_number + 1}/{run_count} — {label}")
 
-        def on_done(fr):
+        def on_done(fr: RedBlueFixtureResult) -> None:
             j = fr.judge
             if progress:
                 progress.on_done(0)

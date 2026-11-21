@@ -34,7 +34,7 @@ def _run_labcompare_sync(
     prompts: int,
     provider_factory: Callable[[str], BaseProvider],
     quality_fn: Callable[[BaseProvider, str | None, str | None, str], Awaitable[float | None]],
-    ps_fetcher_factory: Callable[[str], Callable[[], Awaitable[dict]]],
+    ps_fetcher_factory: Callable[[str], Callable[[], Awaitable[dict[str, object]]]],
     on_cell: Callable[[str, str], None] | None = None,
 ) -> list[CellResult]:
     """Sync wrapper around the async orchestrator (patch target in tests)."""
@@ -167,8 +167,8 @@ def labcompare(
     def provider_factory(url: str) -> BaseProvider:
         return _make_provider("ollama", None, url, settings)
 
-    def ps_fetcher_factory(url: str) -> Callable[[], Awaitable[dict]]:
-        async def _ps() -> dict:
+    def ps_fetcher_factory(url: str) -> Callable[[], Awaitable[dict[str, object]]]:
+        async def _ps() -> dict[str, object]:
             import httpx
 
             async with httpx.AsyncClient(timeout=10.0) as client:

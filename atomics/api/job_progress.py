@@ -399,7 +399,7 @@ def sweep_row(result: Any) -> SweepJobRow:
 
 def payload_request(payload: Any, settings: AtomicsSettings) -> dict[str, Any]:
     """Echo a non-eval submit payload plus resolved host."""
-    data = payload.model_dump(exclude_none=True)
+    data: dict[str, Any] = dict(payload.model_dump(exclude_none=True))
     provider = getattr(payload, "provider", None)
     if provider:
         host = resolve_inference_host(str(provider), getattr(payload, "host", None), settings)

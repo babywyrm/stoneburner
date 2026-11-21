@@ -60,7 +60,7 @@ def login(
     store = TokenStore()
     auth = OAuthPKCEAuth(profile=profile, store=store)
 
-    async def _login():
+    async def _login() -> object:
         tokens = await auth.login(headless=headless)
         console.print(f"[green]Logged in via {profile.name}[/green]")
         console.print(f"[dim]Tokens cached at {store.path}[/dim]")
@@ -137,7 +137,7 @@ def whoami() -> None:
 
 
 @click.group("secrets")
-def secrets_group():
+def secrets_group() -> None:
     """Manage API keys and secrets in the OS keychain.
 
     Secrets stored here are used as the last-resort fallback when an API key
@@ -220,7 +220,7 @@ def secrets_get(key: str, show: bool) -> None:
 
 
 @secrets_group.command("list")
-def secrets_list():
+def secrets_list() -> None:
     """List secret keys stored in the OS keychain (names only, never values)."""
     from atomics.secrets import keychain_available, list_secrets
 

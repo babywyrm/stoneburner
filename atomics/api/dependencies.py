@@ -13,13 +13,15 @@ touching any route definition.
 
 from __future__ import annotations
 
+from typing import cast
+
 from fastapi import Depends, HTTPException, Request, status
 
 from atomics.api.auth import AuthBackend
 
 
 def get_auth(request: Request) -> AuthBackend:
-    return request.app.state.auth
+    return cast(AuthBackend, request.app.state.auth)
 
 
 async def require_auth(request: Request, auth: AuthBackend = Depends(get_auth)) -> str:
@@ -42,7 +44,7 @@ async def require_auth(request: Request, auth: AuthBackend = Depends(get_auth)) 
 
 
 def get_worker_auth(request: Request) -> AuthBackend:
-    return request.app.state.worker_auth
+    return cast(AuthBackend, request.app.state.worker_auth)
 
 
 async def require_worker_auth(

@@ -17,7 +17,7 @@ class CachedTokens:
     id_token: str = ""
     expires_at: float = 0.0
     profile_name: str = ""
-    extra: dict = field(default_factory=dict)
+    extra: dict[str, object] = field(default_factory=dict)
 
     @property
     def expired(self) -> bool:

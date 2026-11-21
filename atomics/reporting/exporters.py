@@ -4,31 +4,33 @@ from __future__ import annotations
 
 import csv
 import json
-from typing import Any, TextIO
+from collections.abc import Mapping, Sequence
+from typing import TextIO
 
 
-def _json_default(obj: Any) -> str:
-    if hasattr(obj, "isoformat"):
-        return obj.isoformat()
+def _json_default(obj: object) -> str:
+    iso = getattr(obj, "isoformat", None)
+    if callable(iso):
+        return str(iso())
     return str(obj)
 
 
-def write_jsonl(rows: list[dict], out: TextIO) -> None:
+def write_jsonl(rows: Sequence[Mapping[str, object]], out: TextIO) -> None:
     for row in rows:
-        out.write(json.dumps(row, default=_json_default) + "\n")
+        out.write(json.dumps(dict(row), default=_json_default) + "\n")
 
 
 _FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
 
 
-def _safe_csv_cell(value: Any) -> Any:
+def _safe_csv_cell(value: object) -> object:
     """Prefix leading spreadsheet formula characters on strings so CSV exports do not execute."""
     if isinstance(value, str) and value.startswith(_FORMULA_PREFIXES):
         return f"'{value}"
     return value
 
 
-def write_csv(rows: list[dict], out: TextIO) -> None:
+def write_csv(rows: Sequence[Mapping[str, object]], out: TextIO) -> None:
     if not rows:
         return
     fieldnames = sorted({k for r in rows for k in r.keys()})
@@ -38,7 +40,7 @@ def write_csv(rows: list[dict], out: TextIO) -> None:
         w.writerow({k: _safe_csv_cell(v) for k, v in row.items()})
 
 
-def write_tasks_export(rows: list[dict], fmt: str, out: TextIO) -> None:
+def write_tasks_export(rows: Sequence[Mapping[str, object]], fmt: str, out: TextIO) -> None:
     if fmt == "jsonl":
         write_jsonl(rows, out)
     else:

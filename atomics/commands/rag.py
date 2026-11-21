@@ -501,7 +501,10 @@ def rag_retrieval(
     embedder = LocalSentenceTransformerEmbedder(embedding_model)
     index = RAGIndex(index_path, embedder=embedder)
 
-    per_query: list[dict] = []
+    per_query: list[dict[str, object]] = []
+    recalls: list[float] = []
+    precisions: list[float] = []
+    ndcgs: list[float] = []
     relevant_sets: list[set[str]] = []
     retrieved_lists: list[list[str]] = []
     for query_id, entry in gold.items():
@@ -510,21 +513,27 @@ def rag_retrieval(
         retrieved_sources = [r.source for r in results]
         relevant = set(entry.get("relevant", []))
         scores = entry.get("scores", {})
+        rec = recall_at_k(relevant, retrieved_sources, top_k)
+        prec = precision_at_k(relevant, retrieved_sources, top_k)
+        ndcg = ndcg_at_k(scores, retrieved_sources, top_k)
+        recalls.append(rec)
+        precisions.append(prec)
+        ndcgs.append(ndcg)
         per_query.append(
             {
                 "query_id": query_id,
-                "recall@k": recall_at_k(relevant, retrieved_sources, top_k),
-                "precision@k": precision_at_k(relevant, retrieved_sources, top_k),
-                "ndcg@k": ndcg_at_k(scores, retrieved_sources, top_k),
+                "recall@k": rec,
+                "precision@k": prec,
+                "ndcg@k": ndcg,
                 "retrieved": retrieved_sources,
             }
         )
         relevant_sets.append(relevant)
         retrieved_lists.append(retrieved_sources)
 
-    avg_recall = sum(q["recall@k"] for q in per_query) / len(per_query) if per_query else 0.0
-    avg_precision = sum(q["precision@k"] for q in per_query) / len(per_query) if per_query else 0.0
-    avg_ndcg = sum(q["ndcg@k"] for q in per_query) / len(per_query) if per_query else 0.0
+    avg_recall = sum(recalls) / len(recalls) if recalls else 0.0
+    avg_precision = sum(precisions) / len(precisions) if precisions else 0.0
+    avg_ndcg = sum(ndcgs) / len(ndcgs) if ndcgs else 0.0
     if not per_query:
         console.print("[yellow]No queries in gold file; metrics are zero.[/yellow]")
         mrr = 0.0

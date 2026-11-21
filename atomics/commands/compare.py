@@ -162,7 +162,11 @@ def compare(
         repo.close()
 
 
-def _print_narrative(console: Console, rows: list[dict], by: str) -> None:
+def _num(val: object, default: float = 0.0) -> float:
+    return float(val) if isinstance(val, (int, float)) else default
+
+
+def _print_narrative(console: Console, rows: list[dict[str, object]], by: str) -> None:
     """Print a plain-English business-case summary of the comparison data."""
     scored = [r for r in rows if r.get("avg_accuracy_score") is not None]
     if not scored:
@@ -172,29 +176,29 @@ def _print_narrative(console: Console, rows: list[dict], by: str) -> None:
         )
         return
 
-    scored_sorted = sorted(scored, key=lambda r: r.get("avg_accuracy_score", 0), reverse=True)
+    scored_sorted = sorted(scored, key=lambda r: _num(r.get("avg_accuracy_score")), reverse=True)
     best = scored_sorted[0]
-    free_options = [r for r in scored if r.get("cost_per_1k_tokens", 1) < 0.0001]
-    paid_options = [r for r in scored if r.get("cost_per_1k_tokens", 0) >= 0.0001]
+    free_options = [r for r in scored if _num(r.get("cost_per_1k_tokens"), 1.0) < 0.0001]
+    paid_options = [r for r in scored if _num(r.get("cost_per_1k_tokens"), 0.0) >= 0.0001]
 
     console.print(
         "\n[bold cyan]── Business Case Summary ──────────────────────────────[/bold cyan]"
     )
 
-    best_acc = best["avg_accuracy_score"] * 100
+    best_acc = _num(best["avg_accuracy_score"]) * 100
     console.print(
         f"\n[bold]{escape(str(best['group_key']))}[/bold] leads on quality at "
         f"[green]{best_acc:.1f}%[/green] accuracy "
-        f"(cost: [yellow]${best['cost_per_1k_tokens']:.4f}/1K tokens[/yellow])."
+        f"(cost: [yellow]${_num(best['cost_per_1k_tokens']):.4f}/1K tokens[/yellow])."
     )
 
     if free_options and paid_options:
-        best_free = max(free_options, key=lambda r: r.get("avg_accuracy_score", 0))
-        best_paid = max(paid_options, key=lambda r: r.get("avg_accuracy_score", 0))
-        free_acc = best_free["avg_accuracy_score"] * 100
-        paid_acc = best_paid["avg_accuracy_score"] * 100
+        best_free = max(free_options, key=lambda r: _num(r.get("avg_accuracy_score")))
+        best_paid = max(paid_options, key=lambda r: _num(r.get("avg_accuracy_score")))
+        free_acc = _num(best_free["avg_accuracy_score"]) * 100
+        paid_acc = _num(best_paid["avg_accuracy_score"]) * 100
         gap_pp = paid_acc - free_acc
-        paid_cost = best_paid["total_cost"]
+        paid_cost = _num(best_paid["total_cost"])
 
         console.print(
             f"\n[bold]Self-hosted vs API:[/bold] "
@@ -221,7 +225,7 @@ def _print_narrative(console: Console, rows: list[dict], by: str) -> None:
                 "Consider a larger local model to close the gap before switching."
             )
 
-    all_costs = [r["total_cost"] for r in paid_options]
+    all_costs = [_num(r["total_cost"]) for r in paid_options]
     if all_costs:
         total_api_spend = sum(all_costs)
         console.print(

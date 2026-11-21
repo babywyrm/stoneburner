@@ -235,7 +235,7 @@ async def run_stress(
     max_concurrency: int = 8,
     phase_seconds: float = 15.0,
     num_predict: int = 2048,
-    on_phase: Callable[[object], None] | None = None,
+    on_phase: Callable[[ConcurrencyResult], None] | None = None,
 ) -> StressResult:
     """Ramp concurrency from 1 to max_concurrency, spending phase_seconds at each level."""
     host = validate_endpoint_url(host, label="ollama host")
@@ -354,7 +354,7 @@ async def run_stress_provider(
     max_concurrency: int = 8,
     phase_seconds: float = 15.0,
     num_predict: int = 2048,
-    on_phase: Callable[[object], None] | None = None,
+    on_phase: Callable[[ConcurrencyResult], None] | None = None,
     on_phase_start: Callable[[int], None] | None = None,
 ) -> StressResult:
     """Ramp concurrency against any BaseProvider (cloud or local)."""
@@ -437,7 +437,7 @@ async def run_stress_profile(
     profile: TargetProfile,
     max_concurrency: int = 8,
     phase_seconds: float = 15.0,
-    on_phase: Callable[[object], None] | None = None,
+    on_phase: Callable[[ConcurrencyResult], None] | None = None,
 ) -> StressResult:
     """Stress test against a custom target profile — ramp concurrency."""
     host = profile.ollama_host if profile.type == "ollama" else profile.http_url
