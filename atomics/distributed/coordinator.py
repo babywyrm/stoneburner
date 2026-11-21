@@ -405,6 +405,7 @@ class Coordinator:
         *,
         worker_id: str,
         error: str | None = None,
+        failed: bool = False,
     ) -> TaskAssignment | None:
         """Record a worker's result for an assignment it currently holds.
 
@@ -413,14 +414,20 @@ class Coordinator:
         late submission cannot overwrite an assignment that already finished or
         was requeued to someone else.
         """
-        status = AssignmentStatus.FAILED.value if error else AssignmentStatus.COMPLETED.value
+        from atomics.validation import sanitize_error
+
+        is_failed = failed or error is not None
+        status = AssignmentStatus.FAILED.value if is_failed else AssignmentStatus.COMPLETED.value
+        stored_json = result_json
+        if error is not None and stored_json is None:
+            stored_json = json.dumps({"error": sanitize_error(RuntimeError(error))})
         cursor = self._conn.execute(
             "UPDATE distributed_assignments "
             "SET status = ?, result_json = ?, completed_at = ? "
             "WHERE assignment_id = ? AND worker_id = ? AND status = ?",
             (
                 status,
-                result_json,
+                stored_json,
                 self._now(),
                 assignment_id,
                 worker_id,
@@ -451,6 +458,14 @@ class Coordinator:
         if not row:
             return None
         return self._row_to_assignment(row)
+
+    def job_owner(self, job_id: str) -> str | None:
+        """Return the caller digest that submitted `job_id`, if present."""
+        row = self._conn.execute(
+            "SELECT owner FROM distributed_jobs WHERE job_id = ?",
+            (job_id,),
+        ).fetchone()
+        return str(row[0]) if row and row[0] else None
 
     def get_job(self, job_id: str, *, owner: str | None = None) -> DistributedJob | None:
         """The job, or None if it is missing or `owner` is given and differs."""

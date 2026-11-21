@@ -15,6 +15,12 @@ MAX_DISTRIBUTED_ITERATIONS = 1000
 MAX_DISTRIBUTED_INTERVAL_SECONDS = 3600
 MAX_DISTRIBUTED_TIMEOUT_SECONDS = 86_400
 MAX_DISTRIBUTED_RETRIES = 10
+MAX_WORKER_LABELS = 32
+MAX_WORKER_LABEL_LEN = 128
+MAX_WORKER_CAPABILITIES = 32
+MAX_WORKER_CAPABILITY_LEN = 64
+MAX_RESULT_JSON_CHARS = 2_000_000
+MAX_WORKER_ERROR_CHARS = 4_096
 
 
 class WorkerStatus(StrEnum):
@@ -58,6 +64,29 @@ class WorkerRegisterRequest(BaseModel):
     labels: dict[str, str] = Field(default_factory=dict)
     capabilities: list[str] = Field(default_factory=list)
     endpoint: str | None = None
+
+    @field_validator("labels")
+    @classmethod
+    def _bounded_labels(cls, value: dict[str, str]) -> dict[str, str]:
+        if len(value) > MAX_WORKER_LABELS:
+            raise ValueError(f"labels cannot exceed {MAX_WORKER_LABELS} entries")
+        for key, val in value.items():
+            if not key or len(key) > MAX_WORKER_LABEL_LEN or len(val) > MAX_WORKER_LABEL_LEN:
+                raise ValueError(
+                    f"label keys must be 1..{MAX_WORKER_LABEL_LEN} chars and values "
+                    f"<= {MAX_WORKER_LABEL_LEN} chars"
+                )
+        return value
+
+    @field_validator("capabilities")
+    @classmethod
+    def _bounded_capabilities(cls, value: list[str]) -> list[str]:
+        if len(value) > MAX_WORKER_CAPABILITIES:
+            raise ValueError(f"capabilities cannot exceed {MAX_WORKER_CAPABILITIES} entries")
+        for cap in value:
+            if not cap or len(cap) > MAX_WORKER_CAPABILITY_LEN:
+                raise ValueError(f"capability names must be 1..{MAX_WORKER_CAPABILITY_LEN} chars")
+        return value
 
     @field_validator("endpoint")
     @classmethod
@@ -140,5 +169,12 @@ class TaskAssignment(BaseModel):
 
 class TaskResultSubmission(BaseModel):
     status: AssignmentStatus
-    result_json: str | None = None
-    error: str | None = None
+    result_json: str | None = Field(default=None, max_length=MAX_RESULT_JSON_CHARS)
+    error: str | None = Field(default=None, max_length=MAX_WORKER_ERROR_CHARS)
+
+    @field_validator("status")
+    @classmethod
+    def _terminal_status(cls, value: AssignmentStatus) -> AssignmentStatus:
+        if value not in (AssignmentStatus.COMPLETED, AssignmentStatus.FAILED):
+            raise ValueError("status must be 'completed' or 'failed'")
+        return value

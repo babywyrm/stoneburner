@@ -162,3 +162,66 @@ def test_an_empty_run_rolls_up_to_nothing():
     assert rollup.workers == []
     assert rollup.completed == 0
     assert rollup.estimated_cost_usd == 0.0
+
+
+def test_rollup_ignores_booleans_and_non_finite_numbers_and_reads_full_summary():
+    from atomics.distributed.rollup import assignment_cost_usd
+
+    bogus = AssignmentRecord(
+        worker_id="host-bool",
+        status="completed",
+        result={
+            "latency_ms": True,
+            "input_tokens": True,
+            "output_tokens": False,
+            "estimated_cost_usd": True,
+            "tokens_per_second": True,
+        },
+    )
+    non_finite = AssignmentRecord(
+        worker_id="host-nan",
+        status="completed",
+        result={
+            "latency_ms": float("nan"),
+            "estimated_cost_usd": float("inf"),
+            "tokens_per_second": float("inf"),
+        },
+    )
+    full_run = AssignmentRecord(
+        worker_id="host-full",
+        status="completed",
+        result={
+            "summary": {
+                "total_cost_usd": 0.42,
+                "avg_latency_ms": 120.0,
+                "provider": "openai",
+                "model": "gpt-4o-mini",
+            },
+            "task_results": [
+                {"input_tokens": 10, "output_tokens": 25},
+                {"input_tokens": 5, "output_tokens": 15},
+            ],
+        },
+    )
+
+    rollup = build_rollup([bogus, non_finite, full_run])
+    by_id = {w.worker_id: w for w in rollup.workers}
+
+    assert by_id["host-bool"].estimated_cost_usd == 0.0
+    assert by_id["host-bool"].input_tokens == 0
+    assert by_id["host-bool"].mean_latency_ms == 0.0
+    assert by_id["host-bool"].mean_tokens_per_second == 0.0
+    assert by_id["host-nan"].estimated_cost_usd == 0.0
+    assert by_id["host-nan"].mean_tokens_per_second == 0.0
+    assert by_id["host-full"].estimated_cost_usd == 0.42
+    assert by_id["host-full"].input_tokens == 15
+    assert by_id["host-full"].output_tokens == 40
+    assert by_id["host-full"].mean_latency_ms == 120.0
+    assert by_id["host-full"].provider == "openai"
+    assert by_id["host-full"].model == "gpt-4o-mini"
+
+    assert assignment_cost_usd('{"estimated_cost_usd": 0.25}') == 0.25
+    assert assignment_cost_usd('{"summary": {"total_cost_usd": 0.42}}') == 0.42
+    assert assignment_cost_usd('{"estimated_cost_usd": true}') == 0.0
+    assert assignment_cost_usd('{"estimated_cost_usd": -5.0}') == 0.0
+    assert assignment_cost_usd("not-json") == 0.0

@@ -11,8 +11,9 @@ the same split the eval suites use between scoring and running.
 
 from __future__ import annotations
 
+import json
 import math
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -106,9 +107,30 @@ def _mean(values: Sequence[float]) -> float:
     return round(sum(values) / len(values), 2)
 
 
-def _number(result: dict[str, Any], key: str) -> float:
+def _number(result: Mapping[str, Any], key: str, *, nonneg: bool = False) -> float:
     value = result.get(key)
-    return float(value) if isinstance(value, int | float) else 0.0
+    if isinstance(value, bool) or not isinstance(value, int | float) or not math.isfinite(value):
+        return 0.0
+    num = float(value)
+    return max(0.0, num) if nonneg else num
+
+
+def assignment_cost_usd(result_json: str | None) -> float:
+    """Extract finite non-negative USD spend from a serialized worker assignment result."""
+    if not result_json:
+        return 0.0
+    try:
+        data = json.loads(result_json)
+    except json.JSONDecodeError:
+        return 0.0
+    if not isinstance(data, dict):
+        return 0.0
+    if "estimated_cost_usd" in data:
+        return _number(data, "estimated_cost_usd", nonneg=True)
+    summary = data.get("summary")
+    if isinstance(summary, dict):
+        return _number(summary, "total_cost_usd", nonneg=True)
+    return 0.0
 
 
 def build_rollup(records: Sequence[AssignmentRecord]) -> FleetRollup:
@@ -145,14 +167,32 @@ def build_rollup(records: Sequence[AssignmentRecord]) -> FleetRollup:
                 continue
             completed += 1
             result = entry.result
-            latencies.append(_number(result, "latency_ms"))
-            input_tokens += int(_number(result, "input_tokens"))
-            output_tokens += int(_number(result, "output_tokens"))
-            cost += _number(result, "estimated_cost_usd")
+            summary = result.get("summary")
+            if isinstance(summary, dict) and "estimated_cost_usd" not in result:
+                latencies.append(_number(summary, "avg_latency_ms", nonneg=True))
+                cost += _number(summary, "total_cost_usd", nonneg=True)
+                task_rows = result.get("task_results")
+                if isinstance(task_rows, list):
+                    for row in task_rows:
+                        if isinstance(row, dict):
+                            input_tokens += int(_number(row, "input_tokens", nonneg=True))
+                            output_tokens += int(_number(row, "output_tokens", nonneg=True))
+                provider = provider or str(summary.get("provider", ""))
+                model = model or str(summary.get("model", ""))
+                continue
+
+            latencies.append(_number(result, "latency_ms", nonneg=True))
+            input_tokens += int(_number(result, "input_tokens", nonneg=True))
+            output_tokens += int(_number(result, "output_tokens", nonneg=True))
+            cost += _number(result, "estimated_cost_usd", nonneg=True)
             # Absent on providers that do not report it; averaging in a zero
             # would understate a host that simply did not measure throughput.
             throughput = result.get("tokens_per_second")
-            if isinstance(throughput, int | float):
+            if (
+                not isinstance(throughput, bool)
+                and isinstance(throughput, int | float)
+                and math.isfinite(throughput)
+            ):
                 throughputs.append(float(throughput))
             provider = provider or str(result.get("provider", ""))
             model = model or str(result.get("model", ""))

@@ -779,3 +779,159 @@ def test_private_file_writers_enforce_0600_mode(tmp_path, monkeypatch):
     res_exp = CliRunner().invoke(cli, ["export", "--format", "csv", "-o", str(export_csv)])
     assert res_exp.exit_code == 0, res_exp.output
     assert stat.S_IMODE(export_csv.stat().st_mode) == 0o600
+
+
+def test_distributed_runs_enforce_and_charge_caller_spend_ceiling(tmp_path):
+    """Distributed runs must charge `caller_spend` and return 429 once over ceiling."""
+    import json
+
+    key_a = "dist-submitter-a"
+    key_b = "dist-submitter-b"
+    worker_key = "dist-worker-only"
+    db_path = tmp_path / "dist-spend.db"
+    settings = ServerSettings(
+        no_auth=False,
+        api_keys={key_a, key_b},
+        worker_api_keys={worker_key},
+        max_spend_usd_per_caller=0.50,
+        db_path=db_path,
+    )
+    with TestClient(create_app(settings), base_url="http://127.0.0.1") as tc:
+        reg = tc.post("/api/v1/workers/register", json={}, headers={"X-API-Key": worker_key})
+        assert reg.status_code == 200
+        wid = reg.json()["worker_id"]
+
+        sub = tc.post(
+            "/api/v1/distributed/runs",
+            json={"mode": "split", "run_request": {"iterations": 1}},
+            headers={"X-API-Key": key_a},
+        )
+        assert sub.status_code == 202
+
+        claim = tc.get(f"/api/v1/workers/{wid}/jobs/next", headers={"X-API-Key": worker_key})
+        assert claim.status_code == 200
+        aid = claim.json()["assignment_id"]
+
+        done = tc.post(
+            f"/api/v1/workers/{wid}/jobs/{aid}/result",
+            json={
+                "status": "completed",
+                "result_json": json.dumps({"estimated_cost_usd": 0.55}),
+            },
+            headers={"X-API-Key": worker_key},
+        )
+        assert done.status_code == 200
+
+        # key_a is now over $0.50 ceiling on distributed runs.
+        over_dist = tc.post(
+            "/api/v1/distributed/runs",
+            json={"mode": "split", "run_request": {"iterations": 1}},
+            headers={"X-API-Key": key_a},
+        )
+        assert over_dist.status_code == 429
+        assert "spend limit" in over_dist.json()["detail"]
+
+        # key_b still has fresh budget.
+        ok_b = tc.post(
+            "/api/v1/distributed/runs",
+            json={"mode": "split", "run_request": {"iterations": 1}},
+            headers={"X-API-Key": key_b},
+        )
+        assert ok_b.status_code == 202
+
+    # Survives server restart via SQLite `caller_spend`.
+    with TestClient(create_app(settings), base_url="http://127.0.0.1") as tc2:
+        over_after_restart = tc2.post(
+            "/api/v1/distributed/runs",
+            json={"mode": "split", "run_request": {"iterations": 1}},
+            headers={"X-API-Key": key_a},
+        )
+        assert over_after_restart.status_code == 429
+
+
+def test_worker_submission_honors_failed_status_sanitizes_and_bounds_inputs(tmp_path):
+    """`status='failed'` without error must fail, redact secrets, and reject oversized payloads."""
+    key_a = "dist-submitter-a"
+    worker_key = "dist-worker-only"
+    settings = ServerSettings(
+        no_auth=False,
+        api_keys={key_a},
+        worker_api_keys={worker_key},
+        db_path=tmp_path / "worker-bounds.db",
+    )
+    wh = {"X-API-Key": worker_key}
+    ah = {"X-API-Key": key_a}
+    with TestClient(create_app(settings), base_url="http://127.0.0.1") as tc:
+        # 1. Oversized worker labels / capabilities are rejected with 422.
+        too_many_labels = {f"k{i}": "v" for i in range(40)}
+        assert (
+            tc.post(
+                "/api/v1/workers/register", json={"labels": too_many_labels}, headers=wh
+            ).status_code
+            == 422
+        )
+        assert (
+            tc.post(
+                "/api/v1/workers/register",
+                json={"capabilities": [f"c{i}" for i in range(40)]},
+                headers=wh,
+            ).status_code
+            == 422
+        )
+
+        wid = tc.post("/api/v1/workers/register", json={}, headers=wh).json()["worker_id"]
+        job = tc.post(
+            "/api/v1/distributed/runs",
+            json={"mode": "split", "run_request": {"iterations": 2}},
+            headers=ah,
+        ).json()
+
+        a1 = tc.get(f"/api/v1/workers/{wid}/jobs/next", headers=wh).json()
+        a2 = tc.get(f"/api/v1/workers/{wid}/jobs/next", headers=wh).json()
+
+        # 2. Non-terminal status ("pending") and oversized result_json rejected with 422.
+        assert (
+            tc.post(
+                f"/api/v1/workers/{wid}/jobs/{a1['assignment_id']}/result",
+                json={"status": "pending"},
+                headers=wh,
+            ).status_code
+            == 422
+        )
+        assert (
+            tc.post(
+                f"/api/v1/workers/{wid}/jobs/{a1['assignment_id']}/result",
+                json={"status": "completed", "result_json": "x" * 2_100_000},
+                headers=wh,
+            ).status_code
+            == 422
+        )
+
+        # 3. `status="failed"` with omitted error MUST record `failed`, never `completed`.
+        r1 = tc.post(
+            f"/api/v1/workers/{wid}/jobs/{a1['assignment_id']}/result",
+            json={"status": "failed"},
+            headers=wh,
+        )
+        assert r1.status_code == 200
+        assert r1.json()["status"] == "failed"
+
+        # 4. Raw credentials in worker `error` are sanitized before persistence.
+        secret_tok = "sk-live-secret-token-9876543210"
+        r2 = tc.post(
+            f"/api/v1/workers/{wid}/jobs/{a2['assignment_id']}/result",
+            json={"status": "failed", "error": f"upstream 401 Bearer {secret_tok}"},
+            headers=wh,
+        )
+        assert r2.status_code == 200
+        assert r2.json()["status"] == "failed"
+
+        stored = tc.app.state.coordinator.get_assignment(a2["assignment_id"])
+        assert stored is not None
+        assert stored.status.value == "failed"
+        assert stored.result_json is not None
+        assert secret_tok not in stored.result_json
+        assert "[REDACTED]" in stored.result_json
+
+        finished = tc.get(f"/api/v1/distributed/runs/{job['job_id']}", headers=ah).json()
+        assert finished["status"] == "partial"

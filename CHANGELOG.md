@@ -8,8 +8,8 @@
   `JobManager.max_spend_usd_per_caller`) enforces an optional cumulative
   dollar ceiling per API key across runs, persisted in SQLite (`caller_spend`,
   schema v23) across server restarts and job eviction, covering completed jobs,
-  budget-aborted jobs, sweeps, and `/api/v1/provider-test`, returning `429`
-  once a caller reaches their limit.
+  budget-aborted jobs, sweeps, distributed worker runs, and
+  `/api/v1/provider-test`, returning `429` once a caller reaches their limit.
 - `atomics server --allowed-host` / `--allowed-hosts` (and
   `ServerSettings.allowed_hosts`) restricts both caller-supplied and
   default/vendor outbound `host`, `judge_host`, battery `profile` / `qa`
@@ -48,6 +48,10 @@
 - Server battery `profile` loading now resolves against an enumerated catalog
   of non-symlink `.yaml`/`.yml` files under `profiles/` and rejects symlinked
   `prompts_file` escapes.
+- Distributed worker result submissions now honor `status="failed"` when
+  `error` is omitted, sanitize worker `error` strings before persistence, bound
+  worker registration and result payload sizes, and ignore boolean or
+  non-finite numbers in fleet rollups while rolling up `full`-mode summaries.
 - `BrainGatewayProvider.generate()` now raises `RuntimeError` when `camazotz`
   returns an HTTP-200 backend stub or outage sentinel (`[ollama-unavailable]`,
   `[cloud-stub]`, `[cloud-error]`, `[openai-stub]`, `[openai-error]`,

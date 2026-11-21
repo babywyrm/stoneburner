@@ -6,8 +6,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
 from atomics.api.config import DisallowedHostError
 from atomics.api.dependencies import require_auth, require_worker_auth
+from atomics.api.jobs import CallerSpendQuotaExceededError, JobManager
 from atomics.distributed.coordinator import AssignmentRejectedError, Coordinator
 from atomics.distributed.models import (
+    AssignmentStatus,
     DistributedJob,
     DistributedRunRequest,
     JobMode,
@@ -16,6 +18,7 @@ from atomics.distributed.models import (
     WorkerRegisterRequest,
     WorkerRegisterResponse,
 )
+from atomics.distributed.rollup import assignment_cost_usd
 from atomics.models import BurnTier
 from atomics.tasks import get_weighted_task
 from atomics.validation import validate_endpoint_url
@@ -111,6 +114,7 @@ async def next_assignment(
 
 @router.post("/workers/{worker_id}/jobs/{assignment_id}/result")
 async def submit_result(
+    request: Request,
     worker_id: str,
     assignment_id: str,
     payload: TaskResultSubmission,
@@ -123,11 +127,18 @@ async def submit_result(
             payload.result_json,
             worker_id=worker_id,
             error=payload.error,
+            failed=payload.status == AssignmentStatus.FAILED,
         )
     except AssignmentRejectedError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     if assignment is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found")
+    cost = assignment_cost_usd(payload.result_json)
+    if cost > 0.0:
+        owner = coordinator.job_owner(assignment.job_id)
+        job_manager = getattr(request.app.state, "job_manager", None)
+        if owner is not None and isinstance(job_manager, JobManager):
+            job_manager.record_spend(owner, cost)
     return {"status": assignment.status.value}
 
 
@@ -226,6 +237,14 @@ async def start_distributed_run(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="run_request is required",
         )
+    job_manager = getattr(request.app.state, "job_manager", None)
+    if isinstance(job_manager, JobManager):
+        try:
+            job_manager.check_caller_spend(caller)
+        except CallerSpendQuotaExceededError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)
+            ) from exc
     if payload.mode is JobMode.FULL:
         task_spec = {"mode": "full", "run_request": payload.run_request, "runtime": "python"}
         if payload.worker_selector:
