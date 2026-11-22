@@ -3,6 +3,11 @@
 ## Unreleased
 
 ### Added
+- `atomics repl` exposes `submit_battery`, `list_workers`,
+  `submit_distributed_run`, `get_distributed_run`, and `list_distributed_runs`
+  with quiet formatters, `wait` polling over `/api/v1/distributed/runs/{job_id}`
+  (including `partial` terminal status), and automated 1:1 verb/parameter
+  parity against `atomics mcp`.
 - `atomics mcp` exposes distributed coordinator tools (`list_workers`,
   `submit_distributed_run`, `get_distributed_run`, `list_distributed_runs`)
   over `/api/v1/workers` and `/api/v1/distributed/runs`.

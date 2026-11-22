@@ -90,6 +90,16 @@ major tag moved by the publish workflow.
       classify hyphen-sized local tags (`-4b-`, `-9b:latest`) alongside `:Nb`
       tags and register `granite4.2:30b` / `gemma4:31b`.
 
+## 0.38.0 — REPL-to-MCP verb parity, battery/distributed wait, and guardrails
+
+- [x] Close REPL-to-MCP verb and parameter parity in `atomics/repl/dispatch.py`
+      (`submit_battery`, `list_workers`, `submit_distributed_run`,
+      `get_distributed_run`, `list_distributed_runs`), backed by an automated
+      parity test against `AtomicsApiClient` and `atomics mcp`.
+- [x] Add quiet display formatters (`list_workers`, `list_distributed_runs`,
+      battery/distributed `submit_*` and completed/`partial` headlines) and
+      `wait` polling support for distributed coordinator jobs.
+
 ## Empirical Baselines
 
 - **Reference judge (`gemma4:26b`).** A red/blue study on six local models

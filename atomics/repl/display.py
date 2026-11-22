@@ -6,7 +6,8 @@ so tests and redirected stdout stay plain.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+import json
+from collections.abc import Callable, Mapping
 from typing import Any
 
 _RESET = "\033[0m"
@@ -174,7 +175,7 @@ def format_jobs_list(body: dict[str, Any]) -> str:
         parts = [kind, status, job_id]
         request = job.get("request") or {}
         if isinstance(request, dict):
-            for key in ("suite", "model", "host"):
+            for key in ("suite", "name", "model", "host"):
                 if request.get(key):
                     parts.append(str(request[key]))
             if request.get("models"):
@@ -183,6 +184,61 @@ def format_jobs_list(body: dict[str, Any]) -> str:
                 parts.append(_join_list(request["suites"]))
         lines.append("  ".join(parts))
     return "\n".join(lines) + "\n"
+
+
+def _distributed_target_parts(body: Mapping[str, object]) -> list[str]:
+    raw_req = body.get("request_json")
+    if not isinstance(raw_req, str) or not raw_req:
+        return []
+    try:
+        parsed = json.loads(raw_req)
+    except json.JSONDecodeError:
+        return []
+    if not isinstance(parsed, dict):
+        return []
+    parts: list[str] = []
+    inner = parsed.get("eval_request") or parsed.get("run_request")
+    if isinstance(inner, dict):
+        for key in ("suite", "tier", "model", "host"):
+            val = inner.get(key)
+            if val:
+                parts.append(str(val))
+    return parts
+
+
+def format_workers_list(body: Mapping[str, object]) -> str:
+    workers = body.get("workers")
+    if not isinstance(workers, list) or not workers:
+        return "no workers\n"
+    lines: list[str] = []
+    for item in workers:
+        if not isinstance(item, dict):
+            continue
+        parts = [str(item.get("worker_id") or "?"), str(item.get("status") or "?")]
+        endpoint = item.get("endpoint")
+        if endpoint:
+            parts.append(str(endpoint))
+        labels = item.get("labels")
+        if isinstance(labels, dict) and labels:
+            parts.append(",".join(f"{k}={labels[k]}" for k in sorted(labels)))
+        lines.append("  ".join(parts))
+    return "\n".join(lines) + "\n" if lines else "no workers\n"
+
+
+def format_distributed_runs_list(body: Mapping[str, object]) -> str:
+    jobs = body.get("jobs")
+    if not isinstance(jobs, list) or not jobs:
+        return "no distributed runs\n"
+    lines: list[str] = []
+    for job in jobs:
+        if not isinstance(job, dict):
+            continue
+        mode = str(job.get("mode") or "?")
+        status = str(job.get("status") or "?")
+        job_id = str(job.get("job_id") or "")[:8]
+        parts = ["distributed", mode, status, job_id, *_distributed_target_parts(job)]
+        lines.append("  ".join(parts))
+    return "\n".join(lines) + "\n" if lines else "no distributed runs\n"
 
 
 def format_models_list(body: dict[str, Any]) -> str:
@@ -299,12 +355,19 @@ def format_provider_test(body: dict[str, Any]) -> str:
 
 
 def format_submitted(body: dict[str, Any]) -> str:
+    if "mode" in body and "kind" not in body:
+        parts = ["distributed", str(body.get("mode") or "?"), *_distributed_target_parts(body)]
+        job_id = str(body.get("job_id") or "")
+        status = str(body.get("status") or "pending")
+        return f"{'  '.join(parts)}\n{job_id}  {status}\n"
     request = body.get("request")
     request = request if isinstance(request, dict) else {}
-    parts: list[str] = [str(body.get("kind") or "job")]
+    parts = [str(body.get("kind") or "job")]
     suite = request.get("suite")
     if suite:
         parts.append(str(suite))
+    elif request.get("name"):
+        parts.append(str(request["name"]))
     elif request.get("suites"):
         parts.append(_join_list(request["suites"]))
     model = request.get("model")
@@ -332,6 +395,39 @@ def format_failed(body: dict[str, Any], *, color: bool = False) -> str:
 
 
 def format_completed(body: dict[str, Any], *, color: bool = False) -> str:
+    if "mode" in body and "request_json" in body:
+        raw_summary = body.get("summary_json")
+        summary: dict[str, Any] = {}
+        if isinstance(raw_summary, str) and raw_summary:
+            try:
+                decoded = json.loads(raw_summary)
+                if isinstance(decoded, dict):
+                    summary = decoded
+            except json.JSONDecodeError:
+                summary = {}
+        elif isinstance(raw_summary, dict):
+            summary = raw_summary
+        mode = str(body.get("mode") or "?")
+        status = str(body.get("status") or "completed")
+        status_txt = _paint(status, _YELLOW if status == "partial" else _GREEN, color=color)
+        ok = int(summary.get("completed") or 0)
+        fail = int(summary.get("failed") or 0)
+        raw_workers = summary.get("workers")
+        workers = raw_workers if isinstance(raw_workers, list) else []
+        tokens = int(summary.get("total_input_tokens") or 0) + int(
+            summary.get("total_output_tokens") or 0
+        )
+        cost_txt = _money(summary.get("estimated_cost_usd"))
+        integrity = summary.get("integrity")
+        int_txt = (
+            f"  integrity={integrity['status']}"
+            if isinstance(integrity, dict) and integrity.get("status")
+            else ""
+        )
+        return (
+            f"distributed  {mode}  {status_txt}\n"
+            f"{ok} ok  {fail} fail  {len(workers)} workers  {tokens} tok  {cost_txt}{int_txt}\n"
+        )
     request = body.get("request") or {}
     result = body.get("result") or {}
     progress = body.get("progress") or {}
@@ -387,6 +483,17 @@ def format_completed(body: dict[str, Any], *, color: bool = False) -> str:
             extras.append(f"{latency}% p95")
         drift_txt = f"  {' / '.join(extras)}" if extras else ""
         return f"soak  {model}{host_txt}\n{verdict}{drift_txt}  {len(samples)} samples\n"
+    if body.get("kind") == "battery" or isinstance(result.get("steps"), list):
+        bname = str(request.get("name") or result.get("battery") or "battery")
+        steps = [s for s in (result.get("steps") or []) if isinstance(s, dict)]
+        ok = sum(1 for s in steps if s.get("ok") is True)
+        skipped = sum(1 for s in steps if s.get("skipped"))
+        fail = sum(1 for s in steps if not s.get("skipped") and not s.get("ok"))
+        skip_txt = f"  {skipped} skipped" if skipped else ""
+        return (
+            f"battery  {bname}  {model}{host_txt}\n"
+            f"{ok} ok  {fail} fail{skip_txt}  {len(steps)} steps\n"
+        )
     if body.get("kind") == "run" or isinstance(result.get("task_rows"), list):
         ok = int(result.get("success") or 0)
         fail = int(result.get("failed") or 0)
@@ -409,6 +516,10 @@ def format_completed(body: dict[str, Any], *, color: bool = False) -> str:
 
 
 def format_still_running(body: dict[str, Any], *, color: bool = False) -> str:
+    if "mode" in body and "request_json" in body:
+        mode = str(body.get("mode") or "?")
+        status = str(body.get("status") or "running")
+        return _paint(f"still running  distributed  {mode}  {status}", _YELLOW, color=color)
     progress = body.get("progress") or {}
     current = progress.get("current") or 0
     total = progress.get("total") or "?"
@@ -463,7 +574,7 @@ class QuietWait:
             if isinstance(row, dict):
                 self._emit(render(row, color=self.color, verbose=self.verbose) + "\n")
         self._seen = len(rows)
-        if body.get("status") == "completed" and not self._summarized:
+        if body.get("status") in {"completed", "partial"} and not self._summarized:
             self._summarized = True
             self._emit(format_completed(body, color=self.color))
         elif body.get("status") == "failed" and not self._summarized:
@@ -473,7 +584,7 @@ class QuietWait:
     def finish(self, body: Any) -> None:
         if not isinstance(body, dict):
             return
-        if body.get("status") in {"completed", "failed"}:
+        if body.get("status") in {"completed", "partial", "failed"}:
             self.update(body)
             return
         if not self._summarized:

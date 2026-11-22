@@ -397,3 +397,86 @@ def test_color_off_has_no_ansi() -> None:
         color=False,
     )
     assert "\033[" not in plain
+
+
+def test_battery_submitted_and_completed_headlines() -> None:
+    submitted = format_submitted(
+        {
+            "job_id": "bat-9",
+            "status": "pending",
+            "kind": "battery",
+            "request": {"name": "agent-gate", "model": "qwen3.5:4b"},
+        }
+    )
+    assert submitted == "battery  agent-gate  qwen3.5:4b\nbat-9  pending\n"
+
+    completed = format_completed(
+        {
+            "status": "completed",
+            "kind": "battery",
+            "request": {"name": "agent-gate", "model": "qwen3.5:4b"},
+            "result": {
+                "battery": "agent-gate",
+                "steps": [
+                    {"suite": "adversarial", "ok": True},
+                    {"suite": "toolcall", "ok": False},
+                    {"suite": "archreview", "skipped": True},
+                ],
+            },
+        }
+    )
+    assert completed == "battery  agent-gate  qwen3.5:4b\n1 ok  1 fail  1 skipped  3 steps\n"
+
+
+def test_distributed_submitted_and_partial_headlines() -> None:
+    import json
+
+    submitted = format_submitted(
+        {
+            "job_id": "dj-1",
+            "mode": "fleet",
+            "status": "pending",
+            "request_json": json.dumps(
+                {"eval_request": {"suite": "refusal", "model": "gemma3:4b"}}
+            ),
+        }
+    )
+    assert submitted == "distributed  fleet  refusal  gemma3:4b\ndj-1  pending\n"
+
+    partial = format_completed(
+        {
+            "job_id": "dj-1",
+            "mode": "fleet",
+            "status": "partial",
+            "request_json": json.dumps(
+                {"eval_request": {"suite": "refusal", "model": "gemma3:4b"}}
+            ),
+            "summary_json": json.dumps(
+                {
+                    "completed": 1,
+                    "failed": 1,
+                    "total_input_tokens": 100,
+                    "total_output_tokens": 50,
+                    "estimated_cost_usd": 0.02,
+                    "integrity": {"status": "partial", "should_exit_nonzero": True},
+                    "workers": [{"worker_id": "w1"}, {"worker_id": "w2"}],
+                }
+            ),
+        }
+    )
+    assert partial == (
+        "distributed  fleet  partial\n1 ok  1 fail  2 workers  150 tok  $0.02  integrity=partial\n"
+    )
+
+    from atomics.repl.display import (
+        format_distributed_runs_list,
+        format_still_running,
+        format_workers_list,
+    )
+
+    assert format_workers_list({"workers": []}) == "no workers\n"
+    assert format_distributed_runs_list({"jobs": []}) == "no distributed runs\n"
+    assert (
+        format_still_running({"mode": "split", "status": "running", "request_json": "{}"})
+        == "still running  distributed  split  running"
+    )

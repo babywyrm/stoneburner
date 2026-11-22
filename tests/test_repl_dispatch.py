@@ -526,3 +526,154 @@ def test_unknown_flag_does_not_call_the_client() -> None:
     )
     assert requests == []
     assert "nope" in result.stderr
+
+
+async def test_repl_verbs_match_mcp_tools_and_client_parameters() -> None:
+    import inspect
+
+    import pytest
+
+    pytest.importorskip("mcp")
+    from atomics.mcp.server import build_server
+    from atomics.repl.dispatch import _VERBS
+
+    server = build_server(_client([]))
+    mcp_names = {tool.name for tool in await server.list_tools()}
+    assert set(_VERBS) == mcp_names
+
+    for verb, (method_name, allowed, positional) in _VERBS.items():
+        method = getattr(AtomicsApiClient, method_name)
+        expected = set(inspect.signature(method).parameters) - {"self"}
+        actual = set(allowed) | ({positional} if positional is not None else set())
+        assert actual == expected, f"parameter drift on {verb}"
+
+
+def test_submit_battery_fills_session_fields_and_formats_quietly() -> None:
+    requests: list[httpx.Request] = []
+    session = Session(
+        provider="ollama",
+        model="granite4.2:3b",
+        host="http://127.0.0.1:11434",
+        effort="low",
+    )
+    job_body = {
+        "job_id": "bat-1",
+        "status": "pending",
+        "kind": "battery",
+        "request": {
+            "name": "desk-pass",
+            "provider": "ollama",
+            "model": "granite4.2:3b",
+            "host": "http://127.0.0.1:11434",
+        },
+    }
+    result = handle_line(
+        "submit_battery --name desk-pass --budget_usd 5",
+        session=session,
+        client=_client(requests, response=httpx.Response(202, json=job_body)),
+    )
+    assert requests[0].url.path == "/api/v1/batteries"
+    payload = json.loads(requests[0].content)
+    assert payload == {
+        "name": "desk-pass",
+        "provider": "ollama",
+        "model": "granite4.2:3b",
+        "host": "http://127.0.0.1:11434",
+        "effort": "low",
+        "budget_usd": 5.0,
+    }
+    assert session.last_job_id == "bat-1"
+    assert "battery  desk-pass  granite4.2:3b" in result.stdout
+
+
+def test_distributed_verbs_dispatch_and_format_quietly() -> None:
+    requests: list[httpx.Request] = []
+    workers_body = {
+        "workers": [
+            {
+                "worker_id": "w-alpha",
+                "status": "online",
+                "endpoint": "http://127.0.0.1:11434",
+                "labels": {"gpu": "m3", "site": "lab"},
+            }
+        ]
+    }
+    res_workers = handle_line(
+        "list_workers",
+        session=Session(),
+        client=_client(requests, response=httpx.Response(200, json=workers_body)),
+    )
+    assert "w-alpha  online  http://127.0.0.1:11434  gpu=m3,site=lab" in res_workers.stdout
+
+    submit_requests: list[httpx.Request] = []
+    session = Session()
+    dist_job = {
+        "job_id": "dj-123456789",
+        "mode": "full",
+        "status": "pending",
+        "request_json": json.dumps(
+            {"mode": "full", "eval_request": {"suite": "refusal", "model": "gemma3:4b"}}
+        ),
+        "summary_json": None,
+    }
+    res_submit = handle_line(
+        "submit_distributed_run --mode full "
+        '--eval_request \'{"suite":"refusal","provider":"ollama"}\' '
+        "--worker_selector site=lab,gpu=m3 --timeout_seconds 120 --max_retries 1",
+        session=session,
+        client=_client(submit_requests, response=httpx.Response(202, json=dist_job)),
+    )
+    assert submit_requests[0].url.path == "/api/v1/distributed/runs"
+    assert json.loads(submit_requests[0].content) == {
+        "mode": "full",
+        "eval_request": {"suite": "refusal", "provider": "ollama"},
+        "worker_selector": {"site": "lab", "gpu": "m3"},
+        "timeout_seconds": 120,
+        "max_retries": 1,
+    }
+    assert session.last_job_id == "dj-123456789"
+    assert "distributed  full  refusal  gemma3:4b" in res_submit.stdout
+
+    list_res = handle_line(
+        "list_distributed_runs --limit 5",
+        session=Session(),
+        client=_client([], response=httpx.Response(200, json={"jobs": [dist_job]})),
+    )
+    assert "distributed  full  pending  dj-12345" in list_res.stdout
+
+    get_requests: list[httpx.Request] = []
+    get_res = handle_line(
+        "get_distributed_run dj-123456789",
+        session=Session(),
+        client=_client(get_requests, response=httpx.Response(200, json=dist_job)),
+    )
+    assert get_requests[0].url.path == "/api/v1/distributed/runs/dj-123456789"
+    assert '"job_id": "dj-123456789"' in get_res.stdout
+
+
+def test_distributed_verbs_reject_malformed_json_and_selector() -> None:
+    requests: list[httpx.Request] = []
+    bad_json = handle_line(
+        "submit_distributed_run --eval_request '[1,2]'",
+        session=Session(),
+        client=_client(requests),
+    )
+    assert requests == []
+    assert "JSON object" in bad_json.stderr
+
+    bad_sel = handle_line(
+        "submit_distributed_run --mode fleet --worker_selector invalid_pair",
+        session=Session(),
+        client=_client(requests),
+    )
+    assert requests == []
+    assert "worker_selector" in bad_sel.stderr
+
+    json_sel_requests: list[httpx.Request] = []
+    handle_line(
+        'submit_distributed_run --mode full --eval_request \'{"suite":"refusal"}\' '
+        '--worker_selector \'{"site":"lab"}\'',
+        session=Session(),
+        client=_client(json_sel_requests),
+    )
+    assert json.loads(json_sel_requests[0].content)["worker_selector"] == {"site": "lab"}

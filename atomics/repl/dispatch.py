@@ -13,6 +13,7 @@ from atomics.mcp.client import AtomicsApiClient, AtomicsApiError
 from atomics.repl.display import (
     QuietWait,
     format_compare,
+    format_distributed_runs_list,
     format_get_run,
     format_jobs_list,
     format_models_list,
@@ -20,6 +21,7 @@ from atomics.repl.display import (
     format_recent_runs,
     format_submitted,
     format_trends,
+    format_workers_list,
 )
 from atomics.repl.parse import ParsedLine, ParseError, parse_line
 from atomics.repl.session import SESSION_KEYS, Session, SessionError
@@ -27,12 +29,15 @@ from atomics.repl.wait import wait_for_job
 
 HELP_TEXT = """\
 Session: set, show, help, exit
-Read:    health, list_models, list_jobs, get_job, get_run, compare, recent_runs, trends
-Spend:   provider_test, submit_run, submit_eval, submit_sweep, submit_stress, submit_soak
+Read:    health, list_models, list_jobs, get_job, get_run, compare, recent_runs,
+         trends, list_workers, get_distributed_run, list_distributed_runs
+Spend:   provider_test, submit_run, submit_eval, submit_sweep, submit_battery,
+         submit_stress, submit_soak, submit_distributed_run
 Poll:    wait [--verbose] [JOB_ID]   one-liners; --verbose adds replies
 Submit:  quiet headline + job id; --verbose keeps the JSON document
-Reads:   list_jobs / list_models / provider_test / get_run / recent_runs /
-         compare / trends are quiet; --verbose keeps JSON
+Reads:   list_jobs / list_models / list_workers / list_distributed_runs /
+         provider_test / get_run / recent_runs / compare / trends are quiet;
+         --verbose keeps JSON
 
 set KEY [VALUE]   set or clear a session field
 show              print the session as JSON
@@ -51,14 +56,20 @@ _INT = frozenset(
         "concurrency",
         "sample_interval",
         "max_concurrency",
+        "timeout_seconds",
+        "max_retries",
     }
 )
 _FLOAT = frozenset({"budget_usd", "since_hours", "phase_seconds", "temperature"})
 _LIST = frozenset({"models", "suites", "fixtures"})
+_JSON_OBJECT = frozenset({"run_request", "eval_request"})
+_SELECTOR = frozenset({"worker_selector"})
 _SESSION_FIELDS = ("provider", "model", "effort", "reasoning_mode", "host")
 _QUIET_FORMATTERS: dict[str, Callable[[dict[str, Any]], str]] = {
     "list_jobs": format_jobs_list,
     "list_models": format_models_list,
+    "list_workers": format_workers_list,
+    "list_distributed_runs": format_distributed_runs_list,
     "provider_test": format_provider_test,
     "recent_runs": format_recent_runs,
     "get_run": format_get_run,
@@ -77,6 +88,9 @@ _VERBS: dict[str, tuple[str, frozenset[str], str | None]] = {
     "compare": ("compare", frozenset({"by", "since_hours", "tier", "category"}), None),
     "recent_runs": ("recent_runs", frozenset({"limit"}), None),
     "trends": ("trends", frozenset({"hours"}), None),
+    "list_workers": ("list_workers", frozenset(), None),
+    "get_distributed_run": ("get_distributed_run", frozenset(), "job_id"),
+    "list_distributed_runs": ("list_distributed_runs", frozenset({"limit"}), None),
     "provider_test": (
         "provider_test",
         frozenset({"provider", "model", "host", "thinking", "effort", "reasoning_mode"}),
@@ -141,6 +155,27 @@ _VERBS: dict[str, tuple[str, frozenset[str], str | None]] = {
         ),
         None,
     ),
+    "submit_battery": (
+        "submit_battery",
+        frozenset(
+            {
+                "name",
+                "provider",
+                "budget_usd",
+                "model",
+                "judge_model",
+                "judge_host",
+                "host",
+                "thinking",
+                "effort",
+                "reasoning_mode",
+                "runs",
+                "profile",
+                "temperature",
+            }
+        ),
+        None,
+    ),
     "submit_stress": (
         "submit_stress",
         frozenset(
@@ -166,6 +201,20 @@ _VERBS: dict[str, tuple[str, frozenset[str], str | None]] = {
                 "concurrency",
                 "sample_interval",
                 "host",
+            }
+        ),
+        None,
+    ),
+    "submit_distributed_run": (
+        "submit_distributed_run",
+        frozenset(
+            {
+                "mode",
+                "run_request",
+                "eval_request",
+                "worker_selector",
+                "timeout_seconds",
+                "max_retries",
             }
         ),
         None,
@@ -255,7 +304,13 @@ def _wait(
     view = QuietWait(emit, color=color, verbose=verbose)
 
     try:
-        last = wait_for_job(client, job_id, sleep=time.sleep, on_update=view.update)
+        last = wait_for_job(
+            client,
+            job_id,
+            sleep=time.sleep,
+            on_update=view.update,
+            distributed=session.is_distributed_job(job_id),
+        )
     except AtomicsApiError as exc:
         return HandleResult(stderr=f"{exc}\n")
     view.finish(last)
@@ -305,7 +360,10 @@ def _call_api(parsed: ParsedLine, *, session: Session, client: AtomicsApiClient)
     except TypeError as exc:
         return HandleResult(stderr=f"{exc}\n")
     if isinstance(body, dict) and body.get("job_id") and parsed.verb.startswith("submit_"):
-        session.last_job_id = str(body["job_id"])
+        session.remember_job(
+            str(body["job_id"]),
+            distributed=(parsed.verb == "submit_distributed_run"),
+        )
         if not verbose:
             return HandleResult(stdout=format_submitted(body))
     if parsed.verb in _QUIET_READS and not verbose and isinstance(body, dict):
@@ -329,4 +387,38 @@ def _coerce(name: str, raw: str) -> Any:
         return float(raw)
     if name in _LIST:
         return [part for part in (item.strip() for item in raw.split(",")) if part]
+    if name in _JSON_OBJECT:
+        try:
+            decoded = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"--{name} expects a JSON object") from exc
+        if not isinstance(decoded, dict):
+            raise ValueError(f"--{name} expects a JSON object")
+        return decoded
+    if name in _SELECTOR:
+        if raw.lstrip().startswith("{"):
+            try:
+                decoded = json.loads(raw)
+            except json.JSONDecodeError as exc:
+                raise ValueError(
+                    "--worker_selector expects key=value pairs or a JSON object"
+                ) from exc
+            if not isinstance(decoded, dict) or not all(
+                isinstance(k, str) and isinstance(v, str) for k, v in decoded.items()
+            ):
+                raise ValueError("--worker_selector expects string key/value pairs")
+            return dict(decoded)
+        pairs: dict[str, str] = {}
+        for item in (part.strip() for part in raw.split(",")):
+            if not item:
+                continue
+            if "=" not in item:
+                raise ValueError("--worker_selector expects key=value pairs or a JSON object")
+            key, val = item.split("=", 1)
+            if not key:
+                raise ValueError("--worker_selector expects non-empty label keys")
+            pairs[key] = val
+        if not pairs:
+            raise ValueError("--worker_selector expects key=value pairs or a JSON object")
+        return pairs
     return raw

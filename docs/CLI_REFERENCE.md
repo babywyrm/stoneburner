@@ -307,11 +307,13 @@ then a `completed` or `failed` headline. Eval jobs keep `progress.trail`
 so a 2s poll that missed `judge` still prints it. Sweep, stress, soak,
 and run keep a trail of each start (cap `total`). `wait --verbose` adds
 latency and the truncated reply. `get_job` still returns the full JSON.
-`list_jobs` / `list_models` / `provider_test` / `get_run` /
-`recent_runs` / `compare` / `trends` are quiet one-liners;
-`--verbose` keeps JSON. Session `host` fills `submit_eval` /
+`list_jobs` / `list_models` / `list_workers` / `list_distributed_runs` /
+`provider_test` / `get_run` / `recent_runs` / `compare` / `trends` are
+quiet one-liners; `--verbose` keeps JSON. Session `host` fills `submit_eval` /
 `submit_sweep` / `submit_battery` / `submit_run` / `submit_stress` / `submit_soak` /
-`list_models` / `provider_test`. An explicit flag wins.
+`list_models` / `provider_test`. An explicit flag wins. `wait` polls
+`get_job` for in-memory jobs and `get_distributed_run` for coordinator
+worker jobs until `completed`, `partial`, or `failed`.
 
 Serves on stdio only: the process holds a spend-authorized API key and no
 MCP-layer credential would guard a listening port. To reach a remote atomics,

@@ -324,3 +324,114 @@ def test_wait_without_id_errors() -> None:
     result = handle_line("wait", session=Session(), client=_client([]))
     assert "submit" in result.stderr.lower() or "job" in result.stderr.lower()
     assert result.exit_loop is False
+
+
+def test_wait_after_submit_distributed_run_polls_coordinator_until_partial() -> None:
+    import json
+
+    paths: list[str] = []
+    states = [
+        {
+            "job_id": "dj-7",
+            "mode": "fleet",
+            "status": "running",
+            "request_json": json.dumps({"eval_request": {"suite": "refusal"}}),
+            "summary_json": None,
+        },
+        {
+            "job_id": "dj-7",
+            "mode": "fleet",
+            "status": "partial",
+            "request_json": json.dumps({"eval_request": {"suite": "refusal"}}),
+            "summary_json": json.dumps(
+                {
+                    "completed": 1,
+                    "failed": 1,
+                    "total_input_tokens": 20,
+                    "total_output_tokens": 10,
+                    "estimated_cost_usd": 0.0,
+                    "workers": [{"worker_id": "w1"}, {"worker_id": "w2"}],
+                }
+            ),
+        },
+    ]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        paths.append(request.url.path)
+        if request.method == "POST":
+            return httpx.Response(202, json=states[0])
+        body = states.pop(0) if len(states) > 1 else states[0]
+        return httpx.Response(200, json=body)
+
+    client = AtomicsApiClient("http://api.test", "k", transport=httpx.MockTransport(handler))
+    session = Session()
+    handle_line(
+        'submit_distributed_run --mode fleet --eval_request \'{"suite":"refusal"}\'',
+        session=session,
+        client=client,
+    )
+    written: list[str] = []
+    handle_line("wait", session=session, client=client, write=written.append)
+    assert paths == [
+        "/api/v1/distributed/runs",
+        "/api/v1/distributed/runs/dj-7",
+        "/api/v1/distributed/runs/dj-7",
+    ]
+    assert "distributed  fleet  partial" in "".join(written)
+
+
+def test_wait_explicit_distributed_id_falls_over_on_404() -> None:
+    import json
+
+    paths: list[str] = []
+    dist_states = [
+        {
+            "job_id": "dj-explicit",
+            "mode": "full",
+            "status": "running",
+            "request_json": "{}",
+            "summary_json": None,
+        },
+        {
+            "job_id": "dj-explicit",
+            "mode": "full",
+            "status": "completed",
+            "request_json": "{}",
+            "summary_json": json.dumps(
+                {
+                    "completed": 1,
+                    "failed": 0,
+                    "total_input_tokens": 5,
+                    "total_output_tokens": 5,
+                    "estimated_cost_usd": 0.0,
+                    "workers": [{"worker_id": "w1"}],
+                }
+            ),
+        },
+    ]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        paths.append(request.url.path)
+        if request.url.path == "/api/v1/jobs/dj-explicit":
+            return httpx.Response(404, json={"detail": "Job not found"})
+        body = dist_states.pop(0) if len(dist_states) > 1 else dist_states[0]
+        return httpx.Response(200, json=body)
+
+    client = AtomicsApiClient("http://api.test", "k", transport=httpx.MockTransport(handler))
+    written: list[str] = []
+    handle_line("wait dj-explicit", session=Session(), client=client, write=written.append)
+    assert paths == [
+        "/api/v1/jobs/dj-explicit",
+        "/api/v1/distributed/runs/dj-explicit",
+        "/api/v1/distributed/runs/dj-explicit",
+    ]
+    assert "distributed  full  completed" in "".join(written)
+
+
+def test_wait_unknown_id_surfaces_original_404() -> None:
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(404, json={"detail": "Job not found"})
+
+    client = AtomicsApiClient("http://api.test", "k", transport=httpx.MockTransport(handler))
+    result = handle_line("wait missing-id", session=Session(), client=client)
+    assert "Job not found" in result.stderr

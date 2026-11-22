@@ -31,14 +31,18 @@ Plus `set`, `show`, `wait [--verbose] [JOB_ID]`, `help`, `exit`.
 
 `submit_*` prints a quiet headline and the `job_id` (and remembers it).
 `--verbose` keeps the full JSON. `list_jobs`, `list_models`,
-`provider_test`, `get_run`, `recent_runs`, `compare`, and `trends` are
-quiet the same way; `--verbose` keeps JSON. Type `wait` once: it polls
-every 2s and prints a **quiet line** per generate/judge and per scored
-fixture, then a two-line headline when `completed` or `failed`. Eval
-jobs keep a `progress.trail` of those phases so a poll that missed
-`judge` still prints it. `wait --verbose` also prints latency and the
-truncated model reply (500 chars, same as the job document). Color is
-TTY-only. `get_job` still returns the full JSON. Ctrl-C returns the
+`list_workers`, `list_distributed_runs`, `provider_test`, `get_run`,
+`recent_runs`, `compare`, and `trends` are quiet the same way; `--verbose`
+keeps JSON. `submit_distributed_run` accepts JSON objects on
+`--run_request` / `--eval_request` and `key=value` pairs (or JSON) on
+`--worker_selector`. Type `wait` once: it polls every 2s (using
+`get_distributed_run` for coordinator jobs) and prints a **quiet line**
+per generate/judge and per scored fixture, then a two-line headline when
+`completed`, `partial`, or `failed`. Eval jobs keep a `progress.trail` of
+those phases so a poll that missed `judge` still prints it.
+`wait --verbose` also prints latency and the truncated model reply (500
+chars, same as the job document). Color is TTY-only. `get_job` and
+`get_distributed_run` still return the full JSON. Ctrl-C returns the
 prompt; the job keeps running. Type `wait` again to resume watching.
 
 Quiet:

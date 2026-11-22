@@ -5,16 +5,18 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from atomics.mcp.client import AtomicsApiClient
+from atomics.mcp.client import AtomicsApiClient, AtomicsApiError
 
 WAIT_INTERVAL_SECONDS = 2.0
 WAIT_MAX_POLLS: int | None = None
-_DONE = frozenset({"completed", "failed"})
+_DONE = frozenset({"completed", "partial", "failed"})
 
 
 def _progress_sig(body: Any) -> Any:
     if not isinstance(body, dict):
         return None
+    if "mode" in body and "request_json" in body:
+        return ("distributed", body.get("status"), body.get("summary_json"))
     progress = body.get("progress") or {}
     in_flight = progress.get("in_flight")
     in_flight_sig: Any
@@ -43,10 +45,12 @@ def wait_for_job(
     interval: float = WAIT_INTERVAL_SECONDS,
     max_polls: int | None = WAIT_MAX_POLLS,
     on_update: Callable[[Any], None] | None = None,
+    distributed: bool = False,
 ) -> Any:
     last: Any = None
     printed: Any = object()
     attempt = 0
+    use_distributed = distributed
 
     def emit(body: Any) -> None:
         nonlocal printed
@@ -56,7 +60,20 @@ def wait_for_job(
             printed = sig
 
     while True:
-        last = client.get_job(job_id)
+        if use_distributed:
+            last = client.get_distributed_run(job_id)
+        else:
+            try:
+                last = client.get_job(job_id)
+            except AtomicsApiError as exc:
+                if attempt == 0 and exc.status_code == 404:
+                    try:
+                        last = client.get_distributed_run(job_id)
+                    except AtomicsApiError:
+                        raise exc from None
+                    use_distributed = True
+                else:
+                    raise
         emit(last)
         if isinstance(last, dict) and last.get("status") in _DONE:
             return last
