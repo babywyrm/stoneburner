@@ -47,6 +47,10 @@ def test_server_cli_forwards_job_bounds_to_server_settings(monkeypatch, tmp_path
             "64",
             "--max-active-jobs-per-caller",
             "2",
+            "--max-request-bytes",
+            "65536",
+            "--max-caller-rpm",
+            "30",
         ],
     )
     assert result.exit_code == 0, result.output
@@ -54,6 +58,8 @@ def test_server_cli_forwards_job_bounds_to_server_settings(monkeypatch, tmp_path
     assert s.max_active_jobs == 8
     assert s.max_retained_jobs == 64
     assert s.max_active_jobs_per_caller == 2
+    assert s.max_request_body_bytes == 65536
+    assert s.max_requests_per_minute_per_caller == 30
 
 
 def test_server_cli_forwards_allowed_hosts_and_fails_closed_on_empty(monkeypatch, tmp_path):

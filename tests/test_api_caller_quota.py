@@ -379,3 +379,87 @@ class TestPerCallerSpendCeiling:
                 repo.record_caller_spend("alice", True)  # type: ignore[arg-type]
         finally:
             repo.close()
+
+
+class TestPerCallerRateLimitAndDistributedQuota:
+    def test_settings_reject_non_positive_or_bool_caller_rpm(self, tmp_path):
+        with pytest.raises(ValueError, match="max_requests_per_minute_per_caller"):
+            ServerSettings(db_path=tmp_path / "r.db", max_requests_per_minute_per_caller=0)
+        with pytest.raises(ValueError, match="max_requests_per_minute_per_caller"):
+            ServerSettings(
+                db_path=tmp_path / "r.db",
+                max_requests_per_minute_per_caller=True,  # type: ignore[arg-type]
+            )
+
+    def test_caller_rpm_blocks_one_key_with_retry_after_while_leaving_second_key_free(
+        self, tmp_path
+    ):
+        now = [1000.0]
+        app = create_app(
+            ServerSettings(
+                api_keys={ALICE, BOB},
+                db_path=tmp_path / "rpm.db",
+                max_requests_per_minute_per_caller=2,
+            )
+        )
+        with TestClient(app, base_url="http://127.0.0.1") as client:
+            app.state.rate_limiter._clock = lambda: now[0]
+            alice, bob = {"X-API-Key": ALICE}, {"X-API-Key": BOB}
+
+            assert client.get("/api/v1/jobs", headers=alice).status_code == 200
+            now[0] += 10.0
+            assert client.get("/api/v1/jobs", headers=alice).status_code == 200
+            now[0] += 5.0
+
+            throttled = client.get("/api/v1/jobs", headers=alice)
+            assert throttled.status_code == 429
+            assert int(throttled.headers["Retry-After"]) == 45
+            assert "rate limit" in throttled.json()["detail"].lower()
+
+            # Bob's window is independent of Alice's.
+            assert client.get("/api/v1/jobs", headers=bob).status_code == 200
+
+            # Public health/ready endpoints are unauthenticated probes and never consume RPM.
+            assert client.get("/api/v1/health").status_code == 200
+
+            # Advancing past the 60s window restores Alice's quota.
+            now[0] += 46.0
+            assert client.get("/api/v1/jobs", headers=alice).status_code == 200
+
+    def test_distributed_runs_honor_per_caller_and_global_active_job_quotas(self, tmp_path):
+        app = create_app(
+            ServerSettings(
+                api_keys={ALICE, BOB},
+                db_path=tmp_path / "dist_q.db",
+                max_active_jobs=3,
+                max_active_jobs_per_caller=2,
+            )
+        )
+        payload = {"mode": "split", "run_request": {"provider": "ollama", "iterations": 1}}
+        alice, bob = {"X-API-Key": ALICE}, {"X-API-Key": BOB}
+
+        with TestClient(app, base_url="http://127.0.0.1") as client:
+            assert (
+                client.post("/api/v1/distributed/runs", json=payload, headers=alice).status_code
+                == 202
+            )
+            assert (
+                client.post("/api/v1/distributed/runs", json=payload, headers=alice).status_code
+                == 202
+            )
+
+            # Alice hits her per-caller active ceiling (2).
+            alice_blocked = client.post("/api/v1/distributed/runs", json=payload, headers=alice)
+            assert alice_blocked.status_code == 429
+            assert "per-caller limit 2" in alice_blocked.json()["detail"]
+
+            # Bob can still take the remaining global slot (3 total).
+            assert (
+                client.post("/api/v1/distributed/runs", json=payload, headers=bob).status_code
+                == 202
+            )
+
+            # Global active ceiling (3) now blocks further distributed submissions.
+            global_blocked = client.post("/api/v1/distributed/runs", json=payload, headers=bob)
+            assert global_blocked.status_code == 429
+            assert "limit 3" in global_blocked.json()["detail"]

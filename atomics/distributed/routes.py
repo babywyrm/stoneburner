@@ -289,6 +289,26 @@ async def start_distributed_run(
             detail="run_request or eval_request is required",
         )
     job_manager = getattr(request.app.state, "job_manager", None)
+    settings = request.app.state.settings
+    in_mem_active = job_manager.active_count if isinstance(job_manager, JobManager) else 0
+    total_active = in_mem_active + coordinator.active_job_count()
+    if total_active >= settings.max_active_jobs:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"{total_active} jobs already running (limit {settings.max_active_jobs})",
+        )
+    in_mem_caller = (
+        job_manager.active_count_for(caller) if isinstance(job_manager, JobManager) else 0
+    )
+    caller_active = in_mem_caller + coordinator.active_job_count_for(caller)
+    if caller_active >= settings.max_active_jobs_per_caller:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=(
+                f"caller already has {caller_active} jobs running "
+                f"(per-caller limit {settings.max_active_jobs_per_caller})"
+            ),
+        )
     if isinstance(job_manager, JobManager):
         try:
             job_manager.check_caller_spend(caller)

@@ -10,6 +10,9 @@ from pathlib import Path
 from atomics.paths import default_db_path
 from atomics.validation import AllowedEndpoint, is_endpoint_allowed, parse_allowed_endpoint
 
+DEFAULT_MAX_REQUEST_BODY_BYTES = 4 * 1024 * 1024
+MIN_REQUEST_BODY_BYTES = 1024
+
 
 class DisallowedHostError(PermissionError):
     """Raised when a caller-supplied outbound endpoint is not in `ServerSettings.allowed_hosts`."""
@@ -57,6 +60,11 @@ class ServerSettings:
     # Optional cumulative dollar ceiling per caller across runs in this server
     # process. None leaves per-run budgets as the only spend bound.
     max_spend_usd_per_caller: float | None = None
+    # Maximum raw HTTP request body bytes accepted before returning 413. Sized
+    # above TaskResultSubmission's 2M-char result_json ceiling with JSON overhead.
+    max_request_body_bytes: int = DEFAULT_MAX_REQUEST_BODY_BYTES
+    # Optional sliding-window requests-per-minute ceiling per authenticated caller.
+    max_requests_per_minute_per_caller: int | None = None
     # Optional allowlist of outbound HTTP(S) origins or URL prefixes callers may
     # target via `host`, `judge_host`, battery profiles, or distributed runs.
     allowed_hosts: set[str] | None = None
@@ -88,6 +96,22 @@ class ServerSettings:
         ):
             raise ValueError(
                 f"max_spend_usd_per_caller must be positive, got {self.max_spend_usd_per_caller}"
+            )
+        if (
+            isinstance(self.max_request_body_bytes, bool)
+            or self.max_request_body_bytes < MIN_REQUEST_BODY_BYTES
+        ):
+            raise ValueError(
+                f"max_request_body_bytes must be at least {MIN_REQUEST_BODY_BYTES}, "
+                f"got {self.max_request_body_bytes}"
+            )
+        if self.max_requests_per_minute_per_caller is not None and (
+            isinstance(self.max_requests_per_minute_per_caller, bool)
+            or self.max_requests_per_minute_per_caller < 1
+        ):
+            raise ValueError(
+                "max_requests_per_minute_per_caller must be positive, got "
+                f"{self.max_requests_per_minute_per_caller}"
             )
         if self.allowed_hosts is not None:
             if not self.allowed_hosts:

@@ -13,9 +13,14 @@ from fastapi import FastAPI
 
 from atomics import __version__
 from atomics.api.auth import ApiKeyAuth, NoAuth
+from atomics.api.callers import CallerRateLimiter
 from atomics.api.config import ServerSettings
 from atomics.api.dashboard import router as dashboard_router
-from atomics.api.headers import loopback_host_middleware, security_headers_middleware
+from atomics.api.headers import (
+    RequestBodyLimitMiddleware,
+    loopback_host_middleware,
+    security_headers_middleware,
+)
 from atomics.api.jobs import JobManager
 from atomics.api.request_log import request_log_middleware
 from atomics.api.routes import router
@@ -37,6 +42,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         max_spend_usd_per_caller=settings.max_spend_usd_per_caller,
         db_path=settings.db_path,
     )
+    app.state.rate_limiter = CallerRateLimiter(settings.max_requests_per_minute_per_caller)
     if settings.no_auth:
         logger.warning(
             "Running with --no-auth: every request is the same anonymous caller, "
@@ -93,9 +99,11 @@ def create_app(
     )
     app.state.settings = settings
     app.state.auth = NoAuth() if settings.no_auth else ApiKeyAuth(settings.api_keys)
+    app.state.rate_limiter = CallerRateLimiter(settings.max_requests_per_minute_per_caller)
     # Registration order is inverted at runtime: the last registered runs
     # outermost. Request logging goes last so it wraps everything, timing the
     # full request and tagging even responses that other middleware produced.
+    app.add_middleware(RequestBodyLimitMiddleware, max_bytes=settings.max_request_body_bytes)
     if settings.no_auth:
         app.middleware("http")(loopback_host_middleware)
     app.middleware("http")(security_headers_middleware)

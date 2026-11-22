@@ -79,6 +79,19 @@ from rich.console import Console
     help="Optional cumulative USD spend ceiling per API key across runs.",
 )
 @click.option(
+    "--max-request-bytes",
+    default=4 * 1024 * 1024,
+    show_default=True,
+    type=int,
+    help="Maximum HTTP request body size in bytes before returning 413.",
+)
+@click.option(
+    "--max-caller-rpm",
+    default=None,
+    type=int,
+    help="Optional sliding-window requests-per-minute ceiling per API key.",
+)
+@click.option(
     "--allowed-host",
     "--allowed-hosts",
     "allowed_hosts",
@@ -100,6 +113,8 @@ def server(
     max_retained_jobs: int,
     max_active_jobs_per_caller: int,
     max_caller_spend_usd: float | None,
+    max_request_bytes: int,
+    max_caller_rpm: int | None,
     allowed_hosts: tuple[str, ...],
 ) -> None:
     """Run the atomics API server."""
@@ -139,6 +154,8 @@ def server(
             max_retained_jobs=max_retained_jobs,
             max_active_jobs_per_caller=max_active_jobs_per_caller,
             max_spend_usd_per_caller=max_caller_spend_usd,
+            max_request_body_bytes=max_request_bytes,
+            max_requests_per_minute_per_caller=max_caller_rpm,
             allowed_hosts=allowed_set,
         )
     except ValueError as exc:

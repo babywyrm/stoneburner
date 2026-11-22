@@ -237,6 +237,22 @@ class Coordinator:
         self._conn.commit()
         return job
 
+    def active_job_count(self) -> int:
+        """Return total pending + running distributed jobs across all callers."""
+        row = self._conn.execute(
+            "SELECT COUNT(*) FROM distributed_jobs WHERE status IN ('pending', 'running')"
+        ).fetchone()
+        return int(row[0]) if row else 0
+
+    def active_job_count_for(self, owner: str) -> int:
+        """Return pending + running distributed jobs currently held by `owner`."""
+        row = self._conn.execute(
+            "SELECT COUNT(*) FROM distributed_jobs "
+            "WHERE status IN ('pending', 'running') AND owner = ?",
+            (owner,),
+        ).fetchone()
+        return int(row[0]) if row else 0
+
     def create_fleet_job(
         self,
         request: DistributedRunRequest,

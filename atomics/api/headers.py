@@ -11,8 +11,10 @@ import secrets
 from collections.abc import Awaitable, Callable
 from urllib.parse import urlsplit
 
+from fastapi import HTTPException
 from starlette.requests import Request
-from starlette.responses import PlainTextResponse, Response
+from starlette.responses import JSONResponse, PlainTextResponse, Response
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from atomics.api.config import is_loopback_host
 
@@ -78,3 +80,61 @@ async def loopback_host_middleware(
     if not is_loopback_host(host):
         return PlainTextResponse("Host header must name a loopback address", status_code=421)
     return await call_next(request)
+
+
+class RequestBodyLimitMiddleware:
+    """Pure ASGI body-size guard enforcing `max_bytes` on Content-Length and chunked streams."""
+
+    def __init__(self, app: ASGIApp, *, max_bytes: int) -> None:
+        self.app = app
+        self.max_bytes = max_bytes
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        detail = f"Request body exceeds maximum of {self.max_bytes} bytes"
+        for raw_name, raw_value in scope.get("headers", ()):
+            if raw_name.lower() == b"content-length":
+                try:
+                    declared = int(raw_value.decode("ascii"))
+                except ValueError:
+                    bad = JSONResponse({"detail": "Invalid Content-Length header"}, status_code=400)
+                    await bad(scope, receive, send)
+                    return
+                if declared < 0:
+                    bad = JSONResponse({"detail": "Invalid Content-Length header"}, status_code=400)
+                    await bad(scope, receive, send)
+                    return
+                if declared > self.max_bytes:
+                    too_big = JSONResponse({"detail": detail}, status_code=413)
+                    await too_big(scope, receive, send)
+                    return
+
+        seen_bytes = 0
+        response_started = False
+
+        async def limited_receive() -> Message:
+            nonlocal seen_bytes
+            message = await receive()
+            if message["type"] == "http.request":
+                chunk = message.get("body", b"")
+                seen_bytes += len(chunk)
+                if seen_bytes > self.max_bytes:
+                    raise HTTPException(status_code=413, detail=detail)
+            return message
+
+        async def tracked_send(message: Message) -> None:
+            nonlocal response_started
+            if message["type"] == "http.response.start":
+                response_started = True
+            await send(message)
+
+        try:
+            await self.app(scope, limited_receive, tracked_send)
+        except HTTPException as exc:
+            if response_started or exc.status_code != 413:
+                raise
+            too_big = JSONResponse({"detail": exc.detail}, status_code=413)
+            await too_big(scope, receive, send)

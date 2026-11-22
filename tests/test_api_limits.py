@@ -207,3 +207,91 @@ class TestSecurityHeaders:
         csp = dashboard_csp("abc")
         assert "frame-ancestors 'none'" in csp
         assert "base-uri 'none'" in csp
+
+
+class TestRequestBodyLimit:
+    def test_settings_reject_tiny_or_bool_body_limit(self):
+        with pytest.raises(ValueError, match="max_request_body_bytes"):
+            ServerSettings(max_request_body_bytes=512)
+        with pytest.raises(ValueError, match="max_request_body_bytes"):
+            ServerSettings(max_request_body_bytes=True)  # type: ignore[arg-type]
+
+    def test_oversized_content_length_returns_413_with_security_headers(self, tmp_path):
+        app = create_app(
+            ServerSettings(
+                no_auth=True,
+                db_path=tmp_path / "body.db",
+                max_request_body_bytes=2048,
+            )
+        )
+        with TestClient(app, base_url="http://127.0.0.1") as client:
+            big_json = b'{"provider":"ollama","model":"' + (b"x" * 3000) + b'"}'
+            res = client.post(
+                "/api/v1/runs",
+                content=big_json,
+                headers={"Content-Type": "application/json"},
+            )
+            assert res.status_code == 413
+            assert "2048" in res.json()["detail"]
+            assert res.headers["X-Content-Type-Options"] == "nosniff"
+
+    def test_streamed_body_without_content_length_exceeding_limit_returns_413(self, tmp_path):
+        app = create_app(
+            ServerSettings(
+                no_auth=True,
+                db_path=tmp_path / "stream.db",
+                max_request_body_bytes=2048,
+            )
+        )
+
+        def chunks():
+            yield b'{"provider":"ollama","model":"'
+            for _ in range(4):
+                yield b"a" * 700
+            yield b'"}'
+
+        with TestClient(app, base_url="http://127.0.0.1") as client:
+            res = client.post(
+                "/api/v1/runs",
+                content=chunks(),
+                headers={"Content-Type": "application/json"},
+            )
+            assert res.status_code == 413
+
+
+class TestDistributedRunCaps:
+    def test_distributed_split_rejects_oversized_or_zero_iterations(self, tmp_path):
+        app = create_app(ServerSettings(no_auth=True, db_path=tmp_path / "dist.db"))
+        with TestClient(app, base_url="http://127.0.0.1") as client:
+            too_big = client.post(
+                "/api/v1/distributed/runs",
+                json={
+                    "mode": "split",
+                    "run_request": {"provider": "ollama", "iterations": MAX_ITERATIONS + 1},
+                },
+            )
+            assert too_big.status_code == 422
+            assert "iterations" in str(too_big.json())
+
+            zero = client.post(
+                "/api/v1/distributed/runs",
+                json={
+                    "mode": "split",
+                    "run_request": {"provider": "ollama", "iterations": 0},
+                },
+            )
+            assert zero.status_code == 422
+
+            bad_interval = client.post(
+                "/api/v1/distributed/runs",
+                json={
+                    "mode": "full",
+                    "run_request": {
+                        "provider": "ollama",
+                        "iterations": 2,
+                        "interval": MAX_INTERVAL_SECONDS + 1,
+                    },
+                },
+            )
+            assert bad_interval.status_code == 422
+            assert "interval" in str(bad_interval.json())

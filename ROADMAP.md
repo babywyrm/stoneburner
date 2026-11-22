@@ -66,6 +66,18 @@ major tag moved by the publish workflow.
       `pip-audit` (`pypi` + `osv`), `zizmor`, `bandit`, `gitleaks`, and
       `trufflehog`.
 
+## 0.36.0 — Caller exhaustion guards, strict scripts, and escalation baseline
+
+- [x] Add HTTP request body size ceiling (`--max-request-bytes`), per-caller
+      sliding-window request rate limit (`--max-caller-rpm`), and distributed
+      run admission/iteration bounds on `atomics server` (closing the
+      `SECURITY.md` authenticated-caller resource exhaustion gap).
+- [ ] Enforce `mypy --strict` across `scripts/` alongside `atomics/` in CI and
+      `CONTRIBUTING.md`.
+- [ ] Record a live local-Ollama empirical baseline for `ESCALATION_FIXTURES`
+      (`--runs 3`, `gemma4:26b` reference judge) and `adversarial-resistance`
+      judge calibration.
+
 ## Empirical Baselines
 
 - **Reference judge (`gemma4:26b`).** A red/blue study on six local models

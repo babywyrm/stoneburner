@@ -18,6 +18,7 @@ from typing import cast
 from fastapi import Depends, HTTPException, Request, status
 
 from atomics.api.auth import AuthBackend
+from atomics.api.callers import CallerRateLimiter, CallerRateLimitExceededError
 
 
 def get_auth(request: Request) -> AuthBackend:
@@ -40,6 +41,16 @@ async def require_auth(request: Request, auth: AuthBackend = Depends(get_auth)) 
     # The logging middleware runs outside the dependency graph, so it reads the
     # caller from request state rather than from this return value.
     request.state.caller_id = caller
+    rate_limiter = getattr(request.app.state, "rate_limiter", None)
+    if isinstance(rate_limiter, CallerRateLimiter):
+        try:
+            rate_limiter.check(caller)
+        except CallerRateLimitExceededError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=str(exc),
+                headers={"Retry-After": str(exc.retry_after)},
+            ) from exc
     return caller
 
 

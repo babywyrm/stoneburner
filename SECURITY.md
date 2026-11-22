@@ -35,10 +35,10 @@ on deployment. In scope, roughly in order of interest:
 - Injection into the terminal, the dashboard, or persisted records
 
 Out of scope: findings that require an attacker who already has local code
-execution as the operator, the deliberate risks documented later in this file
-(post-run hooks, custom OIDC issuers), and resource exhaustion by an
-already-authenticated caller, which is a known gap being tracked rather than a
-new finding.
+execution as the operator, and the deliberate risks documented later in this
+file (post-run hooks, custom OIDC issuers). Per-caller resource controls are
+configurable via `--max-active-jobs-per-caller`, `--max-caller-spend-usd`,
+`--max-caller-rpm`, and `--max-request-bytes`.
 
 ### What to expect
 

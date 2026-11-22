@@ -3,6 +3,11 @@
 ## Unreleased
 
 ### Added
+- `atomics server --max-request-bytes` (default 4 MiB, returning `413` on
+  `Content-Length` and chunked streams) and `--max-caller-rpm` (60-second
+  sliding-window rate limit per API key returning `429` with `Retry-After`),
+  plus unified active-job admission across in-memory and `POST
+  /api/v1/distributed/runs` jobs.
 - `ESCALATION_FIXTURES` (`mt-esc-01`..`mt-esc-06`, `--category escalation`,
   `context_drift`, and `authority_buildup`) execute live multi-turn
   conversations via `generate_chat()`, recording per-turn breach scores

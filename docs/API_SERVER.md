@@ -51,7 +51,11 @@ use the server.
 
 Keys are isolated from each other in two ways. `/api/v1/jobs` and
 `/api/v1/distributed/runs` show only the caller's own jobs, and per-caller
-capacity holds each key to its share. Saved reports and the worker list are
+capacity (`--max-active-jobs-per-caller`, spanning both in-memory and
+distributed jobs), cumulative spend (`--max-caller-spend-usd`), request rate
+(`--max-caller-rpm`, returning `429` with `Retry-After`), and raw HTTP body
+size (`--max-request-bytes`, default 4 MiB, returning `413`) bound what one key
+can consume. Saved reports and the worker list are
 shared across keys. Battery `profile`
 paths must be relative and resolve under the server's `profiles/` directory.
 To lock callers to approved inference and judge endpoints only, pass repeatable
