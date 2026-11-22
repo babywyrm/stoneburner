@@ -27,6 +27,9 @@ READ_ONLY_TOOLS = {
     "compare",
     "recent_runs",
     "trends",
+    "list_workers",
+    "get_distributed_run",
+    "list_distributed_runs",
 }
 SPENDING_TOOLS = {
     "submit_run",
@@ -35,6 +38,7 @@ SPENDING_TOOLS = {
     "submit_battery",
     "submit_stress",
     "submit_soak",
+    "submit_distributed_run",
     "provider_test",
 }
 
@@ -100,6 +104,18 @@ class FakeApi:
 
     def submit_soak(self, **kwargs):
         return self._record("submit_soak", **kwargs)
+
+    def list_workers(self):
+        return self._record("list_workers")
+
+    def submit_distributed_run(self, **kwargs):
+        return self._record("submit_distributed_run", **kwargs)
+
+    def get_distributed_run(self, job_id):
+        return self._record("get_distributed_run", job_id=job_id)
+
+    def list_distributed_runs(self, **kwargs):
+        return self._record("list_distributed_runs", **kwargs)
 
 
 def payload_of(result):
@@ -420,3 +436,34 @@ async def test_submit_eval_tool_names_the_security_suites():
     description = tools["submit_eval"].description or ""
     for suite in ("refusal", "redblue", "toolcall", "codereview"):
         assert suite in description
+
+
+async def test_distributed_tools_forward_arguments_to_api():
+    api = FakeApi()
+    server = build_server(api)
+    await server.call_tool("list_workers", {})
+    await server.call_tool(
+        "submit_distributed_run",
+        {
+            "mode": "full",
+            "eval_request": {"suite": "refusal", "provider": "ollama"},
+            "worker_selector": {"gpu": "m3"},
+        },
+    )
+    await server.call_tool("get_distributed_run", {"job_id": "dj-1"})
+    await server.call_tool("list_distributed_runs", {"limit": 5})
+
+    assert api.calls[0] == ("list_workers", {})
+    assert api.calls[1] == (
+        "submit_distributed_run",
+        {
+            "mode": "full",
+            "run_request": None,
+            "eval_request": {"suite": "refusal", "provider": "ollama"},
+            "worker_selector": {"gpu": "m3"},
+            "timeout_seconds": None,
+            "max_retries": None,
+        },
+    )
+    assert api.calls[2] == ("get_distributed_run", {"job_id": "dj-1"})
+    assert api.calls[3] == ("list_distributed_runs", {"limit": 5})

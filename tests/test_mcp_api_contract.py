@@ -227,3 +227,31 @@ def test_the_api_key_header_is_what_authenticates(app_client):
     request = captured_request(lambda c: c.recent_runs())
     assert replay(app_client, request, with_key=False).status_code == 401
     assert replay(app_client, request, with_key=True).status_code == 200
+
+
+def test_distributed_tools_contract_with_real_api(app_client):
+    workers_req = captured_request(lambda c: c.list_workers())
+    workers_res = replay(app_client, workers_req)
+    assert workers_res.status_code == 200
+    assert workers_res.json()["workers"] == []
+
+    submit_req = captured_request(
+        lambda c: c.submit_distributed_run(
+            mode="full",
+            eval_request={"suite": "refusal", "provider": "ollama"},
+        )
+    )
+    submit_res = replay(app_client, submit_req)
+    assert submit_res.status_code == 202
+    job_id = submit_res.json()["job_id"]
+
+    get_req = captured_request(lambda c: c.get_distributed_run(job_id))
+    assert replay(app_client, get_req).status_code == 200
+
+    missing_req = captured_request(lambda c: c.get_distributed_run("no-such-dist-job"))
+    assert replay(app_client, missing_req).status_code == 404
+
+    list_req = captured_request(lambda c: c.list_distributed_runs(limit=5))
+    list_res = replay(app_client, list_req)
+    assert list_res.status_code == 200
+    assert [j["job_id"] for j in list_res.json()["jobs"]] == [job_id]

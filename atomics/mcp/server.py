@@ -34,13 +34,17 @@ INSTRUCTIONS = """Evaluate and benchmark language models through a running atomi
 
 Runs, evals, sweeps, and load jobs are asynchronous. `submit_run`,
 `submit_eval`, `submit_sweep`, `submit_stress`, and `submit_soak` return a
-job id; poll `get_job` until its status is `completed`.
+job id; poll `get_job` until its status is `completed`. Distributed worker
+jobs from `submit_distributed_run` live in the coordinator ledger; poll
+`get_distributed_run` (or `list_distributed_runs`) after checking `list_workers`.
 
 Read-only tools (`health`, `list_models`, `list_jobs`, `get_job`, `get_run`,
-`compare`, `recent_runs`, `trends`) are safe to call freely. `provider_test`
+`compare`, `recent_runs`, `trends`, `list_workers`, `get_distributed_run`,
+`list_distributed_runs`) are safe to call freely. `provider_test`
 spends a few tokens on a fixed probe.
-`submit_run`, `submit_eval`, `submit_sweep`, `submit_stress`, and
-`submit_soak` spend real provider tokens and money, so treat them as costly.
+`submit_run`, `submit_eval`, `submit_sweep`, `submit_battery`, `submit_stress`,
+`submit_soak`, and `submit_distributed_run` spend real provider tokens and money,
+so treat them as costly.
 `submit_sweep`, `submit_stress`, and `submit_soak` require an explicit
 `budget_usd`. Stress caps concurrency at 8 and each phase at 15s. Soak
 duration is seconds, 30–300. The CLI still owns hours-long soaks.
@@ -400,6 +404,48 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
     def recent_runs(limit: int = 10) -> Any:
         """List the most recent recorded runs."""
         return api.recent_runs(limit=limit)
+
+    @tool(READ_ONLY)
+    def list_workers() -> dict[str, object]:
+        """List registered distributed workers, their labels, and heartbeat status."""
+        return api.list_workers()
+
+    @tool(SPENDS)
+    def submit_distributed_run(
+        mode: str = "split",
+        run_request: dict[str, object] | None = None,
+        eval_request: dict[str, object] | None = None,
+        worker_selector: dict[str, str] | None = None,
+        timeout_seconds: int | None = None,
+        max_retries: int | None = None,
+    ) -> dict[str, object]:
+        """Submit a distributed job (`split`, `fleet`, or `full`) to registered workers.
+
+        Spends tokens on worker inference endpoints. Pass either `run_request`
+        (matching `submit_run` fields) or `eval_request` (matching `submit_eval`
+        fields; requires `mode` `full` or `fleet`), not both. `worker_selector`
+        filters workers by label (`fleet` or `full` only). Poll
+        `get_distributed_run` with the returned `job_id` — distributed jobs live
+        in the coordinator ledger, not `get_job`.
+        """
+        return api.submit_distributed_run(
+            mode=mode,
+            run_request=run_request,
+            eval_request=eval_request,
+            worker_selector=worker_selector,
+            timeout_seconds=timeout_seconds,
+            max_retries=max_retries,
+        )
+
+    @tool(READ_ONLY)
+    def get_distributed_run(job_id: str) -> dict[str, object]:
+        """Fetch one distributed job and its per-worker task statuses."""
+        return api.get_distributed_run(job_id)
+
+    @tool(READ_ONLY)
+    def list_distributed_runs(limit: int = 20) -> dict[str, object]:
+        """List recent distributed jobs (`limit` 1–100) owned by this caller."""
+        return api.list_distributed_runs(limit=limit)
 
     return server
 

@@ -541,3 +541,40 @@ def test_api_client_validates_base_url():
         AtomicsApiClient("file:///etc/passwd")
     with pytest.raises(ValueError, match="embedded credentials"):
         AtomicsApiClient("http://user:pass@127.0.0.1:8000")
+
+
+def test_distributed_client_methods_target_expected_endpoints():
+    import json
+
+    requests: list[httpx.Request] = []
+    with client_recording(requests) as client:
+        client.list_workers()
+        client.submit_distributed_run(
+            mode="full",
+            eval_request={"suite": "refusal", "provider": "ollama", "model": "gemma3:4b"},
+            worker_selector={"site": "lab"},
+            timeout_seconds=300,
+            max_retries=1,
+        )
+        client.get_distributed_run("dist/job 1")
+        client.list_distributed_runs(limit=15)
+
+    assert requests[0].method == "GET"
+    assert requests[0].url.path == "/api/v1/workers"
+
+    assert requests[1].method == "POST"
+    assert requests[1].url.path == "/api/v1/distributed/runs"
+    assert json.loads(requests[1].content) == {
+        "mode": "full",
+        "eval_request": {"suite": "refusal", "provider": "ollama", "model": "gemma3:4b"},
+        "worker_selector": {"site": "lab"},
+        "timeout_seconds": 300,
+        "max_retries": 1,
+    }
+
+    assert requests[2].method == "GET"
+    assert requests[2].url.raw_path == b"/api/v1/distributed/runs/dist%2Fjob%201"
+
+    assert requests[3].method == "GET"
+    assert requests[3].url.path == "/api/v1/distributed/runs"
+    assert dict(requests[3].url.params) == {"limit": "15"}

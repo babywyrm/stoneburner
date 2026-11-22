@@ -318,10 +318,13 @@ MCP-layer credential would guard a listening port. To reach a remote atomics,
 point `--api-url` at its authenticated API server and run this locally.
 
 Tools: `health`, `list_models`, `list_jobs`, `get_job`, `get_run`, `compare`,
-`recent_runs`, `trends` (read-only), `provider_test` (fixed 2+2 probe), plus
-`submit_run`, `submit_eval`, `submit_sweep`, `submit_battery`, `submit_stress`, and
-`submit_soak`, which spend tokens and return a job id to poll until
-`status` is `completed`. `submit_eval` suites: `accuracy`, `rag`,
+`recent_runs`, `trends`, `list_workers`, `get_distributed_run`,
+`list_distributed_runs` (read-only), `provider_test` (fixed 2+2 probe), plus
+`submit_run`, `submit_eval`, `submit_sweep`, `submit_battery`, `submit_stress`,
+`submit_soak`, and `submit_distributed_run`, which spend tokens and return a
+job id to poll (`get_job` for in-memory jobs; `get_distributed_run` for
+coordinator worker jobs) until `status` is `completed`. `submit_eval` suites:
+`accuracy`, `rag`,
 `multiturn`, `adversarial`, `codegen`, `refusal`, `redblue`, `toolcall`,
 `codereview`. `submit_sweep` uses `eval` (not `accuracy`) plus `redblue`,
 `refusal`, `toolcall`, `codereview`; budget is required; at most 8 models

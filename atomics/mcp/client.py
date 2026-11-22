@@ -418,3 +418,45 @@ class AtomicsApiClient:
         if reasoning_mode is not None:
             payload["reasoning_mode"] = reasoning_mode
         return self._request("POST", "/provider-test", json=payload)
+
+    @staticmethod
+    def _as_object(body: object) -> dict[str, object]:
+        if isinstance(body, dict):
+            return body
+        return {"result": body}
+
+    def list_workers(self) -> dict[str, object]:
+        """Registered distributed workers and their heartbeat status."""
+        return self._as_object(self._request("GET", "/workers"))
+
+    def submit_distributed_run(
+        self,
+        *,
+        mode: str = "split",
+        run_request: dict[str, object] | None = None,
+        eval_request: dict[str, object] | None = None,
+        worker_selector: dict[str, str] | None = None,
+        timeout_seconds: int | None = None,
+        max_retries: int | None = None,
+    ) -> dict[str, object]:
+        """Submit a distributed job (`split`, `fleet`, or `full`) across workers."""
+        payload: dict[str, object] = {"mode": mode}
+        if run_request is not None:
+            payload["run_request"] = run_request
+        if eval_request is not None:
+            payload["eval_request"] = eval_request
+        if worker_selector is not None:
+            payload["worker_selector"] = worker_selector
+        if timeout_seconds is not None:
+            payload["timeout_seconds"] = timeout_seconds
+        if max_retries is not None:
+            payload["max_retries"] = max_retries
+        return self._as_object(self._request("POST", "/distributed/runs", json=payload))
+
+    def get_distributed_run(self, job_id: str) -> dict[str, object]:
+        """Fetch one distributed job and its task breakdowns."""
+        return self._as_object(self._request("GET", f"/distributed/runs/{quote(job_id, safe='')}"))
+
+    def list_distributed_runs(self, *, limit: int = 20) -> dict[str, object]:
+        """List recent distributed jobs owned by this caller."""
+        return self._as_object(self._request("GET", "/distributed/runs", params={"limit": limit}))

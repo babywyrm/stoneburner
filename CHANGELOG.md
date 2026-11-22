@@ -3,6 +3,9 @@
 ## Unreleased
 
 ### Added
+- `atomics mcp` exposes distributed coordinator tools (`list_workers`,
+  `submit_distributed_run`, `get_distributed_run`, `list_distributed_runs`)
+  over `/api/v1/workers` and `/api/v1/distributed/runs`.
 - `atomics server --max-request-bytes` (default 4 MiB, returning `413` on
   `Content-Length` and chunked streams) and `--max-caller-rpm` (60-second
   sliding-window rate limit per API key returning `429` with `Retry-After`),
