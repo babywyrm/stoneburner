@@ -151,8 +151,10 @@ def test_readme_links_the_operator_manuals():
 
 
 def test_mypy_strictness_flags_stay_enabled():
-    """Guard against relaxing [tool.mypy] once strict is green across atomics/."""
+    """Guard against relaxing [tool.mypy] once strict is green across atomics/ and scripts/."""
     import tomllib
+
+    import yaml
 
     cfg = tomllib.loads(Path("pyproject.toml").read_text())["tool"]["mypy"]
     assert cfg.get("strict") is True, "[tool.mypy] strict must remain true"
@@ -164,9 +166,14 @@ def test_mypy_strictness_flags_stay_enabled():
             if isinstance(entry.get("module"), list)
             else [entry.get("module")]
         )
-        assert not any(isinstance(m, str) and m.startswith("atomics") for m in mods), (
-            f"Do not add per-module mypy overrides for atomics packages: {mods}"
-        )
+        assert not any(
+            isinstance(m, str) and (m.startswith("atomics") or m.startswith("scripts"))
+            for m in mods
+        ), f"Do not add per-module mypy overrides for atomics/scripts: {mods}"
+
+    ci_wf = yaml.safe_load(Path(".github/workflows/ci.yml").read_text())
+    ci_steps = "\n".join(step.get("run", "") for step in ci_wf["jobs"]["test"]["steps"])
+    assert "uv run mypy atomics/ scripts/" in ci_steps
 
 
 def test_uv_lock_records_sha256_hashes_for_all_packages():

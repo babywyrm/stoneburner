@@ -32,9 +32,13 @@ import socket
 import subprocess
 import sys
 import time
+from collections.abc import Callable
 from pathlib import Path
+from typing import TypeVar
 
 import httpx
+
+_T = TypeVar("_T")
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "tests"))
@@ -54,7 +58,9 @@ def check(label: str, ok: bool, detail: str = "") -> None:
         failures.append(label)
 
 
-def wait_for(fn, timeout=30.0, interval=0.3):
+def wait_for(
+    fn: Callable[[], _T | None], timeout: float = 30.0, interval: float = 0.3
+) -> _T | None:
     """Poll until `fn` returns something truthy. Returns None on timeout."""
     deadline = time.time() + timeout
     last_error: Exception | None = None
@@ -102,11 +108,11 @@ class Fleet:
             "ATOMICS_VLLM_HOST": stub.openai_base_url,
             "ATOMICS_VLLM_MODEL": "stub-model",
         }
-        self.procs: list[subprocess.Popen] = []
+        self.procs: list[subprocess.Popen[bytes]] = []
         flags = [f for pair in server_flags.items() for f in pair]
         self._spawn([ATOMICS, "server", "--api-key", KEY, "--port", str(self.port), *flags])
 
-    def _spawn(self, argv: list[str]) -> subprocess.Popen:
+    def _spawn(self, argv: list[str]) -> subprocess.Popen[bytes]:
         proc = subprocess.Popen(
             argv,
             cwd=self.work,
@@ -122,7 +128,7 @@ class Fleet:
             wait_for(lambda: httpx.get(f"{self.url}/api/v1/health", timeout=2).status_code == 200)
         )
 
-    def add_worker(self, *labels: str, heartbeat: int = 5) -> subprocess.Popen:
+    def add_worker(self, *labels: str, heartbeat: int = 5) -> subprocess.Popen[bytes]:
         label_flags = [f for label in labels for f in ("--label", label)]
         return self._spawn(
             [
@@ -143,8 +149,10 @@ class Fleet:
     def wait_for_workers(self, count: int) -> bool:
         return bool(wait_for(lambda: len(worker_rows(self.db)) >= count, timeout=45))
 
-    def submit_fleet(self, iterations: int, selector: dict | None = None) -> httpx.Response:
-        payload: dict = {
+    def submit_fleet(
+        self, iterations: int, selector: dict[str, str] | None = None
+    ) -> httpx.Response:
+        payload: dict[str, object] = {
             "mode": "fleet",
             "run_request": {"iterations": iterations, "tier": "ez"},
         }
@@ -157,23 +165,25 @@ class Fleet:
             timeout=15,
         )
 
-    def job(self, job_id: str) -> dict:
-        return httpx.get(
+    def job(self, job_id: str) -> dict[str, object]:
+        data = httpx.get(
             f"{self.url}/api/v1/distributed/runs/{job_id}",
             headers=self.auth,
             timeout=10,
         ).json()
+        assert isinstance(data, dict)
+        return data
 
-    def wait_terminal(self, job_id: str, timeout=120.0) -> dict | None:
+    def wait_terminal(self, job_id: str, timeout: float = 120.0) -> dict[str, object] | None:
         terminal = {"completed", "partial", "failed"}
 
-        def poll():
+        def poll() -> dict[str, object] | None:
             job = self.job(job_id)
             return job if job.get("status") in terminal else None
 
         return wait_for(poll, timeout=timeout, interval=0.5)
 
-    def status_output(self, job_id: str) -> subprocess.CompletedProcess:
+    def status_output(self, job_id: str) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
             [ATOMICS, "distributed", "status", job_id, "--coordinator", self.url, "--api-key", KEY],
             cwd=self.work,
@@ -222,17 +232,18 @@ def phase_happy_path(stub: StubInferenceServer) -> None:
         job_id = submit.json()["job_id"]
 
         done = fleet.wait_terminal(job_id, timeout=90)
-        check("job reached a terminal status", bool(done), (done or {}).get("status", "timed out"))
+        done_status = str((done or {}).get("status", "timed out"))
+        check("job reached a terminal status", bool(done), done_status)
         if not done:
             return
-        check("job completed cleanly", done["status"] == "completed", done["status"])
+        check("job completed cleanly", done["status"] == "completed", done_status)
         check(
             "stub served real inference over HTTP",
             len(stub.chat_completions()) >= 4,
             f"{len(stub.chat_completions())} chat completions",
         )
 
-        summary = json.loads(done["summary_json"])
+        summary = json.loads(str(done["summary_json"]))
         hosts = {w["labels"].get("box"): w for w in summary["workers"]}
         check("rollup has a row per host", set(hosts) == {"alpha", "beta"}, str(set(hosts)))
         check(
@@ -304,16 +315,17 @@ def phase_host_loss(stub: StubInferenceServer) -> None:
         )
 
         done = fleet.wait_terminal(job_id, timeout=120)
+        done_status = str((done or {}).get("status", "timed out"))
         check(
             "the job resolves instead of waiting on a dead host",
             bool(done),
-            (done or {}).get("status", "timed out"),
+            done_status,
         )
         if not done:
             return
-        check("job resolved to partial", done["status"] == "partial", done["status"])
+        check("job resolved to partial", done["status"] == "partial", done_status)
 
-        summary = json.loads(done["summary_json"])
+        summary = json.loads(str(done["summary_json"]))
         hosts = {w["labels"].get("box"): w for w in summary["workers"]}
         check(
             "the surviving host finished its whole slice",

@@ -72,7 +72,7 @@ major tag moved by the publish workflow.
       sliding-window request rate limit (`--max-caller-rpm`), and distributed
       run admission/iteration bounds on `atomics server` (closing the
       `SECURITY.md` authenticated-caller resource exhaustion gap).
-- [ ] Enforce `mypy --strict` across `scripts/` alongside `atomics/` in CI and
+- [x] Enforce `mypy --strict` across `scripts/` alongside `atomics/` in CI and
       `CONTRIBUTING.md`.
 - [ ] Record a live local-Ollama empirical baseline for `ESCALATION_FIXTURES`
       (`--runs 3`, `gemma4:26b` reference judge) and `adversarial-resistance`

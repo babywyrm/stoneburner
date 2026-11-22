@@ -22,10 +22,10 @@ HOST = "http://gpu-host:11434"
 MODELS = ["qwen2.5:7b", "qwen3:14b", "deepseek-r1:14b"]
 
 
-def _stats(values: list[float]) -> dict:
+def _stats(values: list[float]) -> dict[str, float]:
     n = len(values)
     if n == 0:
-        return {"mean": 0, "stddev": 0, "min": 0, "max": 0, "n": 0}
+        return {"mean": 0.0, "stddev": 0.0, "min": 0.0, "max": 0.0, "n": 0.0}
     mean = sum(values) / n
     var = sum((v - mean) ** 2 for v in values) / n
     return {
@@ -33,7 +33,7 @@ def _stats(values: list[float]) -> dict:
         "stddev": math.sqrt(var),
         "min": min(values),
         "max": max(values),
-        "n": n,
+        "n": float(n),
     }
 
 
@@ -130,15 +130,15 @@ async def main() -> None:
     summary_lines: list[str] = []
 
     for model in MODELS:
-        quality = _stats(all_results[model])
-        latency = _stats(all_latencies[model])
+        q_stats = _stats(all_results[model])
+        l_stats = _stats(all_latencies[model])
         lines = [
             "",
-            f"--- {model} ({quality['n']} runs) ---",
-            f"  Quality:  mean={quality['mean']:.1f}%  stddev={quality['stddev']:.1f}%"
-            f"  min={quality['min']:.0f}%  max={quality['max']:.0f}%",
-            f"  Latency:  mean={latency['mean']:.0f}ms  stddev={latency['stddev']:.0f}ms"
-            f"  min={latency['min']:.0f}ms  max={latency['max']:.0f}ms",
+            f"--- {model} ({int(q_stats['n'])} runs) ---",
+            f"  Quality:  mean={q_stats['mean']:.1f}%  stddev={q_stats['stddev']:.1f}%"
+            f"  min={q_stats['min']:.0f}%  max={q_stats['max']:.0f}%",
+            f"  Latency:  mean={l_stats['mean']:.0f}ms  stddev={l_stats['stddev']:.0f}ms"
+            f"  min={l_stats['min']:.0f}ms  max={l_stats['max']:.0f}ms",
         ]
         for line in lines:
             print(line)

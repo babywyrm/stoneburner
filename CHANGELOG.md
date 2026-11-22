@@ -41,8 +41,8 @@
 - `[tool.mypy]` now enables `strict = true` and `extra_checks = true` globally
   across the entire `atomics/` package (`api`, `commands`, `mcp`, `repl`,
   `auth`, `reporting`, `storage`, `providers`, `distributed`, `eval`,
-  `benchmark`, `load`, `archreview`, and `probe`), keeping only the optional
-  `[rag]` third-party stub skip.
+  `benchmark`, `load`, `archreview`, and `probe`) and `scripts/`, keeping only
+  the optional `[rag]` third-party stub skip.
 
 ### Changed
 - `.github/workflows/security.yml` now enforces `uv lock --check`,

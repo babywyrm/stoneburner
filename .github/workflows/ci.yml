@@ -53,7 +53,7 @@ jobs:
         run: uv run ruff format --check atomics/ tests/ scripts/
 
       - name: Type check
-        run: uv run mypy atomics/
+        run: uv run mypy atomics/ scripts/
 
       # addopts in pyproject supplies --cov=atomics --cov-report=term-missing.
       # The floor is deliberately below current coverage (87.1%) so it catches

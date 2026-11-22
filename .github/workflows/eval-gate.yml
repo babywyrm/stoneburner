@@ -63,7 +63,7 @@ jobs:
         run: uv run pytest -q --tb=short
 
       - name: Type check
-        run: uv run mypy atomics
+        run: uv run mypy atomics/ scripts/
 
   doctor:
     name: Doctor

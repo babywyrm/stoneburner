@@ -65,21 +65,21 @@ def main() -> int:
         wait_for_server()
 
         status, body = http("GET", "/dashboard")
-        assert status == 200, f"dashboard returned {status}: {body[:200]}"
+        assert status == 200, f"dashboard returned {status}: {body[:200]!r}"
         assert b"atomics dashboard" in body, "dashboard HTML missing title"
         print("GET /dashboard -> 200 OK, HTML looks correct")
 
         status, body = http("GET", "/api/v1/distributed/runs")
-        assert status == 200, f"list jobs returned {status}: {body[:200]}"
+        assert status == 200, f"list jobs returned {status}: {body[:200]!r}"
         assert b'"jobs":[]' in body or b'"jobs": []' in body, (
-            f"expected empty jobs list: {body[:200]}"
+            f"expected empty jobs list: {body[:200]!r}"
         )
         print("GET /api/v1/distributed/runs -> 200 OK, empty list")
 
         status, body = http("GET", "/api/v1/workers")
-        assert status == 200, f"list workers returned {status}: {body[:200]}"
+        assert status == 200, f"list workers returned {status}: {body[:200]!r}"
         assert b'"workers":[]' in body or b'"workers": []' in body, (
-            f"expected empty workers list: {body[:200]}"
+            f"expected empty workers list: {body[:200]!r}"
         )
         print("GET /api/v1/workers -> 200 OK, empty list")
 
@@ -88,12 +88,12 @@ def main() -> int:
             "/api/v1/distributed/runs",
             b'{"mode": "split", "run_request": {"iterations": 1}}',
         )
-        assert status == 202, f"create run returned {status}: {body[:200]}"
+        assert status == 202, f"create run returned {status}: {body[:200]!r}"
         print(f"POST /api/v1/distributed/runs -> {status}")
 
         status, body = http("GET", "/api/v1/distributed/runs")
-        assert status == 200, f"list jobs after create returned {status}: {body[:200]}"
-        assert b'"jobs":' in body and b'"mode"' in body, f"expected jobs: {body[:200]}"
+        assert status == 200, f"list jobs after create returned {status}: {body[:200]!r}"
+        assert b'"jobs":' in body and b'"mode"' in body, f"expected jobs: {body[:200]!r}"
         print("GET /api/v1/distributed/runs -> 200 OK, one job visible")
 
         print("All live dashboard checks passed.")

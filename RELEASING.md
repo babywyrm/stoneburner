@@ -52,7 +52,7 @@ That satisfies the guard without inventing a release that never happened.
 
    ```bash
    uv run pytest -q --cov-fail-under=85
-   uv run mypy atomics/
+   uv run mypy atomics/ scripts/
    uv run ruff check atomics/ tests/ scripts/
    gitleaks git --no-banner --config .gitleaks.toml --redact
    gitleaks dir --no-banner --config .gitleaks.toml --redact

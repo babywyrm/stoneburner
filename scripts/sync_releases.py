@@ -28,7 +28,7 @@ from changelog_section import VersionNotFoundError, section  # noqa: E402
 REPO = Path(__file__).resolve().parent.parent
 
 
-def _run(argv: list[str]) -> subprocess.CompletedProcess:
+def _run(argv: list[str]) -> subprocess.CompletedProcess[str]:
     return subprocess.run(argv, cwd=REPO, capture_output=True, text=True)
 
 
@@ -42,7 +42,7 @@ def tag_commit(tag: str) -> str:
     """The commit a tag points at, dereferencing annotated tags."""
     out = _run(["git", "rev-list", "-n", "1", tag])
     out.check_returncode()
-    return out.stdout.strip()
+    return str(out.stdout).strip()
 
 
 def tag_on_remote(tag: str) -> bool:
@@ -50,18 +50,23 @@ def tag_on_remote(tag: str) -> bool:
     return out.returncode == 0 and bool(out.stdout.strip())
 
 
-def published_releases() -> dict[str, dict]:
+def published_releases() -> dict[str, dict[str, str]]:
     """Map tag -> {name, body}. Empty when gh is unavailable or unauthenticated."""
     out = _run(["gh", "release", "list", "--limit", "100", "--json", "tagName"])
     if out.returncode != 0:
         print(f"warning: could not list releases: {out.stderr.strip()}", file=sys.stderr)
         return {}
-    releases = {}
+    releases: dict[str, dict[str, str]] = {}
     for entry in json.loads(out.stdout or "[]"):
-        tag = entry["tagName"]
+        tag = str(entry["tagName"])
         detail = _run(["gh", "release", "view", tag, "--json", "name,body"])
         if detail.returncode == 0:
-            releases[tag] = json.loads(detail.stdout)
+            parsed = json.loads(detail.stdout)
+            if isinstance(parsed, dict):
+                releases[tag] = {
+                    "name": str(parsed.get("name") or ""),
+                    "body": str(parsed.get("body") or ""),
+                }
     return releases
 
 

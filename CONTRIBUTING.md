@@ -28,7 +28,7 @@ so a local pass means a green build:
 
 ```bash
 uv run pytest -q --cov-fail-under=85
-uv run mypy atomics/
+uv run mypy atomics/ scripts/
 uv run ruff check atomics/ tests/ scripts/
 uv run ruff format --check atomics/ tests/ scripts/
 gitleaks git --no-banner --config .gitleaks.toml --redact
