@@ -28,7 +28,7 @@ Use these labels:
 
 ## Recommended Workflow
 
-1. Start with a named battery, not the full 72-fixture adversarial suite:
+1. Start with a named battery, not the full 78-fixture adversarial suite:
 
 ```bash
 uv run atomics battery list

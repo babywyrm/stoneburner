@@ -33,7 +33,7 @@ def _thinking_argv(thinking: bool) -> str:
 def battery() -> None:
     """Named security jobs that compose existing suites.
 
-    Use these instead of the full 72-fixture adversarial suite unless you
+    Use these instead of the full 78-fixture adversarial suite unless you
     mean to. `list` the packs. `show NAME` prints purpose, labels, and
     copy-pasteable commands. `run NAME` executes those steps in order.
     """

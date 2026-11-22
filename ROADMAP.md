@@ -83,7 +83,7 @@ major tag moved by the publish workflow.
 - [x] Expose distributed worker and run tools (`list_workers`,
       `submit_distributed_run`, `get_distributed_run`, `list_distributed_runs`)
       in `atomics mcp` over `/api/v1/workers` and `/api/v1/distributed/runs`.
-- [ ] Wire live `escalation` into the `agent-gate` battery and reconcile `72` ->
+- [x] Wire live `escalation` into the `agent-gate` battery and reconcile `72` ->
       `78` adversarial fixture counts across battery definitions, CLI help,
       docs, and project skills.
 - [ ] Extend `classify_model()` in `atomics/benchmark/model_classes.py` to

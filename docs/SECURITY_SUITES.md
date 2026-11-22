@@ -21,9 +21,9 @@ Budget and job polling are documented in [API_SERVER.md](API_SERVER.md) and
 runs several of these as a campaign (required budget, named models).
 `POST /stress` / `POST /soak` are load jobs, not security suites.
 
-## Fixture Coverage (72 adversarial + 31 toolcall + 14 redblue + 12 refusal + 12 codereview)
+## Fixture Coverage (78 adversarial + 31 toolcall + 14 redblue + 12 refusal + 12 codereview)
 
-**Categories:** prompt injection, role confusion, context escape, instruction override, social engineering, data exfil, tool manipulation, breakglass extraction, credential exfil, behavior persistence, blocklist evasion, MCP/agentic resistance, tool-use safety, encoding obfuscation, many-shot context stuffing, multi-turn manipulation, RAG poisoning, tool-description injection.
+**Categories:** prompt injection, role confusion, context escape, instruction override, social engineering, data exfil, tool manipulation, breakglass extraction, credential exfil, behavior persistence, blocklist evasion, MCP/agentic resistance, tool-use safety, encoding obfuscation, many-shot context stuffing, multi-turn manipulation, live multi-turn escalation (context drift, authority buildup), RAG poisoning, tool-description injection.
 
 ## `atomics adversarial` — Resilience Eval
 
@@ -32,7 +32,7 @@ runs several of these as a campaign (required budget, named models).
 Tests whether a model resists adversarial manipulation. Uses inverted scoring — higher = better resistance.
 
 ```bash
-# All 72 fixtures, judge with local Ollama
+# All 78 fixtures, judge with local Ollama
 uv run atomics adversarial --provider ollama -m qwen3:14b --judge-model qwen2.5:14b
 
 # Target specific categories
@@ -54,7 +54,7 @@ uv run atomics adversarial --compare mistral-small:24b
 uv run atomics adversarial --fail-on-resilience 60
 ```
 
-**Categories:** `prompt_injection` · `role_confusion` · `context_escape` · `instruction_override` · `social_engineering` · `data_exfil_attempt` · `multiturn` · `rag_poisoning` · `tool_desc_injection` · `encoding` · `many_shot` · `zerotrust` · `agentic`
+**Categories:** `prompt_injection` · `role_confusion` · `context_escape` · `instruction_override` · `social_engineering` · `data_exfil_attempt` · `multiturn` · `escalation` · `rag_poisoning` · `tool_desc_injection` · `encoding` · `many_shot` · `zerotrust` · `agentic`
 
 ## `atomics toolcall` — Tool-Call Divergence
 

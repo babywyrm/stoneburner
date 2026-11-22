@@ -48,6 +48,10 @@
   the optional `[rag]` third-party stub skip.
 
 ### Changed
+- `agent-gate` battery now includes live multi-turn `escalation` (`28`
+  adversarial fixtures across `mcp`, `tool_safety`, `tool_desc_injection`, and
+  `escalation`), and battery/CLI/doc counts reflect the `78`-fixture
+  adversarial suite.
 - `.github/workflows/security.yml` now enforces `uv lock --check`,
   `pip-audit --require-hashes --strict --disable-pip` across `pypi` and `osv`
   on hashed lockfile exports, and checksum-verified `trufflehog --no-update`

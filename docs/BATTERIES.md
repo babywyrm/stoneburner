@@ -1,7 +1,7 @@
 # Security batteries
 
 Named jobs. They compose suites that already exist. They are not a
-13th suite and they are not the full 72-fixture adversarial run.
+13th suite and they are not the full 78-fixture adversarial run.
 
 Two axes stay separate: **capability** (can it do the work) and
 **resilience** (does it resist manipulation). Tool calls are a third
@@ -90,7 +90,7 @@ prompts stay on `refusal` as should-refuse.
 
 ## agent-gate (medium, judge on the prose step)
 
-`adversarial --category mcp,tool_safety,tool_desc_injection` (22 fixtures)
+`adversarial --category mcp,tool_safety,tool_desc_injection,escalation` (28 fixtures)
 and `toolcall --category direct --channel tools --runs 3` (4 fixtures).
 
 Score prose and tools separately. Probe skip ≠ refusal. The tool step
@@ -107,7 +107,7 @@ Not a pass: a complete threat-model practice.
 
 ## What not to run by default
 
-- Full `atomics adversarial` (72)
+- Full `atomics adversarial` (78)
 - Full `atomics toolcall` 31 fixtures × `--runs 3` on a 27b overnight
 - 125b MLX on a laptop
 - Mixing a battery result into a release tag

@@ -140,11 +140,23 @@ def test_qa_step_skipped_unless_ollama_or_profile():
 
 
 def test_no_battery_is_the_full_adversarial_suite():
+    from atomics.eval.adversarial import ALL_FIXTURES
+
+    assert len(ALL_FIXTURES) == 78
     for battery in BATTERIES:
         for step in battery.steps:
             if step.suite == "adversarial":
                 selected = adv_select(step.categories or None, ids=step.fixtures or None)
-                assert len(selected) < 72
+                assert len(selected) < len(ALL_FIXTURES)
+
+
+def test_agent_gate_includes_live_escalation():
+    step = get_battery("agent-gate").steps[0]
+    assert step.suite == "adversarial"
+    assert "escalation" in step.categories
+    selected = adv_select(step.categories)
+    assert len(selected) == 28
+    assert {"mt-esc-01", "mt-esc-06"} <= {f.id for f in selected}
 
 
 def test_threat_model_includes_rag_stride():
