@@ -81,6 +81,7 @@ MODEL_CLASS_MAP: dict[str, ModelClass] = {
     "gemma4:e4b": ModelClass.MID,
     "gemma4:12b": ModelClass.MID,
     "gemma4:26b": ModelClass.HEAVY,
+    "gemma4:31b": ModelClass.HEAVY,
     "functiongemma:latest": ModelClass.LIGHT,
     "custom-agent:latest": ModelClass.LIGHT,
     "cogito:3b": ModelClass.MID,
@@ -90,6 +91,7 @@ MODEL_CLASS_MAP: dict[str, ModelClass] = {
     "granite4.1:8b": ModelClass.MID,
     "granite4.2:3b": ModelClass.MID,
     "granite4.2:8b": ModelClass.MID,
+    "granite4.2:30b": ModelClass.HEAVY,
     "deepseek-r1:14b": ModelClass.MID,
     "deepseek-r1:32b": ModelClass.HEAVY,
     "deepseek-r1:70b": ModelClass.HEAVY,
@@ -174,9 +176,11 @@ THINKING_CAPABLE: frozenset[str] = frozenset(
         "phi4-mini-reasoning:3.8b",
         "granite4.2:3b",
         "granite4.2:8b",
+        "granite4.2:30b",
         "gemma4:e4b",
         "gemma4:12b",
         "gemma4:26b",
+        "gemma4:31b",
         "lfm2.5:8b",
         "muse-glimmer:30b",
         "nemotron-3.5-lightning:30b",
@@ -266,13 +270,13 @@ def supports_ollama_think_field(model_id: str) -> bool:
 
 
 _PARAMETER_TAG = re.compile(
-    r":e?(?P<n>\d+(?:\.\d+)?)b(?:-|:|$)",
+    r"[:-]e?(?P<n>0\.\d+|[1-9]\d{0,2}(?:\.\d+)?)b(?=-|:|$)",
     re.IGNORECASE,
 )
 
 
 def _class_from_parameter_tag(model_id: str) -> ModelClass | None:
-    """Guess light/mid/heavy from an Ollama-style `:3b` / `:35b-a3b` tag."""
+    """Guess light/mid/heavy from an Ollama `:3b` / `:35b-a3b` or hyphen `-4b-` tag."""
     match = _PARAMETER_TAG.search(model_id)
     if match is None:
         return None

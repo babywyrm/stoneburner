@@ -48,6 +48,10 @@
   the optional `[rag]` third-party stub skip.
 
 ### Changed
+- `classify_model()` now classifies hyphen-delimited parameter tags (`-4b-`,
+  `-9b:latest`) alongside `:Nb` tags while ignoring build hashes/years, and
+  `MODEL_CLASS_MAP` / `THINKING_CAPABLE` register `granite4.2:30b` and
+  `gemma4:31b`.
 - `agent-gate` battery now includes live multi-turn `escalation` (`28`
   adversarial fixtures across `mcp`, `tool_safety`, `tool_desc_injection`, and
   `escalation`), and battery/CLI/doc counts reflect the `78`-fixture

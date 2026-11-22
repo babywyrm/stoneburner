@@ -86,7 +86,7 @@ major tag moved by the publish workflow.
 - [x] Wire live `escalation` into the `agent-gate` battery and reconcile `72` ->
       `78` adversarial fixture counts across battery definitions, CLI help,
       docs, and project skills.
-- [ ] Extend `classify_model()` in `atomics/benchmark/model_classes.py` to
+- [x] Extend `classify_model()` in `atomics/benchmark/model_classes.py` to
       classify hyphen-sized local tags (`-4b-`, `-9b:latest`) alongside `:Nb`
       tags and register `granite4.2:30b` / `gemma4:31b`.
 

@@ -273,3 +273,24 @@ def test_model_class_enum_values():
     assert ModelClass.MID == "mid"
     assert ModelClass.HEAVY == "heavy"
     assert ModelClass.UNKNOWN == "unknown"
+
+
+def test_classify_hyphen_sized_local_tags():
+    assert classify_model("qwen-4b-stable:latest") == ModelClass.MID
+    assert classify_model("qwen-4b-workhorse:latest") == ModelClass.MID
+    assert classify_model("ornith-9b-stable:latest") == ModelClass.MID
+    assert classify_model("ornith-9b:latest") == ModelClass.MID
+    assert classify_model("brand-new-1.5b-instruct:latest") == ModelClass.LIGHT
+    assert classify_model("brand-new-32b:q4_K_M") == ModelClass.HEAVY
+    assert classify_model("brand-new-35b-a3b:latest") == ModelClass.HEAVY
+    assert classify_model("custom-gate-0042b:latest") == ModelClass.UNKNOWN
+    assert classify_model("release-2026b:latest") == ModelClass.UNKNOWN
+
+
+def test_granite4_2_30b_and_gemma4_31b_registered():
+    from atomics.benchmark.model_classes import MODEL_CLASS_MAP, THINKING_CAPABLE
+
+    assert MODEL_CLASS_MAP["granite4.2:30b"] == ModelClass.HEAVY
+    assert MODEL_CLASS_MAP["gemma4:31b"] == ModelClass.HEAVY
+    assert "granite4.2:30b" in THINKING_CAPABLE
+    assert "gemma4:31b" in THINKING_CAPABLE
