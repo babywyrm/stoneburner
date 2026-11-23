@@ -65,7 +65,7 @@ def _no_finalize(_repository: MetricsRepository, _run_id: str) -> None:
     "--preset",
     type=click.Choice(list(CALIBRATION_PRESETS), case_sensitive=False),
     default=None,
-    help="Shipped graded set: blue (default), red (payload-free), or resistance.",
+    help="Shipped graded set: blue (default), red, resistance, refusal, or codereview.",
 )
 @click.option(
     "--max-error",

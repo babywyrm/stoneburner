@@ -628,3 +628,115 @@ def test_distributed_cli_uses_atomics_api_client_and_handles_api_error(monkeypat
     res = CliRunner().invoke(dist_mod.distributed, ["status", "missing-id", "--api-key", "k"])
     assert res.exit_code != 0
     assert "Job not found" in res.output
+
+
+def test_distributed_run_suite_dispatches_eval_request_and_renders_eval_status(monkeypatch):
+    from click.testing import CliRunner
+
+    from atomics.commands.distributed import distributed
+
+    captured: dict[str, object] = {}
+
+    class EvalCaptureClient:
+        def __init__(self, base_url: str, api_key: str | None = None, **_kw):
+            captured["base_url"] = base_url
+            captured["api_key"] = api_key
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def submit_distributed_run(self, **kwargs):
+            captured.update(kwargs)
+            return {"job_id": "eval-job-1"}
+
+    monkeypatch.setattr("atomics.commands.distributed.AtomicsApiClient", EvalCaptureClient)
+
+    split_err = CliRunner().invoke(
+        distributed,
+        ["run", "--api-key", "k", "--mode", "split", "--suite", "refusal"],
+    )
+    assert split_err.exit_code != 0
+    assert "full" in split_err.output and "fleet" in split_err.output
+
+    ok = CliRunner().invoke(
+        distributed,
+        [
+            "run",
+            "--api-key",
+            "k",
+            "--mode",
+            "fleet",
+            "--suite",
+            "refusal",
+            "-p",
+            "ollama",
+            "-m",
+            "qwen3:4b",
+            "--judge-model",
+            "qwen3:14b",
+            "--runs",
+            "2",
+            "--budget",
+            "1.5",
+            "--fixtures",
+            "rf-01,rf-02",
+            "--temperature",
+            "0.0",
+            "--label",
+            "tier=gpu",
+        ],
+    )
+    assert ok.exit_code == 0, ok.output
+    assert "eval-job-1" in ok.output
+    assert captured.get("run_request") is None
+    assert captured["mode"] == "fleet"
+    assert captured["worker_selector"] == {"tier": "gpu"}
+    assert captured["eval_request"] == {
+        "suite": "refusal",
+        "provider": "ollama",
+        "model": "qwen3:4b",
+        "judge_model": "qwen3:14b",
+        "runs": 2,
+        "budget_usd": 1.5,
+        "fixtures": ["rf-01", "rf-02"],
+        "temperature": 0.0,
+    }
+
+    fleet_eval_job = {
+        "job_id": "eval-job-1",
+        "status": "completed",
+        "mode": "fleet",
+        "summary_json": json.dumps(
+            {
+                "workers": [
+                    {
+                        "worker_id": "w-gpu1",
+                        "labels": {"tier": "gpu"},
+                        "completed": 1,
+                        "failed": 0,
+                        "mean_latency_ms": 120.0,
+                        "p95_latency_ms": 120.0,
+                        "mean_tokens_per_second": 42.0,
+                        "estimated_cost_usd": 0.0,
+                        "model": "qwen3:4b",
+                        "suite": "refusal",
+                        "overall_score": 0.917,
+                        "integrity": "complete",
+                    }
+                ],
+                "completed": 1,
+                "failed": 0,
+                "total_output_tokens": 200,
+                "estimated_cost_usd": 0.0,
+                "integrity": {"status": "complete"},
+            }
+        ),
+    }
+    _stub_status_response(monkeypatch, fleet_eval_job)
+    status_out = CliRunner().invoke(distributed, ["status", "eval-job-1", "--api-key", "k"])
+    assert status_out.exit_code == 0, status_out.output
+    assert "0.917" in status_out.output
+    assert "complete" in status_out.output

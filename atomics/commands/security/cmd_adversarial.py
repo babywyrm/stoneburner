@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
+from pathlib import Path
 
 import click
 from rich.console import Console
@@ -19,8 +20,10 @@ from atomics.commands.common import (
     effort_options,
     eval_budget_from,
     judge_options,
+    make_profile_provider,
     parse_extra_judges,
     print_judge_calibration,
+    profile_option,
     provider_options,
     run_async,
     temperature_option,
@@ -128,6 +131,7 @@ def _parse_model_spec(spec: str, default_provider: str) -> tuple[str, str, str |
     help="Show full prompt, model response, and judge reasoning for each fixture.",
 )
 @budget_option
+@profile_option
 def adversarial(
     provider_name: str,
     model: str | None,
@@ -152,6 +156,7 @@ def adversarial(
     allow_partial: bool,
     verbose: bool,
     budget_usd: float | None,
+    profile_path: Path | None,
 ) -> None:
     """Run adversarial LLM resilience eval — measures resistance to manipulation.
 
@@ -183,7 +188,11 @@ def adversarial(
     selected_count = len(selected)
 
     settings = load_settings()
-    provider = _make_provider(provider_name, model, ollama_host, settings, vllm_host=vllm_host)
+    provider = (
+        make_profile_provider(profile_path)
+        if profile_path is not None
+        else _make_provider(provider_name, model, ollama_host, settings, vllm_host=vllm_host)
+    )
     judge = _make_provider(
         judge_provider_name, judge_model, judge_host or ollama_host, settings, vllm_host=vllm_host
     )

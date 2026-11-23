@@ -215,6 +215,7 @@ def get_battery(name: str) -> Battery:
 # One rule set for CLI `battery run` and `POST /batteries`; tests/test_battery_parity.py
 # fails when the two hand a runner different work.
 JUDGED_SUITES = frozenset({"adversarial", "redblue", "refusal", "codereview", "archreview"})
+PROFILE_SUITES = frozenset({"adversarial", "refusal", "redblue"})
 RUNS_SUITES = frozenset(
     {"adversarial", "redblue", "refusal", "codereview", "toolcall", "archreview"}
 )
@@ -381,6 +382,8 @@ def step_args(
             vllm_host=vllm_host,
         )
     )
+    if step.suite in PROFILE_SUITES and profile:
+        args.extend(["--profile", profile])
     if thinking_flag and step.suite in _NO_THINKING_SUITES:
         args.append(thinking_flag)
     if step.suite == "redblue" and step.mode:

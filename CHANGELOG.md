@@ -3,6 +3,22 @@
 ## Unreleased
 
 ### Added
+- `ProfileProvider` (`atomics/load/profiles.py`) and `--profile` on `atomics
+  adversarial`, `atomics refusal`, `atomics redblue`, `atomics battery` (CLI
+  and `POST /api/v1/batteries`), and `POST /api/v1/evals` so application-level
+  HTTP and Ollama AI gates can run full prose security suites.
+- `MULTI_TURN_ESCALATION` (`tc-32`..`tc-35`, `--category escalation` /
+  `multi_turn_escalation`) in `atomics toolcall` (`31` -> `35` fixtures),
+  measuring paired prose-vs-tool channel divergence after benign multi-turn
+  authority and rapport buildup (`prior_turns` / `prior_messages`).
+- `atomics judge-calibrate --preset {refusal,codereview}` ships payload-free
+  human-graded calibration sets (`refusal.yaml` on `rubric: refusal` and
+  `codereview.yaml` on `rubric: codereview`) alongside `blue`, `red`, and
+  `resistance`.
+- `atomics distributed run --suite` dispatches `eval_request` suites in `fleet`
+  and `full` modes (`--host`, `--judge-model`, `--judge-host`, `--runs`,
+  `--budget`, `--fixtures`, `--channel`, `--temperature`), and `atomics
+  distributed status` renders per-worker scores and `RunIntegrity` status.
 - `atomics server --allow-codegen` and `atomics worker --allow-codegen` (off by
   default) gate remote `codegen` suite execution over HTTP (`403`) and
   distributed worker dispatch (`PermissionError`); `atomics worker` also gains

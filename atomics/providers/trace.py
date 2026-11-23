@@ -262,12 +262,16 @@ class TracedProvider(BaseProvider):
         max_tokens: int = 1024,
         injected_tool_output: str | None = None,
         history: Sequence[ToolStep] = (),
+        prior_messages: Sequence[ChatMessage] = (),
         thinking: bool | None = None,
         thinking_budget: int | None = None,
         temperature: float | None = None,
         effort: str | None = None,
         reasoning_mode: str | None = None,
     ) -> ProviderResponse:
+        prior_kw: dict[str, Sequence[ChatMessage]] = (
+            {"prior_messages": prior_messages} if prior_messages else {}
+        )
         call = self._inner.generate_with_tools(
             prompt,
             tools=tools,
@@ -281,6 +285,7 @@ class TracedProvider(BaseProvider):
             temperature=temperature,
             effort=effort,
             reasoning_mode=reasoning_mode,
+            **prior_kw,
         )
         parts = {
             "system": system,

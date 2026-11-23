@@ -170,6 +170,25 @@ def _check_distributed_hosts(request: Request, payload: DistributedRunRequest) -
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
                 ) from exc
+        if prefix == "eval_request" and mapping.get("profile") is not None:
+            from atomics.load.profiles import load_confined_profile
+
+            raw_prof = mapping.get("profile")
+            if not isinstance(raw_prof, str):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="eval_request.profile must be a string",
+                )
+            try:
+                prof = load_confined_profile(raw_prof)
+                prof_url = prof.ollama_host if prof.type == "ollama" else prof.http_url
+                settings.check_outbound_host(prof_url, label="eval_request.profile")
+            except DisallowedHostError as exc:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+            except (ValueError, OSError) as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+                ) from exc
         if settings.allowed_hosts is not None:
             provider = mapping.get("provider")
             if isinstance(provider, str) and provider:

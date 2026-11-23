@@ -147,3 +147,52 @@ def test_cli_and_api_hand_the_runner_the_same_work(battery, step, options):
 def test_every_runner_backed_suite_is_covered():
     suites = {step.suite for battery in BATTERIES for step in battery.steps}
     assert suites - {"provider-test", "qa"} <= set(RUNNERS)
+
+
+def test_cli_and_api_both_build_profile_provider_for_profile_suites():
+    from atomics.eval.batteries import PROFILE_SUITES
+    from atomics.load.profiles import ProfileProvider
+
+    profile_ref = "profiles/examples/http-flask-endpoint.yaml"
+    for battery, step in STEPS:
+        if step.suite not in PROFILE_SUITES:
+            continue
+        cli_providers: list[Any] = []
+        api_providers: list[Any] = []
+
+        def _make_prov_recorder(sink: list[Any]) -> Any:
+            async def _rec(provider: Any, *_a: Any, **_kw: Any) -> None:
+                sink.append(getattr(provider, "inner", provider))
+                raise _CapturedError
+
+            return _rec
+
+        argv = step_args(
+            step,
+            model="m",
+            provider="ollama",
+            thinking_flag="--no-thinking",
+            judge_model="judge",
+            profile=profile_ref,
+        )
+        with patch(RUNNERS[step.suite][0], _make_prov_recorder(cli_providers)):
+            try:
+                invoke_atomics(argv)
+            except _CapturedError:
+                pass
+        payload = BatteryRequest(
+            name=battery.id,
+            provider="ollama",
+            model="m",
+            judge_model="judge",
+            budget_usd=1.0,
+            profile=profile_ref,
+        )
+        with patch(RUNNERS[step.suite][1], _make_prov_recorder(api_providers)):
+            try:
+                asyncio.run(run_eval_suite(_step_to_eval(payload, step)))
+            except _CapturedError:
+                pass
+        assert len(cli_providers) == 1 and isinstance(cli_providers[0], ProfileProvider)
+        assert len(api_providers) == 1 and isinstance(api_providers[0], ProfileProvider)
+        assert cli_providers[0].name == api_providers[0].name

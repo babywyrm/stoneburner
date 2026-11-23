@@ -85,9 +85,17 @@ def _guarded_providers(
     deliberately; an API caller is remote and authenticated by a shared key, so
     the ceiling is the only thing between them and the account limit.
     """
-    provider = _provider_for(payload.provider, payload.model, payload.host)
+    if payload.profile is not None:
+        from atomics.load.profiles import ProfileError, ProfileProvider, load_confined_profile
+
+        try:
+            provider: BaseProvider = ProfileProvider(load_confined_profile(payload.profile))
+        except (ProfileError, ValueError, OSError) as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+    else:
+        provider = _provider_for(payload.provider, payload.model, payload.host)
     judge_host = payload.judge_host
-    if judge_host is None and payload.provider == "ollama":
+    if judge_host is None and payload.profile is None and payload.provider == "ollama":
         judge_host = payload.host
     judge_provider = _provider_for("ollama", payload.judge_model, judge_host)
     if meter is not None:

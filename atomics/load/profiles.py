@@ -19,6 +19,7 @@ from pathlib import Path
 
 import httpx
 
+from atomics.providers.base import BaseProvider, ProviderResponse, compute_tps
 from atomics.providers.ollama import DEFAULT_NUM_CTX
 
 
@@ -368,3 +369,163 @@ async def _single_request_profile(
 
     classification = classify_response(profile, text)
     return text, latency_ms, classification
+
+
+class ProfileProvider(BaseProvider):
+    """Wrap a `TargetProfile` as a `BaseProvider` for prose security suites.
+
+    Lets `adversarial`, `refusal`, `redblue`, and `battery` evaluate an
+    application-level HTTP or Ollama gate with the same fixtures and judge
+    pipeline used against raw providers. Tool schemas are not supported
+    (`supports_tools = False`).
+    """
+
+    supports_tools = False
+
+    def __init__(
+        self,
+        profile: TargetProfile,
+        *,
+        client: httpx.AsyncClient | None = None,
+    ) -> None:
+        self._profile = profile
+        self._client = client or httpx.AsyncClient()
+
+    @property
+    def profile(self) -> TargetProfile:
+        return self._profile
+
+    @property
+    def name(self) -> str:
+        return f"profile:{self._profile.name}"
+
+    @property
+    def default_model(self) -> str:
+        return self._profile.model or self._profile.name
+
+    async def generate(
+        self,
+        prompt: str,
+        *,
+        system: str = "",
+        model: str | None = None,
+        max_tokens: int = 1024,
+        thinking: bool | None = None,
+        thinking_budget: int | None = None,
+        temperature: float | None = None,
+        effort: str | None = None,
+        reasoning_mode: str | None = None,
+    ) -> ProviderResponse:
+        del thinking, thinking_budget, effort, reasoning_mode
+        t0 = time.monotonic()
+        effective_model = model or self._profile.model or self._profile.name
+        input_tokens = max(1, len(prompt) // 4)
+        output_tokens = 0
+
+        if self._profile.type == "ollama":
+            from atomics.validation import validate_endpoint_url
+
+            host = validate_endpoint_url(self._profile.ollama_host, label="ollama.host")
+            num_predict = max_tokens if max_tokens > 0 else self._profile.num_predict
+            options: dict[str, int | float] = {
+                "num_predict": num_predict,
+                "num_ctx": DEFAULT_NUM_CTX,
+            }
+            eff_temp = temperature if temperature is not None else self._profile.temperature
+            if eff_temp is not None:
+                options["temperature"] = eff_temp
+            body: dict[str, object] = {
+                "model": effective_model,
+                "prompt": prompt,
+                "stream": False,
+                "options": options,
+            }
+            eff_system = self._profile.system_prompt or system
+            if eff_system:
+                body["system"] = eff_system
+            resp = await self._client.post(f"{host}/api/generate", json=body, timeout=300.0)
+            resp.raise_for_status()
+            data = resp.json()
+            text = str(data.get("response", ""))
+            server_lat = data.get("total_duration")
+            latency_ms = float(server_lat) / 1e6 if server_lat else (time.monotonic() - t0) * 1000
+            prompt_eval = data.get("prompt_eval_count")
+            eval_cnt = data.get("eval_count")
+            input_tokens = int(prompt_eval) if isinstance(prompt_eval, int) else input_tokens
+            output_tokens = (
+                int(eval_cnt)
+                if isinstance(eval_cnt, int)
+                else (max(1, len(text) // 4) if text else 0)
+            )
+        elif self._profile.type == "http":
+            from atomics.validation import validate_endpoint_url
+
+            url = validate_endpoint_url(self._profile.http_url, label="http.url")
+            eff_prompt = (
+                f"{system}\n\n{prompt}" if system and not self._profile.system_prompt else prompt
+            )
+            rendered = render_body(
+                self._profile,
+                eff_prompt,
+                model=model,
+                num_predict=max_tokens,
+            )
+            headers = dict(self._profile.http_headers)
+            if self._profile.http_method == "GET":
+                resp = await self._client.get(
+                    url,
+                    headers=headers,
+                    timeout=float(self._profile.http_timeout),
+                )
+            else:
+                if "content-type" not in {k.lower() for k in headers}:
+                    headers["Content-Type"] = "application/json"
+                resp = await self._client.request(
+                    self._profile.http_method,
+                    url,
+                    content=rendered,
+                    headers=headers,
+                    timeout=float(self._profile.http_timeout),
+                )
+            resp.raise_for_status()
+            latency_ms = (time.monotonic() - t0) * 1000
+            if self._profile.response_format == "json":
+                data = resp.json()
+                text = _extract_text(self._profile, data)
+                server_lat = _extract_latency(self._profile, data)
+                if server_lat is not None:
+                    latency_ms = server_lat
+            else:
+                text = resp.text
+            output_tokens = max(1, len(text) // 4) if text else 0
+        else:
+            raise ProfileError(f"Unknown profile type: {self._profile.type}")
+
+        classification = classify_response(self._profile, text)
+        return ProviderResponse(
+            text=text,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            total_tokens=input_tokens + output_tokens,
+            model=effective_model,
+            latency_ms=latency_ms,
+            estimated_cost_usd=0.0,
+            tokens_per_second=compute_tps(output_tokens, latency_ms),
+            raw={"classification": classification} if classification is not None else None,
+        )
+
+    async def health_check(self) -> bool:
+        try:
+            if self._profile.type == "ollama":
+                from atomics.validation import validate_endpoint_url
+
+                host = validate_endpoint_url(self._profile.ollama_host, label="ollama.host")
+                resp = await self._client.get(f"{host}/api/tags", timeout=5.0)
+                return resp.status_code == 200
+            await _single_request_profile(self._client, self._profile, "healthcheck")
+            return True
+        except (httpx.HTTPError, ProfileError, ValueError):
+            return False
+
+    async def aclose(self) -> None:
+        await self._client.aclose()

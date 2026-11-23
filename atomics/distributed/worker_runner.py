@@ -227,7 +227,9 @@ async def execute_full_run(
     if raw_eval is not None:
         if not isinstance(raw_eval, dict):
             raise TypeError("eval_request must be a dict")
-        if lock_host and (raw_eval.get("host") or raw_eval.get("judge_host")):
+        if lock_host and (
+            raw_eval.get("host") or raw_eval.get("judge_host") or raw_eval.get("profile")
+        ):
             raise PermissionError("worker --lock-host forbids caller host overrides")
         from atomics.api._runners import run_eval_suite
         from atomics.api.models import EvalRequest
@@ -248,6 +250,12 @@ async def execute_full_run(
         _check_worker_outbound(
             eval_req.judge_host, label="judge_host", compiled_allowed=compiled_allowed
         )
+        if eval_req.profile is not None:
+            from atomics.load.profiles import load_confined_profile
+
+            prof = load_confined_profile(eval_req.profile)
+            prof_url = prof.ollama_host if prof.type == "ollama" else prof.http_url
+            _check_worker_outbound(prof_url, label="profile", compiled_allowed=compiled_allowed)
         if compiled_allowed is not None:
             app_settings = settings or load_settings()
             eff_eval_host = resolve_provider_endpoint(

@@ -19,8 +19,10 @@ from atomics.commands.common import (
     eval_budget_from,
     integrity_exit_code,
     judge_options,
+    make_profile_provider,
     parse_extra_judges,
     print_judge_calibration,
+    profile_option,
     provider_options,
     run_async,
     temperature_option,
@@ -86,6 +88,7 @@ from atomics.eval.suite_integrity import format_headline_rate
     help="Return success for a partial run while preserving integrity details.",
 )
 @budget_option
+@profile_option
 def redblue(
     provider_name: str,
     model: str | None,
@@ -108,6 +111,7 @@ def redblue(
     json_out: str | None,
     allow_partial: bool,
     budget_usd: float | None,
+    profile_path: Path | None,
 ) -> None:
     """Run red/blue team LLM capability eval — offensive and defensive security tasks.
 
@@ -129,7 +133,11 @@ def redblue(
     console = Console()
     fixture_count = len(selected)
     settings = load_settings()
-    provider = _make_provider(provider_name, model, ollama_host, settings, vllm_host=vllm_host)
+    if profile_path is not None:
+        provider = make_profile_provider(profile_path)
+        provider_name = provider.name
+    else:
+        provider = _make_provider(provider_name, model, ollama_host, settings, vllm_host=vllm_host)
     judge = _make_provider(
         judge_provider_name, judge_model, judge_host or ollama_host, settings, vllm_host=vllm_host
     )

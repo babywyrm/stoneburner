@@ -46,7 +46,7 @@ from atomics.eval.suite_integrity import fixture_outcome, integrity_of
 from atomics.eval.toolcall.catalog import PROBE_PROMPT, PROBE_TOOL, schemas_for
 from atomics.eval.toolcall.fixtures import ToolCallFixture, result_for
 from atomics.eval.toolcall.scorer import ToolOutcome, classify
-from atomics.providers.base import BaseProvider
+from atomics.providers.base import BaseProvider, ChatMessage
 from atomics.providers.toolcalls import ToolCall, ToolStep
 from atomics.validation import sanitize_error
 
@@ -634,6 +634,18 @@ async def _run_once(
         "judge_agreement": None,
     }
 
+    prior_messages: tuple[ChatMessage, ...] = tuple(
+        msg
+        for user_turn, assistant_turn in fixture.prior_turns
+        for msg in (
+            ChatMessage(role="user", content=user_turn),
+            ChatMessage(role="assistant", content=assistant_turn),
+        )
+    )
+    prior_kw: dict[str, Sequence[ChatMessage]] = (
+        {"prior_messages": prior_messages} if prior_messages else {}
+    )
+
     if channel != "prose":
         history: list[ToolStep] = []
         steps_record: list[dict[str, Any]] = []
@@ -657,6 +669,7 @@ async def _run_once(
                     temperature=temperature,
                     effort=effort,
                     reasoning_mode=reasoning_mode,
+                    **prior_kw,
                 )
             except Exception as exc:
                 # A trajectory that fell over before producing a dangerous call
@@ -726,17 +739,30 @@ async def _run_once(
     # arrives inside a tool result, and there is no tool result without tools.
     if channel != "tools" and not fixture.tool_channel_only:
         try:
-            prose = await provider.generate(
-                fixture.prompt,
-                system=_SYSTEM_PROMPT,
-                model=model,
-                max_tokens=_MAX_TOKENS,
-                thinking=thinking,
-                thinking_budget=thinking_budget,
-                temperature=temperature,
-                effort=effort,
-                reasoning_mode=reasoning_mode,
-            )
+            if prior_messages:
+                prose = await provider.generate_chat(
+                    [*prior_messages, ChatMessage(role="user", content=fixture.prompt)],
+                    system=_SYSTEM_PROMPT,
+                    model=model,
+                    max_tokens=_MAX_TOKENS,
+                    thinking=thinking,
+                    thinking_budget=thinking_budget,
+                    temperature=temperature,
+                    effort=effort,
+                    reasoning_mode=reasoning_mode,
+                )
+            else:
+                prose = await provider.generate(
+                    fixture.prompt,
+                    system=_SYSTEM_PROMPT,
+                    model=model,
+                    max_tokens=_MAX_TOKENS,
+                    thinking=thinking,
+                    thinking_budget=thinking_budget,
+                    temperature=temperature,
+                    effort=effort,
+                    reasoning_mode=reasoning_mode,
+                )
         except Exception as exc:
             record["error"] = f"{type(exc).__name__}: {exc}"
             return record

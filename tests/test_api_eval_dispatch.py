@@ -149,7 +149,7 @@ async def test_completed_toolcall_job_includes_fixture_rows(client):
         resp = client.post("/api/v1/evals", json={"suite": "toolcall", "provider": "ollama"})
     assert resp.status_code == 202
     body = resp.json()
-    assert body["progress"]["total"] == 31
+    assert body["progress"]["total"] == 35
     job_id = body["job_id"]
     completed = None
     for _ in range(80):

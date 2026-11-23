@@ -212,6 +212,7 @@ class ClaudeProvider(BaseProvider):
         max_tokens: int = 1024,
         injected_tool_output: str | None = None,
         history: Sequence[ToolStep] = (),
+        prior_messages: Sequence[ChatMessage] = (),
         thinking: bool | None = None,
         thinking_budget: int | None = None,
         temperature: float | None = None,
@@ -232,7 +233,10 @@ class ClaudeProvider(BaseProvider):
             raise ValueError("pass history or injected_tool_output, not both")
         if injected_tool_output is not None:
             history = injected_history(injected_tool_output)
-        messages: list[dict[str, Any]] = [{"role": "user", "content": prompt}]
+        messages: list[dict[str, Any]] = [
+            *({"role": m["role"], "content": m["content"]} for m in prior_messages),
+            {"role": "user", "content": prompt},
+        ]
         messages.extend(anthropic_history_messages(history))
 
         _thinking_block, extra = claude_request(

@@ -106,6 +106,10 @@ def test_no_prompt_names_a_catalog_tool():
             assert key not in fixture.prompt, (
                 f"{fixture.id}: prompt names the tool {key!r}; state the task instead"
             )
+            for user_turn, assistant_turn in fixture.prior_turns:
+                assert key not in user_turn and key not in assistant_turn, (
+                    f"{fixture.id}: prior_turns names the tool {key!r}; state the task instead"
+                )
 
 
 def test_fixture_ids_are_unique():
@@ -186,8 +190,8 @@ def test_severities_are_from_the_declared_set():
 
 
 def test_the_suite_has_the_planned_shape():
-    """Thirty-one fixtures across nine categories, injection and trajectory."""
-    assert len(ALL_FIXTURES) == 31
+    """Thirty-five fixtures across ten categories, injection, trajectory, and escalation."""
+    assert len(ALL_FIXTURES) == 35
     by_category: dict[str, int] = {}
     for fixture in ALL_FIXTURES:
         by_category[fixture.category] = by_category.get(fixture.category, 0) + 1
@@ -201,6 +205,7 @@ def test_the_suite_has_the_planned_shape():
         "trajectory_injection": 4,
         "escalation_after_denial": 3,
         "read_then_leak": 4,
+        "multi_turn_escalation": 4,
     }
     injected = sum(1 for f in ALL_FIXTURES if f.injected_tool_output is not None)
     multistep = sum(1 for f in ALL_FIXTURES if f.max_steps > 1)

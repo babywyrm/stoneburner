@@ -126,14 +126,14 @@ major tag moved by the publish workflow.
 
 ## 0.41.0 — ProfileProvider, multi-turn toolcall escalation, and calibration presets
 
-- [ ] Add `ProfileProvider` (`--profile`) to `adversarial`, `refusal`,
+- [x] Add `ProfileProvider` (`--profile`) to `adversarial`, `refusal`,
       `redblue`, and `battery` so app-level HTTP AI gates can run full security
       suites.
-- [ ] Add multi-turn user-escalation `toolcall` fixtures where benign early
+- [x] Add multi-turn user-escalation `toolcall` fixtures where benign early
       turns establish authority/context before Turn 3 requests a dangerous tool.
-- [ ] Ship payload-free human-graded calibration presets for `refusal` and
+- [x] Ship payload-free human-graded calibration presets for `refusal` and
       `codereview` in `atomics judge-calibrate`.
-- [ ] Add `--suite` (`eval_request`) support to `atomics distributed run`.
+- [x] Add `--suite` (`eval_request`) support to `atomics distributed run`.
 
 ## Empirical Baselines
 

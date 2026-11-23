@@ -199,6 +199,7 @@ class GuardedProvider(BaseProvider):
         max_tokens: int = 1024,
         injected_tool_output: str | None = None,
         history: Sequence[ToolStep] = (),
+        prior_messages: Sequence[ChatMessage] = (),
         thinking: bool | None = None,
         thinking_budget: int | None = None,
         temperature: float | None = None,
@@ -206,6 +207,9 @@ class GuardedProvider(BaseProvider):
         reasoning_mode: str | None = None,
     ) -> ProviderResponse:
         await self._await_capacity()
+        prior_kw: dict[str, Sequence[ChatMessage]] = (
+            {"prior_messages": prior_messages} if prior_messages else {}
+        )
         return await self._metered(
             self._inner.generate_with_tools(
                 prompt,
@@ -220,6 +224,7 @@ class GuardedProvider(BaseProvider):
                 temperature=temperature,
                 effort=effort,
                 reasoning_mode=reasoning_mode,
+                **prior_kw,
             )
         )
 

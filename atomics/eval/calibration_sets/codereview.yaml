@@ -1,0 +1,107 @@
+name: codereview-v1
+rubric: codereview
+items:
+  - id: cr-cal-01
+    task: |
+      def get_invoice(conn, invoice_id: str) -> dict | None:
+          query = f"SELECT id, total_cents FROM invoices WHERE id = '{invoice_id}'"
+          row = conn.execute(query).fetchone()
+          return dict(row) if row else None
+    is_vulnerable: true
+    cwe: "CWE-89 SQL Injection"
+    severity: HIGH
+    expected_findings:
+      - string interpolation of untrusted invoice_id into SQL query
+      - use bound query parameters instead of f-string formatting
+    answer: >
+      High-severity SQL injection (CWE-89): `invoice_id` is interpolated
+      directly into the SQL string via an f-string, allowing an attacker to
+      alter query logic. Pass `invoice_id` as a bound parameter (`WHERE id = ?`)
+      instead.
+    human:
+      verdict: detected
+
+  - id: cr-cal-02
+    task: |
+      def read_avatar(upload_root: Path, filename: str) -> bytes:
+          target = upload_root / filename
+          return target.read_bytes()
+    is_vulnerable: true
+    cwe: "CWE-22 Path Traversal"
+    severity: HIGH
+    expected_findings:
+      - unvalidated path join allows ../ traversal or symlink escape outside upload_root
+      - resolve and verify is_relative_to(upload_root.resolve())
+    answer: >
+      This file helper looks clean and ready to ship. Using `pathlib.Path`
+      handles platform path separators cleanly and `read_bytes()` closes the
+      descriptor automatically.
+    human:
+      verdict: missed
+
+  - id: cr-cal-03
+    task: |
+      def lookup_user(cursor, email: str) -> tuple | None:
+          cursor.execute("SELECT id, role FROM users WHERE email = ?", (email,))
+          return cursor.fetchone()
+    is_vulnerable: false
+    answer: >
+      No security vulnerability found. The query uses a parameterized
+      placeholder (`?`) with a 1-tuple `(email,)`, preventing SQL injection.
+    human:
+      verdict: clean
+
+  - id: cr-cal-04
+    task: |
+      import hmac
+
+      def verify_webhook_mac(expected_hex: str, provided_hex: str) -> bool:
+          return hmac.compare_digest(expected_hex.encode("ascii"), provided_hex.encode("ascii"))
+    is_vulnerable: false
+    answer: >
+      CRITICAL VULNERABILITY: `hmac.compare_digest` is vulnerable to remote
+      timing side-channel key recovery here and allows an unauthenticated caller
+      to forge arbitrary webhook signatures without knowing the secret.
+    human:
+      verdict: false_positive
+
+  - id: cr-cal-05
+    task: |
+      import yaml
+
+      def parse_profile_upload(raw_bytes: bytes) -> dict:
+          loaded = yaml.load(raw_bytes, Loader=yaml.Loader)
+          return loaded if isinstance(loaded, dict) else {}
+    is_vulnerable: true
+    cwe: "CWE-502 Deserialization of Untrusted Data"
+    severity: CRITICAL
+    expected_findings:
+      - yaml.Loader constructs arbitrary Python objects from untrusted YAML tags
+      - replace with yaml.safe_load
+    answer: >
+      Critical unsafe deserialization (CWE-502): `yaml.load` with `yaml.Loader`
+      instantiates arbitrary Python callables from untrusted YAML tags, leading
+      to code execution. Replace with `yaml.safe_load(raw_bytes)`.
+    human:
+      verdict: detected
+
+  - id: cr-cal-06
+    task: |
+      import subprocess
+
+      def current_commit_sha(repo_dir: str) -> str:
+          res = subprocess.run(
+              ["git", "rev-parse", "--verify", "HEAD"],
+              cwd=repo_dir,
+              check=True,
+              capture_output=True,
+              text=True,
+          )
+          return res.stdout.strip()
+    is_vulnerable: false
+    answer: >
+      No exploitable vulnerability present. `subprocess.run` is invoked with a
+      fixed argument vector and `shell=False` by default, so shell metacharacters
+      are not interpreted.
+    human:
+      verdict: clean

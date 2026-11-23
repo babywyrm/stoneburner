@@ -83,6 +83,7 @@ class OpenAICompatibleTools:
         max_tokens: int = 1024,
         injected_tool_output: str | None = None,
         history: Sequence[ToolStep] = (),
+        prior_messages: Sequence[ChatMessage] = (),
         thinking: bool | None = None,
         thinking_budget: int | None = None,
         temperature: float | None = None,
@@ -99,6 +100,7 @@ class OpenAICompatibleTools:
             history = injected_history(injected_tool_output)
         messages: list[dict[str, Any]] = [
             {"role": "system", "content": system or "You are a helpful assistant."},
+            *({"role": m["role"], "content": m["content"]} for m in prior_messages),
             {"role": "user", "content": prompt},
         ]
         messages.extend(openai_history_messages(history))

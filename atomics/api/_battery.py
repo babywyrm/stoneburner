@@ -21,6 +21,7 @@ from atomics.api.models import BatteryRequest, EvalRequest, ProviderTestRequest
 from atomics.benchmark.qa_runner import load_qa_suite, run_qa_suite
 from atomics.eval.batteries import (
     JUDGED_SUITES,
+    PROFILE_SUITES,
     BatteryStep,
     get_battery,
     step_fixture_ids,
@@ -47,6 +48,7 @@ def _step_to_eval(payload: BatteryRequest, step: BatteryStep) -> EvalRequest:
         temperature=payload.temperature,
         fixtures=step_fixture_ids(step),
         channel=step.channel,
+        profile=payload.profile if step.suite in PROFILE_SUITES else None,
     )
 
 

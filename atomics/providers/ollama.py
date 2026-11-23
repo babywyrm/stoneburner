@@ -249,6 +249,7 @@ class OllamaProvider(BaseProvider):
         max_tokens: int = 1024,
         injected_tool_output: str | None = None,
         history: Sequence[ToolStep] = (),
+        prior_messages: Sequence[ChatMessage] = (),
         thinking: bool | None = None,
         thinking_budget: int | None = None,
         temperature: float | None = None,
@@ -273,6 +274,8 @@ class OllamaProvider(BaseProvider):
         messages: list[dict[str, Any]] = []
         if system:
             messages.append({"role": "system", "content": system})
+        for turn in prior_messages:
+            messages.append({"role": turn["role"], "content": turn["content"]})
         messages.append({"role": "user", "content": prompt})
         messages.extend(ollama_history_messages(history))
         return await self._chat(

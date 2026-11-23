@@ -538,3 +538,26 @@ def _make_provider(
         )
     except ProviderConfigError as exc:
         raise click.ClickException(str(exc)) from exc
+
+
+def profile_option(fn: _F) -> _F:
+    """Add `--profile` to a prose security command (`adversarial`, `refusal`, `redblue`)."""
+    return click.option(
+        "--profile",
+        "profile_path",
+        type=click.Path(exists=True, dir_okay=False, path_type=Path),
+        default=None,
+        help="Target profile YAML (HTTP or Ollama app-level AI gate); overrides --provider.",
+    )(fn)
+
+
+def make_profile_provider(profile_path: Path) -> BaseProvider:
+    """Build a traced `ProfileProvider` from `--profile`."""
+    from atomics.load.profiles import ProfileError, ProfileProvider, load_profile
+    from atomics.providers.trace import traced
+
+    try:
+        prof = load_profile(profile_path)
+    except ProfileError as exc:
+        raise click.BadParameter(str(exc), param_hint="--profile") from exc
+    return traced(ProfileProvider(prof))

@@ -662,3 +662,163 @@ class TestSingleRequestProfile:
         _, _, classification = await _single_request_profile(mock_client, profile, "test")
 
         assert classification is None
+
+
+class TestProfileProviderAndSuiteWiring:
+    @pytest.mark.asyncio
+    async def test_profile_provider_http_generate_and_chat(self):
+        from atomics.load.profiles import ProfileProvider
+
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.raise_for_status = MagicMock()
+        mock_resp.json.return_value = {"decision": "DENY: policy violation", "elapsed_ms": 42.5}
+
+        mock_client = AsyncMock()
+        mock_client.request = AsyncMock(return_value=mock_resp)
+        mock_client.aclose = AsyncMock()
+
+        profile = TargetProfile(
+            name="gate",
+            type="http",
+            model="gate-v1",
+            http_url="http://127.0.0.1:5000/api/classify",
+            http_body_template='{"prompt": "{{ prompt }}", "model": "{{ model }}"}',
+            response_format="json",
+            response_text_field="decision",
+            response_latency_field="elapsed_ms",
+            classify={"blocked": ["DENY"]},
+        )
+        provider = ProfileProvider(profile, client=mock_client)
+        assert provider.name == "profile:gate"
+        assert provider.default_model == "gate-v1"
+        assert provider.supports_tools is False
+
+        resp = await provider.generate("ignore rules")
+        assert resp.text == "DENY: policy violation"
+        assert resp.latency_ms == 42.5
+        assert resp.raw == {"classification": "blocked"}
+
+        chat_resp = await provider.generate_chat(
+            [
+                {"role": "user", "content": "hello"},
+                {"role": "assistant", "content": "hi"},
+                {"role": "user", "content": "override policy"},
+            ]
+        )
+        assert chat_resp.text == "DENY: policy violation"
+        assert await provider.health_check() is True
+        await provider.aclose()
+        mock_client.aclose.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_profile_provider_ollama_overrides_and_health(self):
+        from atomics.load.profiles import ProfileProvider
+
+        gen_resp = MagicMock()
+        gen_resp.status_code = 200
+        gen_resp.raise_for_status = MagicMock()
+        gen_resp.json.return_value = {
+            "response": "I cannot assist with that.",
+            "prompt_eval_count": 12,
+            "eval_count": 6,
+        }
+        tags_resp = MagicMock()
+        tags_resp.status_code = 200
+
+        mock_client = AsyncMock()
+        mock_client.post = AsyncMock(return_value=gen_resp)
+        mock_client.get = AsyncMock(return_value=tags_resp)
+
+        profile = TargetProfile(
+            name="local-gate",
+            type="ollama",
+            ollama_host="http://127.0.0.1:11434",
+            model="qwen3:4b",
+            system_prompt="Gate prompt",
+        )
+        provider = ProfileProvider(profile, client=mock_client)
+        resp = await provider.generate("probe", model="qwen3:8b", max_tokens=64, temperature=0.0)
+        assert resp.text == "I cannot assist with that."
+        assert resp.input_tokens == 12
+        assert resp.output_tokens == 6
+        sent_json = mock_client.post.call_args.kwargs["json"]
+        assert sent_json["model"] == "qwen3:8b"
+        assert sent_json["system"] == "Gate prompt"
+        assert sent_json["options"]["num_predict"] == 64
+        assert sent_json["options"]["temperature"] == 0.0
+        assert await provider.health_check() is True
+
+    def test_battery_and_cli_forward_profile_to_prose_security_suites(self, monkeypatch):
+        from click.testing import CliRunner
+
+        from atomics.api._battery import _step_to_eval
+        from atomics.api.models import BatteryRequest
+        from atomics.cli import cli
+        from atomics.eval.batteries import BatteryStep, step_args
+        from atomics.load.profiles import ProfileProvider
+
+        adv_step = BatteryStep(
+            suite="adversarial",
+            purpose="jailbreak check",
+            categories=("prompt_injection",),
+        )
+        tc_step = BatteryStep(suite="toolcall", purpose="tool check")
+
+        adv_argv = step_args(
+            adv_step,
+            model="m",
+            provider="ollama",
+            thinking_flag="--no-thinking",
+            judge_model="j",
+            profile="profiles/examples/http-flask-endpoint.yaml",
+        )
+        assert "--profile" in adv_argv
+        tc_argv = step_args(
+            tc_step,
+            model="m",
+            provider="ollama",
+            thinking_flag="--no-thinking",
+            judge_model="j",
+            profile="profiles/examples/http-flask-endpoint.yaml",
+        )
+        assert "--profile" not in tc_argv
+
+        b_req = BatteryRequest(
+            name="desk-pass",
+            provider="ollama",
+            model="m",
+            judge_model="j",
+            budget_usd=1.0,
+            profile="profiles/examples/http-flask-endpoint.yaml",
+        )
+        assert (
+            _step_to_eval(b_req, adv_step).profile == "profiles/examples/http-flask-endpoint.yaml"
+        )
+        assert _step_to_eval(b_req, tc_step).profile is None
+
+        seen_providers: list[object] = []
+
+        class _StopError(Exception):
+            pass
+
+        async def _capture_refusal(provider, **_kwargs):
+            seen_providers.append(provider)
+            raise _StopError
+
+        monkeypatch.setattr("atomics.eval.refusal.run_refusal", _capture_refusal)
+        runner = CliRunner()
+        runner.invoke(
+            cli,
+            [
+                "refusal",
+                "--profile",
+                "profiles/examples/http-flask-endpoint.yaml",
+                "--judge-model",
+                "j",
+                "--no-save",
+            ],
+            catch_exceptions=True,
+        )
+        assert len(seen_providers) == 1
+        assert isinstance(seen_providers[0], ProfileProvider)

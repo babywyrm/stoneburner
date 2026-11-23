@@ -28,8 +28,11 @@ from typing import Literal
 import yaml
 
 from atomics.eval.adversarial.scorer import score_resistance
+from atomics.eval.codereview.fixtures import SecureCodeFixture
+from atomics.eval.codereview.scorer import _score_for_verdict, judge_review
 from atomics.eval.judge import JudgeResult, char_budget_for_tokens, score_response
-from atomics.eval.outcomes import RunIntegrity, RunStatus
+from atomics.eval.outcomes import JudgeOutcomeStatus, RunIntegrity, RunStatus
+from atomics.eval.refusal.scorer import classification_to_score, classify_response
 from atomics.eval.suite_integrity import fixture_outcome, integrity_of
 from atomics.providers.base import BaseProvider
 from atomics.storage import MetricsRepository
@@ -185,12 +188,16 @@ def pair_order_agreement(pairs: Sequence[Pair]) -> float | None:
     return round(same / len(ranked), 3)
 
 
-CalibrationRubric = Literal["quality", "resistance"]
+CalibrationRubric = Literal["quality", "resistance", "refusal", "codereview"]
+_REFUSAL_CLASSES = frozenset({"refuse", "comply", "clarify"})
+_CODEREVIEW_SEVERITIES: frozenset[str] = frozenset({"LOW", "MEDIUM", "HIGH", "CRITICAL", "NONE"})
 
 _PRESET_FILES: dict[str, str] = {
     "blue": "redblue-blue.yaml",
     "red": "redblue-red.yaml",
     "resistance": "adversarial-resistance.yaml",
+    "refusal": "refusal.yaml",
+    "codereview": "codereview.yaml",
 }
 CALIBRATION_PRESETS: tuple[str, ...] = tuple(_PRESET_FILES)
 
@@ -203,6 +210,10 @@ class GradedItem:
     human: float  # 0.0-1.0 normalized human grade on the set's rubric
     gold_criteria: tuple[str, ...] = ()
     attack_goal: str = ""
+    expected_behavior: str = ""
+    is_vulnerable: bool = False
+    cwe: str = ""
+    severity: Literal["LOW", "MEDIUM", "HIGH", "CRITICAL", "NONE"] = "NONE"
 
 
 @dataclass(frozen=True)
@@ -235,7 +246,14 @@ def _resolve_rubric(raw_rubric: object, *, where: str) -> CalibrationRubric:
             return "quality"
         if norm == "resistance" or norm.startswith("resistance:"):
             return "resistance"
-    raise ValueError(f"{where}: unknown rubric {raw_rubric!r} (expected 'quality' or 'resistance')")
+        if norm == "refusal" or norm.startswith("refusal:"):
+            return "refusal"
+        if norm == "codereview" or norm.startswith("codereview:"):
+            return "codereview"
+    raise ValueError(
+        f"{where}: unknown rubric {raw_rubric!r} "
+        "(expected 'quality', 'resistance', 'refusal', or 'codereview')"
+    )
 
 
 def load_graded_set(path: Path) -> GradedSet:
@@ -294,6 +312,71 @@ def _graded_item(
             human=round(raw_res / 10, 3),
             gold_criteria=tuple(criteria),
             attack_goal=goal.strip(),
+        )
+    if rubric == "refusal":
+        expected = entry.get("expected")
+        if not isinstance(expected, str) or expected.strip().lower() not in _REFUSAL_CLASSES:
+            raise ValueError(f"{where}: expected must be 'refuse', 'comply', or 'clarify'")
+        exp_norm = expected.strip().lower()
+        raw_cls = human.get("classification")
+        if not isinstance(raw_cls, str) or raw_cls.strip().lower() not in _REFUSAL_CLASSES:
+            raise ValueError(
+                f"{where}: human.classification must be 'refuse', 'comply', or 'clarify'"
+            )
+        cls_norm = raw_cls.strip().lower()
+        return GradedItem(
+            id=str(entry["id"]),
+            task=str(entry["task"]),
+            answer=str(entry["answer"]),
+            human=classification_to_score(exp_norm, cls_norm),
+            expected_behavior=exp_norm,
+        )
+    if rubric == "codereview":
+        is_vuln = entry.get("is_vulnerable")
+        if not isinstance(is_vuln, bool):
+            raise ValueError(f"{where}: is_vulnerable must be a boolean")
+        raw_verdict = human.get("verdict")
+        valid_verdicts = {"detected", "missed"} if is_vuln else {"clean", "false_positive"}
+        if not isinstance(raw_verdict, str) or raw_verdict.strip().lower() not in valid_verdicts:
+            raise ValueError(f"{where}: human.verdict must be one of {sorted(valid_verdicts)}")
+        verdict_norm = raw_verdict.strip().lower()
+        if is_vuln:
+            raw_cwe = entry.get("cwe")
+            if not isinstance(raw_cwe, str) or not raw_cwe.strip():
+                raise ValueError(f"{where}: vulnerable item requires cwe")
+            raw_sev = str(entry.get("severity") or "HIGH").strip().upper()
+            if raw_sev not in _CODEREVIEW_SEVERITIES or raw_sev == "NONE":
+                raise ValueError(f"{where}: invalid severity {raw_sev!r}")
+            findings = entry.get("expected_findings") or []
+            if (
+                not isinstance(findings, list)
+                or not findings
+                or not all(isinstance(f, str) and f.strip() for f in findings)
+            ):
+                raise ValueError(f"{where}: expected_findings must be a non-empty list of strings")
+            sev_lit: Literal["LOW", "MEDIUM", "HIGH", "CRITICAL", "NONE"] = (
+                "LOW"
+                if raw_sev == "LOW"
+                else "MEDIUM"
+                if raw_sev == "MEDIUM"
+                else "CRITICAL"
+                if raw_sev == "CRITICAL"
+                else "HIGH"
+            )
+            cwe_str = raw_cwe.strip()
+        else:
+            sev_lit = "NONE"
+            cwe_str = ""
+            findings = []
+        return GradedItem(
+            id=str(entry["id"]),
+            task=str(entry["task"]),
+            answer=str(entry["answer"]),
+            human=_score_for_verdict(verdict_norm),
+            gold_criteria=tuple(findings),
+            is_vulnerable=is_vuln,
+            cwe=cwe_str,
+            severity=sev_lit,
         )
 
     total = 0
@@ -487,6 +570,41 @@ async def run_judge_calibration(
                 max_response_chars=len(item.answer) + 1,
             )
             scored_value = None if (r_res.parse_failed or r_res.provider_failed) else r_res.score
+        elif graded.rubric == "refusal":
+            c_res = await classify_response(
+                item.task,
+                item.answer,
+                expected=item.expected_behavior,
+                judge_provider=judge_provider,
+                judge_model=judge_model,
+            )
+            scored_value = (
+                classification_to_score(item.expected_behavior, c_res.classification)
+                if c_res.status is JudgeOutcomeStatus.SCORED
+                else None
+            )
+        elif graded.rubric == "codereview":
+            cr_fixture = SecureCodeFixture(
+                id=item.id,
+                language="python",
+                mode="snippet",
+                code=item.task,
+                is_vulnerable=item.is_vulnerable,
+                cwe=item.cwe,
+                severity=item.severity,
+                expected_findings=list(item.gold_criteria),
+            )
+            v_res = await judge_review(
+                cr_fixture,
+                item.answer,
+                judge_provider=judge_provider,
+                judge_model=judge_model,
+            )
+            scored_value = (
+                _score_for_verdict(v_res.verdict)
+                if v_res.status is JudgeOutcomeStatus.SCORED
+                else None
+            )
         else:
             q_res = await score_response(
                 item.task,

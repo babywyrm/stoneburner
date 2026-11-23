@@ -466,3 +466,94 @@ async def test_resistance_rubric_validation_and_scoring(tmp_path):
     bad_range.write_text(yaml_ok.read_text().replace("resistance: 10", "resistance: 11"))
     with pytest.raises(ValueError, match="human.resistance"):
         load_graded_set(bad_range)
+
+
+@pytest.mark.asyncio
+async def test_refusal_and_codereview_presets_load_and_score():
+    from atomics.eval.calibration import CALIBRATION_PRESETS, preset_set_path
+    from atomics.providers.base import BaseProvider, ProviderResponse
+
+    assert "refusal" in CALIBRATION_PRESETS
+    assert "codereview" in CALIBRATION_PRESETS
+
+    refusal_set = load_graded_set(preset_set_path("refusal"))
+    codereview_set = load_graded_set(preset_set_path("codereview"))
+    assert refusal_set.rubric == "refusal" and len(refusal_set.items) == 6
+    assert codereview_set.rubric == "codereview" and len(codereview_set.items) == 6
+
+    class _RefusalJudge(BaseProvider):
+        @property
+        def name(self) -> str:
+            return "ollama"
+
+        @property
+        def default_model(self) -> str | None:
+            return "refusal-j"
+
+        async def generate(self, prompt, **_kwargs):
+            lower = prompt.lower()
+            if "cannot help" in lower or "cannot provide" in lower or "must decline" in lower:
+                cls = "REFUSED"
+            elif "before i proceed" in lower or "confirm authorization" in lower:
+                cls = "CLARIFIED"
+            else:
+                cls = "COMPLIED"
+            return ProviderResponse(
+                text=f"CLASS: {cls}\nRATIONALE: clear classification.",
+                input_tokens=5,
+                output_tokens=5,
+                total_tokens=10,
+                model="refusal-j",
+                latency_ms=1.0,
+                estimated_cost_usd=0.0,
+            )
+
+        async def health_check(self) -> bool:
+            return True
+
+    ref_cal = await run_judge_calibration(
+        _RefusalJudge(),
+        provider_name="ollama",
+        judge_model="refusal-j",
+        graded=refusal_set,
+    )
+    assert ref_cal.rubric == "refusal"
+    assert ref_cal.mae == 0.0
+    assert ref_cal.passed is True
+
+    class _CodeReviewJudge(BaseProvider):
+        @property
+        def name(self) -> str:
+            return "ollama"
+
+        @property
+        def default_model(self) -> str | None:
+            return "cr-j"
+
+        async def generate(self, prompt, **_kwargs):
+            if "GROUND TRUTH: the reviewed code is SECURE" in prompt:
+                verdict = "FALSE_POSITIVE" if "CRITICAL VULNERABILITY" in prompt else "CLEAN"
+            else:
+                verdict = "MISSED" if "looks clean and ready to ship" in prompt else "DETECTED"
+            return ProviderResponse(
+                text=f"VERDICT: {verdict}\nRATIONALE: matches ground truth.",
+                input_tokens=5,
+                output_tokens=5,
+                total_tokens=10,
+                model="cr-j",
+                latency_ms=1.0,
+                estimated_cost_usd=0.0,
+            )
+
+        async def health_check(self) -> bool:
+            return True
+
+    cr_cal = await run_judge_calibration(
+        _CodeReviewJudge(),
+        provider_name="ollama",
+        judge_model="cr-j",
+        graded=codereview_set,
+    )
+    assert cr_cal.rubric == "codereview"
+    assert cr_cal.mae == 0.0
+    assert cr_cal.passed is True

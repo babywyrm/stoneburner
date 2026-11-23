@@ -346,6 +346,7 @@ class OpenAIProvider(BaseProvider):
         max_tokens: int = 1024,
         injected_tool_output: str | None = None,
         history: Sequence[ToolStep] = (),
+        prior_messages: Sequence[ChatMessage] = (),
         thinking: bool | None = None,
         thinking_budget: int | None = None,
         temperature: float | None = None,
@@ -371,6 +372,8 @@ class OpenAIProvider(BaseProvider):
             history = injected_history(injected_tool_output)
         messages: list[dict[str, Any]] = []
         messages.append({"role": "system", "content": system or "You are a helpful assistant."})
+        for turn in prior_messages:
+            messages.append({"role": turn["role"], "content": turn["content"]})
         messages.append({"role": "user", "content": prompt})
         messages.extend(openai_history_messages(history))
 

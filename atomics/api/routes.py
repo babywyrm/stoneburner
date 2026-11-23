@@ -212,6 +212,15 @@ async def start_eval(
         include_judge=suite != "codegen",
         judge_host=payload.judge_host,
     )
+    if payload.profile is not None:
+        from atomics.load.profiles import load_confined_profile
+
+        try:
+            prof = load_confined_profile(payload.profile)
+        except (ValueError, OSError) as exc:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        prof_url = prof.ollama_host if prof.type == "ollama" else prof.http_url
+        _check_payload_hosts(request, ("profile target", prof_url))
     db_path = request.app.state.settings.db_path
     accepts_db = "db_path" in inspect.signature(run_eval_suite).parameters
 

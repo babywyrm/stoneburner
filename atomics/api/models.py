@@ -107,6 +107,22 @@ class EvalRequest(BaseModel):
     runs: int = Field(default=1, ge=1, le=MAX_SWEEP_RUNS)
     channel: str | None = None
     temperature: float | None = Field(default=None, ge=0.0, le=2.0)
+    profile: str | None = None
+
+    @field_validator("profile")
+    @classmethod
+    def _profile_under_profiles(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        root = Path("profiles").resolve()
+        path = Path(value)
+        if (
+            path.is_absolute()
+            or path.suffix.lower() not in {".yaml", ".yml"}
+            or not path.resolve().is_relative_to(root)
+        ):
+            raise ValueError("profile must be a relative .yaml/.yml path under profiles/")
+        return value
 
     @field_validator("effort")
     @classmethod
@@ -120,6 +136,14 @@ class EvalRequest(BaseModel):
 
     @model_validator(mode="after")
     def _runs_and_channel_only_on_matching_suites(self) -> EvalRequest:
+        if self.profile is not None:
+            from atomics.eval.batteries import PROFILE_SUITES
+
+            if self.suite not in PROFILE_SUITES:
+                raise ValueError(
+                    f"profile is only valid for {sorted(PROFILE_SUITES)}; "
+                    f"{self.suite} does not support profile targets"
+                )
         if self.runs > 1 and self.suite not in EVAL_RUNS_SUITES:
             raise ValueError(
                 f"runs is only valid for {sorted(EVAL_RUNS_SUITES)}; "

@@ -21,8 +21,10 @@ from atomics.commands.common import (
     evaluation_record_from_fixture,
     integrity_exit_code,
     judge_options,
+    make_profile_provider,
     parse_extra_judges,
     print_judge_calibration,
+    profile_option,
     provider_options,
     run_async,
     temperature_option,
@@ -75,6 +77,7 @@ if TYPE_CHECKING:
     help="Return success for a partial run while preserving integrity details.",
 )
 @budget_option
+@profile_option
 @click.pass_context
 def refusal(
     ctx: click.Context,
@@ -97,6 +100,7 @@ def refusal(
     fixtures_filter: str | None,
     allow_partial: bool,
     budget_usd: float | None,
+    profile_path: Path | None,
 ) -> None:
     """Refusal calibration — measure over- and under-refusal."""
     from atomics.eval.refusal import run_refusal, select_fixtures
@@ -114,13 +118,17 @@ def refusal(
     console = Console()
     try:
         settings = load_settings()
-        provider = _make_provider(
-            provider_name,
-            model,
-            ollama_host,
-            settings,
-            vllm_host=vllm_host,
-        )
+        if profile_path is not None:
+            provider = make_profile_provider(profile_path)
+            provider_name = provider.name
+        else:
+            provider = _make_provider(
+                provider_name,
+                model,
+                ollama_host,
+                settings,
+                vllm_host=vllm_host,
+            )
         judge = _make_provider(
             judge_provider_name,
             judge_model,
