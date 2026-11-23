@@ -37,6 +37,7 @@ def test_dashboard_script_renders_run_and_job_via_textcontent(tmp_path: Path) ->
     report = json.loads(report_path.read_text(encoding="utf-8"))
 
     assert report["innerHTMLWrites"] == []
+    assert report["storedKey"] == "FRAGMENT_KEY"
     assert "SECRET_RESULT" not in report["allText"]
     assert "do not leak" not in report["allText"]
     assert "<img src=x onerror=alert(1)>" in report["allText"]

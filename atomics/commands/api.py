@@ -99,6 +99,12 @@ from rich.console import Console
     help="Allowlisted outbound inference/judge origin or URL prefix "
     "(repeatable or comma-separated). Rejects non-matching caller hosts with 403.",
 )
+@click.option(
+    "--allow-codegen",
+    is_flag=True,
+    default=False,
+    help="Enable remote submission of the codegen suite (executes model-generated Python).",
+)
 def server(
     host: str,
     port: int,
@@ -116,6 +122,7 @@ def server(
     max_request_bytes: int,
     max_caller_rpm: int | None,
     allowed_hosts: tuple[str, ...],
+    allow_codegen: bool,
 ) -> None:
     """Run the atomics API server."""
     console = Console()
@@ -157,6 +164,7 @@ def server(
             max_request_body_bytes=max_request_bytes,
             max_requests_per_minute_per_caller=max_caller_rpm,
             allowed_hosts=allowed_set,
+            allow_codegen=allow_codegen,
         )
     except ValueError as exc:
         console.print(f"[red]Error:[/red] {exc}")

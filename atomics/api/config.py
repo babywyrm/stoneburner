@@ -8,7 +8,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from atomics.paths import default_db_path
-from atomics.validation import AllowedEndpoint, is_endpoint_allowed, parse_allowed_endpoint
+from atomics.validation import (
+    AllowedEndpoint,
+    is_endpoint_allowed,
+    is_metadata_or_link_local_endpoint,
+    parse_allowed_endpoint,
+)
 
 DEFAULT_MAX_REQUEST_BODY_BYTES = 4 * 1024 * 1024
 MIN_REQUEST_BODY_BYTES = 1024
@@ -68,6 +73,9 @@ class ServerSettings:
     # Optional allowlist of outbound HTTP(S) origins or URL prefixes callers may
     # target via `host`, `judge_host`, battery profiles, or distributed runs.
     allowed_hosts: set[str] | None = None
+    # Remote submission of the `codegen` suite executes model-generated Python on
+    # the host; keep it disabled by default unless the operator opts in.
+    allow_codegen: bool = False
     _compiled_allowed_hosts: tuple[AllowedEndpoint, ...] | None = field(
         default=None, init=False, repr=False, compare=False
     )
@@ -130,8 +138,14 @@ class ServerSettings:
             )
 
     def check_outbound_host(self, url: str | None, *, label: str = "host") -> None:
-        """Validate a caller-supplied outbound endpoint against `allowed_hosts` when configured."""
-        if url is None or self._compiled_allowed_hosts is None:
+        """Validate a caller-supplied outbound endpoint against SSRF and `allowed_hosts`."""
+        if url is None:
+            return
+        if self._compiled_allowed_hosts is None:
+            if is_metadata_or_link_local_endpoint(url, label=label):
+                raise DisallowedHostError(
+                    f"{label} targets a blocked link-local or cloud-metadata address"
+                )
             return
         if not is_endpoint_allowed(url, self._compiled_allowed_hosts, label=label):
             raise DisallowedHostError(

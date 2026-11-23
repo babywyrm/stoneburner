@@ -218,6 +218,8 @@ class TestDashboardEscaping:
 
         assert "sessionStorage" in _DASHBOARD_HTML
         assert "history.replaceState" in _DASHBOARD_HTML
+        assert "window.location.search" not in _DASHBOARD_HTML
+        assert "location.search" not in _DASHBOARD_HTML
 
     def test_a_scripted_worker_label_is_stored_verbatim_not_rendered(self, tmp_path):
         """The payload round-trips as data; escaping happens at render time."""
@@ -935,3 +937,86 @@ def test_worker_submission_honors_failed_status_sanitizes_and_bounds_inputs(tmp_
 
         finished = tc.get(f"/api/v1/distributed/runs/{job['job_id']}", headers=ah).json()
         assert finished["status"] == "partial"
+
+
+class TestRemoteCodegenAndDefaultMetadataSsrf:
+    def test_codegen_is_blocked_over_http_unless_allow_codegen_is_enabled(
+        self, tmp_path, jobs_never_run
+    ):
+        denied_app = create_app(ServerSettings(api_keys={"k"}, db_path=tmp_path / "cg1.db"))
+        headers = {"X-API-Key": "k"}
+        with TestClient(denied_app, base_url="http://127.0.0.1") as tc:
+            res_eval = tc.post(
+                "/api/v1/evals",
+                json={"suite": "codegen", "provider": "ollama"},
+                headers=headers,
+            )
+            assert res_eval.status_code == 403
+            assert "--allow-codegen" in res_eval.json()["detail"]
+
+            res_dist = tc.post(
+                "/api/v1/distributed/runs",
+                json={
+                    "mode": "full",
+                    "eval_request": {"suite": "codegen", "provider": "ollama"},
+                },
+                headers=headers,
+            )
+            assert res_dist.status_code == 403
+
+        allowed_app = create_app(
+            ServerSettings(api_keys={"k"}, allow_codegen=True, db_path=tmp_path / "cg2.db")
+        )
+        with TestClient(allowed_app, base_url="http://127.0.0.1") as tc:
+            assert (
+                tc.post(
+                    "/api/v1/evals",
+                    json={"suite": "codegen", "provider": "ollama"},
+                    headers=headers,
+                ).status_code
+                == 202
+            )
+            assert (
+                tc.post(
+                    "/api/v1/distributed/runs",
+                    json={
+                        "mode": "full",
+                        "eval_request": {"suite": "codegen", "provider": "ollama"},
+                    },
+                    headers=headers,
+                ).status_code
+                == 202
+            )
+
+    @pytest.mark.parametrize(
+        "target",
+        [
+            "http://169.254.169.254/latest/meta-data",
+            "http://[::ffff:169.254.169.254]:80/latest",
+            "http://[fe80::1]:8080/v1",
+            "http://100.100.100.200/latest/meta-data",
+            "http://[fd00:ec2::254]/latest/meta-data",
+            "http://metadata.google.internal/computeMetadata/v1",
+        ],
+    )
+    def test_metadata_and_link_local_hosts_blocked_even_without_allowed_hosts(
+        self, tmp_path, jobs_never_run, target
+    ):
+        app = create_app(ServerSettings(api_keys={"k"}, db_path=tmp_path / "imds.db"))
+        headers = {"X-API-Key": "k"}
+        with TestClient(app, base_url="http://127.0.0.1") as tc:
+            res = tc.post(
+                "/api/v1/evals",
+                json={"suite": "refusal", "provider": "ollama", "host": target},
+                headers=headers,
+            )
+            assert res.status_code == 403
+            res_dist = tc.post(
+                "/api/v1/distributed/runs",
+                json={
+                    "mode": "full",
+                    "eval_request": {"suite": "refusal", "provider": "ollama", "host": target},
+                },
+                headers=headers,
+            )
+            assert res_dist.status_code == 403

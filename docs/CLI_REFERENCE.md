@@ -281,6 +281,7 @@ runs such as a local model judged by a paid one.
 | `atomics server --max-active-jobs-per-caller N` | Maximum concurrent active jobs per API key (default: 4) |
 | `atomics server --max-caller-spend-usd USD` | Optional cumulative USD spend ceiling per API key across runs (SQLite-persisted) |
 | `atomics server --allowed-host URL` | Restrict caller-supplied outbound `host` / `judge_host` targets to approved HTTP(S) origins or URL prefixes (repeatable; alias `--allowed-hosts`) |
+| `atomics server --allow-codegen` | Enable remote submission of the `codegen` suite (disabled by default) |
 | `atomics worker` | Start a distributed worker (polls coordinator for tasks) |
 | `atomics worker-npm` | Start a Node.js worker bridge for distributed task execution |
 | `atomics distributed run` | Submit a distributed run (split, fleet, or full mode) |
@@ -347,6 +348,9 @@ Start a worker process that registers with the coordinator, heartbeats, polls fo
 | `--provider`, `-p` | Provider used by this worker (default: `ollama`) |
 | `--model`, `-m` | Model override for this worker |
 | `--host`, `-h` | Provider host/URL override (e.g. `http://localhost:30080`) |
+| `--lock-host` | Reject caller-supplied `host` / `judge_host` overrides in dispatched assignments |
+| `--allowed-host URL` | Restrict outbound inference/judge targets on this worker (repeatable; alias `--allowed-hosts`) |
+| `--allow-codegen` | Allow distributed execution of the `codegen` suite (disabled by default) |
 
 `--host` applies to whichever provider the worker selected, including `vllm`.
 

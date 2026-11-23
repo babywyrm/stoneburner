@@ -106,17 +106,19 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
   </div>
 
   <script>
-    // The key is held in sessionStorage rather than the URL so it does not leak
-    // into browser history, referrer headers, or reverse-proxy access logs.
+    // The key is held in sessionStorage (or passed once via #api_key=... in the
+    // URL fragment, which browsers never send over HTTP) rather than the query
+    // string so it cannot leak into referrer headers or reverse-proxy logs.
     function readKey() {
-      const params = new URLSearchParams(window.location.search);
-      const fromUrl = params.get("api_key");
-      if (fromUrl) {
-        sessionStorage.setItem("atomics_api_key", fromUrl);
+      const rawHash = (window.location.hash || "").replace(/^#/, "");
+      const params = new URLSearchParams(rawHash);
+      const fromHash = params.get("api_key");
+      if (fromHash) {
+        sessionStorage.setItem("atomics_api_key", fromHash);
         params.delete("api_key");
         const rest = params.toString();
-        history.replaceState(null, "", window.location.pathname + (rest ? "?" + rest : ""));
-        return fromUrl;
+        history.replaceState(null, "", window.location.pathname + (rest ? "#" + rest : ""));
+        return fromHash;
       }
       return sessionStorage.getItem("atomics_api_key") || "";
     }
@@ -190,7 +192,7 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
 
     function clearRun() {
       if (location.hash.startsWith("#run=")) {
-        history.replaceState(null, "", location.pathname + location.search);
+        history.replaceState(null, "", location.pathname);
       }
       document.getElementById("run-detail").classList.remove("visible");
     }
@@ -204,7 +206,7 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
 
     function clearJob() {
       if (location.hash.startsWith("#job=")) {
-        history.replaceState(null, "", location.pathname + location.search);
+        history.replaceState(null, "", location.pathname);
       }
       document.getElementById("job-detail").classList.remove("visible");
     }

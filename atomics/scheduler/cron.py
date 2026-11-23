@@ -4,12 +4,68 @@ from __future__ import annotations
 
 import platform
 import plistlib
+import shlex
 import shutil
 import subprocess
 import sys
 from collections.abc import Callable
 from pathlib import Path
 from typing import Protocol
+
+from atomics.models import BurnTier
+from atomics.providers.factory import PROVIDER_NAMES
+
+_VALID_TIERS: frozenset[str] = frozenset(t.value for t in BurnTier)
+_VALID_PROVIDERS: frozenset[str] = frozenset(PROVIDER_NAMES)
+
+
+def _has_control_chars(value: str) -> bool:
+    return any(ord(ch) < 32 or ord(ch) == 127 for ch in value)
+
+
+def _validate_interval_minutes(value: int) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1 or value > 1440:
+        raise ValueError(f"interval_minutes must be an integer in 1..1440, got {value!r}")
+    return value
+
+
+def _validate_max_iterations(value: int) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1 or value > 100_000:
+        raise ValueError(f"max_iterations must be an integer in 1..100000, got {value!r}")
+    return value
+
+
+def _validate_tier(tier: str) -> str:
+    if tier not in _VALID_TIERS:
+        raise ValueError(f"Invalid tier {tier!r}; expected one of {sorted(_VALID_TIERS)}")
+    return tier
+
+
+def _validate_provider(provider: str) -> str:
+    if provider not in _VALID_PROVIDERS:
+        raise ValueError(
+            f"Invalid provider {provider!r}; expected one of {sorted(_VALID_PROVIDERS)}"
+        )
+    return provider
+
+
+def _validate_label(label: str) -> str:
+    if (
+        not label
+        or _has_control_chars(label)
+        or "/" in label
+        or "\\" in label
+        or ".." in label
+        or label.startswith(".")
+    ):
+        raise ValueError(f"Invalid schedule label {label!r}")
+    return label
+
+
+def _validate_single_line_path(value: str, *, field: str) -> str:
+    if not value or _has_control_chars(value):
+        raise ValueError(f"{field} must be non-empty and free of control characters")
+    return value
 
 
 class _CmdResult(Protocol):
@@ -33,10 +89,18 @@ def generate_crontab_entry(
     tier: str = "baseline",
     provider: str = "claude",
 ) -> str:
-    py = python_path or shutil.which("python3") or sys.executable
+    _validate_interval_minutes(interval_minutes)
+    _validate_max_iterations(max_iterations)
+    _validate_tier(tier)
+    _validate_provider(provider)
+    py = _validate_single_line_path(
+        python_path or shutil.which("python3") or sys.executable, field="python_path"
+    )
+    cwd = _validate_single_line_path(str(Path.cwd()), field="working_dir")
     return (
         f"*/{interval_minutes} * * * * "
-        f"cd {Path.cwd()} && {py} -m atomics run --tier {tier} --provider {provider} "
+        f"cd {shlex.quote(cwd)} && {shlex.quote(py)} -m atomics run "
+        f"--tier {tier} --provider {provider} "
         f"--trigger scheduled "
         f"--max-iterations {max_iterations} >> logs/atomics-cron.log 2>&1"
     )
@@ -49,10 +113,14 @@ def generate_systemd_timer(
     tier: str = "baseline",
     provider: str = "claude",
 ) -> tuple[str, str]:
-    wd = working_dir or str(Path.cwd())
-    py = shutil.which("python3") or sys.executable
+    _validate_interval_minutes(interval_minutes)
+    _validate_max_iterations(max_iterations)
+    _validate_tier(tier)
+    _validate_provider(provider)
+    wd = _validate_single_line_path(working_dir or str(Path.cwd()), field="working_dir")
+    py = _validate_single_line_path(shutil.which("python3") or sys.executable, field="python_path")
     exec_start = (
-        f"{py} -m atomics run --tier {tier} --provider {provider} "
+        f"{shlex.quote(py)} -m atomics run --tier {tier} --provider {provider} "
         f"--trigger scheduled --max-iterations {max_iterations}"
     )
 
@@ -90,8 +158,13 @@ def generate_launchd_plist(
     tier: str = "baseline",
     provider: str = "claude",
 ) -> str:
-    wd = working_dir or str(Path.cwd())
-    py = shutil.which("python3") or sys.executable
+    _validate_interval_minutes(interval_minutes)
+    _validate_max_iterations(max_iterations)
+    _validate_label(label)
+    _validate_tier(tier)
+    _validate_provider(provider)
+    wd = _validate_single_line_path(working_dir or str(Path.cwd()), field="working_dir")
+    py = _validate_single_line_path(shutil.which("python3") or sys.executable, field="python_path")
     interval_seconds = interval_minutes * 60
     log_path = f"{wd}/logs/atomics.log"
     payload = {
@@ -124,6 +197,7 @@ def generate_launchd_plist(
 
 def install_crontab(entry: str, *, run_cmd: _RunCmd = subprocess.run) -> str:
     """Append an atomics crontab entry, avoiding duplicates."""
+    _validate_single_line_path(entry, field="crontab entry")
     result = run_cmd(["crontab", "-l"], capture_output=True, text=True)
     existing = result.stdout if result.returncode == 0 else ""
 
@@ -161,6 +235,8 @@ def install_launchd(
     home_dir: Path | None = None,
 ) -> str:
     """Write plist and load it via launchctl."""
+    _validate_label(label)
+    _validate_tier(tier)
     home = home_dir or Path.home()
     plist_dir = home / "Library" / "LaunchAgents"
     plist_dir.mkdir(parents=True, exist_ok=True)
@@ -190,6 +266,8 @@ def uninstall_launchd(
     home_dir: Path | None = None,
 ) -> str:
     """Unload and remove launchd plist."""
+    _validate_label(label)
+    _validate_tier(tier)
     home = home_dir or Path.home()
     plist_path = home / "Library" / "LaunchAgents" / f"{label}.{tier}.plist"
     if not plist_path.exists():
@@ -209,6 +287,7 @@ def install_systemd(
     home_dir: Path | None = None,
 ) -> str:
     """Write systemd user units and enable the timer."""
+    _validate_tier(tier)
     home = home_dir or Path.home()
     unit_dir = home / ".config" / "systemd" / "user"
     unit_dir.mkdir(parents=True, exist_ok=True)
@@ -236,6 +315,7 @@ def uninstall_systemd(
     home_dir: Path | None = None,
 ) -> str:
     """Disable and remove systemd user units."""
+    _validate_tier(tier)
     run_cmd(
         ["systemctl", "--user", "disable", "--now", f"atomics-{tier}.timer"],
         capture_output=True,
@@ -272,7 +352,11 @@ def check_schedule_health(
     home_dir: Path | None = None,
 ) -> bool:
     """Check whether the OS-level schedule is actually active."""
+    if fmt not in {"launchd", "systemd", "crontab"}:
+        return False
+    _validate_tier(tier)
     if fmt == "launchd":
+        _validate_label(label)
         result = run_cmd(
             ["launchctl", "list", f"{label}.{tier}"],
             capture_output=True,

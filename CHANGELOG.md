@@ -3,6 +3,11 @@
 ## Unreleased
 
 ### Added
+- `atomics server --allow-codegen` and `atomics worker --allow-codegen` (off by
+  default) gate remote `codegen` suite execution over HTTP (`403`) and
+  distributed worker dispatch (`PermissionError`); `atomics worker` also gains
+  `--lock-host` and `--allowed-host` / `--allowed-hosts` to reject unauthorized
+  submitter host overrides.
 - `atomics repl` exposes `submit_battery`, `list_workers`,
   `submit_distributed_run`, `get_distributed_run`, and `list_distributed_runs`
   with quiet formatters, `wait` polling over `/api/v1/distributed/runs/{job_id}`
@@ -76,6 +81,16 @@
   retired legacy post-split helper/command re-exports from `atomics/cli.py`.
 
 ### Fixed
+- `ServerSettings.check_outbound_host()` and distributed worker outbound checks
+  now block link-local, unspecified, and cloud-metadata SSRF targets
+  (`169.254.0.0/16`, `fe80::/10`, `::ffff:169.254.169.254`, `100.100.100.200`,
+  `fd00:ec2::254`, `metadata.google.internal`) even when `--allowed-hosts` is
+  not configured; `/dashboard` drops `?api_key=` query-string ingestion in
+  favor of `sessionStorage` or `#api_key=` URL fragments; `scheduler/cron.py`
+  quotes shell paths via `shlex.quote()` and validates `tier`, `provider`,
+  `label`, and control characters; and `auth/oauth.py` enforces HTTPS (or
+  loopback HTTP) control-character-free URIs and bounded `expires_in`
+  device-code polling.
 - `/api/v1/compare`, `/api/v1/reports/recent-runs`, `POST /api/v1/runs`,
   `POST /api/v1/evals`, `POST /api/v1/sweeps`, and `POST /api/v1/batteries`
   now use `ServerSettings.db_path` (including `judge_calibration` lookups)

@@ -100,6 +100,41 @@ major tag moved by the publish workflow.
       battery/distributed `submit_*` and completed/`partial` headlines) and
       `wait` polling support for distributed coordinator jobs.
 
+## 0.39.0 — Remote codegen gate, SSRF/worker lock-host, and cron/OIDC hardening
+
+- [x] Gate remote `codegen` execution on `atomics server` and `atomics worker`
+      behind explicit `--allow-codegen` (off by default, `403` when disabled).
+- [x] Block link-local and cloud metadata SSRF (`169.254.0.0/16`, `fe80::/10`,
+      `100.100.100.200`, `fd00:ec2::254`, `metadata.google.internal`) by default
+      on API and worker outbound endpoints even when `--allowed-hosts` is unset,
+      and add `--lock-host` / `--allowed-hosts` to `atomics worker`.
+- [x] Drop `?api_key=` query-string ingestion from `/dashboard` (`readKey()`
+      uses `sessionStorage` or `#api_key=` fragment only).
+- [x] Quote paths with `shlex.quote()` and validate `tier` / `provider` /
+      `label` in `atomics/scheduler/cron.py`; enforce HTTPS/loopback URI
+      validation and `expires_in` device-flow deadlines in
+      `atomics/auth/oauth.py`.
+
+## 0.40.0 — Debloating: retire `worker-npm`, unify sweep, and share API client
+
+- [ ] Retire the vestigial Node.js `worker-npm` bridge (`atomics/workers/`,
+      `atomics/commands/worker_npm.py`).
+- [ ] Collapse `atomics/benchmark/sweep.py` into `atomics/eval/gauntlet.py` so
+      `atomics sweep` has one orchestrator and persistence path.
+- [ ] Route `atomics distributed` CLI commands through `AtomicsApiClient`
+      instead of raw `httpx` requests.
+
+## 0.41.0 — ProfileProvider, multi-turn toolcall escalation, and calibration presets
+
+- [ ] Add `ProfileProvider` (`--profile`) to `adversarial`, `refusal`,
+      `redblue`, and `battery` so app-level HTTP AI gates can run full security
+      suites.
+- [ ] Add multi-turn user-escalation `toolcall` fixtures where benign early
+      turns establish authority/context before Turn 3 requests a dangerous tool.
+- [ ] Ship payload-free human-graded calibration presets for `refusal` and
+      `codereview` in `atomics judge-calibrate`.
+- [ ] Add `--suite` (`eval_request`) support to `atomics distributed run`.
+
 ## Empirical Baselines
 
 - **Reference judge (`gemma4:26b`).** A red/blue study on six local models

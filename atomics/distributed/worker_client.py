@@ -11,7 +11,11 @@ from typing import Any
 import httpx
 
 from atomics.distributed.models import TaskAssignment, WorkerRegisterRequest
-from atomics.distributed.worker_runner import execute_assignment, execute_full_run
+from atomics.distributed.worker_runner import (
+    _compile_worker_allowed_hosts,
+    execute_assignment,
+    execute_full_run,
+)
 from atomics.validation import sanitize_error, validate_endpoint_url
 
 logger = logging.getLogger("atomics.distributed.worker_client")
@@ -32,6 +36,9 @@ class WorkerClient:
         provider_name: str = "ollama",
         model: str | None = None,
         host: str | None = None,
+        allow_codegen: bool = False,
+        lock_host: bool = False,
+        allowed_hosts: set[str] | None = None,
     ) -> None:
         self.coordinator_url = validate_endpoint_url(coordinator_url, label="coordinator")
         self.api_key = api_key
@@ -39,11 +46,15 @@ class WorkerClient:
         self.endpoint = (
             validate_endpoint_url(endpoint, label="worker endpoint") if endpoint else None
         )
+        _compile_worker_allowed_hosts(allowed_hosts)
         self.heartbeat_interval = heartbeat_interval
         self._executor: Executor = executor or execute_assignment
         self._provider_name = provider_name
         self._model = model
         self._host = host
+        self._allow_codegen = allow_codegen
+        self._lock_host = lock_host
+        self._allowed_hosts = allowed_hosts
         self._worker_id: str | None = None
         self._shutdown = asyncio.Event()
         self._client = httpx.AsyncClient(
@@ -90,6 +101,18 @@ class WorkerClient:
                     provider_name=self._provider_name,
                     model=self._model,
                     host=self._host,
+                    allow_codegen=self._allow_codegen,
+                    lock_host=self._lock_host,
+                    allowed_hosts=self._allowed_hosts,
+                )
+            elif self._executor is execute_assignment:
+                result = await execute_assignment(
+                    assignment,
+                    provider_name=self._provider_name,
+                    model=self._model,
+                    host=self._host,
+                    lock_host=self._lock_host,
+                    allowed_hosts=self._allowed_hosts,
                 )
             else:
                 result = await self._executor(

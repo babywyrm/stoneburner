@@ -106,8 +106,8 @@ ids["key-input"].value = "";
 const store = {};
 const location = {
   pathname: "/dashboard",
-  search: "",
-  hash: "#run=dash-run",
+  search: "?api_key=LEAKED_QUERY_KEY",
+  hash: "#api_key=FRAGMENT_KEY&run=dash-run",
 };
 const history = {
   replaceState(_s, _t, url) {
@@ -316,6 +316,7 @@ fs.writeFileSync(
       innerHTMLWrites,
       htmlSerializations,
       allText,
+      storedKey: store["atomics_api_key"] ?? null,
       runDetailVisible: (ids["run-detail"].className || "").includes("visible"),
       jobDetailVisible: (ids["job-detail"].className || "").includes("visible"),
     },

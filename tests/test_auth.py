@@ -1033,3 +1033,89 @@ def test_callback_handler_oauth_error():
     server.shutdown()
     server.server_close()
     loop.close()
+
+
+@pytest.mark.asyncio
+async def test_oauth_rejects_unsafe_uris_and_control_chars(tmp_path: Path):
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    from atomics.auth.profiles import OIDCProfile
+
+    js_profile = OIDCProfile(
+        name="bad",
+        issuer="https://idp.example.com",
+        authorization_endpoint="javascript:alert(1)",
+        token_endpoint="https://idp.example.com/token",
+        client_id="cid",
+    )
+    auth = OAuthPKCEAuth(profile=js_profile, store=TokenStore(tmp_path / "a.json"))
+    with patch("webbrowser.open") as mock_open, pytest.raises(ValueError, match="https"):
+        await auth._browser_flow()
+    mock_open.assert_not_called()
+
+    device_resp = MagicMock()
+    device_resp.raise_for_status = MagicMock()
+    device_resp.json = MagicMock(
+        return_value={
+            "device_code": "dc-bad",
+            "user_code": "ABCD\x1b[2J",
+            "verification_uri": "https://example.com/activate",
+            "interval": 1,
+        }
+    )
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock(return_value=device_resp)
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+
+    dev_auth = OAuthPKCEAuth(profile=_DEVICE_PROFILE, store=TokenStore(tmp_path / "b.json"))
+    with (
+        patch("httpx.AsyncClient", return_value=mock_client),
+        pytest.raises(ValueError, match="control"),
+    ):
+        await dev_auth._device_code_flow()
+
+
+@pytest.mark.asyncio
+async def test_oauth_device_code_flow_times_out(tmp_path: Path):
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    device_resp = MagicMock()
+    device_resp.raise_for_status = MagicMock()
+    device_resp.json = MagicMock(
+        return_value={
+            "device_code": "dc-exp",
+            "user_code": "ABCD-1234",
+            "verification_uri": "https://example.com/activate",
+            "interval": 5,
+            "expires_in": 10,
+        }
+    )
+    pending_resp = MagicMock()
+    pending_resp.status_code = 400
+    pending_resp.raise_for_status = MagicMock()
+    pending_resp.json = MagicMock(return_value={"error": "authorization_pending"})
+
+    async def fake_post(url, **_kw):
+        return device_resp if "device/code" in url else pending_resp
+
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock(side_effect=fake_post)
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+
+    clock = [100.0]
+
+    def fake_monotonic() -> float:
+        val = clock[0]
+        clock[0] += 6.0
+        return val
+
+    dev_auth = OAuthPKCEAuth(profile=_DEVICE_PROFILE, store=TokenStore(tmp_path / "c.json"))
+    with (
+        patch("httpx.AsyncClient", return_value=mock_client),
+        patch("asyncio.sleep", new=AsyncMock()),
+        patch("atomics.auth.oauth.time.monotonic", side_effect=fake_monotonic),
+        pytest.raises(TimeoutError, match="timed out"),
+    ):
+        await dev_auth._device_code_flow()

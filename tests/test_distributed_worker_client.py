@@ -222,3 +222,53 @@ async def test_worker_client_run_closes_http_client_on_exit(mock_httpx_client):
     worker.shutdown()
     await worker.run()
     mock_httpx_client.aclose.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_execute_full_run_enforces_codegen_lock_host_and_ssrf():
+    from atomics.distributed.models import TaskAssignment
+    from atomics.distributed.worker_runner import execute_full_run
+
+    cg_assignment = TaskAssignment(
+        assignment_id="a-cg",
+        job_id="j-cg",
+        task_spec={"mode": "full", "eval_request": {"suite": "codegen", "provider": "ollama"}},
+    )
+    with pytest.raises(PermissionError, match="allow-codegen"):
+        await execute_full_run(cg_assignment)
+
+    override_assignment = TaskAssignment(
+        assignment_id="a-lock",
+        job_id="j-lock",
+        task_spec={
+            "mode": "full",
+            "eval_request": {
+                "suite": "refusal",
+                "provider": "ollama",
+                "host": "http://10.0.0.99:11434",
+            },
+        },
+    )
+    with pytest.raises(PermissionError, match="lock-host"):
+        await execute_full_run(override_assignment, host="http://127.0.0.1:11434", lock_host=True)
+
+    with pytest.raises(PermissionError, match="allowlist"):
+        await execute_full_run(
+            override_assignment,
+            allowed_hosts={"http://127.0.0.1:11434"},
+        )
+
+    imds_assignment = TaskAssignment(
+        assignment_id="a-imds",
+        job_id="j-imds",
+        task_spec={
+            "mode": "full",
+            "eval_request": {
+                "suite": "refusal",
+                "provider": "ollama",
+                "host": "http://169.254.169.254/latest/meta-data",
+            },
+        },
+    )
+    with pytest.raises(PermissionError, match="metadata|link-local"):
+        await execute_full_run(imds_assignment)

@@ -48,6 +48,44 @@ class AllowedEndpoint:
     path_prefix: str = ""
 
 
+_METADATA_HOSTNAMES: frozenset[str] = frozenset(
+    {"metadata.google.internal", "metadata.goog", "instance-data"}
+)
+_CLOUD_METADATA_IPS: frozenset[ipaddress.IPv4Address | ipaddress.IPv6Address] = frozenset(
+    {
+        ipaddress.ip_address("100.100.100.200"),
+        ipaddress.ip_address("fd00:ec2::254"),
+    }
+)
+
+
+def _canonical_endpoint_host(url: str, *, label: str = "host") -> str:
+    cleaned = validate_endpoint_url(url, label=label)
+    parsed = urlparse(cleaned)
+    raw_host = (parsed.hostname or "").lower().rstrip(".")
+    if not raw_host:
+        raise ValueError(f"{label}: missing hostname")
+    try:
+        ip = ipaddress.ip_address(raw_host)
+    except ValueError:
+        return raw_host
+    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
+        ip = ip.ipv4_mapped
+    return str(ip)
+
+
+def is_metadata_or_link_local_endpoint(url: str, *, label: str = "host") -> bool:
+    """Return True if `url` targets a link-local, unspecified, or cloud-metadata address."""
+    host = _canonical_endpoint_host(url, label=label)
+    if host in _METADATA_HOSTNAMES:
+        return True
+    try:
+        ip = ipaddress.ip_address(host)
+    except ValueError:
+        return False
+    return ip.is_link_local or ip.is_unspecified or ip in _CLOUD_METADATA_IPS
+
+
 def parse_allowed_endpoint(url: str, *, label: str = "endpoint") -> AllowedEndpoint:
     """Validate and canonicalize an HTTP(S) endpoint URL for origin/path matching."""
     raw = url.strip()
@@ -63,18 +101,7 @@ def parse_allowed_endpoint(url: str, *, label: str = "endpoint") -> AllowedEndpo
     if port < 1 or port > 65535:
         raise ValueError(f"{label}: port out of range 1..65535")
 
-    raw_host = (parsed.hostname or "").lower().rstrip(".")
-    if not raw_host:
-        raise ValueError(f"{label}: missing hostname")
-    try:
-        ip = ipaddress.ip_address(raw_host)
-    except ValueError:
-        canonical_host = raw_host
-    else:
-        if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
-            ip = ip.ipv4_mapped
-        canonical_host = str(ip)
-
+    canonical_host = _canonical_endpoint_host(cleaned, label=label)
     path_prefix = parsed.path.rstrip("/")
     return AllowedEndpoint(
         scheme=parsed.scheme,

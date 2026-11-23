@@ -187,3 +187,39 @@ def test_launchd_plist_escapes_xml_special_chars():
     parsed = plistlib.loads(plist.encode("utf-8"))
     assert parsed["WorkingDirectory"] == "/tmp/dir & <evil>"
     assert parsed["Label"] == "com.example.a&b.ez"
+
+
+def test_scheduler_quotes_shell_paths_and_rejects_injection(tmp_path):
+    import pytest
+
+    from atomics.scheduler.cron import install_crontab, install_launchd, uninstall_launchd
+
+    quoted = generate_crontab_entry(python_path="/opt/my dir/python3; echo pwned")
+    assert "'/opt/my dir/python3; echo pwned'" in quoted
+
+    with pytest.raises(ValueError, match="tier"):
+        generate_crontab_entry(tier="baseline; rm -rf /")
+
+    with pytest.raises(ValueError, match="provider"):
+        generate_systemd_timer(provider="claude\nExecStartPre=/bin/sh")
+
+    with pytest.raises(ValueError, match="interval"):
+        generate_crontab_entry(interval_minutes=0)
+
+    with pytest.raises(ValueError, match="interval"):
+        generate_crontab_entry(interval_minutes=True)
+
+    with pytest.raises(ValueError, match="max_iterations"):
+        generate_launchd_plist(max_iterations=0)
+
+    with pytest.raises(ValueError, match="control"):
+        generate_systemd_timer(working_dir="/opt/app\nExecStartPre=/bin/true")
+
+    with pytest.raises(ValueError, match="label"):
+        install_launchd("<plist/>", label="../../evil", home_dir=tmp_path, run_cmd=_fake_run())
+
+    with pytest.raises(ValueError, match="label"):
+        uninstall_launchd(label="../outside", home_dir=tmp_path, run_cmd=_fake_run())
+
+    with pytest.raises(ValueError, match="control"):
+        install_crontab("* * * * * echo ok\n* * * * * id", run_cmd=_fake_run())

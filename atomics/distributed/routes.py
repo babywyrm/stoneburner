@@ -218,7 +218,7 @@ def _validate_distributed_eval_request(
         candidate["provider"] = "ollama"
     try:
         parsed = EvalRequest(**candidate)
-        validate_eval_suite(parsed.suite)
+        suite = validate_eval_suite(parsed.suite)
     except ValidationError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -229,6 +229,14 @@ def _validate_distributed_eval_request(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
         ) from exc
+    if suite == "codegen" and not request.app.state.settings.allow_codegen:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                "codegen suite is disabled on this server; start with "
+                "--allow-codegen to enable remote code execution"
+            ),
+        )
 
     settings = request.app.state.settings
     if settings.allowed_hosts is not None and not eval_request.get("judge_host"):

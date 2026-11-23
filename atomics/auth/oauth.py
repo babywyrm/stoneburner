@@ -21,6 +21,32 @@ from atomics.auth.store import CachedTokens, TokenStore
 
 logger = logging.getLogger("atomics.auth.oauth")
 
+_LOOPBACK_OAUTH_HOSTS: frozenset[str] = frozenset({"localhost", "127.0.0.1", "::1"})
+
+
+def _validate_oauth_uri(uri: str, *, label: str) -> str:
+    """Validate an OAuth endpoint or verification URI before opening or printing it."""
+    if not uri or any(ord(ch) <= 32 or ord(ch) == 127 for ch in uri):
+        raise ValueError(
+            f"{label}: URI must be non-empty and free of whitespace or control characters"
+        )
+    parsed = urlparse(uri)
+    if parsed.username or parsed.password:
+        raise ValueError(f"{label}: embedded credentials not allowed")
+    host = (parsed.hostname or "").lower()
+    is_loopback_http = parsed.scheme == "http" and host in _LOOPBACK_OAUTH_HOSTS
+    if parsed.scheme != "https" and not is_loopback_http:
+        raise ValueError(f"{label}: must use https (or loopback http), got {parsed.scheme!r}")
+    if not host:
+        raise ValueError(f"{label}: missing hostname")
+    return uri
+
+
+def _validate_terminal_safe(text: str, *, label: str) -> str:
+    if any(ord(ch) < 32 or ord(ch) == 127 for ch in text):
+        raise ValueError(f"{label}: control characters not allowed")
+    return text
+
 
 def _generate_pkce() -> tuple[str, str]:
     """Generate PKCE code_verifier and code_challenge (S256)."""
@@ -80,6 +106,10 @@ class OAuthPKCEAuth(AuthStrategy):
 
     async def _browser_flow(self) -> CachedTokens:
         """PKCE authorization code flow with local redirect."""
+        auth_endpoint = _validate_oauth_uri(
+            self._profile.authorization_endpoint, label="authorization_endpoint"
+        )
+        _validate_oauth_uri(self._profile.token_endpoint, label="token_endpoint")
         verifier, challenge = _generate_pkce()
         state = secrets.token_urlsafe(16)
 
@@ -93,7 +123,7 @@ class OAuthPKCEAuth(AuthStrategy):
             "code_challenge": challenge,
             "code_challenge_method": "S256",
         }
-        auth_url = f"{self._profile.authorization_endpoint}?{urlencode(params)}"
+        auth_url = f"{auth_endpoint}?{urlencode(params)}"
 
         code_future: asyncio.Future[str] = asyncio.get_running_loop().create_future()
         server = _start_callback_server(
@@ -114,10 +144,14 @@ class OAuthPKCEAuth(AuthStrategy):
         """Device authorization grant for headless environments."""
         if not self._profile.device_authorization_endpoint:
             raise RuntimeError(f"Profile {self._profile.name!r} does not support device code flow")
+        device_endpoint = _validate_oauth_uri(
+            self._profile.device_authorization_endpoint, label="device_authorization_endpoint"
+        )
+        token_endpoint = _validate_oauth_uri(self._profile.token_endpoint, label="token_endpoint")
 
         async with httpx.AsyncClient() as client:
             resp = await client.post(
-                self._profile.device_authorization_endpoint,
+                device_endpoint,
                 data={
                     "client_id": self._profile.client_id,
                     "scope": " ".join(self._profile.scopes),
@@ -126,10 +160,25 @@ class OAuthPKCEAuth(AuthStrategy):
             resp.raise_for_status()
             body = resp.json()
 
-        verification_uri = body.get("verification_uri_complete") or body.get("verification_uri", "")
-        user_code = body.get("user_code", "")
-        device_code = body["device_code"]
-        poll_interval = body.get("interval", 5)
+        raw_uri = body.get("verification_uri_complete") or body.get("verification_uri", "")
+        verification_uri = _validate_oauth_uri(str(raw_uri), label="verification_uri")
+        user_code = _validate_terminal_safe(str(body.get("user_code", "")), label="user_code")
+        device_code = str(body["device_code"])
+        raw_interval = body.get("interval", 5)
+        poll_interval = (
+            max(0.0, float(raw_interval))
+            if isinstance(raw_interval, int | float) and not isinstance(raw_interval, bool)
+            else 5.0
+        )
+        raw_expires = body.get("expires_in", 600)
+        expires_in = (
+            min(3600.0, float(raw_expires))
+            if isinstance(raw_expires, int | float)
+            and not isinstance(raw_expires, bool)
+            and raw_expires > 0
+            else 600.0
+        )
+        deadline = time.monotonic() + expires_in
 
         print(f"\nVisit: {verification_uri}")
         if user_code:
@@ -137,10 +186,12 @@ class OAuthPKCEAuth(AuthStrategy):
         print("Waiting for authorization...\n")
 
         async with httpx.AsyncClient() as client:
-            while True:
+            while time.monotonic() < deadline:
                 await asyncio.sleep(poll_interval)
+                if time.monotonic() >= deadline:
+                    break
                 resp = await client.post(
-                    self._profile.token_endpoint,
+                    token_endpoint,
                     data={
                         "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
                         "device_code": device_code,
@@ -154,14 +205,16 @@ class OAuthPKCEAuth(AuthStrategy):
                 if error == "authorization_pending":
                     continue
                 if error == "slow_down":
-                    poll_interval += 5
+                    poll_interval += 5.0
                     continue
                 resp.raise_for_status()
+        raise TimeoutError("Device authorization timed out")
 
     async def _exchange_code(self, code: str, verifier: str, redirect_uri: str) -> CachedTokens:
+        token_endpoint = _validate_oauth_uri(self._profile.token_endpoint, label="token_endpoint")
         async with httpx.AsyncClient() as client:
             resp = await client.post(
-                self._profile.token_endpoint,
+                token_endpoint,
                 data={
                     "grant_type": "authorization_code",
                     "code": code,
@@ -174,9 +227,10 @@ class OAuthPKCEAuth(AuthStrategy):
             return self._parse_token_response(resp.json())
 
     async def _refresh(self, tokens: CachedTokens) -> CachedTokens:
+        token_endpoint = _validate_oauth_uri(self._profile.token_endpoint, label="token_endpoint")
         async with httpx.AsyncClient() as client:
             resp = await client.post(
-                self._profile.token_endpoint,
+                token_endpoint,
                 data={
                     "grant_type": "refresh_token",
                     "refresh_token": tokens.refresh_token,

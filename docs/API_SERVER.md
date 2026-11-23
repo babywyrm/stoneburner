@@ -62,6 +62,12 @@ To lock callers to approved inference and judge endpoints only, pass repeatable
 `--allowed-host` (or comma-separated `--allowed-hosts`) with exact HTTP(S)
 origins or URL prefixes; non-matching `host`, `judge_host`, battery `profile`,
 or distributed host overrides are rejected at request admission with `403`.
+Even without `--allowed-hosts`, link-local, unspecified, and cloud-metadata
+addresses (`169.254.0.0/16`, `fe80::/10`, `100.100.100.200`, `fd00:ec2::254`,
+`metadata.google.internal`) are always rejected with `403`. Remote submission of
+the `codegen` suite (which executes model-generated Python) is disabled over
+HTTP and distributed dispatch unless `--allow-codegen` is passed to
+`atomics server` (and `atomics worker` for distributed runs).
 
 ### Separate worker keys
 
@@ -202,10 +208,11 @@ uv run atomics server --no-auth --with-dashboard
 ```
 
 Open `http://127.0.0.1:8000/dashboard`. When authentication is enabled the page
-prompts for a key and keeps it in `sessionStorage`. You can still pass
-`?api_key=YOUR_KEY` to prefill it — the dashboard saves it and immediately
-strips it from the address bar so it does not linger in browser history,
-referrer headers, or proxy access logs.
+prompts for a key and keeps it in `sessionStorage`. You can also pass
+`#api_key=YOUR_KEY` in the URL fragment (which browsers never transmit over
+HTTP) — the dashboard saves it to `sessionStorage` and strips it from the
+fragment via `history.replaceState`. Query-string `?api_key=` parameters are
+ignored so keys cannot leak into referrer headers or reverse-proxy access logs.
 
 The dashboard auto-refreshes every 10 seconds and shows:
 

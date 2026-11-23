@@ -29,6 +29,27 @@ from atomics.distributed.worker_client import WorkerClient
 )
 @click.option("--model", "-m", help="Model override for this worker")
 @click.option("--host", "-h", help="Provider host/URL override (e.g. http://gpu-host:30080)")
+@click.option(
+    "--lock-host",
+    is_flag=True,
+    default=False,
+    help="Reject any caller-supplied host/judge_host overrides in dispatched assignments.",
+)
+@click.option(
+    "--allowed-host",
+    "--allowed-hosts",
+    "allowed_hosts",
+    multiple=True,
+    help=(
+        "Allowlisted outbound inference/judge origin or URL prefix (repeatable or comma-separated)."
+    ),
+)
+@click.option(
+    "--allow-codegen",
+    is_flag=True,
+    default=False,
+    help="Allow distributed execution of the codegen suite (executes model-generated Python).",
+)
 def worker(
     coordinator: str,
     api_key: str,
@@ -38,6 +59,9 @@ def worker(
     provider: str,
     model: str | None,
     host: str | None,
+    lock_host: bool,
+    allowed_hosts: tuple[str, ...],
+    allow_codegen: bool,
 ) -> None:
     """Start a distributed worker process."""
     if not api_key:
@@ -48,17 +72,28 @@ def worker(
             raise click.BadParameter(f"Label must be key=value: {label}")
         k, v = label.split("=", 1)
         label_dict[k] = v
-    setup_logging("INFO")
-    client = WorkerClient(
-        coordinator,
-        api_key,
-        labels=label_dict,
-        endpoint=endpoint,
-        heartbeat_interval=heartbeat_interval,
-        provider_name=provider,
-        model=model,
-        host=host,
+    allowed_set: set[str] | None = (
+        {part.strip() for raw in allowed_hosts for part in raw.split(",") if part.strip()}
+        if allowed_hosts
+        else None
     )
+    setup_logging("INFO")
+    try:
+        client = WorkerClient(
+            coordinator,
+            api_key,
+            labels=label_dict,
+            endpoint=endpoint,
+            heartbeat_interval=heartbeat_interval,
+            provider_name=provider,
+            model=model,
+            host=host,
+            allow_codegen=allow_codegen,
+            lock_host=lock_host,
+            allowed_hosts=allowed_set,
+        )
+    except ValueError as exc:
+        raise click.BadParameter(str(exc)) from exc
     try:
         asyncio.run(client.run())
     except KeyboardInterrupt:

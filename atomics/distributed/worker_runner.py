@@ -13,11 +13,47 @@ from atomics.core.runner import execute_task
 from atomics.distributed.models import TaskAssignment
 from atomics.models import BurnTier, TaskCategory, TaskComplexity, TaskDefinition
 from atomics.providers.base import aclose_providers
-from atomics.providers.factory import make_provider
+from atomics.providers.factory import make_provider, resolve_provider_endpoint
 from atomics.storage.repository import MetricsRepository
 from atomics.tasks.catalog import TASK_CATALOG
+from atomics.validation import (
+    AllowedEndpoint,
+    is_endpoint_allowed,
+    is_metadata_or_link_local_endpoint,
+    parse_allowed_endpoint,
+)
 
 logger = logging.getLogger("atomics.distributed.worker_runner")
+
+
+def _compile_worker_allowed_hosts(
+    allowed_hosts: set[str] | None,
+) -> tuple[AllowedEndpoint, ...] | None:
+    if allowed_hosts is None:
+        return None
+    if not allowed_hosts:
+        raise ValueError("allowed_hosts must not be empty when set")
+    return tuple(
+        parse_allowed_endpoint(item, label="allowed_hosts") for item in sorted(allowed_hosts)
+    )
+
+
+def _check_worker_outbound(
+    url: str | None,
+    *,
+    label: str,
+    compiled_allowed: tuple[AllowedEndpoint, ...] | None,
+) -> None:
+    if url is None:
+        return
+    if compiled_allowed is not None:
+        if not is_endpoint_allowed(url, compiled_allowed, label=label):
+            raise PermissionError(
+                f"{label} is not permitted by the worker's outbound host allowlist"
+            )
+        return
+    if is_metadata_or_link_local_endpoint(url, label=label):
+        raise PermissionError(f"{label} targets a blocked link-local or cloud-metadata address")
 
 
 def _resolve_task_definition(task_spec: dict[str, Any]) -> tuple[TaskDefinition, str]:
@@ -106,23 +142,36 @@ async def execute_assignment(
     model: str | None = None,
     settings: AtomicsSettings | None = None,
     host: str | None = None,
+    lock_host: bool = False,
+    allowed_hosts: set[str] | None = None,
 ) -> dict[str, Any]:
     """Execute a single distributed assignment and return a serializable result."""
+    compiled_allowed = _compile_worker_allowed_hosts(allowed_hosts)
+    spec_host = assignment.task_spec.get("host")
+    if lock_host and spec_host:
+        raise PermissionError("worker --lock-host forbids caller host overrides")
+    effective_host = spec_host if isinstance(spec_host, str) and spec_host else host
+    _check_worker_outbound(effective_host, label="host", compiled_allowed=compiled_allowed)
     settings = settings or load_settings()
     pinned_provider, pinned_model = _pinned_execution(assignment.task_spec)
     provider_name = pinned_provider or provider_name
     model = pinned_model or model
+    if compiled_allowed is not None:
+        eff_resolved = resolve_provider_endpoint(
+            provider_name, effective_host, settings, host_label="host"
+        )
+        _check_worker_outbound(eff_resolved, label="host", compiled_allowed=compiled_allowed)
     provider = make_provider(
         provider_name,
         model,
-        host,
+        effective_host,
         settings,
         # The vllm branch reads its own `vllm_host` rather than the shared
         # `host`, because CLI commands accept --ollama-host and --vllm-host
         # independently and one positional cannot serve both. A worker has a
         # single --host and exactly one provider, so it routes that host to
         # whichever parameter the chosen provider actually reads.
-        vllm_host=host if provider_name == "vllm" else None,
+        vllm_host=effective_host if provider_name == "vllm" else None,
     )
     task, prompt = _resolve_task_definition(assignment.task_spec)
     logger.info(
@@ -146,12 +195,18 @@ async def execute_assignment(
 
 def _parse_run_request_host(run_request: dict[str, Any], provider_name: str) -> str | None:
     """Return the host override from the run request for the named provider."""
+    generic = run_request.get("host")
+    if isinstance(generic, str) and generic:
+        return generic
     if provider_name == "ollama":
-        return run_request.get("ollama_host")
+        val = run_request.get("ollama_host")
+        return val if isinstance(val, str) and val else None
     if provider_name == "vllm":
-        return run_request.get("vllm_host")
+        val = run_request.get("vllm_host")
+        return val if isinstance(val, str) and val else None
     if provider_name == "brain-gateway":
-        return run_request.get("gateway_url")
+        val = run_request.get("gateway_url")
+        return val if isinstance(val, str) and val else None
     return None
 
 
@@ -162,12 +217,18 @@ async def execute_full_run(
     model: str | None = None,
     host: str | None = None,
     settings: AtomicsSettings | None = None,
+    allow_codegen: bool = False,
+    lock_host: bool = False,
+    allowed_hosts: set[str] | None = None,
 ) -> dict[str, Any]:
     """Execute a full benchmark or eval run locally and return a serializable result."""
+    compiled_allowed = _compile_worker_allowed_hosts(allowed_hosts)
     raw_eval = assignment.task_spec.get("eval_request")
     if raw_eval is not None:
         if not isinstance(raw_eval, dict):
             raise TypeError("eval_request must be a dict")
+        if lock_host and (raw_eval.get("host") or raw_eval.get("judge_host")):
+            raise PermissionError("worker --lock-host forbids caller host overrides")
         from atomics.api._runners import run_eval_suite
         from atomics.api.models import EvalRequest
 
@@ -178,6 +239,33 @@ async def execute_full_run(
         if not eval_payload.get("host") and host is not None:
             eval_payload["host"] = host
         eval_req = EvalRequest(**eval_payload)
+        if eval_req.suite == "codegen" and not allow_codegen:
+            raise PermissionError(
+                "codegen suite is disabled on this worker; start with "
+                "--allow-codegen to enable remote code execution"
+            )
+        _check_worker_outbound(eval_req.host, label="host", compiled_allowed=compiled_allowed)
+        _check_worker_outbound(
+            eval_req.judge_host, label="judge_host", compiled_allowed=compiled_allowed
+        )
+        if compiled_allowed is not None:
+            app_settings = settings or load_settings()
+            eff_eval_host = resolve_provider_endpoint(
+                eval_req.provider, eval_req.host, app_settings, host_label="host"
+            )
+            _check_worker_outbound(eff_eval_host, label="host", compiled_allowed=compiled_allowed)
+            if eval_req.suite != "codegen":
+                eff_judge_in = (
+                    eval_req.judge_host
+                    if eval_req.judge_host is not None
+                    else (eval_req.host if eval_req.provider == "ollama" else None)
+                )
+                eff_judge = resolve_provider_endpoint(
+                    "ollama", eff_judge_in, app_settings, host_label="judge_host"
+                )
+                _check_worker_outbound(
+                    eff_judge, label="judge_host", compiled_allowed=compiled_allowed
+                )
         eval_out = await run_eval_suite(eval_req)
         eval_out.setdefault("suite", eval_req.suite)
         return eval_out
@@ -186,10 +274,20 @@ async def execute_full_run(
     run_request = assignment.task_spec.get("run_request", {})
     if not isinstance(run_request, dict):
         raise TypeError("run_request must be a dict")
+    if lock_host and any(
+        run_request.get(k) for k in ("host", "ollama_host", "vllm_host", "gateway_url")
+    ):
+        raise PermissionError("worker --lock-host forbids caller host overrides")
 
     effective_provider = run_request.get("provider") or provider_name
     effective_model = run_request.get("model") or model
     effective_host = _parse_run_request_host(run_request, effective_provider) or host
+    _check_worker_outbound(effective_host, label="host", compiled_allowed=compiled_allowed)
+    if compiled_allowed is not None:
+        eff_run_host = resolve_provider_endpoint(
+            effective_provider, effective_host, settings, host_label="host"
+        )
+        _check_worker_outbound(eff_run_host, label="host", compiled_allowed=compiled_allowed)
 
     provider = make_provider(
         effective_provider,
