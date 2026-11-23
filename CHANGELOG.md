@@ -3,6 +3,14 @@
 ## Unreleased
 
 ### Added
+- Rubric-scoped `judge_calibrations` (schema v25 in-place migration) keys stored
+  calibrations by `(provider, model, model_digest, rubric)` (`quality`,
+  `resistance`, `refusal`, `codereview`) and looks up each suite's own rubric
+  across CLI and API so calibrating one rubric cannot overwrite or masquerade as
+  another.
+- `AtomicsApiClient.submit_eval`, `atomics mcp` `submit_eval`, and `atomics
+  repl` `submit_eval` now accept `profile` (`profiles/...` YAML on
+  `adversarial`, `refusal`, `redblue`), matching `POST /api/v1/evals`.
 - `ProfileProvider` (`atomics/load/profiles.py`) and `--profile` on `atomics
   adversarial`, `atomics refusal`, `atomics redblue`, `atomics battery` (CLI
   and `POST /api/v1/batteries`), and `POST /api/v1/evals` so application-level
