@@ -157,7 +157,13 @@ def codereview(
         f"Judge: [cyan]{escape(judge_provider_name)}[/cyan] "
         f"({escape(attributed_judge)})\n"
     )
-    print_judge_calibration(console, judge_provider_name, attributed_judge, judge_provider=judge)
+    print_judge_calibration(
+        console,
+        judge_provider_name,
+        attributed_judge,
+        judge_provider=judge,
+        rubric="codereview",
+    )
 
     show_progress = bool((ctx.obj or {}).get("progress", True))
     progress = (

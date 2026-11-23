@@ -10,7 +10,7 @@ from pathlib import Path
 
 logger = logging.getLogger("atomics.schema")
 
-SCHEMA_VERSION = 24
+SCHEMA_VERSION = 25
 
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -395,6 +395,7 @@ CREATE TABLE IF NOT EXISTS judge_calibrations (
     provider        TEXT NOT NULL,
     model           TEXT NOT NULL,
     model_digest    TEXT NOT NULL DEFAULT '',
+    rubric          TEXT NOT NULL DEFAULT 'quality',
     run_id          TEXT NOT NULL,
     set_name        TEXT NOT NULL,
     set_digest      TEXT NOT NULL,
@@ -405,7 +406,7 @@ CREATE TABLE IF NOT EXISTS judge_calibrations (
     passed          INTEGER NOT NULL,
     item_count      INTEGER NOT NULL,
     calibrated_at   TEXT NOT NULL,
-    PRIMARY KEY (provider, model, model_digest),
+    PRIMARY KEY (provider, model, model_digest, rubric),
     FOREIGN KEY (run_id) REFERENCES runs(run_id)
 );
 
@@ -665,6 +666,37 @@ def _execute_sql_statements(conn: sqlite3.Connection, script: str) -> None:
         raise sqlite3.OperationalError("incomplete SQL statement")
 
 
+def _infer_rubric_from_set_name(set_name: str, explicit: object = None) -> str:
+    if isinstance(explicit, str) and explicit in {"quality", "resistance", "refusal", "codereview"}:
+        return explicit
+    lower = set_name.strip().lower()
+    if "resistance" in lower:
+        return "resistance"
+    if lower.startswith("refusal"):
+        return "refusal"
+    if lower.startswith("codereview"):
+        return "codereview"
+    return "quality"
+
+
+def _backfill_calibration_rubrics(conn: sqlite3.Connection) -> None:
+    """Infer non-quality rubrics from `set_name` when migrating v24 rows."""
+    rows = conn.execute(
+        "SELECT provider, model, model_digest, rubric, set_name FROM judge_calibrations"
+    ).fetchall()
+    for row in rows:
+        inferred = _infer_rubric_from_set_name(str(row["set_name"] or ""))
+        if inferred != row["rubric"]:
+            conn.execute(
+                """
+                UPDATE judge_calibrations
+                SET rubric = ?
+                WHERE provider = ? AND model = ? AND model_digest = ? AND rubric = ?
+                """,
+                (inferred, row["provider"], row["model"], row["model_digest"], row["rubric"]),
+            )
+
+
 def _backfill_judge_calibrations(conn: sqlite3.Connection) -> None:
     """Populate `judge_calibrations` from pre-v24 `evaluation_results` calibration runs."""
     rows = conn.execute(
@@ -735,17 +767,19 @@ def _backfill_judge_calibrations(conn: sqlite3.Connection) -> None:
         provider = str(group[0]["provider"] or "")
         model = str(group[0]["model"] or "")
         calibrated_at = max(str(r["timestamp"] or "") for r in group)
+        inferred_rubric = _infer_rubric_from_set_name(set_name)
         conn.execute(
             """
             INSERT OR REPLACE INTO judge_calibrations (
-                provider, model, model_digest, run_id, set_name, set_digest,
+                provider, model, model_digest, rubric, run_id, set_name, set_digest,
                 mae, bias, pair_order, max_error, passed, item_count, calibrated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 provider,
                 model,
                 model_digest,
+                inferred_rubric,
                 run_id,
                 set_name,
                 set_digest,
@@ -800,6 +834,8 @@ def init_db(db_path: Path) -> sqlite3.Connection:
         _execute_sql_statements(conn, SCHEMA_SQL)
         if current != 0 and current < 24:
             _backfill_judge_calibrations(conn)
+        elif current != 0 and current < 25:
+            _backfill_calibration_rubrics(conn)
         conn.execute(
             "INSERT OR REPLACE INTO schema_version (version) VALUES (?)",
             (SCHEMA_VERSION,),

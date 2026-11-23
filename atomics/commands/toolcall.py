@@ -244,6 +244,7 @@ def toolcall(
             judge_provider_name,
             effective_model(judge_model, judge),
             judge_provider=judge,
+            rubric="resistance",
         )
     if judge is None and channel != "tools":
         console.print(

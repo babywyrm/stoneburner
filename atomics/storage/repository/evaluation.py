@@ -198,17 +198,18 @@ class EvaluationMixin(RepositoryBase):
         max_error: float,
         passed: bool,
         item_count: int,
+        rubric: str = "quality",
         calibrated_at: str | None = None,
     ) -> None:
-        """Upsert a judge calibration summary keyed by `(provider, model, model_digest)`."""
+        """Upsert a judge calibration summary keyed by `(provider, model, model_digest, rubric)`."""
         stamp = calibrated_at or datetime.now(UTC).isoformat()
         self._conn.execute(
             """
             INSERT INTO judge_calibrations (
-                provider, model, model_digest, run_id, set_name, set_digest,
+                provider, model, model_digest, rubric, run_id, set_name, set_digest,
                 mae, bias, pair_order, max_error, passed, item_count, calibrated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(provider, model, model_digest) DO UPDATE SET
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(provider, model, model_digest, rubric) DO UPDATE SET
                 run_id = excluded.run_id,
                 set_name = excluded.set_name,
                 set_digest = excluded.set_digest,
@@ -224,6 +225,7 @@ class EvaluationMixin(RepositoryBase):
                 provider,
                 model,
                 model_digest,
+                rubric,
                 run_id,
                 set_name,
                 set_digest,
@@ -244,6 +246,7 @@ class EvaluationMixin(RepositoryBase):
         provider: str | None = None,
         model: str | None = None,
         model_digest: str | None = None,
+        rubric: str | None = None,
     ) -> list[dict[str, object]]:
         """Return judge calibration rows newest-first."""
         query = "SELECT * FROM judge_calibrations"
@@ -258,6 +261,9 @@ class EvaluationMixin(RepositoryBase):
         if model_digest is not None:
             clauses.append("model_digest = ?")
             params.append(model_digest)
+        if rubric is not None:
+            clauses.append("rubric = ?")
+            params.append(rubric)
         if clauses:
             query += " WHERE " + " AND ".join(clauses)
         query += " ORDER BY calibrated_at DESC"

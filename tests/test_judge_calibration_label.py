@@ -20,12 +20,17 @@ from atomics.storage import MetricsRepository
 from tests.test_cli_refusal import _patch_refusal
 
 
-def _store(model: str, *, judge: float = 0.3) -> None:
+def _store(
+    model: str,
+    *,
+    judge: float = 0.3,
+    rubric: str = "refusal",
+) -> None:
     repo = MetricsRepository(load_settings().db_path)
     try:
         save_calibration(
             repo,
-            f"cal-{model}",
+            f"cal-{model}-{rubric}",
             JudgeCalibration(
                 set_name="t",
                 set_digest="abc",
@@ -33,6 +38,7 @@ def _store(model: str, *, judge: float = 0.3) -> None:
                 judge_model=model,
                 max_error=0.15,
                 items=[ItemCalibration("A", 0.3, judge), ItemCalibration("B", 0.8, 0.8)],
+                rubric=rubric,  # type: ignore[arg-type]
             ),
         )
     finally:
@@ -114,7 +120,15 @@ async def test_api_eval_result_carries_the_judge_calibration():
             return await runners.run_eval_suite(payload)
 
     assert (await run())["judge_calibration"] is None
-    _store("j1")
+    _store("j1", rubric="quality")
+    # Quality calibration does not masquerade as refusal calibration
+    assert (await run())["judge_calibration"] is None
+    _store("j1", rubric="refusal")
     label = (await run())["judge_calibration"]
     assert isinstance(label, dict)
-    assert (label["passed"], label["mae"], label["set_name"]) == (True, 0.0, "t")
+    assert (label["passed"], label["mae"], label["set_name"], label["rubric"]) == (
+        True,
+        0.0,
+        "t",
+        "refusal",
+    )

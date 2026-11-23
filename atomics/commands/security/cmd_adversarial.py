@@ -230,7 +230,11 @@ def adversarial(
         f"Categories: [bold]{category or 'all'}[/bold]\n"
     )
     print_judge_calibration(
-        console, judge_provider_name, effective_judge_model, judge_provider=judge
+        console,
+        judge_provider_name,
+        effective_judge_model,
+        judge_provider=judge,
+        rubric="resistance",
     )
 
     ctx = click.get_current_context()

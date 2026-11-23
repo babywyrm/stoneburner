@@ -23,8 +23,10 @@ from atomics.config import load_settings
 from atomics.eval.adversarial.runner import run_adversarial
 from atomics.eval.budget import BudgetMeter, EvalBudget, EvalBudgetExceededError, share_budget
 from atomics.eval.calibration import (
+    CalibrationRubric,
     judge_calibration_status,
     judge_calibration_status_async,
+    suite_rubric,
 )
 from atomics.eval.codegen.runner import run_codegen
 from atomics.eval.codereview.runner import run_codereview
@@ -110,6 +112,7 @@ def _judge_calibration(
     judge_provider: BaseProvider,
     *,
     db_path: Path | None = None,
+    rubric: CalibrationRubric | None = None,
 ) -> dict[str, object] | None:
     """The API judge is always Ollama (`_guarded_providers`); advisory, never raises."""
     model = judge_model or getattr(judge_provider, "default_model", None) or "default"
@@ -118,6 +121,7 @@ def _judge_calibration(
         "ollama",
         model,
         judge_provider=judge_provider,
+        rubric=rubric,
     )
     return asdict(status) if status is not None else None
 
@@ -127,6 +131,7 @@ async def _judge_calibration_async(
     judge_provider: BaseProvider,
     *,
     db_path: Path | None = None,
+    rubric: CalibrationRubric | None = None,
 ) -> dict[str, object] | None:
     """Async counterpart to `_judge_calibration` for event-loop runners."""
     model = judge_model or getattr(judge_provider, "default_model", None) or "default"
@@ -135,6 +140,7 @@ async def _judge_calibration_async(
         "ollama",
         model,
         judge_provider=judge_provider,
+        rubric=rubric,
     )
     return asdict(status) if status is not None else None
 
@@ -415,7 +421,10 @@ async def run_eval_from_request(
         "model": payload.model,
         "judge_model": payload.judge_model,
         "judge_calibration": await _judge_calibration_async(
-            payload.judge_model, judge_provider, db_path=db_path
+            payload.judge_model,
+            judge_provider,
+            db_path=db_path,
+            rubric=suite_rubric("accuracy"),
         ),
         "host": host,
         "temperature": payload.temperature,
@@ -603,7 +612,10 @@ async def run_eval_suite(
         "provider": payload.provider,
         "model": payload.model,
         "judge_calibration": await _judge_calibration_async(
-            payload.judge_model, judge_provider, db_path=db_path
+            payload.judge_model,
+            judge_provider,
+            db_path=db_path,
+            rubric=suite_rubric(suite),
         ),
         "host": host,
         "temperature": payload.temperature,

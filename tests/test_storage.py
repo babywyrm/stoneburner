@@ -18,7 +18,7 @@ def _tmp_repo() -> MetricsRepository:
 
 
 def test_schema_version_is_current():
-    assert SCHEMA_VERSION == 24
+    assert SCHEMA_VERSION == 25
 
 
 def test_archreview_results_table_exists(tmp_path):

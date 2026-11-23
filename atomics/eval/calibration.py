@@ -237,6 +237,18 @@ def default_set_path() -> Path:
     return preset_set_path("blue")
 
 
+def suite_rubric(suite: str) -> CalibrationRubric:
+    """Return the judge calibration rubric corresponding to `suite`."""
+    norm = suite.strip().lower()
+    if norm in {"adversarial", "toolcall"}:
+        return "resistance"
+    if norm == "refusal":
+        return "refusal"
+    if norm == "codereview":
+        return "codereview"
+    return "quality"
+
+
 def _resolve_rubric(raw_rubric: object, *, where: str) -> CalibrationRubric:
     if raw_rubric is None or raw_rubric == "":
         return "quality"
@@ -641,6 +653,7 @@ class CalibrationStatus:
     max_error: float
     calibrated_at: str
     model_digest: str = ""
+    rubric: str = "quality"
 
     def label(self) -> str:
         state = "calibrated" if self.passed else "failed calibration"
@@ -685,6 +698,7 @@ def save_calibration(
                     "set_name": calibration.set_name,
                     "set_digest": calibration.set_digest,
                     "model_digest": calibration.model_digest,
+                    "rubric": calibration.rubric,
                     "max_error": calibration.max_error,
                 },
             )
@@ -701,6 +715,7 @@ def save_calibration(
             provider=calibration.judge_provider,
             model=calibration.judge_model,
             model_digest=calibration.model_digest,
+            rubric=calibration.rubric,
             run_id=run_id,
             set_name=calibration.set_name,
             set_digest=calibration.set_digest,
@@ -730,14 +745,21 @@ def _select_calibration_row(
                 max_error=_number(row["max_error"]),
                 calibrated_at=str(row["calibrated_at"]),
                 model_digest=str(row.get("model_digest", "")),
+                rubric=str(row.get("rubric", "quality")),
             )
     return None
 
 
-def _load_candidate_rows(db_path: Path, provider: str, model: str) -> list[dict[str, object]]:
+def _load_candidate_rows(
+    db_path: Path,
+    provider: str,
+    model: str,
+    *,
+    rubric: CalibrationRubric | None = None,
+) -> list[dict[str, object]]:
     repository = MetricsRepository(db_path)
     try:
-        return repository.get_judge_calibrations(provider=provider, model=model)
+        return repository.get_judge_calibrations(provider=provider, model=model, rubric=rubric)
     finally:
         repository.close()
 
@@ -749,12 +771,13 @@ def judge_calibration_status(
     *,
     model_digest: str | None = None,
     judge_provider: object | None = None,
+    rubric: CalibrationRubric | None = None,
 ) -> CalibrationStatus | None:
-    """Newest stored calibration for `(provider, model, model_digest)`. Never raises."""
+    """Newest stored calibration for `(provider, model, model_digest[, rubric])`. Never raises."""
     if not db_path.exists():
         return None
     try:
-        rows = _load_candidate_rows(db_path, provider, model)
+        rows = _load_candidate_rows(db_path, provider, model, rubric=rubric)
         if not rows:
             return None
         if model_digest is not None:
@@ -776,12 +799,13 @@ async def judge_calibration_status_async(
     *,
     model_digest: str | None = None,
     judge_provider: object | None = None,
+    rubric: CalibrationRubric | None = None,
 ) -> CalibrationStatus | None:
     """Async counterpart to `judge_calibration_status` for API/event-loop callers."""
     if not db_path.exists():
         return None
     try:
-        rows = _load_candidate_rows(db_path, provider, model)
+        rows = _load_candidate_rows(db_path, provider, model, rubric=rubric)
         if not rows:
             return None
         if model_digest is not None:

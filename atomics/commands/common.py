@@ -383,13 +383,24 @@ def print_judge_calibration(
     model: str,
     *,
     judge_provider: object | None = None,
+    rubric: str | None = "quality",
 ) -> None:
     """One dim line naming the judge's stored calibration. Advisory: never fails a run."""
+    from typing import cast
+
     from atomics.config import load_settings
-    from atomics.eval.calibration import calibration_label, judge_calibration_status
+    from atomics.eval.calibration import (
+        CalibrationRubric,
+        calibration_label,
+        judge_calibration_status,
+    )
 
     status = judge_calibration_status(
-        load_settings().db_path, provider_name, model, judge_provider=judge_provider
+        load_settings().db_path,
+        provider_name,
+        model,
+        judge_provider=judge_provider,
+        rubric=cast(CalibrationRubric | None, rubric),
     )
     console.print(f"[dim]Judge calibration: {escape(calibration_label(status))}[/dim]")
 

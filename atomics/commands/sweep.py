@@ -341,6 +341,7 @@ def sweep(
         judge_provider_name,
         effective_model(judge_model, judge_provider),
         judge_provider=judge_provider,
+        rubric="quality" if suite_list == ["eval"] else None,
     )
 
     if suite_list != ["eval"] or status_path or log_path:

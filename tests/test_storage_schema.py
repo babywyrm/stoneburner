@@ -423,7 +423,7 @@ def test_v22_populated_db_migrates_to_v23_with_caller_spend_and_fk_rows_intact(
 
     repo = MetricsRepository(db_path)
     try:
-        assert schema.SCHEMA_VERSION == 24
+        assert schema.SCHEMA_VERSION == 25
         assert repo.get_run("r-parent") is not None
         assert len(repo.get_run_tasks("r-parent")) == 1
         assert len(repo.get_evaluation_results(run_id="r-parent")) == 1
@@ -529,3 +529,117 @@ def test_v23_to_v24_migrates_populated_db_and_backfills_judge_calibrations(tmp_p
 
     status = judge_calibration_status(db_path, "ollama", "legacy-judge:7b")
     assert status is not None and status.passed is True and status.set_name == "blue-v1"
+
+
+def test_v24_to_v25_migrates_populated_db_and_preserves_multi_rubric_rows(tmp_path: Path) -> None:
+    """Upgrading from v24 rebuilds `judge_calibrations` with `rubric` PK and infers set rubrics."""
+    from atomics.storage import schema
+    from atomics.storage.repository import MetricsRepository
+
+    db_path = tmp_path / "v24_populated.db"
+    conn = init_db(db_path)
+    conn.close()
+
+    raw = sqlite3.connect(str(db_path))
+    try:
+        raw.execute("DROP TABLE IF EXISTS judge_calibrations")
+        raw.execute(
+            """
+            CREATE TABLE judge_calibrations (
+                provider        TEXT NOT NULL,
+                model           TEXT NOT NULL,
+                model_digest    TEXT NOT NULL DEFAULT '',
+                run_id          TEXT NOT NULL,
+                set_name        TEXT NOT NULL,
+                set_digest      TEXT NOT NULL,
+                mae             REAL NOT NULL,
+                bias            REAL NOT NULL,
+                pair_order      REAL,
+                max_error       REAL NOT NULL,
+                passed          INTEGER NOT NULL,
+                item_count      INTEGER NOT NULL,
+                calibrated_at   TEXT NOT NULL,
+                PRIMARY KEY (provider, model, model_digest),
+                FOREIGN KEY (run_id) REFERENCES runs(run_id)
+            )
+            """
+        )
+        raw.execute("DELETE FROM schema_version")
+        raw.execute("INSERT INTO schema_version (version) VALUES (24)")
+        for rid, model, set_name in (
+            ("run-q", "gemma4:26b", "redblue-blue-v1"),
+            ("run-r", "granite4.2:8b", "adversarial-resistance-v1"),
+        ):
+            raw.execute(
+                "INSERT INTO runs (run_id, started_at, completed_at, tier, provider, model) "
+                "VALUES (?, '2026-11-22T00:00:00+00:00', '2026-11-22T00:00:05+00:00', "
+                "'judge-calibrate', 'ollama', ?)",
+                (rid, model),
+            )
+            raw.execute(
+                """
+                INSERT INTO judge_calibrations (
+                    provider, model, model_digest, run_id, set_name, set_digest,
+                    mae, bias, pair_order, max_error, passed, item_count, calibrated_at
+                ) VALUES ('ollama', ?, 'dig123', ?, ?, 'sdig', 0.10, 0.02, 0.9, 0.15, 1, 6,
+                          '2026-11-22T00:00:05+00:00')
+                """,
+                (model, rid, set_name),
+            )
+        raw.execute(
+            "INSERT INTO task_results "
+            "(task_id, run_id, category, task_name, provider, model, status, started_at) "
+            "VALUES ('t-fk', 'run-q', 'general_qa', 'q1', 'ollama', 'gemma4:26b', "
+            "'success', '2026-11-22T00:00:01+00:00')"
+        )
+        raw.execute(
+            "INSERT INTO caller_spend (caller_id, total_cost_usd, updated_at) "
+            "VALUES ('caller-1', 2.5, '2026-11-22T00:00:01+00:00')"
+        )
+        raw.commit()
+    finally:
+        raw.close()
+
+    repo = MetricsRepository(db_path)
+    try:
+        assert schema.SCHEMA_VERSION == 25
+        assert len(repo.get_run_tasks("run-q")) == 1
+        assert repo.get_caller_spend("caller-1") == 2.5
+        q_rows = repo.get_judge_calibrations(
+            provider="ollama", model="gemma4:26b", rubric="quality"
+        )
+        r_rows = repo.get_judge_calibrations(
+            provider="ollama", model="granite4.2:8b", rubric="resistance"
+        )
+        assert len(q_rows) == 1 and q_rows[0]["rubric"] == "quality"
+        assert len(r_rows) == 1 and r_rows[0]["rubric"] == "resistance"
+
+        # Coexistence: store refusal + codereview + resistance on gemma4:26b same digest
+        for rub in ("resistance", "refusal", "codereview"):
+            repo.create_run(
+                f"run-{rub}", tier="judge-calibrate", provider="ollama", model="gemma4:26b"
+            )
+            repo.save_judge_calibration(
+                provider="ollama",
+                model="gemma4:26b",
+                model_digest="dig123",
+                rubric=rub,
+                run_id=f"run-{rub}",
+                set_name=f"{rub}-v1",
+                set_digest="sd",
+                mae=0.05,
+                bias=0.0,
+                pair_order=1.0,
+                max_error=0.15,
+                passed=True,
+                item_count=6,
+            )
+        all_gemma = repo.get_judge_calibrations(provider="ollama", model="gemma4:26b")
+        assert {r["rubric"] for r in all_gemma} == {
+            "quality",
+            "resistance",
+            "refusal",
+            "codereview",
+        }
+    finally:
+        repo.close()
