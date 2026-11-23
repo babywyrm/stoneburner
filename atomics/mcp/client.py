@@ -199,10 +199,13 @@ class AtomicsApiClient:
         runs: int | None = None,
         channel: str | None = None,
         temperature: float | None = None,
+        profile: str | None = None,
     ) -> Any:
         payload: dict[str, Any] = {"suite": suite, "provider": provider}
         if temperature is not None:
             payload["temperature"] = temperature
+        if profile is not None:
+            payload["profile"] = profile
         if model is not None:
             payload["model"] = model
         if host is not None:

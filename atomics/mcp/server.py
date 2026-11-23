@@ -180,6 +180,7 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
         runs: int = 1,
         channel: str | None = None,
         temperature: float | None = None,
+        profile: str | None = None,
     ) -> Any:
         """Start an eval suite and return its job id immediately.
 
@@ -189,7 +190,9 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
         `budget_usd` caps the combined spend; leave it unset to accept
         the server's default ceiling. `host` is the inference endpoint
         (same meaning as `list_models`). `judge_host` is the judge endpoint
-        when it differs from `host`. `runs` is 1–3 on `adversarial`,
+        when it differs from `host`. `profile` is an optional relative
+        `profiles/...` YAML path on `adversarial`, `refusal`, or `redblue`
+        (CLI `--profile`). `runs` is 1–3 on `adversarial`,
         `redblue`, `refusal`, `codereview`, and `toolcall` only. `channel` is `both`, `tools`, or
         `prose` on `toolcall` only (CLI `--channel`). `effort` /
         `reasoning_mode` are the shared reasoning dial (same values as
@@ -214,6 +217,7 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
             runs=runs,
             channel=channel,
             temperature=temperature,
+            profile=profile,
         )
 
     @tool(SPENDS)

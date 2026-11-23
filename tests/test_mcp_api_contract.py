@@ -255,3 +255,16 @@ def test_distributed_tools_contract_with_real_api(app_client):
     list_res = replay(app_client, list_req)
     assert list_res.status_code == 200
     assert [j["job_id"] for j in list_res.json()["jobs"]] == [job_id]
+
+
+def test_submit_eval_profile_is_accepted_by_the_real_api(app_client):
+    request = captured_request(
+        lambda c: c.submit_eval(
+            suite="adversarial",
+            provider="ollama",
+            profile="profiles/examples/http-flask-endpoint.yaml",
+        )
+    )
+    response = replay(app_client, request)
+    assert response.status_code == 202
+    assert response.json()["kind"] == "eval"

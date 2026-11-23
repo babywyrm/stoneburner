@@ -72,7 +72,7 @@ while a window is open, then each sample, then
 name while a burn-loop iteration is open, then `name  success  N tok`
 as each task finishes, then `N ok  M fail  K tok`.
 
-`probe`, hours-long soak, contention, and profiles stay on the CLI.
+`probe`, hours-long soak, contention, and load profiles stay on the CLI.
 
 Sweep / stress / soak still require `budget_usd`. Sweep suite names are `eval`
 (not `accuracy`), `redblue`, `refusal`, `toolcall`, `codereview`.

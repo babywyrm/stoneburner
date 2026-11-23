@@ -467,3 +467,20 @@ async def test_distributed_tools_forward_arguments_to_api():
     )
     assert api.calls[2] == ("get_distributed_run", {"job_id": "dj-1"})
     assert api.calls[3] == ("list_distributed_runs", {"limit": 5})
+
+
+async def test_submit_eval_forwards_profile_to_the_api():
+    api = FakeApi()
+    tools = {t.name: t for t in await build_server(api).list_tools()}
+    assert "profile" in tools["submit_eval"].input_schema["properties"]
+    await build_server(api).call_tool(
+        "submit_eval",
+        {
+            "suite": "adversarial",
+            "provider": "ollama",
+            "profile": "profiles/examples/http-flask-endpoint.yaml",
+        },
+    )
+    called, kwargs = api.calls[-1]
+    assert called == "submit_eval"
+    assert kwargs["profile"] == "profiles/examples/http-flask-endpoint.yaml"

@@ -578,3 +578,21 @@ def test_distributed_client_methods_target_expected_endpoints():
     assert requests[3].method == "GET"
     assert requests[3].url.path == "/api/v1/distributed/runs"
     assert dict(requests[3].url.params) == {"limit": "15"}
+
+
+def test_submit_eval_includes_profile_when_given():
+    import json
+
+    requests: list[httpx.Request] = []
+    with client_recording(requests) as client:
+        client.submit_eval(
+            suite="adversarial",
+            provider="ollama",
+            profile="profiles/examples/http-flask-endpoint.yaml",
+        )
+
+    assert json.loads(requests[0].content) == {
+        "suite": "adversarial",
+        "provider": "ollama",
+        "profile": "profiles/examples/http-flask-endpoint.yaml",
+    }

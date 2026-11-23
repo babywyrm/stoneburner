@@ -120,6 +120,20 @@ def test_submit_eval_forwards_channel() -> None:
     assert json.loads(requests[0].content)["channel"] == "tools"
 
 
+def test_submit_eval_forwards_profile() -> None:
+    requests: list[httpx.Request] = []
+    session = Session(provider="ollama")
+    res = handle_line(
+        "submit_eval --suite adversarial --profile profiles/examples/http-flask-endpoint.yaml",
+        session=session,
+        client=_client(requests, response=httpx.Response(200, json=_EVAL_JOB)),
+    )
+    assert res.stderr == ""
+    assert json.loads(requests[0].content)["profile"] == (
+        "profiles/examples/http-flask-endpoint.yaml"
+    )
+
+
 def test_submit_eval_and_sweep_forward_temperature() -> None:
     requests: list[httpx.Request] = []
     session = Session(provider="ollama", model="a")

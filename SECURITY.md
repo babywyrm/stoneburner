@@ -113,9 +113,9 @@ never `${{ }}` expansion. The CI gitleaks download is checked against its
 release SHA-256. Exceptions carry `# zizmor: ignore[<audit>]` with the reason
 above them.
 
-CI also runs CodeQL (`.github/workflows/codeql.yml`) over Python, the npm
-worker's JavaScript, and the workflow files, on every push, pull request, and
-weekly. Findings land in the repository's code-scanning alerts; on a pull
+CI also runs CodeQL (`.github/workflows/codeql.yml`) over Python, the dashboard
+test harness JavaScript, and the workflow files, on every push, pull request,
+and weekly. Findings land in the repository's code-scanning alerts; on a pull
 request, a new critical- or high-severity one fails the code-scanning check.
 
 ## Dependency auditing
@@ -183,6 +183,15 @@ and on the settings value used when the flag is omitted (`ollama_host`,
 contention, scenario, and QA posts use it too, as do ollama and http target
 profiles. A bad URL fails before a request is sent.
 
+On `atomics server` and `atomics worker`, remote submissions also reject
+link-local, unspecified, and cloud-metadata addresses (`169.254.0.0/16`,
+`fe80::/10`, `100.100.100.200`, `fd00:ec2::254`, `metadata.google.internal`) by
+default (`403` on the API, `PermissionError` on the worker), even when
+`--allowed-hosts` is unset. Operators can lock outbound `host`, `judge_host`,
+`profile`, and distributed endpoint overrides to approved origins or URL
+prefixes via `--allowed-host` / `--allowed-hosts` on `atomics server` and
+`--allowed-hosts` or `--lock-host` on `atomics worker`.
+
 ## API server exposure
 
 `atomics server` was designed for a trusted operator on a trusted network. Its
@@ -205,7 +214,10 @@ the port as equivalent to holding the key.
 - Keys are compared with `hmac.compare_digest`.
 - Every response carries `nosniff`, `X-Frame-Options: DENY`,
   `Referrer-Policy: no-referrer`, and a restrictive CSP. The dashboard's CSP
-  uses a per-response nonce rather than `unsafe-inline`.
+  uses a per-response nonce rather than `unsafe-inline`. The dashboard reads
+  `#api_key=` from the URL fragment into `sessionStorage`, scrubs the fragment
+  via `history.replaceState`, and ignores `?api_key=` query parameters so keys
+  cannot leak through referrer headers or proxy logs.
 
 Resource bounds, all configurable on `ServerSettings`:
 
@@ -217,9 +229,12 @@ Resource bounds, all configurable on `ServerSettings`:
 | `interval` | 3600s | The same, via a long sleep between tasks |
 | `fixtures` | 500 | An oversized eval request |
 | `budget_usd` | 10.0 | One eval spending without limit; capped at 1000 |
-| `max_active_jobs_per_caller` | 4 | One key taking every slot and starving the rest |
+| `max_active_jobs_per_caller` | 4 | One key taking every slot and starving the rest (spans in-memory + distributed jobs) |
 | `max_spend_usd_per_caller` | `None` | Optional cumulative dollar ceiling per key across jobs (`--max-caller-spend-usd`) |
-| `allowed_hosts` | `None` | Optional outbound origin/URL-prefix allowlist for caller `host` / `judge_host` / battery `profile` / distributed runs (`--allowed-host` / `--allowed-hosts`); non-matching targets get `403` |
+| `max_rpm_per_caller` | `None` | Optional sliding-window request-rate cap per key (`--max-caller-rpm`, `429` + `Retry-After`) |
+| `max_request_bytes` | `4194304` | Oversized HTTP bodies rejected at ASGI ingress (`--max-request-bytes`, `413`) |
+| `allowed_hosts` | `None` | Optional outbound origin/URL-prefix allowlist for caller `host` / `judge_host` / eval & battery `profile` / distributed runs (`--allowed-host` / `--allowed-hosts`); non-matching targets get `403` |
+| `allow_codegen` | `False` | Remote `codegen` execution disabled by default (`403` on API, `PermissionError` on worker) unless `--allow-codegen` is passed |
 
 These cap how much *one server* will do at once. The per-caller bound is the
 one that makes the others fair: a global limit alone is first-come-first-served,
@@ -245,8 +260,9 @@ iteration/fixture bounds already documented above. See
   runs for sweep; c≤8 and 15s phases for stress; 300s and c≤4 for soak).
   No discover-everything flag. Hours-long soaks, contention, and `probe`
   stay CLI-only.
-- `submit_run`, `submit_eval`, `submit_sweep`, `submit_stress`,
-  `submit_soak`, and `provider_test` are annotated as not read-only. The
+- `submit_run`, `submit_eval`, `submit_sweep`, `submit_battery`,
+  `submit_stress`, `submit_soak`, `submit_distributed_run`, and
+  `provider_test` are annotated as not read-only. The
   rest are annotated read-only.
 - On stdio, stdout is the JSON-RPC channel. Status and logs go to stderr.
 
@@ -313,9 +329,11 @@ Two limits worth stating plainly:
 
 ## Generated code execution (codegen suite)
 
-The `codegen` suite executes code written by the model under test, and is
-reachable over HTTP via `POST /api/v1/evals`. Each snippet runs in a child
-interpreter with:
+The `codegen` suite executes code written by the model under test. Remote
+submission over `POST /api/v1/evals` and distributed `eval_request` is disabled
+by default (`403` on `atomics server`, `PermissionError` on `atomics worker`)
+unless `--allow-codegen` is passed at startup. When enabled (or invoked locally
+on the CLI), each snippet runs in a child interpreter with:
 
 - an environment stripped of provider credentials
 - a temporary working directory, discarded afterwards

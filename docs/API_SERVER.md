@@ -56,11 +56,11 @@ distributed jobs), cumulative spend (`--max-caller-spend-usd`), request rate
 (`--max-caller-rpm`, returning `429` with `Retry-After`), and raw HTTP body
 size (`--max-request-bytes`, default 4 MiB, returning `413`) bound what one key
 can consume. Saved reports and the worker list are
-shared across keys. Battery `profile`
+shared across keys. Eval (`adversarial`, `refusal`, `redblue`) and battery `profile`
 paths must be relative and resolve under the server's `profiles/` directory.
 To lock callers to approved inference and judge endpoints only, pass repeatable
 `--allowed-host` (or comma-separated `--allowed-hosts`) with exact HTTP(S)
-origins or URL prefixes; non-matching `host`, `judge_host`, battery `profile`,
+origins or URL prefixes; non-matching `host`, `judge_host`, eval/battery `profile`,
 or distributed host overrides are rejected at request admission with `403`.
 Even without `--allowed-hosts`, link-local, unspecified, and cloud-metadata
 addresses (`169.254.0.0/16`, `fe80::/10`, `100.100.100.200`, `fd00:ec2::254`,
@@ -245,8 +245,9 @@ any run (the number to gate on when `runs` is above 1). `overall_score_ci` is
 the headline's 95% interval, `{low, high, n, method}` or `null` (see
 [Intervals](COMPARING.md#intervals)); toolcall adds
 `dangerous_any_run_rate_ci`. `judge_calibration`
-is the judge's latest stored `atomics judge-calibrate` result (`passed`,
-`mae`, `bias`, `n`, `set_name`, `max_error`, `calibrated_at`) or `null`. It is
+is the judge's latest stored `atomics judge-calibrate` result for that suite's
+rubric (`passed`, `rubric`, `mae`, `bias`, `n`, `set_name`, `max_error`,
+`calibrated_at`, `digest_status`) or `null`. It is
 advisory and never changes the score.
 
 | `suite` | Headline | Measures |
@@ -285,8 +286,9 @@ poll can still show every phase, including extra multiturn turns and
 at `total`.
 Dashboard `#job=` still shows the current `in_flight` plus the
 fixture / phase / sample tables, not the trail. `POST /evals` accepts
-optional `host` and `judge_host` (CLI `--judge-host`: judge on a second
-Ollama). `runs` is 1–3 on `adversarial` / `redblue` / `refusal` /
+optional `host`, `judge_host` (CLI `--judge-host`: judge on a second
+Ollama), and `profile` (`profiles/...` YAML on `adversarial`, `refusal`,
+`redblue`, CLI `--profile`). `runs` is 1–3 on `adversarial` / `redblue` / `refusal` /
 `codereview` / `toolcall`; other
 suites return `422` if `runs > 1`. `channel` is `both` / `tools` /
 `prose` on `toolcall` only (CLI `--channel`). `temperature` (0–2, CLI
@@ -425,7 +427,7 @@ Spread benchmark work across multiple worker processes that poll a coordinator (
 
 Every worker endpoint, registration included, requires worker authentication via `X-API-Key` (pluggable `WorkerAuth`; uses the server API keys when auth is enabled). A worker has no id yet at registration, so the worker key is the only credential it can present.
 
-Workers register with `capabilities` (e.g., `["python"]` for the built-in Python worker, `["node"]` for the npm bridge). The coordinator uses capabilities to route assignments: a task with `runtime: "node"` is only claimed by workers that advertise the `node` capability. Python workers advertise `python` by default; the npm worker advertises `node` by default. A worker with no capabilities is treated as `python` for backwards compatibility.
+Workers register with `capabilities` (default `["python"]` for the built-in Python worker). The coordinator uses capabilities to route assignments: a task with `runtime` set is only claimed by workers that advertise that capability. A worker with no capabilities is treated as `python` for backwards compatibility. Pass `--lock-host` on `atomics worker` to pin outbound traffic to the worker's own `--endpoint`, `--allowed-hosts` to restrict outbound endpoints to approved origins/prefixes, and `--allow-codegen` only when the worker is permitted to execute remote `codegen` assignments.
 
 A worker that stops sending heartbeats for 120 seconds is marked offline. It is then excluded from new fleet runs, and its pinned work is failed rather than left for a host that is not coming back. The window is `atomics server --worker-absent-after SECONDS`; raise it above roughly four times your workers' `--heartbeat-interval`, or hosts that are heartbeating exactly as configured will be declared absent and lose their fleet slice.
 
@@ -440,7 +442,7 @@ A worker that stops sending heartbeats for 120 seconds is marked offline. It is 
 
 Both require client authentication via `X-API-Key`. Submitting a run spends GPU time and cloud budget, so neither is anonymous.
 
-`POST /api/v1/distributed/runs` accepts `mode`, `run_request` (tier/iterations, plus optional provider/model), and for fleet mode an optional `worker_selector`.
+`POST /api/v1/distributed/runs` accepts `mode`, either `run_request` (tier/iterations, plus optional provider/model) or `eval_request` (any eval suite in `fleet` or `full` mode, matching `atomics distributed run --suite`), and an optional `worker_selector`.
 
 | `mode` | Behavior |
 |--------|----------|
