@@ -28,27 +28,25 @@ def test_distributed_help():
 
 def test_distributed_status_outputs_clean_json(monkeypatch):
     """atomics distributed status should print clean JSON without Rich markup."""
-    import json
-    from unittest.mock import MagicMock
-
+    import httpx
     from click.testing import CliRunner
 
     from atomics.commands.distributed import distributed
+    from atomics.mcp.client import AtomicsApiClient as RealClient
 
-    fake_response = MagicMock()
-    fake_response.json.return_value = {
-        "job_id": "abc123",
-        "status": "completed",
-        "mode": "split",
-    }
-    fake_response.raise_for_status.return_value = None
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert str(request.url) == "http://coordinator:8000/api/v1/distributed/runs/abc123"
+        assert request.headers.get("X-API-Key") == "client-key"
+        return httpx.Response(
+            200, json={"job_id": "abc123", "status": "completed", "mode": "split"}
+        )
 
-    def fake_get(url, *, headers=None):
-        assert url == "http://coordinator:8000/api/v1/distributed/runs/abc123"
-        assert headers == {"X-API-Key": "client-key"}
-        return fake_response
-
-    monkeypatch.setattr("atomics.commands.distributed.httpx.get", fake_get)
+    monkeypatch.setattr(
+        "atomics.commands.distributed.AtomicsApiClient",
+        lambda base_url, api_key=None: RealClient(
+            base_url, api_key, transport=httpx.MockTransport(handler)
+        ),
+    )
 
     runner = CliRunner()
     result = runner.invoke(
@@ -70,18 +68,22 @@ def test_distributed_status_outputs_clean_json(monkeypatch):
 
 def _capture_run_payload(monkeypatch) -> dict:
     """Invoke `distributed run` against a stubbed coordinator and return the payload."""
-    from unittest.mock import MagicMock
+    import httpx
+
+    from atomics.mcp.client import AtomicsApiClient as RealClient
 
     captured: dict = {}
-    fake_response = MagicMock()
-    fake_response.json.return_value = {"job_id": "job-1"}
-    fake_response.raise_for_status.return_value = None
 
-    def fake_post(url, *, json=None, headers=None):
-        captured.update(json or {})
-        return fake_response
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured.update(json.loads(request.content.decode("utf-8")) if request.content else {})
+        return httpx.Response(202, json={"job_id": "job-1"})
 
-    monkeypatch.setattr("atomics.commands.distributed.httpx.post", fake_post)
+    monkeypatch.setattr(
+        "atomics.commands.distributed.AtomicsApiClient",
+        lambda base_url, api_key=None: RealClient(
+            base_url, api_key, transport=httpx.MockTransport(handler)
+        ),
+    )
     return captured
 
 
@@ -144,14 +146,17 @@ def test_distributed_run_rejects_label_in_split_mode(monkeypatch):
 
 
 def _stub_status_response(monkeypatch, payload: dict) -> None:
-    from unittest.mock import MagicMock
+    import httpx
 
-    fake_response = MagicMock()
-    fake_response.json.return_value = payload
-    fake_response.raise_for_status.return_value = None
+    from atomics.mcp.client import AtomicsApiClient as RealClient
+
     monkeypatch.setattr(
-        "atomics.commands.distributed.httpx.get",
-        lambda url, *, headers=None: fake_response,
+        "atomics.commands.distributed.AtomicsApiClient",
+        lambda base_url, api_key=None: RealClient(
+            base_url,
+            api_key,
+            transport=httpx.MockTransport(lambda _req: httpx.Response(200, json=payload)),
+        ),
     )
 
 
@@ -524,22 +529,24 @@ def test_distributed_run_sends_runtime_override(monkeypatch):
 
 
 def test_distributed_status_quotes_job_id_and_validates_coordinator(monkeypatch):
-    from unittest.mock import MagicMock
-
+    import httpx
     from click.testing import CliRunner
 
     from atomics.commands.distributed import distributed
+    from atomics.mcp.client import AtomicsApiClient as RealClient
 
     seen_urls: list[str] = []
-    fake_response = MagicMock()
-    fake_response.json.return_value = {"job_id": "x", "status": "completed", "mode": "split"}
-    fake_response.raise_for_status.return_value = None
 
-    def fake_get(url, *, headers=None):
-        seen_urls.append(url)
-        return fake_response
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen_urls.append(str(request.url))
+        return httpx.Response(200, json={"job_id": "x", "status": "completed", "mode": "split"})
 
-    monkeypatch.setattr("atomics.commands.distributed.httpx.get", fake_get)
+    monkeypatch.setattr(
+        "atomics.commands.distributed.AtomicsApiClient",
+        lambda base_url, api_key=None: RealClient(
+            base_url, api_key, transport=httpx.MockTransport(handler)
+        ),
+    )
     res = CliRunner().invoke(
         distributed,
         ["status", "../workers", "--coordinator", "http://coordinator:8000", "--api-key", "k"],
@@ -592,3 +599,32 @@ def test_fleet_status_escapes_rich_markup_in_labels_and_models(monkeypatch):
     assert "job-[bold red]FAKE[/]" in result.output
     assert "m-[red]1[/red]" in result.output
     assert "t=[red]X[/]" in result.output
+
+
+def test_distributed_cli_uses_atomics_api_client_and_handles_api_error(monkeypatch):
+    from click.testing import CliRunner
+
+    import atomics.commands.distributed as dist_mod
+    from atomics.cli import cli
+    from atomics.mcp.client import AtomicsApiError
+
+    assert "worker-npm" not in cli.commands
+    assert not hasattr(dist_mod, "httpx")
+
+    class FailingClient:
+        def __init__(self, base_url: str, api_key: str | None = None, **_kw):
+            self.base_url = base_url
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def get_distributed_run(self, job_id: str):
+            raise AtomicsApiError("HTTP 404 from /api/v1/distributed/runs: Job not found")
+
+    monkeypatch.setattr("atomics.commands.distributed.AtomicsApiClient", FailingClient)
+    res = CliRunner().invoke(dist_mod.distributed, ["status", "missing-id", "--api-key", "k"])
+    assert res.exit_code != 0
+    assert "Job not found" in res.output

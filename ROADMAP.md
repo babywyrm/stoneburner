@@ -117,11 +117,11 @@ major tag moved by the publish workflow.
 
 ## 0.40.0 — Debloating: retire `worker-npm`, unify sweep, and share API client
 
-- [ ] Retire the vestigial Node.js `worker-npm` bridge (`atomics/workers/`,
+- [x] Retire the vestigial Node.js `worker-npm` bridge (`atomics/workers/`,
       `atomics/commands/worker_npm.py`).
-- [ ] Collapse `atomics/benchmark/sweep.py` into `atomics/eval/gauntlet.py` so
+- [x] Collapse `atomics/benchmark/sweep.py` into `atomics/eval/gauntlet.py` so
       `atomics sweep` has one orchestrator and persistence path.
-- [ ] Route `atomics distributed` CLI commands through `AtomicsApiClient`
+- [x] Route `atomics distributed` CLI commands through `AtomicsApiClient`
       instead of raw `httpx` requests.
 
 ## 0.41.0 — ProfileProvider, multi-turn toolcall escalation, and calibration presets

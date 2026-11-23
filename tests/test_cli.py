@@ -995,7 +995,7 @@ def test_cli_provider_test_generate_failure_is_not_a_pass(monkeypatch):
 
 def test_cli_sweep_command(monkeypatch):
     """atomics sweep should run eval across multiple models."""
-    from atomics.benchmark.sweep import ModelSweepResult
+    from atomics.eval.gauntlet import ModelSweepResult
 
     mock_results = [
         ModelSweepResult(
@@ -1027,7 +1027,7 @@ def test_cli_sweep_command(monkeypatch):
                 cb(r)
         return mock_results
 
-    monkeypatch.setattr("atomics.benchmark.sweep.run_model_sweep", fake_sweep)
+    monkeypatch.setattr("atomics.eval.gauntlet.run_model_sweep", fake_sweep)
     runner = CliRunner()
     result = runner.invoke(
         cli,
@@ -1047,7 +1047,7 @@ def test_cli_sweep_command(monkeypatch):
 
 def test_cli_sweep_cloud_provider(monkeypatch):
     """atomics sweep --provider claude should work with cloud models."""
-    from atomics.benchmark.sweep import ModelSweepResult
+    from atomics.eval.gauntlet import ModelSweepResult
 
     mock_results = [
         ModelSweepResult(
@@ -1075,7 +1075,7 @@ def test_cli_sweep_cloud_provider(monkeypatch):
                 cb(r)
         return mock_results
 
-    monkeypatch.setattr("atomics.benchmark.sweep.run_model_sweep", fake_sweep)
+    monkeypatch.setattr("atomics.eval.gauntlet.run_model_sweep", fake_sweep)
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test-fake-key")
     runner = CliRunner()
     result = runner.invoke(
@@ -1096,7 +1096,7 @@ def test_cli_sweep_cloud_provider(monkeypatch):
 
 def test_cli_sweep_openai_provider(monkeypatch):
     """atomics sweep --provider openai should work with OpenAI models."""
-    from atomics.benchmark.sweep import ModelSweepResult
+    from atomics.eval.gauntlet import ModelSweepResult
 
     mock_results = [
         ModelSweepResult(
@@ -1118,7 +1118,7 @@ def test_cli_sweep_openai_provider(monkeypatch):
                 cb(r)
         return mock_results
 
-    monkeypatch.setattr("atomics.benchmark.sweep.run_model_sweep", fake_sweep)
+    monkeypatch.setattr("atomics.eval.gauntlet.run_model_sweep", fake_sweep)
     monkeypatch.setenv("OPENAI_API_KEY", "sk-proj-test-fake-key")
     runner = CliRunner()
     result = runner.invoke(
@@ -1199,8 +1199,8 @@ def test_cli_sweep_verbose_shows_replies(monkeypatch):
     """atomics sweep --verbose should print actual model replies."""
     from datetime import UTC, datetime
 
-    from atomics.benchmark.sweep import ModelSweepResult
     from atomics.eval.fixtures import EvalFixture
+    from atomics.eval.gauntlet import ModelSweepResult
     from atomics.eval.judge import JudgeResult
     from atomics.eval.runner import EvalRunSummary, FixtureResult
     from atomics.models import TaskCategory, TaskComplexity, TaskResult, TaskStatus
@@ -1270,7 +1270,7 @@ def test_cli_sweep_verbose_shows_replies(monkeypatch):
                 model_cb(r)
         return mock_results
 
-    monkeypatch.setattr("atomics.benchmark.sweep.run_model_sweep", fake_sweep)
+    monkeypatch.setattr("atomics.eval.gauntlet.run_model_sweep", fake_sweep)
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test-fake-key")
     runner = CliRunner()
     result = runner.invoke(
@@ -1293,8 +1293,8 @@ def test_cli_sweep_no_verbose_hides_replies(monkeypatch):
     """Without --verbose, sweep should NOT print full replies."""
     from datetime import UTC, datetime
 
-    from atomics.benchmark.sweep import ModelSweepResult
     from atomics.eval.fixtures import EvalFixture
+    from atomics.eval.gauntlet import ModelSweepResult
     from atomics.eval.judge import JudgeResult
     from atomics.eval.runner import EvalRunSummary, FixtureResult
     from atomics.models import TaskCategory, TaskComplexity, TaskResult, TaskStatus
@@ -1364,7 +1364,7 @@ def test_cli_sweep_no_verbose_hides_replies(monkeypatch):
                 model_cb(r)
         return mock_results
 
-    monkeypatch.setattr("atomics.benchmark.sweep.run_model_sweep", fake_sweep)
+    monkeypatch.setattr("atomics.eval.gauntlet.run_model_sweep", fake_sweep)
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test-fake-key")
     runner = CliRunner()
     result = runner.invoke(
@@ -1613,7 +1613,7 @@ def test_cli_provider_test_brain_gateway_does_not_auto_pin_thinking(monkeypatch)
 
 def test_cli_sweep_vllm_provider(monkeypatch, tmp_path):
     """atomics sweep --provider vllm should use VllmProvider via _make_provider."""
-    from atomics.benchmark.sweep import ModelSweepResult
+    from atomics.eval.gauntlet import ModelSweepResult
 
     constructed: list[str] = []
 
@@ -1649,7 +1649,7 @@ def test_cli_sweep_vllm_provider(monkeypatch, tmp_path):
         return mock_results
 
     monkeypatch.setattr("atomics.providers.vllm.VllmProvider", FakeVllm)
-    monkeypatch.setattr("atomics.benchmark.sweep.run_model_sweep", fake_sweep)
+    monkeypatch.setattr("atomics.eval.gauntlet.run_model_sweep", fake_sweep)
     monkeypatch.chdir(tmp_path)
 
     runner = CliRunner()

@@ -48,7 +48,7 @@ def test_no_eval_running_command_is_missing_a_budget():
     runners = re.compile(
         r"\b(run_eval|run_rag|run_codegen|run_multiturn|run_adversarial"
         r"|run_redblue|run_refusal|run_codereview|run_toolcall"
-        r"|run_model_sweep|run_archreview|run_probe)\b"
+        r"|run_model_sweep|run_gauntlet|run_archreview|run_probe)\b"
     )
     commands_dir = Path(__file__).resolve().parent.parent / "atomics" / "commands"
     spending_modules = {

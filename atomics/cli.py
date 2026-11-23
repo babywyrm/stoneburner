@@ -29,7 +29,6 @@ from atomics.commands import soak as soak_commands
 from atomics.commands import sweep as sweep_commands
 from atomics.commands import toolcall as toolcall_commands
 from atomics.commands import worker as worker_commands
-from atomics.commands import worker_npm as worker_npm_commands
 from atomics.commands.auth import login, logout, secrets_group, whoami
 from atomics.commands.common import setup_logging
 
@@ -119,5 +118,4 @@ cli.add_command(api_commands.server)
 cli.add_command(mcp_commands.mcp)
 cli.add_command(repl_commands.repl)
 cli.add_command(worker_commands.worker)
-cli.add_command(worker_npm_commands.worker_npm)
 cli.add_command(distributed_commands.distributed)

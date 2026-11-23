@@ -20,9 +20,9 @@ never imports eval; providers never import storage.
 ```
 CLI / entry          cli.py, commands/, __main__.py
 API / server         api/, distributed/      # FastAPI, async jobs, fleet
-HTTP clients         mcp/, repl/, workers/   # talk to a running API server
-Orchestration        benchmark/ (sweep, qa_runner, labcompare, advisor),
-                     eval/batteries, inventory/
+HTTP clients         mcp/, repl/             # talk to a running API server
+Orchestration        eval/gauntlet, eval/batteries,
+                     benchmark/ (qa_runner, labcompare, advisor), inventory/
 Burn loop            core/, tasks/, benchmark/tiers, reporting/hooks
 Eval / security      eval/, probe/, archreview/
 Load testing         load/ (stress, soak, scenario, contention, capacity)
@@ -38,12 +38,12 @@ workers hold no provider, storage, or budget logic of their own.
 
 ```mermaid
 flowchart TB
-    Clients["HTTP clients\nmcp/, repl/, workers/"]
+    Clients["HTTP clients\nmcp/, repl/"]
     CLI["CLI\ncli.py, commands/"]
     API["API server\napi/, distributed/"]
     subgraph Work["Workloads"]
         direction LR
-        Orch["Orchestration\nbenchmark/, eval/batteries, inventory/"]
+        Orch["Orchestration\neval/gauntlet, eval/batteries, benchmark/, inventory/"]
         Eval["Eval / security\neval/, probe/, archreview/"]
         Burn["Burn loop\ncore/, tasks/"]
         Load["Load testing\nload/"]
@@ -68,8 +68,8 @@ flowchart TB
 |-------|------|-------------|
 | CLI | Thin Click registration in `cli.py`; command modules in `commands/` handle argument parsing, wiring, and Rich output. No business logic that can't be reached another way. | `cli.py`, `commands/` |
 | API / server | FastAPI HTTP surface for runs, evals, reports, and async jobs; optional auth; the distributed coordinator. Never imports `commands/`. | `api/`, `distributed/` |
-| HTTP clients | The stdio MCP server, the REPL, and npm workers. They share `mcp/client.AtomicsApiClient` and inherit the API's authentication and spend ceilings. Tool surface is bounded by the API, not the CLI. | `mcp/`, `repl/`, `workers/` |
-| Orchestration | Multi-run/multi-model coordination over the lower layers; named batteries; model inventory and cohorts. | `benchmark/sweep.py`, `benchmark/qa_runner.py`, `eval/batteries.py`, `inventory/` |
+| HTTP clients | The stdio MCP server, the REPL, and `atomics distributed` CLI commands. They share `mcp/client.AtomicsApiClient` and inherit the API's authentication and spend ceilings. Tool surface is bounded by the API, not the CLI. | `mcp/`, `repl/` |
+| Orchestration | Multi-run/multi-model coordination over the lower layers; named batteries; model inventory and cohorts. | `eval/gauntlet.py`, `benchmark/qa_runner.py`, `eval/batteries.py`, `inventory/` |
 | Burn loop | The continuous token-burn benchmark. | `core/engine.py`, `core/runner.py`, `core/guard.py`, `tasks/` |
 | Eval / security | LLM quality and security evaluation suites. | `eval/`, `probe/`, `archreview/` |
 | Load testing | Throughput/latency/stability under concurrency. | `load/stress.py`, `load/soak.py`, `load/contention.py`, `load/capacity.py` |

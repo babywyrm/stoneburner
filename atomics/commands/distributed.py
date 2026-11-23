@@ -4,15 +4,14 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from urllib.parse import quote
 
 import click
-import httpx
 from rich.console import Console
 from rich.markup import escape
 from rich.table import Table
 
 from atomics.commands.common import PROVIDER_CHOICES
+from atomics.mcp.client import AtomicsApiClient, AtomicsApiError
 from atomics.validation import validate_endpoint_url
 
 
@@ -46,14 +45,14 @@ def distributed() -> None:
     "--label",
     "labels",
     multiple=True,
-    help="Worker selector key=value, repeatable. Fleet mode only; a worker must "
-    "match every pair. Omit to broadcast to all online workers.",
+    help="Worker selector key=value, repeatable. Fleet and full mode only; a worker "
+    "must match every pair. Omit to broadcast to all online workers.",
 )
 @click.option(
     "--runtime",
     default="python",
     show_default=True,
-    help="Runtime for generated tasks. Use 'node' to target npm workers via the bridge.",
+    help="Required worker capability tag for generated tasks.",
 )
 def run(
     coordinator: str,
@@ -90,14 +89,15 @@ def run(
         run_request["provider"] = provider
     if model:
         run_request["model"] = model
-    payload: dict[str, object] = {"mode": mode, "run_request": run_request}
-    # Omitted rather than sent empty: an absent selector means every online worker.
-    if selector:
-        payload["worker_selector"] = selector
-    headers = {"X-API-Key": api_key}
-    resp = httpx.post(f"{coordinator}/api/v1/distributed/runs", json=payload, headers=headers)
-    resp.raise_for_status()
-    data = resp.json()
+    try:
+        with AtomicsApiClient(coordinator, api_key) as client:
+            data = client.submit_distributed_run(
+                mode=mode,
+                run_request=run_request,
+                worker_selector=selector or None,
+            )
+    except AtomicsApiError as exc:
+        raise click.ClickException(str(exc)) from exc
     Console().print(f"Submitted distributed run: {data['job_id']}")
 
 
@@ -215,18 +215,19 @@ def status(coordinator: str, api_key: str, job_id: str, json_out: Path | None) -
         coordinator = validate_endpoint_url(coordinator, label="--coordinator")
     except ValueError as exc:
         raise click.BadParameter(str(exc), param_hint="--coordinator") from exc
-    headers = {"X-API-Key": api_key}
-    resp = httpx.get(
-        f"{coordinator}/api/v1/distributed/runs/{quote(job_id, safe='')}", headers=headers
-    )
-    resp.raise_for_status()
-    job = resp.json()
+    try:
+        with AtomicsApiClient(coordinator, api_key) as client:
+            job = client.get_distributed_run(job_id)
+    except AtomicsApiError as exc:
+        raise click.ClickException(str(exc)) from exc
 
-    summary = {}
+    summary: dict[str, object] = {}
     raw_summary = job.get("summary_json")
-    if raw_summary:
+    if isinstance(raw_summary, str) and raw_summary:
         try:
-            summary = json.loads(raw_summary)
+            loaded = json.loads(raw_summary)
+            if isinstance(loaded, dict):
+                summary = loaded
         except json.JSONDecodeError:
             summary = {}
 

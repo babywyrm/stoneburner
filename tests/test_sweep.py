@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from atomics.benchmark.sweep import ModelSweepResult, run_model_sweep
+from atomics.eval.gauntlet import ModelSweepResult, run_model_sweep
 
 
 def _make_mock_provider(name: str = "ollama") -> AsyncMock:
@@ -172,3 +172,14 @@ async def test_sweep_on_fixture_done_callback():
 
     assert len(fixture_log) == 2
     assert all("ev-0" in entry for entry in fixture_log)
+
+
+def test_sweep_lives_in_eval_gauntlet_not_benchmark_sweep():
+    import importlib.util
+
+    from atomics.eval.gauntlet import ModelSweepResult as GauntletSweepResult
+    from atomics.eval.gauntlet import run_model_sweep as gauntlet_run_sweep
+
+    assert GauntletSweepResult is not None
+    assert callable(gauntlet_run_sweep)
+    assert importlib.util.find_spec("atomics.benchmark.sweep") is None

@@ -22,7 +22,7 @@ jobs:
       fail-fast: false
       matrix:
         # actions scans these workflow files; javascript-typescript covers the
-        # npm worker. Nothing here is compiled, so no build step is needed.
+        # dashboard harness. Nothing here is compiled, so no build step is needed.
         language: [python, javascript-typescript, actions]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

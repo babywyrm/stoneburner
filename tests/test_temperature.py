@@ -870,7 +870,7 @@ async def test_gauntlet_forwards_temperature_to_every_suite(monkeypatch, suite):
 
 @pytest.mark.asyncio
 async def test_model_sweep_forwards_temperature(monkeypatch):
-    from atomics.benchmark.sweep import run_model_sweep
+    from atomics.eval.gauntlet import run_model_sweep
 
     seen: dict = {}
 
@@ -878,7 +878,7 @@ async def test_model_sweep_forwards_temperature(monkeypatch):
         seen.update(kwargs)
         raise RuntimeError("stop after capture")
 
-    monkeypatch.setattr("atomics.benchmark.sweep.run_eval", fake_run_eval)
+    monkeypatch.setattr("atomics.eval.runner.run_eval", fake_run_eval)
     await run_model_sweep(
         provider_factory=lambda _model: _TemperatureRecorder(),
         judge_provider=_TemperatureRecorder(),
@@ -891,7 +891,7 @@ async def test_model_sweep_forwards_temperature(monkeypatch):
 @pytest.mark.parametrize(
     ("suites", "target"),
     [
-        ("eval", "atomics.benchmark.sweep.run_model_sweep"),
+        ("eval", "atomics.eval.gauntlet.run_model_sweep"),
         ("redblue,toolcall", "atomics.eval.gauntlet.make_suite_runner"),
     ],
 )

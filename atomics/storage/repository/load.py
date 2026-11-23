@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any
 from atomics.storage.repository._base import RepositoryBase
 
 if TYPE_CHECKING:
-    from atomics.benchmark.sweep import ModelSweepResult
+    from atomics.eval.gauntlet import ModelSweepResult
     from atomics.load.scenario_models import ScenarioResult
     from atomics.load.soak import SoakResult
     from atomics.load.stress import StressResult

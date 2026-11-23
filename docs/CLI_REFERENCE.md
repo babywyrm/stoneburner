@@ -283,7 +283,6 @@ runs such as a local model judged by a paid one.
 | `atomics server --allowed-host URL` | Restrict caller-supplied outbound `host` / `judge_host` targets to approved HTTP(S) origins or URL prefixes (repeatable; alias `--allowed-hosts`) |
 | `atomics server --allow-codegen` | Enable remote submission of the `codegen` suite (disabled by default) |
 | `atomics worker` | Start a distributed worker (polls coordinator for tasks) |
-| `atomics worker-npm` | Start a Node.js worker bridge for distributed task execution |
 | `atomics distributed run` | Submit a distributed run (split, fleet, or full mode) |
 | `atomics distributed status JOB_ID` | Poll distributed run status |
 
@@ -367,37 +366,6 @@ uv run atomics worker --label gpu=1
 uv run atomics worker --provider brain-gateway --host http://localhost:30080 --model qwen3:4b
 uv run atomics worker --provider vllm --host http://localhost:8000/v1 --label gpu=4090
 ```
-
-## atomics worker-npm
-
-Start a Node.js worker that joins the distributed pool via the JSON-over-stdin bridge protocol. The npm worker registers with the coordinator, heartbeats, polls for assignments, and executes them by spawning the command provided by `--worker-cmd`.
-
-| Option | Description |
-|--------|-------------|
-| `--coordinator URL` | Coordinator base URL (default: `http://127.0.0.1:8000`) |
-| `--api-key KEY` | Worker API key (or `ATOMICS_WORKER_API_KEY`) |
-| `--label KEY=VALUE` | Worker label, repeatable |
-| `--capability TEXT` | Worker capability, repeatable (default: `node`) |
-| `--endpoint URL` | Optional push endpoint URL for this worker |
-| `--worker-cmd CMD` | Command used to execute each task (default: `node task-runner.js`) |
-| `--heartbeat-interval N` | Heartbeat interval in seconds (default: 30) |
-| `--pool-size N` | Number of independent npm workers to run on this host (default: 1) |
-| `--npm-dir PATH` | Path to the npm worker package |
-
-Use `--runtime node` on `atomics distributed run` to generate node-runtime tasks that only npm workers can claim.
-
-```bash
-# Terminal 1 — start a single npm worker
-uv run atomics worker-npm --api-key worker-key --label box=239
-
-# Terminal 1 — start four npm workers on the same host
-uv run atomics worker-npm --api-key worker-key --label box=239 --pool-size 4
-
-# Terminal 2 — submit node-runtime work
-uv run atomics distributed run --mode split --runtime node -n 10 --api-key client-key
-```
-
-The bundled `task-runner.js` is a minimal example that echoes the task name. Real deployments should point `--worker-cmd` at their own Node.js runner that implements the bridge protocol.
 
 ## atomics distributed
 

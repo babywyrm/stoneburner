@@ -13,7 +13,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from atomics.benchmark.sweep import run_model_sweep
+from atomics.eval.gauntlet import run_model_sweep
 from atomics.providers.ollama import OllamaProvider
 
 RUNS = 25

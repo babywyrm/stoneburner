@@ -248,15 +248,16 @@ def sweep(
     """
     from pathlib import Path
 
-    from atomics.benchmark.sweep import ModelSweepResult, run_model_sweep
     from atomics.doctor import _warn_cpu_offload
     from atomics.eval.gauntlet import (
+        ModelSweepResult,
         format_headline_cell,
         format_vs_best,
         ignore_broken_pipe,
         make_suite_runner,
         parse_suites,
         run_gauntlet,
+        run_model_sweep,
     )
 
     if resume and not status_path:

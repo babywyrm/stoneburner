@@ -12,14 +12,17 @@ import json
 import logging
 import signal
 import statistics
+from collections import Counter
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import asdict, dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal, Protocol
 
+from atomics.eval.fixtures import EVAL_FIXTURES, EvalFixture
 from atomics.eval.intervals import paired_interval
 from atomics.eval.outcomes import RunStatus
+from atomics.eval.runner import EvalRunSummary
 from atomics.eval.suite_integrity import headline_rate
 from atomics.providers.base import BaseProvider
 from atomics.validation import sanitize_error
@@ -51,6 +54,40 @@ class SuiteJobResult:
     # Paired-difference interval behind vs_best, in the leader's favor.
     vs_low: float | None = None
     vs_high: float | None = None
+
+
+@dataclass
+class ModelSweepResult:
+    model: str
+    fixtures_run: int
+    overall_quality: float | None
+    avg_latency_ms: float
+    total_tokens: int
+    total_cost_usd: float
+    value_score: float | None
+    eval_summary: EvalRunSummary | None
+    error: str | None = None
+    provider: str = ""
+
+
+def _representative_error(summary: EvalRunSummary) -> str | None:
+    """Most common per-fixture error message in a summary, or None."""
+    msgs = [
+        fr.task_result.error_message
+        for fr in summary.fixture_results
+        if fr.task_result.error_message
+    ]
+    if not msgs:
+        return None
+    return Counter(msgs).most_common(1)[0][0][:200]
+
+
+def _filter_fixtures(fixture_ids: list[str] | None) -> list[EvalFixture]:
+    """Return fixtures matching the given IDs, or all if None."""
+    if fixture_ids is None:
+        return list(EVAL_FIXTURES)
+    id_set = set(fixture_ids)
+    return [f for f in EVAL_FIXTURES if f.id in id_set]
 
 
 class _RunScored(Protocol):
@@ -441,9 +478,9 @@ async def _dispatch_suite(
     temperature: float | None = None,
     effort: str | None = None,
     reasoning_mode: str | None = None,
+    on_fixture_done: Callable[..., object] | None = None,
 ) -> tuple[SuiteJobResult, object | None]:
     if suite == "eval":
-        from atomics.benchmark.sweep import _filter_fixtures
         from atomics.eval.runner import run_eval
 
         eval_summary = await run_eval(
@@ -457,12 +494,18 @@ async def _dispatch_suite(
             effort=effort,
             reasoning_mode=reasoning_mode,
             fixtures=_filter_fixtures(fixture_ids),
+            on_fixture_done=on_fixture_done,
         )
         return SuiteJobResult(
             model=model,
             suite=suite,
             ok=eval_summary.overall_accuracy is not None,
             headline=eval_summary.overall_accuracy,
+            error=(
+                _representative_error(eval_summary)
+                if eval_summary.overall_accuracy is None
+                else None
+            ),
             fixture_scores=_fixture_scores(eval_summary),
         ), eval_summary
     if suite == "redblue":
@@ -577,3 +620,74 @@ async def _dispatch_suite(
             stdev=review_summary.review_score_stdev,
         ), review_summary
     raise ValueError(f"unknown suite: {suite}")
+
+
+async def run_model_sweep(
+    *,
+    provider_factory: Callable[[str], BaseProvider],
+    judge_provider: BaseProvider,
+    models: list[str],
+    fixture_ids: list[str] | None = None,
+    judge_model: str | None = None,
+    thinking: bool | None = None,
+    thinking_budget: int | None = None,
+    temperature: float | None = None,
+    effort: str | None = None,
+    reasoning_mode: str | None = None,
+    on_model_done: Callable[[ModelSweepResult], None] | None = None,
+    on_fixture_done: Callable[..., object] | None = None,
+) -> list[ModelSweepResult]:
+    """Run eval fixtures across a list of models via the unified gauntlet dispatcher."""
+    results: list[ModelSweepResult] = []
+    for model in models:
+        provider = provider_factory(model)
+        provider_name = str(getattr(provider, "name", "") or "")
+        try:
+            job, raw_summary = await _dispatch_suite(
+                suite="eval",
+                provider=provider,
+                judge_provider=judge_provider,
+                model=model,
+                judge_model=judge_model,
+                runs=1,
+                thinking=thinking,
+                thinking_budget=thinking_budget,
+                fixture_ids=fixture_ids,
+                skip_incapable=False,
+                temperature=temperature,
+                effort=effort,
+                reasoning_mode=reasoning_mode,
+                on_fixture_done=on_fixture_done,
+            )
+            assert isinstance(raw_summary, EvalRunSummary)
+            result = ModelSweepResult(
+                model=model,
+                fixtures_run=len(raw_summary.fixture_results),
+                overall_quality=raw_summary.overall_accuracy,
+                avg_latency_ms=raw_summary.avg_latency_ms,
+                total_tokens=raw_summary.total_tokens,
+                total_cost_usd=raw_summary.total_cost_usd,
+                value_score=raw_summary.value_score,
+                eval_summary=raw_summary,
+                error=job.error,
+                provider=provider_name,
+            )
+        except Exception as exc:
+            err = sanitize_error(exc)[:200]
+            logger.warning("[gauntlet] Model %s failed: %s", model, err)
+            result = ModelSweepResult(
+                model=model,
+                fixtures_run=0,
+                overall_quality=None,
+                avg_latency_ms=0.0,
+                total_tokens=0,
+                total_cost_usd=0.0,
+                value_score=None,
+                eval_summary=None,
+                error=err,
+                provider=provider_name,
+            )
+        results.append(result)
+        if on_model_done is not None:
+            on_model_done(result)
+    return results

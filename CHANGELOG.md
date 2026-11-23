@@ -58,6 +58,11 @@
   the optional `[rag]` third-party stub skip.
 
 ### Changed
+- Collapsed `atomics/benchmark/sweep.py` (`ModelSweepResult`,
+  `run_model_sweep()`) into `atomics/eval/gauntlet.py`, routed `atomics
+  distributed` CLI commands through `AtomicsApiClient`, and retired the
+  vestigial Node.js `worker-npm` bridge (`atomics/workers/`,
+  `atomics/commands/worker_npm.py`).
 - `classify_model()` now classifies hyphen-delimited parameter tags (`-4b-`,
   `-9b:latest`) alongside `:Nb` tags while ignoring build hashes/years, and
   `MODEL_CLASS_MAP` / `THINKING_CAPABLE` register `granite4.2:30b` and
