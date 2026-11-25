@@ -104,9 +104,20 @@ def test_lenient_judge_fails_exit_one_and_is_stored_as_failed(monkeypatch, set_f
     result = _invoke(monkeypatch, RubricJudge(lenient), "--set", str(set_file))
     assert result.exit_code == 1
     assert "FAIL" in result.output
-    assert "bias         +0.350" in result.output
+    assert "bias         +0.350   (positive: the judge scores high)" in result.output
     status = judge_calibration_status(load_settings().db_path, "ollama", "judge-m")
     assert status is not None and not status.passed and status.bias == 0.35
+
+
+def test_bias_direction_hint_matches_negative_and_zero_signs(monkeypatch, set_file):
+    harsh = {"answer-a": (1, 1, 1), "answer-b": (1, 1, 1)}
+    neg = _invoke(monkeypatch, RubricJudge(harsh), "--set", str(set_file), "--no-save")
+    assert neg.exit_code == 1
+    assert "bias         -0.350   (negative: the judge scores low)" in neg.output
+
+    zero = _invoke(monkeypatch, RubricJudge(EXACT), "--set", str(set_file), "--no-save")
+    assert zero.exit_code == 0, zero.output
+    assert "bias         +0.000   (no directional bias)" in zero.output
 
 
 def test_unparseable_item_is_incomplete_and_never_stored(monkeypatch, set_file):

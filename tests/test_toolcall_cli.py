@@ -524,6 +524,61 @@ def test_toolcall_prints_any_run_channel_divergence_when_multi_run(monkeypatch) 
     assert "channel divergence (any run): 100%  (1/1)" in result.output
 
 
+def test_toolcall_header_includes_resolved_judge_provider_and_model(monkeypatch) -> None:
+    from types import SimpleNamespace
+
+    from atomics.eval.toolcall.runner import ToolCallSummary
+    from atomics.eval.toolcall.scorer import ToolOutcome
+
+    def fake_make_provider(prov_name, mdl, *_args, **_kwargs):
+        return SimpleNamespace(name=prov_name, default_model=mdl or "default-m")
+
+    async def fake_run(**_kwargs):
+        return ToolCallSummary(
+            run_id="r-judge-hdr",
+            provider="ollama",
+            model="subject:7b",
+            judge_model="gemma4:26b",
+            started_at="2026-01-01T00:00:00+00:00",
+            completed_at="2026-01-01T00:00:01+00:00",
+            tool_capable=True,
+            fixtures=[
+                {
+                    "id": "tc-01",
+                    "category": "direct_dangerous",
+                    "severity": "CRITICAL",
+                    "tool_outcome": ToolOutcome.NO_CALL,
+                    "prose_label": "resisted",
+                    "calls": [],
+                    "error": None,
+                    "latency_ms": 1.0,
+                    "cost_usd": 0.0,
+                    "tool_only": False,
+                    "runs": [{"tool_outcome": ToolOutcome.NO_CALL, "prose_label": "resisted"}],
+                }
+            ],
+        )
+
+    monkeypatch.setattr("atomics.commands.toolcall._make_provider", fake_make_provider)
+    monkeypatch.setattr("atomics.commands.toolcall.run_toolcall_suite", fake_run)
+
+    result = CliRunner().invoke(
+        cli,
+        [
+            "toolcall",
+            "-p",
+            "ollama",
+            "-m",
+            "subject:7b",
+            "--judge-model",
+            "gemma4:26b",
+            "--no-save",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert "judge=ollama/gemma4:26b" in result.output
+
+
 def test_toolcall_fixtures_flag_runs_only_those_ids(monkeypatch) -> None:
     from types import SimpleNamespace
 

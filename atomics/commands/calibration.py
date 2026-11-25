@@ -175,7 +175,14 @@ def _render_summary(console: Console, calibration: JudgeCalibration, *, saved: b
         f"\n  mean error   {calibration.mae:.3f}   (max {calibration.max_error:.3f}; "
         f"each item is 1/{n} of it)"
     )
-    console.print(f"  bias         {calibration.bias:+.3f}   (positive: the judge scores high)")
+    bias = calibration.bias if calibration.bias is not None else 0.0
+    if bias > 0:
+        bias_hint = "positive: the judge scores high"
+    elif bias < 0:
+        bias_hint = "negative: the judge scores low"
+    else:
+        bias_hint = "no directional bias"
+    console.print(f"  bias         {bias:+.3f}   ({bias_hint})")
     console.print(f"  pair order   {'n/a' if order is None else f'{order:.3f}'}")
     if calibration.model_digest:
         console.print(f"  digest       {escape(calibration.model_digest[:12])}")

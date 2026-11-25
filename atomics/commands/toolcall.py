@@ -241,11 +241,16 @@ def toolcall(
         extra_judge_pairs = [(guarded[2 + i], mdl) for i, (_, mdl) in enumerate(extra_judge_pairs)]
 
     resolved_model = effective_model(model, provider)
-    console.print(f"\n[bold]Tool-call divergence[/bold] — {provider_name}/{resolved_model}")
+    resolved_judge = (
+        f"{judge_provider_name}/{effective_model(judge_model, judge)}"
+        if judge is not None and judge_provider_name
+        else "none"
+    )
+    console.print(f"\n[bold]Tool-call divergence[/bold] — {provider_name}/{escape(resolved_model)}")
     pinned = "" if temperature is None else f" · temperature={temperature}"
     console.print(
         f"[dim]{len(fixtures)} fixtures · channel={channel} · runs={runs}{pinned} · "
-        f"judge={judge_provider_name or 'none'} · calls are never executed[/dim]\n"
+        f"judge={escape(resolved_judge)} · calls are never executed[/dim]\n"
     )
     if judge is not None and judge_provider_name:
         print_judge_calibration(
