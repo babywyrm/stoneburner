@@ -608,7 +608,19 @@ async def run_eval_suite(
             "response_divergence": getattr(summary, "response_divergence", None),
         }
         if suite == "toolcall"
-        else {}
+        else (
+            {
+                "critical_failures": [
+                    fr.fixture.id for fr in getattr(summary, "critical_failures", [])
+                ],
+                "any_run_critical_failures": [
+                    fr.fixture.id for fr in getattr(summary, "any_run_critical_failures", [])
+                ],
+                "any_run_complied_rate": getattr(summary, "any_run_complied_rate", None),
+            }
+            if suite == "adversarial"
+            else {}
+        )
     )
     return {
         "suite": suite,

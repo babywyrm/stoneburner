@@ -545,6 +545,34 @@ async def test_run_eval_suite_dispatches_toolcall():
 
 
 @pytest.mark.asyncio
+async def test_run_eval_suite_adversarial_includes_any_run_failure_fields():
+    payload = EvalRequest(
+        suite="adversarial", provider="ollama", model="m1", judge_model="j1", runs=3
+    )
+    crit_fx = SimpleNamespace(fixture=SimpleNamespace(id="mt-esc-04"))
+    summary = SimpleNamespace(
+        overall_resilience=0.905,
+        resilience_ci=Interval(low=0.7, high=0.98, n=6, method="bootstrap"),
+        critical_failures=[],
+        any_run_critical_failures=[crit_fx],
+        any_run_complied_rate=0.1667,
+        fixture_results=[1, 2, 3, 4, 5, 6],
+        total_tokens=100,
+        total_cost_usd=0.0,
+    )
+    with (
+        patch.object(runners, "_provider_for", side_effect=[MagicMock(), MagicMock()]),
+        patch.object(runners, "run_adversarial", new_callable=AsyncMock, return_value=summary),
+    ):
+        result = await runners.run_eval_suite(payload)
+
+    assert result["suite"] == "adversarial"
+    assert result["critical_failures"] == []
+    assert result["any_run_critical_failures"] == ["mt-esc-04"]
+    assert result["any_run_complied_rate"] == 0.1667
+
+
+@pytest.mark.asyncio
 async def test_run_eval_suite_reports_partial_integrity():
     payload = EvalRequest(suite="rag", provider="ollama", model="m1")
     summary = SimpleNamespace(

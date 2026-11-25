@@ -437,6 +437,14 @@ def adversarial(
         f"{integrity.attempts_total} / {integrity.attempts_scored}",
     )
     table.add_row("Critical Failures", str(len(summary.critical_failures)))
+    any_run_crit = getattr(summary, "any_run_critical_failures", [])
+    any_run_rate = getattr(summary, "any_run_complied_rate", None)
+    if summary.runs > 1:
+        table.add_row("Any-Run Critical Failures", str(len(any_run_crit)))
+        table.add_row(
+            "Any-Run Complied Rate",
+            f"{any_run_rate * 100:.1f}%" if any_run_rate is not None else "N/A",
+        )
     # Cost + token summary
     total_cost = sum(fr.estimated_cost_usd for fr in summary.fixture_results)
     total_latency = sum(fr.latency_ms for fr in summary.fixture_results)
@@ -455,6 +463,16 @@ def adversarial(
         )
         for fr in summary.critical_failures:
             console.print(f"  • {fr.fixture.id} [{fr.fixture.severity}] {fr.fixture.category}")
+    if summary.runs > 1:
+        mean_ids = {fr.fixture.id for fr in summary.critical_failures}
+        masked = [fr for fr in any_run_crit if fr.fixture.id not in mean_ids]
+        if masked:
+            console.print(
+                f"\n[bold yellow]⚠ {len(masked)} CRITICAL/HIGH fixture(s) complied in at least "
+                f"one run (masked by multi-run mean):[/bold yellow]"
+            )
+            for fr in masked:
+                console.print(f"  • {fr.fixture.id} [{fr.fixture.severity}] {fr.fixture.category}")
 
     # ── --compare: run a second model on the same fixtures and diff ──────────
     compare_summary = None

@@ -83,6 +83,88 @@ def test_cli_adversarial_empty_fixtures_is_rejected():
     assert "fixture" in result.output.lower()
 
 
+def test_cli_adversarial_multi_run_surfaces_any_run_critical_failures(monkeypatch):
+    from datetime import datetime
+
+    from atomics.eval.adversarial.fixtures import AdversarialFixture
+    from atomics.eval.adversarial.runner import AdversarialFixtureResult, AdversarialSummary
+    from atomics.eval.adversarial.scorer import ResistanceResult
+    from atomics.eval.outcomes import AttemptResult, JudgeOutcome, JudgeOutcomeStatus
+    from atomics.providers.outcomes import ProviderOutcome, ProviderOutcomeKind
+
+    attempt_ok = AttemptResult(
+        attempt_index=0,
+        provider=ProviderOutcome(ProviderOutcomeKind.COMPLETED),
+        response_text="No.",
+        latency_ms=1.0,
+        estimated_cost_usd=0.0,
+        input_tokens=1,
+        output_tokens=1,
+        thinking_tokens=0,
+        judge=JudgeOutcome(
+            status=JudgeOutcomeStatus.SCORED,
+            score=1.0,
+            label="resisted",
+            rationale="ok",
+            judge_model="j",
+        ),
+    )
+    attempt_leak = AttemptResult(
+        attempt_index=1,
+        provider=ProviderOutcome(ProviderOutcomeKind.COMPLETED),
+        response_text="Sure.",
+        latency_ms=1.0,
+        estimated_cost_usd=0.0,
+        input_tokens=1,
+        output_tokens=1,
+        thinking_tokens=0,
+        judge=JudgeOutcome(
+            status=JudgeOutcomeStatus.SCORED,
+            score=0.0,
+            label="complied",
+            rationale="leaked",
+            judge_model="j",
+        ),
+    )
+    fr = AdversarialFixtureResult(
+        fixture=AdversarialFixture(
+            id="mt-esc-04",
+            category="authority_buildup",
+            severity="CRITICAL",
+            prompt="p",
+            attack_goal="g",
+            resistance_criteria=["r"],
+        ),
+        response="No.",
+        resistance=ResistanceResult(score=0.5, label="partial", rationale="avg", judge_model="j"),
+        latency_ms=2.0,
+        estimated_cost_usd=0.0,
+        thinking_tokens=0,
+        run_scores=[1.0, 0.0],
+        attempts=[attempt_ok, attempt_leak],
+    )
+    summary = AdversarialSummary(
+        run_id="r-cli-any",
+        provider="ollama",
+        model="m",
+        judge_provider="ollama",
+        judge_model="j",
+        judges=["j"],
+        runs=2,
+        started_at=datetime.now(UTC),
+        completed_at=datetime.now(UTC),
+        fixture_results=[fr],
+    )
+    _mock_adversarial_cli(monkeypatch, [summary])
+    result = CliRunner().invoke(
+        cli, ["adversarial", "-p", "ollama", "-m", "m", "--runs", "2", "--no-save"]
+    )
+    assert result.exit_code == 0, result.output
+    assert "Any-Run Critical Failures" in result.output
+    assert "Any-Run Complied Rate" in result.output
+    assert "mt-esc-04" in result.output
+
+
 def test_cli_adversarial_passes_fixture_subset_to_runner(monkeypatch):
     captured: list = []
 

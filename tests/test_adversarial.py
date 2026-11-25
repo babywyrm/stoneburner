@@ -2122,3 +2122,66 @@ def test_escalation_runner_aggregates_turn_scores_across_runs():
     assert fr.first_breach_turn == 3
     assert fr.conversation_breached is True
     assert fr.run_scores == [1.0, 0.2]
+
+
+def test_any_run_critical_failures_and_complied_rate_surface_masked_compliance():
+    """A 1/3 0.00 compliance masked as partial (mean 0.50) must surface in any-run metrics."""
+    from datetime import UTC, datetime
+
+    from atomics.eval.adversarial.fixtures import AdversarialFixture
+    from atomics.eval.adversarial.runner import AdversarialFixtureResult, AdversarialSummary
+    from atomics.eval.adversarial.scorer import ResistanceResult
+
+    def _make_fr(fid: str, severity: str, mean_score: float, label: str, run_scores: list[float]):
+        return AdversarialFixtureResult(
+            fixture=AdversarialFixture(
+                id=fid,
+                category="authority_buildup",
+                severity=severity,
+                prompt="p",
+                attack_goal="g",
+                resistance_criteria=["r"],
+            ),
+            response="r",
+            resistance=ResistanceResult(
+                score=mean_score,
+                label=label,
+                rationale="ok",
+                judge_model="j",
+            ),
+            latency_ms=1.0,
+            estimated_cost_usd=0.0,
+            thinking_tokens=0,
+            run_scores=run_scores,
+        )
+
+    summary = AdversarialSummary(
+        run_id="r-any",
+        provider="ollama",
+        model="qwen3.5:9b",
+        judge_provider="ollama",
+        judge_model="gemma4:26b",
+        judges=["gemma4:26b"],
+        runs=3,
+        started_at=datetime.now(UTC),
+        completed_at=datetime.now(UTC),
+        fixture_results=[
+            _make_fr("mt-esc-04", "CRITICAL", 0.5, "partial", [0.5, 0.0, 1.0]),
+            _make_fr("mt-esc-05", "HIGH", 1.0, "resisted", [1.0, 1.0, 1.0]),
+            _make_fr("adv-low", "LOW", 0.67, "partial", [0.0, 1.0, 1.0]),
+        ],
+    )
+    assert summary.critical_failures == []
+    assert [fr.fixture.id for fr in summary.any_run_critical_failures] == ["mt-esc-04"]
+    assert summary.any_run_complied_rate == pytest.approx(2 / 3, abs=1e-4)
+
+    payload = summary.to_dict()
+    assert payload["critical_failures"] == []
+    assert payload["any_run_critical_failures"] == ["mt-esc-04"]
+    assert payload["any_run_complied_rate"] == pytest.approx(0.6667)
+    assert payload["fixtures"][0]["any_run_complied"] is True
+    assert payload["fixtures"][1]["any_run_complied"] is False
+
+    empty = _empty_summary([])
+    assert empty.any_run_critical_failures == []
+    assert empty.any_run_complied_rate is None
