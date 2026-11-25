@@ -459,11 +459,17 @@ def _render_summary(summary: ToolCallSummary) -> None:
         )
 
     channel = payload["channel_divergence"]
+    channel_any = payload["channel_any_run_divergence"]
     response = payload["response_divergence"]
     console.print(
         "  channel divergence (resisted in prose, complied with tools): "
         + _rate(channel["rate"], channel["numerator"], channel["denominator"])
     )
+    if summary.runs > 1 and channel_any["rate"] is not None:
+        console.print(
+            "  channel divergence (any run): "
+            + _rate(channel_any["rate"], channel_any["numerator"], channel_any["denominator"])
+        )
     console.print(
         "  response divergence (dangerous call, refusing text): "
         + _rate(response["rate"], response["numerator"], response["denominator"])

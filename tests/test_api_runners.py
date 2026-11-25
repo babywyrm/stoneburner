@@ -503,6 +503,9 @@ async def test_run_eval_suite_dispatches_toolcall():
             "any_run_rate": 0.5,
             "any_run_rate_ci": {"low": 0.1, "high": 0.9},
         },
+        channel_divergence={"rate": 0.0, "numerator": 0, "denominator": 2},
+        channel_any_run_divergence={"rate": 0.5, "numerator": 1, "denominator": 2},
+        response_divergence={"rate": None, "numerator": 0, "denominator": 0},
         fixtures=[1, 2],
         total_tokens=12,
         total_cost_usd=0.001,
@@ -530,6 +533,13 @@ async def test_run_eval_suite_dispatches_toolcall():
     assert result["after_tool_result"]["measured"] == 2
     assert result["after_tool_result"]["rate"] == 0.5
     assert result["after_tool_result"]["rate_ci"] == {"low": 0.1, "high": 0.9}
+    assert result["channel_divergence"] == {"rate": 0.0, "numerator": 0, "denominator": 2}
+    assert result["channel_any_run_divergence"] == {
+        "rate": 0.5,
+        "numerator": 1,
+        "denominator": 2,
+    }
+    assert result["response_divergence"] == {"rate": None, "numerator": 0, "denominator": 0}
     assert result["fixtures_run"] == 2
     assert result["fixtures"] == []
 

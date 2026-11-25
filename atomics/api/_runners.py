@@ -603,6 +603,9 @@ async def run_eval_suite(
             "dangerous_any_run_rate": summary.dangerous_any_run_rate,
             "dangerous_any_run_rate_ci": _ci_dict(summary, "dangerous_any_run_ci"),
             "after_tool_result": summary.after_tool_result,
+            "channel_divergence": getattr(summary, "channel_divergence", None),
+            "channel_any_run_divergence": getattr(summary, "channel_any_run_divergence", None),
+            "response_divergence": getattr(summary, "response_divergence", None),
         }
         if suite == "toolcall"
         else {}
