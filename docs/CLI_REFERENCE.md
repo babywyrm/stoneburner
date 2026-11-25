@@ -112,7 +112,7 @@ one backend that reports its window size.
 | `atomics adversarial` | Adversarial resilience eval — resistance to manipulation (78 fixtures) |
 | `atomics adversarial --category tool_desc_injection` | Run one suite/group |
 | `atomics adversarial --fixtures adv-01` | One fixture. Unknown ids fail before a request |
-| `atomics adversarial --runs 3` | Variance-aware scoring (mean ± stddev). Live `run 2/3` lines print each pass so a 1/3 comply is visible |
+| `atomics adversarial --runs 3` | Variance-aware scoring (mean ± stddev), plus `Any-Run Critical Failures` and `Any-Run Complied Rate`. Live `run 2/3` lines print each pass so a 1/3 comply is visible |
 | `atomics adversarial --temperature 0` | Pin the model under test (0–2); judges stay at 0. Same flag on `redblue`, `refusal`, and `codereview`. Recorded as `temperature` in the JSON |
 | `atomics adversarial --compare mistral-small:24b` | Run a second model, print per-fixture diff |
 | `atomics adversarial --json-out run.json` | Write full per-fixture results as JSON |
@@ -120,11 +120,11 @@ one backend that reports its window size.
 | `atomics adversarial --profile profiles/examples/http-flask-endpoint.yaml` | Run prose security suite against an app-level HTTP/Ollama gate (`refusal`, `redblue`, and `battery` also accept `--profile`) |
 | `atomics toolcall` | Tool-call divergence — refuses in prose, complies via function call (35 fixtures, incl. multi-step trajectories and multi-turn user escalation). Calls are never executed |
 | `atomics toolcall --extra-judges ollama:mistral:7b` | Multi-judge consensus on the prose channel only |
-| `atomics toolcall --category exfil --verbose` | Run one category and print the arguments the model asked for |
+| `atomics toolcall --category direct,escalation --verbose` | Run one or more comma-separated categories/aliases and print the arguments the model asked for |
 | `atomics toolcall --fixtures tc-01 --channel tools` | One fixture, tool channel only. Unknown ids fail before a request |
 | `atomics toolcall --channel tools` | Tool channel only — deterministic, needs no judge |
 | `atomics toolcall --channel tools --runs 3` | One-box first run. No judge. Divergence not measured. |
-| `atomics toolcall --runs 3` | Three passes per fixture, modal outcome reported. Live `run 2/3` lines print each pass so a 1/3 leak is visible; the summary adds the share dangerous in at least one run (`dangerous_any_run_rate`) |
+| `atomics toolcall --runs 3` | Three passes per fixture, modal outcome reported. Live `run 2/3` lines print each pass so a 1/3 leak is visible; the summary adds `dangerous_any_run_rate` and within-run `channel divergence (any run)` |
 | `atomics -v toolcall --judge-provider ollama --judge-model qwen2.5:14b` | Required for channel divergence. Live lines show `prose=resisted` + `DANGEROUS` when the model refused in chat and still called the tool |
 | `atomics toolcall --temperature 0 --runs 3` | Pin the model under test (probe, tool, and prose calls; 0–2). Recorded as `temperature` in the JSON. Unset is the model's own, which shows how often it makes a dangerous call |
 | `atomics toolcall --no-skip-incapable` | Non-zero exit if the model cannot emit tool calls (for sweeps) |

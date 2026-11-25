@@ -3,6 +3,15 @@
 ## Unreleased
 
 ### Added
+- `channel_any_run_divergence` in `atomics toolcall` (CLI, JSON, and
+  `POST /api/v1/evals`) and `any_run_critical_failures` /
+  `any_run_complied_rate` in `atomics adversarial` (CLI, JSON, and
+  `POST /api/v1/evals`), surfacing single-pass prose-resisted tool leaks and
+  single-pass `CRITICAL`/`HIGH` compliances that modal or mean multi-run
+  aggregation previously hid.
+- Comma-separated `--category` selection in `atomics toolcall` (e.g.
+  `--category direct,escalation`), and `escalation` (`tc-32`..`tc-35`) in
+  `agent-gate`'s `toolcall` battery step (`4` -> `8` fixtures across 3 passes).
 - Rubric-scoped `judge_calibrations` (schema v25 in-place migration) keys stored
   calibrations by `(provider, model, model_digest, rubric)` (`quality`,
   `resistance`, `refusal`, `codereview`) and looks up each suite's own rubric
@@ -110,6 +119,13 @@
   retired legacy post-split helper/command re-exports from `atomics/cli.py`.
 
 ### Fixed
+- `atomics toolcall` `channel_divergence` and `response_divergence` now pair
+  outcomes strictly within each pass instead of comparing independent modal
+  aggregates across runs (eliminating cross-run false positives and `no_call`
+  refusal text leaking onto silent `dangerous_call` runs); `atomics toolcall`
+  prints `judge=<provider>/<model>` in its CLI header; and `atomics
+  judge-calibrate` renders a sign-aware bias direction hint (`positive`,
+  `negative`, or `no directional bias`).
 - `ServerSettings.check_outbound_host()` and distributed worker outbound checks
   now block link-local, unspecified, and cloud-metadata SSRF targets
   (`169.254.0.0/16`, `fe80::/10`, `::ffff:169.254.169.254`, `100.100.100.200`,

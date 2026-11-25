@@ -243,8 +243,10 @@ headline; for `toolcall` that headline is the dangerous-call rate (higher is
 worse), and the result adds `dangerous_any_run_rate`, the share dangerous on
 any run (the number to gate on when `runs` is above 1). `overall_score_ci` is
 the headline's 95% interval, `{low, high, n, method}` or `null` (see
-[Intervals](COMPARING.md#intervals)); toolcall adds
-`dangerous_any_run_rate_ci`. `judge_calibration`
+[Intervals](COMPARING.md#intervals)); toolcall adds `dangerous_any_run_rate_ci`, `channel_divergence`,
+`channel_any_run_divergence`, and `response_divergence`; `adversarial` adds
+`critical_failures`, `any_run_critical_failures`, and `any_run_complied_rate`.
+`judge_calibration`
 is the judge's latest stored `atomics judge-calibrate` result for that suite's
 rubric (`passed`, `rubric`, `mae`, `bias`, `n`, `set_name`, `max_error`,
 `calibrated_at`, `digest_status`) or `null`. It is

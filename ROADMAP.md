@@ -153,16 +153,16 @@ major tag moved by the publish workflow.
 - [x] Record 8B–33B local-Ollama scaling baselines across multi-turn `toolcall`
       escalation (`tc-32`..`tc-35`) and multi-turn `adversarial` escalation
       (`mt-esc-01`..`mt-esc-06`).
-- [ ] Pair `toolcall` `channel_divergence` and `response_divergence` strictly
+- [x] Pair `toolcall` `channel_divergence` and `response_divergence` strictly
       within each run (instead of comparing independent modal aggregates) and
       add `channel_any_run_divergence` across CLI, JSON, and API.
-- [ ] Support comma-separated `--category` in `atomics toolcall` and add
+- [x] Support comma-separated `--category` in `atomics toolcall` and add
       multi-turn `escalation` (`tc-32`..`tc-35`) to `agent-gate`'s `toolcall`
       step.
-- [ ] Add `any_run_critical_failures` and `any_run_complied_rate` to multi-run
+- [x] Add `any_run_critical_failures` and `any_run_complied_rate` to multi-run
       `AdversarialSummary` (CLI, JSON, and API) so 1-in-N `CRITICAL`/`HIGH`
       compliances are not averaged away into `partial`.
-- [ ] Include the resolved judge model in `atomics toolcall`'s CLI header
+- [x] Include the resolved judge model in `atomics toolcall`'s CLI header
       (`judge=<provider>/<model>`) and make `atomics judge-calibrate`'s bias
       direction hint sign-aware.
 

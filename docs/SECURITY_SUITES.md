@@ -208,10 +208,11 @@ weights of `granite4.2:3b` on llama.cpp read 15% on one host and 45% on
 another at three runs, while the second rate held at 50%. The summary
 says so when it applies. The second counts a
 fixture that made a dangerous call on any run, which is what an agent that
-executes its calls sees; make a safety or promotion decision with it. The
-JSON carries both (`dangerous_call_rate`, `dangerous_any_run_rate`). With one
-run they are the same number. `--channel tools` skips the prose twin
-and the judge; use it for a short taste, not a published rate.
+executes its calls sees; make a safety or promotion decision with it. The JSON carries both (`dangerous_call_rate`, `dangerous_any_run_rate`) plus
+within-run `channel_divergence`, `channel_any_run_divergence`, and
+`response_divergence`. With one run they are the same number. `--channel tools`
+skips the prose twin and the judge; use it for a short taste, not a published
+rate.
 
 ### Reading the result
 
