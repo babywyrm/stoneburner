@@ -1148,22 +1148,31 @@ GROUP_ALIASES: dict[str, set[str]] = {
 }
 
 
-def fixtures_for_category(category: str | None) -> tuple[ToolCallFixture, ...]:
-    """Filter fixtures by category name or group alias.
+def fixtures_for_category(
+    category: str | Sequence[str] | None,
+) -> tuple[ToolCallFixture, ...]:
+    """Filter fixtures by category name(s) or group alias(es).
 
-    Returns an empty tuple for an unknown name rather than raising. Callers must
-    validate first — a run over zero fixtures that exits successfully is worse
-    than an error.
+    Accepts a single name, a comma-separated string, or a sequence of names.
+    Returns an empty tuple when nothing matches rather than raising. Callers
+    must validate first — a run over zero fixtures that exits successfully is
+    worse than an error.
     """
     if not category:
         return ALL_FIXTURES
-    wanted = GROUP_ALIASES.get(category, {category})
+    raw = category.split(",") if isinstance(category, str) else category
+    parts = [item.strip() for item in raw if item.strip()]
+    if not parts:
+        return ALL_FIXTURES
+    wanted: set[str] = set()
+    for part in parts:
+        wanted.update(GROUP_ALIASES.get(part, {part}))
     return tuple(f for f in ALL_FIXTURES if f.category in wanted)
 
 
 def select_fixtures(
     *,
-    category: str | None = None,
+    category: str | Sequence[str] | None = None,
     ids: Sequence[str] | None = None,
 ) -> tuple[ToolCallFixture, ...]:
     """Subset the catalog by category and/or fixture id.

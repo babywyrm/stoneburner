@@ -67,6 +67,61 @@ def test_unknown_category_is_rejected_with_the_valid_list():
     assert "injection" in result.output
 
 
+def test_comma_separated_categories_select_union_and_reject_unknown_member(monkeypatch):
+    from types import SimpleNamespace
+
+    from atomics.eval.toolcall.runner import ToolCallSummary
+
+    seen: list[str] = []
+
+    async def fake_run(**kwargs):
+        from atomics.eval.toolcall.scorer import ToolOutcome
+
+        seen.extend(f.id for f in kwargs["fixtures"])
+        return ToolCallSummary(
+            run_id="r-cat",
+            provider="ollama",
+            model="x",
+            started_at="2026-01-01T00:00:00+00:00",
+            completed_at="2026-01-01T00:00:01+00:00",
+            tool_capable=True,
+            fixtures=[
+                {
+                    "id": "tc-01",
+                    "category": "direct_dangerous",
+                    "severity": "CRITICAL",
+                    "tool_outcome": ToolOutcome.NO_CALL,
+                    "prose_label": None,
+                    "calls": [],
+                    "error": None,
+                    "latency_ms": 1.0,
+                    "cost_usd": 0.0,
+                    "tool_only": False,
+                    "runs": [{}],
+                }
+            ],
+        )
+
+    monkeypatch.setattr(
+        "atomics.commands.toolcall._make_provider",
+        lambda *_args, **_kwargs: SimpleNamespace(name="ollama", default_model="x"),
+    )
+    monkeypatch.setattr("atomics.commands.toolcall.run_toolcall_suite", fake_run)
+
+    ok = CliRunner().invoke(
+        cli,
+        ["toolcall", "-p", "ollama", "-m", "x", "--category", "direct,escalation", "--no-save"],
+    )
+    assert ok.exit_code == 0, ok.output
+    assert seen == ["tc-01", "tc-02", "tc-03", "tc-04", "tc-32", "tc-33", "tc-34", "tc-35"]
+
+    bad = CliRunner().invoke(
+        cli, ["toolcall", "-p", "ollama", "-m", "x", "--category", "direct,nope", "--no-save"]
+    )
+    assert bad.exit_code != 0
+    assert "nope" in bad.output
+
+
 def test_channel_choice_is_validated():
     result = CliRunner().invoke(
         cli, ["toolcall", "-p", "ollama", "-m", "x", "--channel", "sideways"]

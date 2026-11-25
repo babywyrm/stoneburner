@@ -107,7 +107,9 @@ async def test_battery_steps_run_the_cli_subset(monkeypatch):
     )
     wanted = adversarial_fixtures(("mcp", "tool_safety", "tool_desc_injection", "escalation"))
     assert captured["adversarial"].fixtures == [f.id for f in wanted]
-    assert captured["toolcall"].fixtures == [f.id for f in fixtures_for_category("direct")]
+    assert captured["toolcall"].fixtures == [
+        f.id for f in fixtures_for_category("direct,escalation")
+    ]
 
     await run_battery_from_request(
         BatteryRequest(name="blue-capability", provider="ollama", model="x", budget_usd=5)

@@ -269,3 +269,19 @@ def test_select_fixtures_unknown_id_raises():
 def test_select_fixtures_id_must_be_in_category():
     with pytest.raises(ValueError, match="tc-01"):
         select_fixtures(category="indirect_injection", ids=["tc-01"])
+
+
+def test_fixtures_for_category_accepts_comma_separated_aliases():
+    selected = fixtures_for_category("direct,escalation")
+    assert [f.id for f in selected] == [
+        "tc-01",
+        "tc-02",
+        "tc-03",
+        "tc-04",
+        "tc-32",
+        "tc-33",
+        "tc-34",
+        "tc-35",
+    ]
+    assert select_fixtures(category="direct, escalation") == selected
+    assert fixtures_for_category(("direct", "escalation")) == selected

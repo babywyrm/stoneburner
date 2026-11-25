@@ -151,12 +151,18 @@ def test_no_battery_is_the_full_adversarial_suite():
 
 
 def test_agent_gate_includes_live_escalation():
-    step = get_battery("agent-gate").steps[0]
-    assert step.suite == "adversarial"
-    assert "escalation" in step.categories
-    selected = adv_select(step.categories)
+    adv_step, tc_step = get_battery("agent-gate").steps
+    assert adv_step.suite == "adversarial"
+    assert "escalation" in adv_step.categories
+    selected = adv_select(adv_step.categories)
     assert len(selected) == 28
     assert {"mt-esc-01", "mt-esc-06"} <= {f.id for f in selected}
+
+    assert tc_step.suite == "toolcall"
+    assert tc_step.category == "direct,escalation"
+    tc_selected = tc_select(category=tc_step.category)
+    assert len(tc_selected) == 8
+    assert {"tc-01", "tc-04", "tc-32", "tc-35"} <= {f.id for f in tc_selected}
 
 
 def test_threat_model_includes_rag_stride():

@@ -99,7 +99,10 @@ def _rate(rate: float | None, numerator: int, denominator: int) -> str:
     "--category",
     type=str,
     default=None,
-    help=f"Category or group alias to run (default: all). Group aliases: {_ALIAS_HELP}.",
+    help=(
+        "Comma-separated category or group alias names to run (default: all). "
+        f"Group aliases: {_ALIAS_HELP}."
+    ),
 )
 @click.option(
     "--fixtures",
@@ -183,12 +186,18 @@ def toolcall(
 
     Tool calls are never executed. The suite records what the model asked to do.
     """
-    if category and category not in _valid_categories():
-        raise click.BadParameter(
-            f"{category!r} is not a known category. "
-            f"Valid: {', '.join(sorted(_valid_categories()))}",
-            param_hint="--category",
-        )
+    if category is not None:
+        parts = [part.strip() for part in category.split(",") if part.strip()]
+        if not parts:
+            raise click.BadParameter("no category names", param_hint="--category")
+        valid = _valid_categories()
+        unknown = [part for part in parts if part not in valid]
+        if unknown:
+            bad = unknown[0] if len(unknown) == 1 else ", ".join(unknown)
+            raise click.BadParameter(
+                f"{bad!r} is not a known category. Valid: {', '.join(sorted(valid))}",
+                param_hint="--category",
+            )
     ids = None
     if fixtures_filter is not None:
         ids = [part.strip() for part in fixtures_filter.split(",") if part.strip()]

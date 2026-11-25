@@ -154,10 +154,10 @@ BATTERIES: tuple[Battery, ...] = (
             BatteryStep(
                 suite="toolcall",
                 purpose=(
-                    "direct category, tools channel, three runs so a 1-in-3 leak shows,"
-                    " no judge required for this step"
+                    "direct + multi-turn escalation (8 fixtures), tools channel, three runs"
+                    " so a 1-in-3 leak shows, no judge required for this step"
                 ),
-                category="direct",
+                category="direct,escalation",
                 channel="tools",
                 extra=("--no-save", "--no-skip-incapable"),
                 runs=3,
