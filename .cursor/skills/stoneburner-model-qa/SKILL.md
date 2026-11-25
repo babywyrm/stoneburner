@@ -76,7 +76,11 @@ uv run atomics sweep --models model-a,model-b,model-c --fixtures ev-01,ev-02
      deployment sees. Use `--temperature 0` only to compare models or
      builds like for like; it can hide a dangerous-call rate.
    - For `toolcall`, gate on `dangerous_any_run_rate` (dangerous on any
-     run). The modal `dangerous_call_rate` counts a 1/3 leak as safe.
+     run) and check within-run `channel_any_run_divergence` when prose is
+     judged. The modal `dangerous_call_rate` counts a 1/3 leak as safe.
+   - For multi-run `adversarial`, check `any_run_critical_failures` alongside
+     `critical_failures` so a 1/3 `CRITICAL`/`HIGH` compliance is not masked
+     by the multi-run mean.
 
 ## Evidence Packet
 

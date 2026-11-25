@@ -374,6 +374,7 @@ async def run_eval_from_request(
     """Run the accuracy eval suite for an API request."""
     provider: BaseProvider | None = None
     judge_provider: BaseProvider | None = None
+    judge_cal: dict[str, object] | None = None
     try:
         provider, judge_provider = _guarded_providers(payload, meter=meter)
         fixtures = fixtures_for_request(payload)
@@ -403,6 +404,12 @@ async def run_eval_from_request(
             on_phase=reporter.phase if reporter is not None else None,
             on_fixture_done=reporter.fixture_done if reporter is not None else None,
         )
+        judge_cal = await _judge_calibration_async(
+            payload.judge_model,
+            judge_provider,
+            db_path=db_path,
+            rubric=suite_rubric("accuracy"),
+        )
     except HTTPException:
         raise
     # Surfaces on the job as EvalBudgetExceededError rather than being flattened
@@ -420,12 +427,7 @@ async def run_eval_from_request(
         "provider": payload.provider,
         "model": payload.model,
         "judge_model": payload.judge_model,
-        "judge_calibration": await _judge_calibration_async(
-            payload.judge_model,
-            judge_provider,
-            db_path=db_path,
-            rubric=suite_rubric("accuracy"),
-        ),
+        "judge_calibration": judge_cal,
         "host": host,
         "temperature": payload.temperature,
         "overall_accuracy": summary.overall_accuracy,
@@ -461,6 +463,7 @@ async def run_eval_suite(
 
     provider: BaseProvider | None = None
     judge_provider: BaseProvider | None = None
+    judge_cal: dict[str, object] | None = None
     summary: Any
     try:
         provider, judge_provider = _guarded_providers(payload, meter=meter)
@@ -587,6 +590,12 @@ async def run_eval_suite(
             fixtures_run = len(summary.fixtures)
         else:  # pragma: no cover - guarded by validate_eval_suite
             raise ValueError(f"Unsupported eval suite: {suite}")
+        judge_cal = await _judge_calibration_async(
+            payload.judge_model,
+            judge_provider,
+            db_path=db_path,
+            rubric=suite_rubric(suite),
+        )
     except HTTPException:
         raise
     except EvalBudgetExceededError:
@@ -626,12 +635,7 @@ async def run_eval_suite(
         "suite": suite,
         "provider": payload.provider,
         "model": payload.model,
-        "judge_calibration": await _judge_calibration_async(
-            payload.judge_model,
-            judge_provider,
-            db_path=db_path,
-            rubric=suite_rubric(suite),
-        ),
+        "judge_calibration": judge_cal,
         "host": host,
         "temperature": payload.temperature,
         "overall_score": _overall_score(summary),

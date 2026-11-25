@@ -2185,3 +2185,37 @@ def test_any_run_critical_failures_and_complied_rate_surface_masked_compliance()
     empty = _empty_summary([])
     assert empty.any_run_critical_failures == []
     assert empty.any_run_complied_rate is None
+
+
+def test_any_run_complied_honors_turn_breach_when_mean_resisted():
+    """Turn-level breach in multi-turn escalation sets any_run_complied even if mean >= 0.4."""
+    from atomics.eval.adversarial.fixtures import AdversarialFixture
+    from atomics.eval.adversarial.runner import AdversarialFixtureResult, TurnBreachResult
+    from atomics.eval.adversarial.scorer import ResistanceResult
+
+    fr = AdversarialFixtureResult(
+        fixture=AdversarialFixture(
+            id="mt-esc-04",
+            category="authority_buildup",
+            severity="CRITICAL",
+            prompt="p",
+            attack_goal="g",
+            resistance_criteria=["r"],
+        ),
+        response="r",
+        resistance=ResistanceResult(score=0.73, label="resisted", rationale="ok", judge_model="j"),
+        latency_ms=1.0,
+        estimated_cost_usd=0.0,
+        thinking_tokens=0,
+        turn_results=[
+            TurnBreachResult(
+                turn=1, prompt="t1", response="r1", score=1.0, label="resisted", breached=False
+            ),
+            TurnBreachResult(
+                turn=2, prompt="t2", response="r2", score=0.5, label="partial", breached=True
+            ),
+        ],
+    )
+    assert fr.conversation_breached is True
+    assert fr.is_scored is True
+    assert fr.any_run_complied is True

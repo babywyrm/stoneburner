@@ -1073,3 +1073,108 @@ async def test_run_benchmark_from_request_honors_explicit_db_path(tmp_path):
         await runners.run_benchmark_from_request(payload, db_path=custom_db)
 
     assert seen_db == [custom_db]
+
+
+@pytest.mark.asyncio
+async def test_run_eval_resolves_judge_calibration_before_closing_judge_provider(tmp_path):
+    """Regression: aclose_providers must not close judge_provider before model_digest lookup."""
+    from atomics.storage import MetricsRepository
+
+    db_path = tmp_path / "cal.db"
+    repo = MetricsRepository(db_path)
+    repo.create_run("cal-r1", tier="judge-calibrate", provider="ollama", model="gemma4:26b")
+    repo.create_run("cal-q1", tier="judge-calibrate", provider="ollama", model="gemma4:26b")
+    repo.save_judge_calibration(
+        provider="ollama",
+        model="gemma4:26b",
+        model_digest="08ae7ec1744b",
+        rubric="resistance",
+        run_id="cal-r1",
+        set_name="adversarial-resistance-2026-11-21",
+        set_digest="bb86e9f07ede",
+        mae=0.1,
+        bias=0.033,
+        pair_order=0.733,
+        max_error=0.15,
+        passed=True,
+        item_count=6,
+        calibrated_at="2026-11-25T17:00:00+00:00",
+    )
+    repo.save_judge_calibration(
+        provider="ollama",
+        model="gemma4:26b",
+        model_digest="08ae7ec1744b",
+        rubric="quality",
+        run_id="cal-q1",
+        set_name="redblue-blue-2026-10-03",
+        set_digest="aabbccddeeff",
+        mae=0.12,
+        bias=-0.05,
+        pair_order=0.8,
+        max_error=0.15,
+        passed=True,
+        item_count=6,
+        calibrated_at="2026-11-25T17:00:00+00:00",
+    )
+    repo.close()
+
+    class _ClosableJudge:
+        name = "ollama"
+        default_model = "gemma4:26b"
+
+        def __init__(self) -> None:
+            self.closed = False
+
+        async def model_digest(self, _model: str) -> str:
+            if self.closed:
+                raise RuntimeError("Cannot send a request, as the client has been closed.")
+            return "08ae7ec1744b"
+
+        async def aclose(self) -> None:
+            self.closed = True
+
+    adv_summary = SimpleNamespace(
+        overall_resilience=1.0,
+        resilience_ci=None,
+        critical_failures=[],
+        any_run_critical_failures=[],
+        any_run_complied_rate=0.0,
+        fixture_results=[],
+        total_tokens=10,
+        total_cost_usd=0.0,
+    )
+    judge1 = _ClosableJudge()
+    with (
+        patch.object(runners, "_provider_for", side_effect=[MagicMock(), judge1]),
+        patch.object(runners, "run_adversarial", new_callable=AsyncMock, return_value=adv_summary),
+    ):
+        res_suite = await runners.run_eval_suite(
+            EvalRequest(
+                suite="adversarial", provider="ollama", model="m1", judge_model="gemma4:26b"
+            ),
+            db_path=db_path,
+        )
+    assert judge1.closed is True
+    assert res_suite["judge_calibration"] is not None
+    assert res_suite["judge_calibration"]["passed"] is True
+    assert res_suite["judge_calibration"]["rubric"] == "resistance"
+
+    acc_summary = SimpleNamespace(
+        overall_accuracy=1.0,
+        fixture_results=[],
+        total_tokens=10,
+        total_cost_usd=0.0,
+    )
+    judge2 = _ClosableJudge()
+    with (
+        patch.object(runners, "_provider_for", side_effect=[MagicMock(), judge2]),
+        patch.object(runners, "run_eval", new_callable=AsyncMock, return_value=acc_summary),
+    ):
+        res_acc = await runners.run_eval_suite(
+            EvalRequest(suite="accuracy", provider="ollama", model="m1", judge_model="gemma4:26b"),
+            db_path=db_path,
+        )
+    assert judge2.closed is True
+    assert res_acc["judge_calibration"] is not None
+    assert res_acc["judge_calibration"]["passed"] is True
+    assert res_acc["judge_calibration"]["rubric"] == "quality"

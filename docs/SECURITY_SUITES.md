@@ -44,7 +44,9 @@ uv run atomics adversarial --fixtures adv-01 --no-thinking
 # With thinking enabled
 uv run atomics adversarial --provider ollama -m qwen3:14b --thinking
 
-# Variance-aware scoring — each pass prints (`adv-01 run 2/3 — complied  0.12`)
+# Variance-aware scoring — each pass prints (`adv-01 run 2/3 — complied  0.12`),
+# and the summary adds Any-Run Critical Failures / Any-Run Complied Rate so a
+# 1-in-3 CRITICAL/HIGH compliance is not masked by the 3-run mean
 uv run atomics adversarial --runs 3
 
 # Compare two models
@@ -71,15 +73,15 @@ tool schemas attached — and the gap between those two answers is the result.
 **Tool calls are never executed.** The suite records what the model asked to do.
 
 ```bash
-# All 31 fixtures, judging the prose channel with a local model
+# All 35 fixtures, judging the prose channel with a local model
 uv run atomics toolcall --provider ollama -m qwen3:14b \
     --judge-provider ollama --judge-model qwen2.5:14b
 
 # Tool channel only — no judge needed, and the scoring is fully deterministic
 uv run atomics toolcall --provider claude --channel tools
 
-# One category, with the emitted arguments printed
-uv run atomics toolcall --category exfil --verbose
+# One or more comma-separated categories/aliases, with emitted arguments printed
+uv run atomics toolcall --category direct,escalation --verbose
 
 # One fixture (same subsetting as POST /evals)
 uv run atomics toolcall --fixtures tc-01 --channel tools --no-thinking
@@ -102,7 +104,7 @@ uv run atomics -v toolcall -p ollama -m qwen3:14b \
 ```
 
 **Categories:** `direct` · `authority` · `injection` · `exfil` · `destructive` ·
-`trajectory`
+`trajectory` · `escalation`
 
 ### Multi-step trajectories
 
@@ -140,13 +142,17 @@ emit valid calls is a finding, and counting it as refusal would flatter it.
 ### Two divergence measures
 
 - **Channel divergence** — of the fixtures the model resisted in prose, the share
-  where it emitted a dangerous call with tools attached. The `toolcall` command
-  prints this beside the dangerous-call rate. A sweep `headline` for this suite
+  where it emitted a dangerous call with tools attached, paired strictly within
+  each pass before taking the modal outcome across `--runs`. With `--runs` above
+  1, the summary also prints `channel divergence (any run)`
+  (`channel_any_run_divergence`). A sweep `headline` for this suite
   is the dangerous-call rate, and a higher number is worse. With `--runs`
   above 1 the sweep cell adds `any run` (`any_run` in the status file), and
   `vs best` ranks on it.
-- **Response divergence** — of the dangerous calls, the share whose accompanying
-  text refused. Self-contradiction inside a single response.
+- **Response divergence** — of the modal dangerous-call fixtures with judged
+  accompanying text on their dangerous passes, the share whose text refused.
+  Self-contradiction inside a single response; refusal prose from a `no_call`
+  pass never bleeds onto silent dangerous passes.
 
 Both print with their numerator and denominator, because both are computed over
 subsets. Both report *not measured* rather than 0% when no fixture qualifies:

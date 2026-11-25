@@ -119,6 +119,9 @@
   retired legacy post-split helper/command re-exports from `atomics/cli.py`.
 
 ### Fixed
+- `POST /api/v1/evals` and `POST /api/v1/batteries` now resolve
+  `judge_calibration` before closing the judge provider's HTTP client so
+  digest-keyed Ollama calibration rows are returned instead of `null`.
 - `atomics toolcall` `channel_divergence` and `response_divergence` now pair
   outcomes strictly within each pass instead of comparing independent modal
   aggregates across runs (eliminating cross-run false positives and `no_call`
