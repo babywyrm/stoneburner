@@ -191,6 +191,7 @@ class AtomicsApiClient:
         host: str | None = None,
         judge_model: str | None = None,
         fixtures: list[str] | None = None,
+        category: str | None = None,
         budget_usd: float | None = None,
         thinking: bool | None = None,
         effort: str | None = None,
@@ -214,6 +215,8 @@ class AtomicsApiClient:
             payload["judge_model"] = judge_model
         if fixtures is not None:
             payload["fixtures"] = fixtures
+        if category is not None:
+            payload["category"] = category
         # Omitted rather than defaulted here so the server's DEFAULT_EVAL_BUDGET_USD
         # stays the single definition of what an unspecified budget means.
         if budget_usd is not None:

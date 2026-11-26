@@ -99,6 +99,8 @@ def resolve_eval_request(payload: EvalRequest, settings: AtomicsSettings) -> dic
     }
     if payload.judge_host:
         request["judge_host"] = payload.judge_host
+    if payload.category:
+        request["category"] = payload.category
     if payload.channel:
         request["channel"] = payload.channel
     if payload.effort is not None:
@@ -134,8 +136,13 @@ def select_catalog_fixtures(catalog: SuiteCatalog, ids: list[str] | None) -> lis
 
 
 def fixtures_for_request(payload: EvalRequest) -> list[Any]:
-    if payload.suite == "accuracy":
-        catalog: SuiteCatalog = EVAL_FIXTURES
+    if payload.category:
+        from atomics.api.models import category_catalog_for_suite
+
+        parts = [part.strip() for part in payload.category.split(",") if part.strip()]
+        catalog: SuiteCatalog = category_catalog_for_suite(payload.suite.strip().lower(), parts)[0]
+    elif payload.suite == "accuracy":
+        catalog = EVAL_FIXTURES
     else:
         found = _SUITE_CATALOGS.get(payload.suite)
         if found is None:

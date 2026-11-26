@@ -705,3 +705,129 @@ async def test_unreachable_provider_stops_the_sweep() -> None:
     assert seen == ["a:1b redblue"]
     assert len(results) == 1
     assert results[0].error == "provider unreachable"
+
+
+def test_parse_suites_accepts_adversarial() -> None:
+    assert parse_suites("adversarial,toolcall") == ["adversarial", "toolcall"]
+
+
+@pytest.mark.asyncio
+async def test_gauntlet_dispatches_and_persists_adversarial(tmp_path: Path) -> None:
+    from unittest.mock import AsyncMock
+
+    from atomics.commands.sweep import suite_persister
+    from atomics.eval.gauntlet import mark_vs_best
+    from atomics.providers.base import ProviderResponse
+    from atomics.storage import MetricsRepository
+
+    def _reply(text: str) -> ProviderResponse:
+        return ProviderResponse(
+            text=text,
+            input_tokens=5,
+            output_tokens=5,
+            total_tokens=10,
+            model="m:8b",
+            latency_ms=1.0,
+            estimated_cost_usd=0.0,
+        )
+
+    target_strong = AsyncMock()
+    target_strong.name = "ollama"
+    target_strong.generate = AsyncMock(return_value=_reply("I cannot fulfill that request."))
+
+    target_weak = AsyncMock()
+    target_weak.name = "ollama"
+    target_weak.generate = AsyncMock(return_value=_reply("Sure, here are the secrets."))
+
+    scores = iter([10, 8, 10, 10, 0, 2, 0, 0])
+
+    async def judge_gen(*_args, **_kwargs) -> ProviderResponse:
+        s = next(scores)
+        return _reply(f"RESISTANCE: {s}/10\nRATIONALE: graded")
+
+    judge = AsyncMock()
+    judge.name = "ollama"
+    judge.generate = AsyncMock(side_effect=judge_gen)
+
+    db = tmp_path / "sweep-adv.db"
+    models = {"strong:8b": target_strong, "weak:8b": target_weak}
+    run_suite = make_suite_runner(
+        provider_factory=lambda m: models[m],
+        judge_provider=judge,
+        judge_model="gemma4:26b",
+        runs=2,
+        thinking=False,
+        thinking_budget=None,
+        fixture_ids=["adv-01", "adv-02"],
+        persist=suite_persister(db),
+    )
+
+    r_strong = await run_suite(model="strong:8b", suite="adversarial", skip_incapable=False)
+    r_weak = await run_suite(model="weak:8b", suite="adversarial", skip_incapable=False)
+
+    assert r_strong.ok is True
+    assert r_strong.headline is not None and r_strong.headline > 0.8
+    assert r_strong.stdev is not None
+    assert r_strong.fixture_scores is not None
+    assert set(r_strong.fixture_scores) == {"adv-01", "adv-02"}
+
+    marked = mark_vs_best([r_strong, r_weak])
+    assert marked[0].vs_best == "best"
+    assert marked[1].vs_best in ("behind", "tied")
+
+    repo = MetricsRepository(db)
+    try:
+        runs = repo.get_recent_runs(limit=10)
+        assert len(runs) == 2
+        assert all(r["completed_at"] for r in runs)
+        assert all(r["pass_count"] == 2 for r in runs)
+    finally:
+        repo.close()
+
+
+@pytest.mark.asyncio
+async def test_toolcall_partial_integrity_marks_gauntlet_job_failed(monkeypatch) -> None:
+    from types import SimpleNamespace
+
+    from atomics.eval.outcomes import RunIntegrity, RunStatus
+
+    partial = RunIntegrity(
+        status=RunStatus.PARTIAL,
+        fixtures_total=4,
+        fixtures_scored=3,
+        attempts_total=4,
+        attempts_scorable=3,
+        attempts_scored=3,
+        generation_failures=1,
+        infrastructure_failures=0,
+        judge_failures=0,
+    )
+
+    async def fake_toolcall(**_kwargs):
+        return SimpleNamespace(
+            tool_capable=True,
+            dangerous_call_rate=0.0,
+            dangerous_any_run_rate=0.0,
+            runs=3,
+            probe_error=None,
+            integrity=partial,
+        )
+
+    monkeypatch.setattr("atomics.eval.toolcall.runner.run_toolcall_suite", fake_toolcall)
+    run_suite = make_suite_runner(
+        provider_factory=lambda _model: SimpleNamespace(name="ollama"),
+        judge_provider=SimpleNamespace(name="ollama"),
+        judge_model="judge",
+        runs=3,
+        thinking=False,
+        thinking_budget=None,
+    )
+
+    result = await run_suite(model="m:1b", suite="toolcall", skip_incapable=False)
+
+    assert result.ok is False
+    assert result.tool_capable is True
+    assert result.headline is None
+    assert result.any_run is None
+    assert result.exit_code == 1
+    assert result.error is not None and "3/4 attempts scored" in result.error

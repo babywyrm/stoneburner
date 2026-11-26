@@ -382,3 +382,69 @@ def test_post_sweeps_without_budget_is_422():
             json={"provider": "ollama", "models": ["a"], "suites": ["eval"]},
         )
     assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_run_sweep_accepts_adversarial_and_resolves_suite_rubric_calibration(tmp_path):
+    from atomics.storage import MetricsRepository
+
+    db_path = tmp_path / "sweep-cal.db"
+    repo = MetricsRepository(db_path)
+    repo.create_run("cal-res", tier="judge-calibrate", provider="ollama", model="gemma4:26b")
+    repo.create_run("cal-cr", tier="judge-calibrate", provider="ollama", model="gemma4:26b")
+    repo.save_judge_calibration(
+        provider="ollama",
+        model="gemma4:26b",
+        model_digest="",
+        rubric="resistance",
+        run_id="cal-res",
+        set_name="adversarial-resistance-2026-11-21",
+        set_digest="bb86e9f07ede",
+        mae=0.1,
+        bias=0.033,
+        pair_order=0.733,
+        max_error=0.15,
+        passed=True,
+        item_count=6,
+        calibrated_at="2026-11-25T17:00:00+00:00",
+    )
+    repo.save_judge_calibration(
+        provider="ollama",
+        model="gemma4:26b",
+        model_digest="",
+        rubric="codereview",
+        run_id="cal-cr",
+        set_name="codereview-v1",
+        set_digest="61e3ef8e4a10",
+        mae=0.333,
+        bias=-0.333,
+        pair_order=0.5,
+        max_error=0.15,
+        passed=False,
+        item_count=6,
+        calibrated_at="2026-11-26T01:00:00+00:00",
+    )
+    repo.close()
+
+    payload = SweepRequest(
+        provider="ollama",
+        models=["a"],
+        suites=["adversarial", "toolcall"],
+        judge_model="gemma4:26b",
+        budget_usd=2.0,
+    )
+
+    async def instant_suite(*, model: str, suite: str, skip_incapable: bool):
+        return SuiteJobResult(model=model, suite=suite, ok=True, headline=0.9)
+
+    with (
+        patch("atomics.api._sweep._provider_for", return_value=SimpleNamespace(name="ollama")),
+        patch("atomics.api._sweep.make_suite_runner", return_value=instant_suite),
+    ):
+        result = await run_sweep_from_request(payload, db_path=db_path)
+
+    assert result["suites"] == ["adversarial", "toolcall"]
+    assert result["judge_calibration"] is not None
+    assert result["judge_calibration"]["rubric"] == "resistance"
+    assert result["judge_calibration"]["passed"] is True
+    assert result["judge_calibrations"] == {"resistance": result["judge_calibration"]}

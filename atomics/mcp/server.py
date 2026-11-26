@@ -172,6 +172,7 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
         host: str | None = None,
         judge_model: str | None = None,
         fixtures: list[str] | None = None,
+        category: str | None = None,
         budget_usd: float | None = None,
         thinking: bool | None = None,
         effort: str | None = None,
@@ -187,6 +188,8 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
         Spends provider tokens, for the judge as well as the model under test.
         `suite` is one of `accuracy`, `rag`, `multiturn`, `adversarial`,
         `codegen`, `refusal`, `redblue`, `toolcall`, or `codereview`.
+        `category` is an optional comma-separated category / group alias filter
+        on `adversarial`, `toolcall`, or `redblue` (CLI `--category` / `--mode`).
         `budget_usd` caps the combined spend; leave it unset to accept
         the server's default ceiling. `host` is the inference endpoint
         (same meaning as `list_models`). `judge_host` is the judge endpoint
@@ -209,6 +212,7 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
             host=host,
             judge_model=judge_model,
             fixtures=fixtures,
+            category=category,
             budget_usd=budget_usd,
             thinking=thinking,
             effort=effort,
@@ -239,7 +243,7 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
 
         Spends tokens. `budget_usd` is required. Name the models — there is no
         discover-everything flag; call `list_models` first. `suites` is a list
-        from `eval`, `redblue`, `refusal`, `toolcall`, `codereview`. `runs` is
+        from `eval`, `adversarial`, `redblue`, `refusal`, `toolcall`, `codereview`. `runs` is
         1–3. `host` is the inference endpoint (same meaning as `submit_eval`).
         `judge_host` is the judge endpoint when it differs from `host`.
         `temperature` (0–2) pins every model under test; judges stay at 0.

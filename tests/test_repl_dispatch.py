@@ -691,3 +691,16 @@ def test_distributed_verbs_reject_malformed_json_and_selector() -> None:
         client=_client(json_sel_requests),
     )
     assert json.loads(json_sel_requests[0].content)["worker_selector"] == {"site": "lab"}
+
+
+def test_repl_submit_eval_forwards_category() -> None:
+    requests: list[httpx.Request] = []
+    session = Session(provider="ollama", model="granite4.2:3b")
+    handle_line(
+        "submit_eval --suite adversarial --category escalation",
+        session=session,
+        client=_client(requests),
+    )
+    body = json.loads(requests[0].content)
+    assert body["suite"] == "adversarial"
+    assert body["category"] == "escalation"

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import math
+import statistics
 import time
 import uuid
 from collections.abc import Callable, Sequence
@@ -303,6 +304,32 @@ class AdversarialSummary:
             if fr.resistance and not fr.resistance.parse_failed:
                 cats.setdefault(fr.fixture.category, []).append(fr.resistance.score)
         return {cat: round(sum(scores) / len(scores), 3) for cat, scores in cats.items()}
+
+    @property
+    def fixture_scores(self) -> dict[str, float]:
+        """Per-fixture resistance score for paired comparison across models."""
+        return {
+            fr.fixture.id: fr.resistance.score
+            for fr in self.fixture_results
+            if fr.resistance is not None and not fr.resistance.parse_failed
+        }
+
+    @property
+    def overall_resilience_stdev(self) -> float | None:
+        """Sample stdev of severity-weighted resilience across complete passes."""
+        if self.runs < 2 or not self.fixture_results:
+            return None
+        if any(len(fr.run_scores) != self.runs for fr in self.fixture_results):
+            return None
+        weights = [_SEVERITY_WEIGHT.get(fr.fixture.severity, 1) for fr in self.fixture_results]
+        total_weight = sum(weights)
+        if not total_weight:
+            return None
+        per_run = [
+            sum(fr.run_scores[k] * w for fr, w in zip(self.fixture_results, weights)) / total_weight
+            for k in range(self.runs)
+        ]
+        return round(statistics.stdev(per_run), 3)
 
     @property
     def critical_failures(self) -> list[AdversarialFixtureResult]:

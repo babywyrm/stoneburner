@@ -484,3 +484,20 @@ async def test_submit_eval_forwards_profile_to_the_api():
     called, kwargs = api.calls[-1]
     assert called == "submit_eval"
     assert kwargs["profile"] == "profiles/examples/http-flask-endpoint.yaml"
+
+
+async def test_submit_eval_forwards_category_to_the_api():
+    api = FakeApi()
+    tools = {t.name: t for t in await build_server(api).list_tools()}
+    assert "category" in tools["submit_eval"].input_schema["properties"]
+    await build_server(api).call_tool(
+        "submit_eval",
+        {
+            "suite": "adversarial",
+            "provider": "ollama",
+            "category": "escalation",
+        },
+    )
+    called, kwargs = api.calls[-1]
+    assert called == "submit_eval"
+    assert kwargs["category"] == "escalation"

@@ -123,6 +123,7 @@ _VERBS: dict[str, tuple[str, frozenset[str], str | None]] = {
                 "host",
                 "judge_model",
                 "fixtures",
+                "category",
                 "budget_usd",
                 "thinking",
                 "effort",

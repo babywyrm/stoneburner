@@ -37,11 +37,13 @@ def suite_persister(db_path: Path) -> Callable[[str, str, str, object], None]:
     """Save one sweep job's rows the way that suite's own command does."""
     from atomics.commands.common import evaluation_record_from_fixture
     from atomics.commands.suite_run import (
+        finalize_adversarial_run,
         finalize_evaluation_run,
         finalize_task_run,
         suite_run,
     )
     from atomics.commands.toolcall import _save as save_toolcall
+    from atomics.eval.adversarial.runner import AdversarialSummary
     from atomics.eval.codereview.runner import CodeReviewSummary
     from atomics.eval.redblue.runner import RedBlueSummary
     from atomics.eval.refusal.runner import RefusalSummary
@@ -51,6 +53,30 @@ def suite_persister(db_path: Path) -> Callable[[str, str, str, object], None]:
     def persist(suite: str, provider_name: str, model: str, summary: object) -> None:
         if isinstance(summary, ToolCallSummary):
             save_toolcall(summary, db_path=db_path)
+            return
+        if isinstance(summary, AdversarialSummary):
+            with suite_run(
+                suite="adversarial",
+                db_path=db_path,
+                save=True,
+                finalize=finalize_adversarial_run,
+                failure_prefix="Sweep adversarial save failed",
+            ) as adv_run:
+                adv_run.begin(
+                    summary.run_id,
+                    provider=provider_name,
+                    model=model,
+                    pass_count=summary.runs,
+                )
+                adv_repo = adv_run.require_repository()
+                for adv_fr in summary.fixture_results:
+                    adv_repo.save_adversarial_result(
+                        summary.run_id,
+                        adv_fr,
+                        thinking_enabled=adv_fr.thinking_tokens > 0,
+                        provider=provider_name,
+                        model=model,
+                    )
             return
         judged = isinstance(summary, (RefusalSummary, CodeReviewSummary))
         with suite_run(
@@ -168,7 +194,7 @@ def suite_persister(db_path: Path) -> Callable[[str, str, str, object], None]:
     type=str,
     default="eval",
     show_default=True,
-    help="Comma-separated suites: eval, redblue, refusal, toolcall, codereview",
+    help="Comma-separated suites: eval, adversarial, redblue, refusal, toolcall, codereview",
 )
 @click.option(
     "--runs",
@@ -176,7 +202,7 @@ def suite_persister(db_path: Path) -> Callable[[str, str, str, object], None]:
     default=1,
     show_default=True,
     help="Passes per fixture for suites that support --runs "
-    "(redblue, toolcall, refusal, codereview).",
+    "(adversarial, redblue, toolcall, refusal, codereview).",
 )
 @click.option(
     "--status",
@@ -336,13 +362,19 @@ def sweep(
             vllm_host=vllm_host,
         )
     )
-    print_judge_calibration(
-        console,
-        judge_provider_name,
-        effective_model(judge_model, judge_provider),
-        judge_provider=judge_provider,
-        rubric="quality" if suite_list == ["eval"] else None,
+    from atomics.eval.calibration import suite_rubric
+
+    rubrics = list(
+        dict.fromkeys(suite_rubric("accuracy" if s == "eval" else s) for s in suite_list)
     )
+    for cal_rubric in rubrics:
+        print_judge_calibration(
+            console,
+            judge_provider_name,
+            effective_model(judge_model, judge_provider),
+            judge_provider=judge_provider,
+            rubric=cal_rubric,
+        )
 
     if suite_list != ["eval"] or status_path or log_path:
         ignore_broken_pipe()

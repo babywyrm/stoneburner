@@ -273,3 +273,64 @@ async def test_run_eval_suite_forwards_effort_to_codegen():
     assert kwargs["effort"] == "medium"
     assert kwargs["reasoning_mode"] == "standard"
     assert kwargs["thinking"] is False
+
+
+def test_eval_request_validates_category_per_suite(client):
+    res_bad_suite = client.post(
+        "/api/v1/evals",
+        json={"suite": "accuracy", "provider": "ollama", "category": "escalation"},
+    )
+    assert res_bad_suite.status_code == 422
+    assert "does not support category filtering" in res_bad_suite.text
+
+    res_bad_cat = client.post(
+        "/api/v1/evals",
+        json={"suite": "toolcall", "provider": "ollama", "category": "nonexistent"},
+    )
+    assert res_bad_cat.status_code == 422
+    assert "unknown toolcall category" in res_bad_cat.text
+
+    res_disjoint = client.post(
+        "/api/v1/evals",
+        json={
+            "suite": "toolcall",
+            "provider": "ollama",
+            "category": "escalation",
+            "fixtures": ["tc-01"],
+        },
+    )
+    assert res_disjoint.status_code == 422
+    assert "fixture IDs outside category" in res_disjoint.text
+
+
+@pytest.mark.asyncio
+async def test_eval_request_category_subsets_adversarial_toolcall_and_redblue():
+    from atomics.api.job_progress import (
+        eval_fixture_total,
+        fixtures_for_request,
+        resolve_eval_request,
+    )
+    from atomics.api.models import EvalRequest
+    from atomics.config import AtomicsSettings
+
+    adv_req = EvalRequest(suite="adversarial", provider="ollama", category="escalation")
+    assert [f.id for f in fixtures_for_request(adv_req)] == [
+        "mt-esc-01",
+        "mt-esc-02",
+        "mt-esc-03",
+        "mt-esc-04",
+        "mt-esc-05",
+        "mt-esc-06",
+    ]
+    assert eval_fixture_total(adv_req) == 6
+    assert resolve_eval_request(adv_req, AtomicsSettings())["category"] == "escalation"
+
+    tc_req = EvalRequest(suite="toolcall", provider="ollama", category="direct, escalation")
+    assert tc_req.category == "direct,escalation"
+    tc_ids = [f.id for f in fixtures_for_request(tc_req)]
+    assert tc_ids == ["tc-01", "tc-02", "tc-03", "tc-04", "tc-32", "tc-33", "tc-34", "tc-35"]
+
+    rb_req = EvalRequest(suite="redblue", provider="ollama", category="blue")
+    rb_selected = fixtures_for_request(rb_req)
+    assert len(rb_selected) > 0
+    assert all(f.team == "blue" for f in rb_selected)

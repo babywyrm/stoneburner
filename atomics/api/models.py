@@ -22,7 +22,7 @@ DEFAULT_EVAL_BUDGET_USD = 10.0
 MAX_EVAL_BUDGET_USD = 1000.0
 
 # A sweep is models × suites × runs. The CLI can do a 32-model overnight;
-# a remote caller cannot. Eight models, the five known suites, three passes
+# a remote caller cannot. Eight models, the six known suites, three passes
 # is the most one API request may start.
 MAX_SWEEP_MODELS = 8
 MAX_SWEEP_RUNS = 3
@@ -32,6 +32,8 @@ EVAL_RUNS_SUITES = frozenset({"adversarial", "redblue", "refusal", "codereview",
 EVAL_TEMPERATURE_SUITES = frozenset(
     {"accuracy", "adversarial", "redblue", "refusal", "codereview", "toolcall"}
 )
+# Suites with CLI --category / --mode subsetting.
+EVAL_CATEGORY_SUITES = frozenset({"adversarial", "toolcall", "redblue"})
 EVAL_CHANNELS = frozenset({"both", "tools", "prose"})
 
 # Load tests. The CLI can soak for hours at c=8; a remote caller cannot.
@@ -86,6 +88,39 @@ class RunRequest(BaseModel):
         return _normalize_reasoning_mode_field(value)
 
 
+def category_catalog_for_suite(suite: str, parts: list[str]) -> tuple[list[Any], set[str]]:
+    """Return ``(matching_fixtures, valid_category_tokens)`` for a suite."""
+    if suite == "adversarial":
+        from atomics.eval.adversarial import ALL_FIXTURES as ADV_ALL
+        from atomics.eval.adversarial import GROUP_ALIASES as ADV_ALIASES
+        from atomics.eval.adversarial import select_fixtures as select_adversarial
+
+        valid = set(ADV_ALIASES) | {f.category for f in ADV_ALL}
+        return list(select_adversarial(parts)), valid
+    if suite == "toolcall":
+        from atomics.eval.toolcall.fixtures import (
+            ALL_FIXTURES as TC_ALL,
+        )
+        from atomics.eval.toolcall.fixtures import (
+            GROUP_ALIASES as TC_ALIASES,
+        )
+        from atomics.eval.toolcall.fixtures import (
+            fixtures_for_category,
+        )
+
+        valid = set(TC_ALIASES) | {f.category for f in TC_ALL}
+        return list(fixtures_for_category(parts)), valid
+    if suite == "redblue":
+        from atomics.eval.redblue.fixtures import ALL_FIXTURES as RB_ALL
+
+        valid = {"red", "blue", "all"} | {f.category for f in RB_ALL}
+        wanted = set(parts)
+        if "all" in wanted:
+            return list(RB_ALL), valid
+        return [f for f in RB_ALL if f.team in wanted or f.category in wanted], valid
+    return [], set()
+
+
 class EvalRequest(BaseModel):
     """Request body to start an eval suite."""
 
@@ -97,6 +132,7 @@ class EvalRequest(BaseModel):
     judge_model: str | None = None
     host: str | None = None
     fixtures: list[str] | None = Field(default=None, max_length=MAX_FIXTURES)
+    category: str | None = None
     # Accepted for old clients and ignored: API evals return results and never persist.
     save: bool = True
     thinking: bool | None = None
@@ -136,6 +172,31 @@ class EvalRequest(BaseModel):
 
     @model_validator(mode="after")
     def _runs_and_channel_only_on_matching_suites(self) -> EvalRequest:
+        if self.category is not None:
+            suite_norm = self.suite.strip().lower()
+            if suite_norm not in EVAL_CATEGORY_SUITES:
+                raise ValueError(
+                    f"category is only valid for {sorted(EVAL_CATEGORY_SUITES)}; "
+                    f"{self.suite} does not support category filtering"
+                )
+            parts = [part.strip() for part in self.category.split(",") if part.strip()]
+            if not parts:
+                raise ValueError("category must not be empty")
+            catalog, valid = category_catalog_for_suite(suite_norm, parts)
+            unknown = [part for part in parts if part not in valid]
+            if unknown:
+                raise ValueError(
+                    f"unknown {suite_norm} category: {', '.join(unknown)}. "
+                    f"Valid: {', '.join(sorted(valid))}"
+                )
+            if self.fixtures is not None:
+                allowed_ids = {f.id for f in catalog}
+                outside = [fid for fid in self.fixtures if fid not in allowed_ids]
+                if outside:
+                    raise ValueError(
+                        f"fixture IDs outside category {','.join(parts)!r}: {', '.join(outside)}"
+                    )
+            self.category = ",".join(parts)
         if self.profile is not None:
             from atomics.eval.batteries import PROFILE_SUITES
 

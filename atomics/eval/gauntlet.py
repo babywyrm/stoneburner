@@ -29,7 +29,7 @@ from atomics.validation import sanitize_error
 
 logger = logging.getLogger("atomics.gauntlet")
 
-KNOWN_SUITES = ("eval", "redblue", "refusal", "toolcall", "codereview")
+KNOWN_SUITES = ("eval", "adversarial", "redblue", "refusal", "toolcall", "codereview")
 
 RunSuite = Callable[..., Awaitable["SuiteJobResult"]]
 Persist = Callable[[str, str, str, object], None]
@@ -508,6 +508,31 @@ async def _dispatch_suite(
             ),
             fixture_scores=_fixture_scores(eval_summary),
         ), eval_summary
+    if suite == "adversarial":
+        from atomics.eval.adversarial import select_fixtures as select_adversarial
+        from atomics.eval.adversarial.runner import run_adversarial
+
+        adv_fixtures = select_adversarial(ids=fixture_ids) if fixture_ids else None
+        adv_summary = await run_adversarial(
+            provider,
+            judge_provider=judge_provider,
+            model=model,
+            judge_model=judge_model,
+            fixtures=adv_fixtures,
+            runs=runs,
+            thinking=thinking,
+            thinking_budget=thinking_budget,
+            temperature=temperature,
+            effort=effort,
+            reasoning_mode=reasoning_mode,
+        )
+        return _suite_job(
+            model=model,
+            suite=suite,
+            score=adv_summary.overall_resilience,
+            summary=adv_summary,
+            stdev=adv_summary.overall_resilience_stdev,
+        ), adv_summary
     if suite == "redblue":
         from atomics.eval.redblue.runner import run_redblue
 
@@ -554,14 +579,16 @@ async def _dispatch_suite(
         ), refusal_summary
     if suite == "toolcall":
         from atomics.eval.toolcall.fixtures import ALL_FIXTURES
+        from atomics.eval.toolcall.fixtures import select_fixtures as select_toolcall
         from atomics.eval.toolcall.runner import run_toolcall_suite
 
+        tc_fixtures = select_toolcall(ids=fixture_ids) if fixture_ids else ALL_FIXTURES
         toolcall_summary = await run_toolcall_suite(
             provider=provider,
             model=model,
             judge_provider=judge_provider,
             judge_model=judge_model,
-            fixtures=ALL_FIXTURES,
+            fixtures=tc_fixtures,
             runs=runs,
             thinking=thinking,
             thinking_budget=thinking_budget,
@@ -583,6 +610,25 @@ async def _dispatch_suite(
                 error="model did not emit a tool call",
                 exit_code=0 if skip_incapable else 1,
             ), None
+        tc_integrity = getattr(toolcall_summary, "integrity", None)
+        if tc_integrity is not None and tc_integrity.should_exit_nonzero:
+            tc_error = (
+                "provider unreachable"
+                if tc_integrity.status is RunStatus.INFRASTRUCTURE_INVALID
+                else (
+                    f"{tc_integrity.attempts_scored}/{tc_integrity.attempts_total} attempts scored "
+                    f"({tc_integrity.generation_failures} unanswered, "
+                    f"{tc_integrity.judge_failures} unjudged)"
+                )
+            )
+            return SuiteJobResult(
+                model=model,
+                suite=suite,
+                ok=False,
+                tool_capable=True,
+                error=tc_error,
+                exit_code=1,
+            ), toolcall_summary
         return SuiteJobResult(
             model=model,
             suite=suite,

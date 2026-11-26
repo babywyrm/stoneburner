@@ -268,3 +268,19 @@ def test_submit_eval_profile_is_accepted_by_the_real_api(app_client):
     response = replay(app_client, request)
     assert response.status_code == 202
     assert response.json()["kind"] == "eval"
+
+
+def test_submit_eval_category_is_accepted_by_the_real_api(app_client):
+    request = captured_request(
+        lambda c: c.submit_eval(
+            suite="toolcall",
+            provider="ollama",
+            category="escalation",
+        )
+    )
+    response = replay(app_client, request)
+    assert response.status_code == 202
+    body = response.json()
+    assert body["kind"] == "eval"
+    assert body["request"]["category"] == "escalation"
+    assert body["progress"]["total"] == 4

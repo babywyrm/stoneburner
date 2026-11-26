@@ -596,3 +596,21 @@ def test_submit_eval_includes_profile_when_given():
         "provider": "ollama",
         "profile": "profiles/examples/http-flask-endpoint.yaml",
     }
+
+
+def test_submit_eval_includes_category_when_given():
+    import json
+
+    requests: list[httpx.Request] = []
+    with client_recording(requests) as client:
+        client.submit_eval(
+            suite="toolcall",
+            provider="ollama",
+            category="direct,escalation",
+        )
+
+    assert json.loads(requests[0].content) == {
+        "suite": "toolcall",
+        "provider": "ollama",
+        "category": "direct,escalation",
+    }

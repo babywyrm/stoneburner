@@ -18,6 +18,7 @@ from atomics.api.job_progress import SweepJobReporter, sweep_job_total
 from atomics.api.jobs import Job
 from atomics.api.models import SweepRequest
 from atomics.eval.budget import BudgetMeter, EvalBudget, EvalBudgetExceededError
+from atomics.eval.calibration import suite_rubric
 from atomics.eval.gauntlet import SuiteJobResult, make_suite_runner, run_gauntlet
 from atomics.providers.base import BaseProvider, aclose_providers
 
@@ -56,8 +57,21 @@ async def run_sweep_from_request(
 
     try:
         judge_provider = meter.wrap(_provider_for("ollama", payload.judge_model, judge_host))
-        judge_cal = await _judge_calibration_async(
-            payload.judge_model, judge_provider, db_path=db_path
+        rubrics = list(
+            dict.fromkeys(suite_rubric("accuracy" if s == "eval" else s) for s in payload.suites)
+        )
+        judge_cals = {
+            r: await _judge_calibration_async(
+                payload.judge_model, judge_provider, db_path=db_path, rubric=r
+            )
+            for r in rubrics
+        }
+        judge_cal = (
+            judge_cals[rubrics[0]]
+            if len(rubrics) == 1
+            else await _judge_calibration_async(
+                payload.judge_model, judge_provider, db_path=db_path
+            )
         )
         inner = make_suite_runner(
             provider_factory=provider_factory,
@@ -103,6 +117,7 @@ async def run_sweep_from_request(
         "budget_usd": payload.budget_usd,
         "total_cost_usd": round(meter.guard.total_cost, 6) if meter.guard is not None else 0.0,
         "judge_calibration": judge_cal,
+        "judge_calibrations": judge_cals,
         "ok": sum(1 for row in results if row.ok),
         "fail": sum(1 for row in results if not row.ok),
         "jobs": jobs,

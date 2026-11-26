@@ -835,6 +835,7 @@ async def test_eval_suite_pins_the_model_and_keeps_the_judge_at_zero():
 
 _SWEEP_RUNNERS = {
     "eval": "atomics.eval.runner.run_eval",
+    "adversarial": "atomics.eval.adversarial.runner.run_adversarial",
     "redblue": "atomics.eval.redblue.runner.run_redblue",
     "refusal": "atomics.eval.refusal.run_refusal",
     "toolcall": "atomics.eval.toolcall.runner.run_toolcall_suite",
