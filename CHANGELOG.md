@@ -3,6 +3,16 @@
 ## Unreleased
 
 ### Added
+- `adversarial` in `atomics sweep --suites`, `POST /api/v1/sweeps`,
+  `atomics mcp` `submit_sweep`, and `atomics repl` `submit_sweep` (including
+  `AdversarialSummary.fixture_scores` for `vs_best` intervals,
+  `overall_resilience_stdev` across multi-run passes, and `suite_persister`
+  SQLite writes under `--save`).
+- `category` filtering on `POST /api/v1/evals` (`EvalRequest`),
+  `AtomicsApiClient.submit_eval`, `atomics mcp` `submit_eval`, and `atomics
+  repl` `submit_eval` (comma-separated categories or group aliases on
+  `adversarial`, `toolcall`, and `redblue`, rejecting unknown categories or
+  disjoint `fixtures` IDs with `422`).
 - `channel_any_run_divergence` in `atomics toolcall` (CLI, JSON, and
   `POST /api/v1/evals`) and `any_run_critical_failures` /
   `any_run_complied_rate` in `atomics adversarial` (CLI, JSON, and
@@ -119,6 +129,12 @@
   retired legacy post-split helper/command re-exports from `atomics/cli.py`.
 
 ### Fixed
+- `eval.gauntlet` (`atomics sweep` and `POST /api/v1/sweeps`) now marks
+  `toolcall` jobs failed when `toolcall_summary.integrity.should_exit_nonzero`
+  is true instead of recording partial/unscored toolcall runs as `ok`, forwards
+  `--fixtures` to `toolcall` inside `sweep`, and resolves per-suite rubric
+  judge calibrations (`judge_calibrations` on sweep API jobs and per-rubric CLI
+  lines) instead of querying only the `quality` rubric.
 - `POST /api/v1/evals` and `POST /api/v1/batteries` now resolve
   `judge_calibration` before closing the judge provider's HTTP client so
   digest-keyed Ollama calibration rows are returned instead of `null`.

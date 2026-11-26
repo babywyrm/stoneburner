@@ -423,9 +423,9 @@ provider is distinguishable from a broken judge. For `codegen` this is the
 difference between a model that cannot code and a run where every request
 errored — both otherwise report `overall_pass_rate: 0.0`.
 
-Only `adversarial`, `refusal`, and `codereview` exit nonzero on partial
-coverage. The other five report it without changing their exit code, so runs
-that pass today keep passing; gate on `integrity.should_exit_nonzero` from
-`--json-out` if you want CI to enforce it.
+Every suite exits nonzero when `integrity.should_exit_nonzero` is true unless
+`--allow-partial` is passed (changing only the exit code, never the stored
+`integrity` status). API callers and `atomics sweep` gate on the same
+`integrity.should_exit_nonzero` field.
 
 Saved fixture rows live in the schema-v20 `evaluation_results` ledger. Its `result_json` contains raw model and judge evidence — treat the database and JSON exports as potentially sensitive.

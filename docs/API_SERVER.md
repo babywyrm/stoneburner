@@ -289,7 +289,9 @@ at `total`.
 Dashboard `#job=` still shows the current `in_flight` plus the
 fixture / phase / sample tables, not the trail. `POST /evals` accepts
 optional `host`, `judge_host` (CLI `--judge-host`: judge on a second
-Ollama), and `profile` (`profiles/...` YAML on `adversarial`, `refusal`,
+Ollama), `category` (comma-separated categories or group aliases on
+`adversarial`, `toolcall`, and `redblue`, CLI `--category` / `--mode`),
+and `profile` (`profiles/...` YAML on `adversarial`, `refusal`,
 `redblue`, CLI `--profile`). `runs` is 1–3 on `adversarial` / `redblue` / `refusal` /
 `codereview` / `toolcall`; other
 suites return `422` if `runs > 1`. `channel` is `both` / `tools` /
@@ -323,8 +325,8 @@ CLI-only.
 Unlike a single eval, **`budget_usd` has no default** — omit it and the
 request is `422`. Name the models; there is no `--all-local` / discover-
 everything flag (call `GET /models` first). Caps: 8 models, 3 runs, suites
-from `eval`, `redblue`, `refusal`, `toolcall`, `codereview` (note `eval`,
-not `accuracy`). Optional `host` and `judge_host` have the same meaning
+from `eval`, `adversarial`, `redblue`, `refusal`, `toolcall`, `codereview`
+(note `eval`, not `accuracy`). Optional `host` and `judge_host` have the same meaning
 as `POST /evals`.
 While it runs, `progress.total` is models × suites,
 `in_flight` is `{model, suite}`, that dict is appended to

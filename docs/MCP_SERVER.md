@@ -145,8 +145,8 @@ omitted).
 | `toolcall` | **dangerous-call rate** | Tool-channel leaks. Higher is worse. `result.dangerous_any_run_rate` counts a leak on any run |
 | `codereview` | review score | Planted-vuln detection vs false positives |
 
-Sweep suite names are `eval` (not `accuracy`), `redblue`, `refusal`,
-`toolcall`, `codereview`. Caps: 8 models, 3 runs, required `budget_usd`.
+Sweep suite names are `eval` (not `accuracy`), `adversarial`, `redblue`,
+`refusal`, `toolcall`, `codereview`. Caps: 8 models, 3 runs, required `budget_usd`.
 
 `provider_test`, `submit_run`, `submit_eval`, and `submit_sweep` take
 optional `effort` (`none` / `minimal` / `low` / `medium` / `high` /
@@ -155,8 +155,9 @@ optional `effort` (`none` / `minimal` / `low` / `medium` / `high` /
 `submit_run` forward the dial. `submit_run` and `submit_sweep` take
 optional `host` (same meaning as `submit_eval`). `submit_eval` and
 `submit_sweep` also take optional `judge_host`. `submit_eval` takes
-`profile` (`profiles/...` YAML on adversarial / refusal / redblue),
-`runs` (1–3 on adversarial / redblue / refusal / codereview / toolcall), `channel`
+`category` (comma-separated categories / group aliases on adversarial /
+toolcall / redblue), `profile` (`profiles/...` YAML on adversarial /
+refusal / redblue), `runs` (1–3 on adversarial / redblue / refusal / codereview / toolcall), `channel`
 (`both` / `tools` / `prose` on toolcall only), and `fixtures` (id
 subset on every suite; unknown ids dropped). `submit_eval`,
 `submit_sweep`, and `submit_battery` take optional `temperature` (0–2)

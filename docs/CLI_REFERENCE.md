@@ -176,7 +176,7 @@ one backend that reports its window size.
 | `atomics sweep` | Multi-model eval sweep with ranked comparison |
 | `atomics sweep --verbose` | Print the full prompt, model reply, thinking, and judge rationale per fixture |
 | `atomics sweep --models a,b,c --temperature 0` | Pin every model under test (0–2) so the ranking is not run-to-run noise. Judges stay at 0. Applies to `eval` and every `--suites` entry |
-| `atomics sweep --suites redblue,refusal,toolcall,codereview --runs 3 --no-thinking --models-from ollama --status sweep.status.json --log sweep.log` | Overnight multi-suite driver: status file + detachable log. Toolcall uses `--no-skip-incapable`. A `vs best` column marks each job `best`, `tied`, or `behind` the suite leader ([COMPARING.md](COMPARING.md#intervals)). |
+| `atomics sweep --suites adversarial,redblue,refusal,toolcall,codereview --runs 3 --no-thinking --models-from ollama --status sweep.status.json --log sweep.log` | Overnight multi-suite driver: status file + detachable log. Toolcall uses `--no-skip-incapable`. A `vs best` column marks each job `best`, `tied`, or `behind` the suite leader ([COMPARING.md](COMPARING.md#intervals)). |
 | `atomics sweep ... --status sweep.status.json --resume` | Same command after a stop. Keeps jobs the status file records as ok; re-runs failed, crashed, and unfinished ones. A partial suite is not ok. A dead provider stops the sweep. |
 
 Real retrieval (`rag-index`, `rag --index`, `rag-retrieval`) requires the optional extra: `uv pip install "stoneburner-atomics[rag]"` (or `uv sync --extra rag` from a clone).
@@ -331,8 +331,8 @@ job id to poll (`get_job` for in-memory jobs; `get_distributed_run` for
 coordinator worker jobs) until `status` is `completed`. `submit_eval` suites:
 `accuracy`, `rag`,
 `multiturn`, `adversarial`, `codegen`, `refusal`, `redblue`, `toolcall`,
-`codereview`. `submit_sweep` uses `eval` (not `accuracy`) plus `redblue`,
-`refusal`, `toolcall`, `codereview`; budget is required; at most 8 models
+`codereview`. `submit_sweep` uses `eval` (not `accuracy`) plus `adversarial`,
+`redblue`, `refusal`, `toolcall`, `codereview`; budget is required; at most 8 models
 and 3 runs. `submit_stress` / `submit_soak` require a budget; stress is
 c≤8 and phase ≤15s; soak duration is 30–300 seconds.
 
