@@ -32,13 +32,15 @@ updates:
     commit-message:
       prefix: "chore(deps)"
     ignore:
-      # 2.1+ wraps tool errors and drops the API detail the agent needs.
+      # pyproject.toml caps mcp at >=2.2.0,<2.3; allow 2.2.x patch updates while
+      # holding 2.3+ until a dedicated MCP SDK pass.
       - dependency-name: "mcp"
-        versions: [">=2.1.0"]
+        versions: [">=2.3.0"]
       # 3.x taken in-tree. Ignore 4+ until a dedicated pass.
       - dependency-name: "openai"
         update-types: ["version-update:semver-major"]
-      # HTTPX2 core-dep jump. Same class as the old openai 3 park.
+      # 2.x sends API version 2026-10-21, which rejects temperature with 400;
+      # judges and --temperature 0 still rely on it.
       - dependency-name: "anthropic"
         update-types: ["version-update:semver-major"]
       # rag extra. Stay on 5.7 until someone asks for the 6.x encode path.
