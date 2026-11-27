@@ -173,12 +173,16 @@ major tag moved by the publish workflow.
       `AdversarialSummary.fixture_scores` for `vs_best` intervals,
       `overall_resilience_stdev`, and `suite_persister` SQLite persistence).
 - [x] Enforce `toolcall_summary.integrity.should_exit_nonzero` and forward
-      `--fixtures` on `toolcall` inside `eval.gauntlet`, and resolve per-suite
-      rubric calibrations (`judge_calibrations`) across CLI and API sweeps.
+      `--fixtures` across `toolcall`, `redblue`, `refusal`, and `codereview`
+      inside `eval.gauntlet` (keeping one-sided `complete` `codereview` subsets
+      `ok`), and resolve per-suite rubric calibrations (`judge_calibrations`)
+      across CLI and API sweeps.
 - [x] Add `category` filtering to `EvalRequest` (`POST /api/v1/evals`),
       `AtomicsApiClient.submit_eval`, `atomics mcp` `submit_eval`, and `atomics
-      repl` `submit_eval` (`adversarial`, `toolcall`, and `redblue`), rejecting
-      unknown categories or disjoint `fixtures` IDs with `422`.
+      repl` `submit_eval` (`adversarial`, `toolcall`, and `redblue`), normalize
+      `EvalRequest.suite` at validation time (closing `CWE-178` case-variant
+      `codegen` worker bypasses), and fix `run_codegen` / `run_multiturn`
+      explicit empty `fixtures=[]` handling.
 - [x] Extend the 3-pass local-Ollama multi-turn escalation sweep across
       `ornith-1.5:35b`, `nemotron-3.5-lightning:30b`, and
       `north-mini-code-1.0:latest`.

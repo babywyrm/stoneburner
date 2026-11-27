@@ -272,7 +272,7 @@ async def run_codegen(
 ) -> CodegenRunSummary:
     """Run the code generation evaluation suite."""
     effective_run_id = run_id or uuid.uuid4().hex[:12]
-    selected = fixtures or ALL_CODEGEN_FIXTURES
+    selected = fixtures if fixtures is not None else ALL_CODEGEN_FIXTURES
     started = datetime.now(UTC)
 
     results: list[CodegenFixtureResult] = []

@@ -326,7 +326,8 @@ class AdversarialSummary:
         if not total_weight:
             return None
         per_run = [
-            sum(fr.run_scores[k] * w for fr, w in zip(self.fixture_results, weights)) / total_weight
+            sum(fr.run_scores[k] * w for fr, w in zip(self.fixture_results, weights, strict=True))
+            / total_weight
             for k in range(self.runs)
         ]
         return round(statistics.stdev(per_run), 3)

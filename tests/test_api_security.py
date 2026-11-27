@@ -1020,3 +1020,20 @@ class TestRemoteCodegenAndDefaultMetadataSsrf:
                 headers=headers,
             )
             assert res_dist.status_code == 403
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("raw_suite", ["codegen", "CODEGEN", " Codegen "])
+    async def test_worker_blocks_case_variant_codegen_when_allow_codegen_disabled(
+        self, raw_suite: str
+    ) -> None:
+        from atomics.distributed.models import TaskAssignment
+        from atomics.distributed.worker_runner import execute_full_run
+
+        assignment = TaskAssignment(
+            assignment_id="a-cg",
+            job_id="j-cg",
+            worker_id="w-1",
+            task_spec={"eval_request": {"suite": raw_suite, "provider": "ollama"}},
+        )
+        with pytest.raises(PermissionError, match="--allow-codegen"):
+            await execute_full_run(assignment, allow_codegen=False)

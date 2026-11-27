@@ -129,12 +129,20 @@
   retired legacy post-split helper/command re-exports from `atomics/cli.py`.
 
 ### Fixed
+- `EvalRequest` now normalizes `suite` (`strip().lower()`) at Pydantic
+  validation time (preventing uppercase/padded `"CODEGEN"` payloads from
+  bypassing `atomics worker`'s `--allow-codegen` gate, `CWE-178`), bounds
+  `category` to `256` chars, and types `category_catalog_for_suite()` via a
+  strict `CategoryFixture` `Protocol` without `Any`; `run_codegen()` and
+  `run_multiturn()` now honor explicit empty `fixtures=[]` subsets instead of
+  falling back to the full catalog.
 - `eval.gauntlet` (`atomics sweep` and `POST /api/v1/sweeps`) now marks
   `toolcall` jobs failed when `toolcall_summary.integrity.should_exit_nonzero`
   is true instead of recording partial/unscored toolcall runs as `ok`, forwards
-  `--fixtures` to `toolcall` inside `sweep`, and resolves per-suite rubric
-  judge calibrations (`judge_calibrations` on sweep API jobs and per-rubric CLI
-  lines) instead of querying only the `quality` rubric.
+  `--fixtures` across `toolcall`, `redblue`, `refusal`, and `codereview` (and
+  keeps one-sided `codereview` subsets `ok` when `integrity` is `complete`),
+  and resolves per-suite rubric judge calibrations (`judge_calibrations` on
+  sweep API jobs and per-rubric CLI lines) instead of querying only `quality`.
 - `POST /api/v1/evals` and `POST /api/v1/batteries` now resolve
   `judge_calibration` before closing the judge provider's HTTP client so
   digest-keyed Ollama calibration rows are returned instead of `null`.

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -13,6 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 MAX_ITERATIONS = 1000
 MAX_INTERVAL_SECONDS = 3600
 MAX_FIXTURES = 500
+MAX_CATEGORY_LENGTH = 256
 MAX_TREND_HOURS = 168
 
 # Dollar ceiling for one API-triggered eval, shared by the model and its judge.
@@ -88,7 +89,16 @@ class RunRequest(BaseModel):
         return _normalize_reasoning_mode_field(value)
 
 
-def category_catalog_for_suite(suite: str, parts: list[str]) -> tuple[list[Any], set[str]]:
+class CategoryFixture(Protocol):
+    """Fixture row exposing an ``id`` string for category subsetting."""
+
+    @property
+    def id(self) -> str: ...
+
+
+def category_catalog_for_suite(
+    suite: str, parts: list[str]
+) -> tuple[list[CategoryFixture], set[str]]:
     """Return ``(matching_fixtures, valid_category_tokens)`` for a suite."""
     if suite == "adversarial":
         from atomics.eval.adversarial import ALL_FIXTURES as ADV_ALL
@@ -132,7 +142,7 @@ class EvalRequest(BaseModel):
     judge_model: str | None = None
     host: str | None = None
     fixtures: list[str] | None = Field(default=None, max_length=MAX_FIXTURES)
-    category: str | None = None
+    category: str | None = Field(default=None, max_length=MAX_CATEGORY_LENGTH)
     # Accepted for old clients and ignored: API evals return results and never persist.
     save: bool = True
     thinking: bool | None = None
@@ -144,6 +154,11 @@ class EvalRequest(BaseModel):
     channel: str | None = None
     temperature: float | None = Field(default=None, ge=0.0, le=2.0)
     profile: str | None = None
+
+    @field_validator("suite")
+    @classmethod
+    def _normalize_suite(cls, value: str) -> str:
+        return value.strip().lower()
 
     @field_validator("profile")
     @classmethod

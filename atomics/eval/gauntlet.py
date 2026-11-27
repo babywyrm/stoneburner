@@ -437,10 +437,11 @@ def _suite_job(
     """
     integrity = getattr(summary, "integrity", None)
     headline = score if integrity is None else headline_rate(score, integrity)
+    ok = (not integrity.should_exit_nonzero) if integrity is not None else (headline is not None)
     error = None
     if integrity is not None and integrity.status is RunStatus.INFRASTRUCTURE_INVALID:
         error = "provider unreachable"
-    elif integrity is not None and headline is None:
+    elif integrity is not None and not ok:
         error = (
             f"{integrity.attempts_scored}/{integrity.attempts_total} attempts scored "
             f"({integrity.generation_failures} unanswered, "
@@ -449,12 +450,12 @@ def _suite_job(
     return SuiteJobResult(
         model=model,
         suite=suite,
-        ok=headline is not None,
+        ok=ok,
         headline=headline,
         error=error,
         stdev=stdev,
-        exit_code=0 if headline is not None else 1,
-        fixture_scores=_fixture_scores(summary) if headline is not None else None,
+        exit_code=0 if ok else 1,
+        fixture_scores=_fixture_scores(summary) if ok else None,
     )
 
 
@@ -534,13 +535,16 @@ async def _dispatch_suite(
             stdev=adv_summary.overall_resilience_stdev,
         ), adv_summary
     if suite == "redblue":
+        from atomics.eval.redblue.fixtures import select_fixtures as select_redblue
         from atomics.eval.redblue.runner import run_redblue
 
+        rb_fixtures = select_redblue(ids=fixture_ids) if fixture_ids else None
         redblue_summary = await run_redblue(
             provider,
             judge_provider=judge_provider,
             model=model,
             judge_model=judge_model,
+            fixtures=rb_fixtures,
             runs=runs,
             thinking=thinking,
             thinking_budget=thinking_budget,
@@ -557,12 +561,15 @@ async def _dispatch_suite(
         ), redblue_summary
     if suite == "refusal":
         from atomics.eval.refusal import run_refusal
+        from atomics.eval.refusal.fixtures import select_fixtures as select_refusal
 
+        ref_fixtures = select_refusal(ids=fixture_ids) if fixture_ids else None
         refusal_summary = await run_refusal(
             provider,
             judge_provider=judge_provider,
             model=model,
             judge_model=judge_model,
+            fixtures=ref_fixtures,
             runs=runs,
             thinking=thinking,
             thinking_budget=thinking_budget,
@@ -645,12 +652,15 @@ async def _dispatch_suite(
         ), toolcall_summary
     if suite == "codereview":
         from atomics.eval.codereview import run_codereview
+        from atomics.eval.codereview.fixtures import select_fixtures as select_codereview
 
+        cr_fixtures = select_codereview(ids=fixture_ids) if fixture_ids else None
         review_summary = await run_codereview(
             provider,
             judge_provider=judge_provider,
             model=model,
             judge_model=judge_model,
+            fixtures=cr_fixtures,
             runs=runs,
             thinking=thinking,
             thinking_budget=thinking_budget,

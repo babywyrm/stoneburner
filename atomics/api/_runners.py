@@ -58,7 +58,7 @@ SUPPORTED_EVAL_SUITES = frozenset(
 
 def validate_eval_suite(suite: str) -> str:
     """Normalize and validate an eval suite name."""
-    normalized = suite.lower()
+    normalized = suite.strip().lower()
     if normalized not in SUPPORTED_EVAL_SUITES:
         raise ValueError(f"Unsupported eval suite: {normalized}")
     return normalized

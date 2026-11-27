@@ -258,7 +258,7 @@ async def run_multiturn(
     effective_judge = judge_provider or provider
     extra_judges = extra_judges or []
     effective_run_id = run_id or uuid.uuid4().hex[:12]
-    selected = fixtures or ALL_MULTITURN_FIXTURES
+    selected = fixtures if fixtures is not None else ALL_MULTITURN_FIXTURES
     started = datetime.now(UTC)
 
     conversation_results: list[ConversationResult] = []

@@ -831,3 +831,100 @@ async def test_toolcall_partial_integrity_marks_gauntlet_job_failed(monkeypatch)
     assert result.any_run is None
     assert result.exit_code == 1
     assert result.error is not None and "3/4 attempts scored" in result.error
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("suite", "patch_target", "fixture_id", "score_attr"),
+    [
+        ("redblue", "atomics.eval.redblue.runner.run_redblue", "rb-r01", "overall_quality"),
+        ("refusal", "atomics.eval.refusal.run_refusal", "rc-b01", "calibration_score"),
+        ("codereview", "atomics.eval.codereview.run_codereview", "scr-01", "review_score"),
+    ],
+)
+async def test_gauntlet_forwards_fixture_ids_to_redblue_refusal_and_codereview(
+    monkeypatch, suite: str, patch_target: str, fixture_id: str, score_attr: str
+) -> None:
+    from types import SimpleNamespace
+
+    from atomics.eval.outcomes import RunIntegrity, RunStatus
+
+    seen_ids: list[str] = []
+
+    async def fake_runner(*_args, **kwargs):
+        fixtures = kwargs.get("fixtures") or []
+        seen_ids.extend(f.id for f in fixtures)
+        return SimpleNamespace(
+            **{
+                score_attr: 1.0,
+                "runs": 1,
+                "review_score_stdev": None,
+                "results": [],
+                "integrity": RunIntegrity(
+                    status=RunStatus.COMPLETE,
+                    fixtures_total=1,
+                    fixtures_scored=1,
+                    attempts_total=1,
+                    attempts_scorable=1,
+                    attempts_scored=1,
+                    generation_failures=0,
+                    infrastructure_failures=0,
+                    judge_failures=0,
+                ),
+            }
+        )
+
+    monkeypatch.setattr(patch_target, fake_runner)
+    run_suite = make_suite_runner(
+        provider_factory=lambda _model: SimpleNamespace(name="ollama"),
+        judge_provider=SimpleNamespace(name="ollama"),
+        judge_model="judge",
+        runs=1,
+        thinking=False,
+        thinking_budget=None,
+        fixture_ids=[fixture_id],
+    )
+    job = await run_suite(model="m:1b", suite=suite, skip_incapable=False)
+    assert job.ok is True
+    assert seen_ids == [fixture_id]
+
+
+@pytest.mark.asyncio
+async def test_codereview_single_side_subset_complete_integrity_is_ok(monkeypatch) -> None:
+    from types import SimpleNamespace
+
+    from atomics.eval.outcomes import RunIntegrity, RunStatus
+
+    async def fake_codereview(*_args, **_kwargs):
+        return SimpleNamespace(
+            review_score=None,
+            review_score_stdev=None,
+            results=[],
+            integrity=RunIntegrity(
+                status=RunStatus.COMPLETE,
+                fixtures_total=1,
+                fixtures_scored=1,
+                attempts_total=1,
+                attempts_scorable=1,
+                attempts_scored=1,
+                generation_failures=0,
+                infrastructure_failures=0,
+                judge_failures=0,
+            ),
+        )
+
+    monkeypatch.setattr("atomics.eval.codereview.run_codereview", fake_codereview)
+    run_suite = make_suite_runner(
+        provider_factory=lambda _model: SimpleNamespace(name="ollama"),
+        judge_provider=SimpleNamespace(name="ollama"),
+        judge_model="judge",
+        runs=1,
+        thinking=False,
+        thinking_budget=None,
+        fixture_ids=["scr-01"],
+    )
+    job = await run_suite(model="m:1b", suite="codereview", skip_incapable=False)
+    assert job.ok is True
+    assert job.headline is None
+    assert job.error is None
+    assert job.exit_code == 0
