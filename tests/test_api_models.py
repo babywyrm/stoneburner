@@ -153,3 +153,30 @@ def test_battery_request_defaults():
     nulled = BatteryRequest(name="desk-pass", provider="ollama", budget_usd=5, thinking=None)
     assert nulled.thinking is False
     assert req.profile is None
+
+
+def test_requests_and_factory_normalize_provider_battery_and_forbid_extra_on_run() -> None:
+    from atomics.api.models import BatteryRequest, SoakRequest, StressRequest, SweepRequest
+    from atomics.config import AtomicsSettings
+    from atomics.providers.factory import resolve_provider_endpoint
+
+    assert RunRequest(provider=" OLLAMA ").provider == "ollama"
+    assert EvalRequest(suite="rag", provider=" OLLAMA ").provider == "ollama"
+    assert (
+        SweepRequest(provider=" OLLAMA ", models=["m"], suites=["eval"], budget_usd=1.0).provider
+        == "ollama"
+    )
+    bat = BatteryRequest(name=" Agent-Gate ", provider=" OLLAMA ", model="m", budget_usd=1.0)
+    assert bat.provider == "ollama"
+    assert bat.name == "agent-gate"
+    assert StressRequest(provider=" OLLAMA ", model="m", budget_usd=1.0).provider == "ollama"
+    assert SoakRequest(provider=" OLLAMA ", model="m", budget_usd=1.0).provider == "ollama"
+    assert ProviderTestRequest(provider=" OLLAMA ").provider == "ollama"
+
+    with pytest.raises(ValidationError, match="provider must not be empty"):
+        RunRequest(provider="   ")
+    with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+        RunRequest.model_validate({"provider": "ollama", "bogus": 1})
+
+    ep = resolve_provider_endpoint(" OLLAMA ", "http://127.0.0.1:11434", AtomicsSettings())
+    assert ep == "http://127.0.0.1:11434"

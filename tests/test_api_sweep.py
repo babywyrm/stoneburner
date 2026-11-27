@@ -448,3 +448,154 @@ async def test_run_sweep_accepts_adversarial_and_resolves_suite_rubric_calibrati
     assert result["judge_calibration"]["rubric"] == "resistance"
     assert result["judge_calibration"]["passed"] is True
     assert result["judge_calibrations"] == {"resistance": result["judge_calibration"]}
+
+
+def test_sweep_request_validates_category_and_fixtures():
+    req = SweepRequest(
+        provider="ollama",
+        models=["a"],
+        suites=["adversarial", "toolcall"],
+        category=" escalation ",
+        fixtures=[" mt-esc-04 ", "tc-32"],
+        budget_usd=2.0,
+    )
+    assert req.category == "escalation"
+    assert req.fixtures == ["mt-esc-04", "tc-32"]
+
+    with pytest.raises(ValidationError, match="does not support category filtering"):
+        SweepRequest(
+            provider="ollama",
+            models=["a"],
+            suites=["eval"],
+            category="escalation",
+            budget_usd=1.0,
+        )
+
+    with pytest.raises(ValidationError, match="unknown toolcall category"):
+        SweepRequest(
+            provider="ollama",
+            models=["a"],
+            suites=["adversarial", "toolcall"],
+            category="rag_poisoning",
+            budget_usd=1.0,
+        )
+
+    with pytest.raises(ValidationError, match="unknown fixture IDs"):
+        SweepRequest(
+            provider="ollama",
+            models=["a"],
+            suites=["eval"],
+            fixtures=["bogus-99"],
+            budget_usd=1.0,
+        )
+
+    with pytest.raises(ValidationError, match="fixture IDs outside category"):
+        SweepRequest(
+            provider="ollama",
+            models=["a"],
+            suites=["toolcall"],
+            category="escalation",
+            fixtures=["tc-01"],
+            budget_usd=1.0,
+        )
+
+    with pytest.raises(ValidationError, match="toolcall"):
+        SweepRequest(
+            provider="ollama",
+            models=["a"],
+            suites=["adversarial", "toolcall"],
+            fixtures=["mt-esc-04"],
+            budget_usd=1.0,
+        )
+
+    with pytest.raises(ValidationError, match="fixtures must not be empty"):
+        SweepRequest(
+            provider="ollama",
+            models=["a"],
+            suites=["eval"],
+            fixtures=[""],
+            budget_usd=1.0,
+        )
+
+
+@pytest.mark.asyncio
+async def test_sweep_api_mcp_and_repl_forward_category_and_fixtures():
+    import httpx
+
+    from atomics.mcp.client import AtomicsApiClient
+    from atomics.mcp.server import build_server
+    from atomics.repl.dispatch import handle_line
+    from atomics.repl.session import Session
+
+    payload = SweepRequest(
+        provider="ollama",
+        models=["a"],
+        suites=["adversarial", "toolcall"],
+        category="escalation",
+        fixtures=["mt-esc-04", "tc-32"],
+        budget_usd=2.0,
+    )
+    captured_runner: dict[str, object] = {}
+
+    async def instant_suite(*, model: str, suite: str, skip_incapable: bool):
+        return SuiteJobResult(model=model, suite=suite, ok=True, headline=0.9)
+
+    def capture_factory(**kwargs):
+        captured_runner.update(kwargs)
+        return instant_suite
+
+    with (
+        patch("atomics.api._sweep._provider_for", return_value=SimpleNamespace(name="ollama")),
+        patch("atomics.api._sweep.make_suite_runner", side_effect=capture_factory),
+    ):
+        result = await run_sweep_from_request(payload)
+
+    assert captured_runner["category"] == "escalation"
+    assert captured_runner["fixture_ids"] == ["mt-esc-04", "tc-32"]
+    assert result["category"] == "escalation"
+    assert result["fixtures"] == ["mt-esc-04", "tc-32"]
+
+    seen_bodies: list[dict[str, object]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        import json
+
+        seen_bodies.append(json.loads(request.content))
+        return httpx.Response(
+            202,
+            json={
+                "job_id": "sw-1",
+                "status": "pending",
+                "kind": "sweep",
+                "created_at": "2026-11-27T00:00:00Z",
+            },
+        )
+
+    with AtomicsApiClient(
+        "http://127.0.0.1:8000", "secret", transport=httpx.MockTransport(handler)
+    ) as api_client:
+        mcp = build_server(api_client)
+        await mcp.call_tool(
+            "submit_sweep",
+            {
+                "provider": "ollama",
+                "models": ["a"],
+                "suites": ["adversarial", "toolcall"],
+                "category": "escalation",
+                "fixtures": ["mt-esc-04", "tc-32"],
+                "budget_usd": 2.0,
+            },
+        )
+        session = Session()
+        out = handle_line(
+            "submit_sweep --provider ollama --models a --suites adversarial,toolcall "
+            "--category escalation --fixtures mt-esc-04,tc-32 --budget_usd 2",
+            session=session,
+            client=api_client,
+        )
+        assert out.stderr == ""
+
+    assert len(seen_bodies) == 2
+    for body in seen_bodies:
+        assert body["category"] == "escalation"
+        assert body["fixtures"] == ["mt-esc-04", "tc-32"]

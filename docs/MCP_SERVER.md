@@ -154,12 +154,12 @@ optional `effort` (`none` / `minimal` / `low` / `medium` / `high` /
 `reasoning_mode` (`standard` / `pro`). `submit_eval` `codegen` and
 `submit_run` forward the dial. `submit_run` and `submit_sweep` take
 optional `host` (same meaning as `submit_eval`). `submit_eval` and
-`submit_sweep` also take optional `judge_host`. `submit_eval` takes
-`category` (comma-separated categories / group aliases on adversarial /
-toolcall / redblue), `profile` (`profiles/...` YAML on adversarial /
-refusal / redblue), `runs` (1–3 on adversarial / redblue / refusal / codereview / toolcall), `channel`
-(`both` / `tools` / `prose` on toolcall only), and `fixtures` (id
-subset on every suite; unknown ids dropped). `submit_eval`,
+`submit_sweep` also take optional `judge_host`, `category`
+(comma-separated categories / group aliases on adversarial / toolcall /
+redblue), and `fixtures` (id subset; on `submit_sweep`, every requested
+suite must match at least one id). `submit_eval` also takes `profile` (`profiles/...` YAML on adversarial /
+refusal / redblue), `runs` (1–3 on adversarial / redblue / refusal / codereview / toolcall), and `channel`
+(`both` / `tools` / `prose` on toolcall only). `submit_eval`,
 `submit_sweep`, and `submit_battery` take optional `temperature` (0–2)
 to pin the model under test, as CLI `--temperature` does.
 

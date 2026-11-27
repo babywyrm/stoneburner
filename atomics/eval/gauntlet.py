@@ -17,9 +17,9 @@ from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import asdict, dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Literal, Protocol
+from typing import Any, Literal, Protocol, TypeVar
 
-from atomics.eval.fixtures import EVAL_FIXTURES, EvalFixture
+from atomics.eval.fixtures import EVAL_FIXTURES
 from atomics.eval.intervals import paired_interval
 from atomics.eval.outcomes import RunStatus
 from atomics.eval.runner import EvalRunSummary
@@ -30,6 +30,149 @@ from atomics.validation import sanitize_error
 logger = logging.getLogger("atomics.gauntlet")
 
 KNOWN_SUITES = ("eval", "adversarial", "redblue", "refusal", "toolcall", "codereview")
+CATEGORY_SUITES = frozenset({"adversarial", "toolcall", "redblue"})
+
+
+class CategoryFixture(Protocol):
+    """Fixture row exposing an ``id`` string for category and ID subsetting."""
+
+    @property
+    def id(self) -> str: ...
+
+
+_F = TypeVar("_F", bound=CategoryFixture)
+
+
+def category_catalog_for_suite(
+    suite: str, parts: Sequence[str]
+) -> tuple[list[CategoryFixture], set[str]]:
+    """Return ``(matching_fixtures, valid_category_tokens)`` for a suite."""
+    if suite == "adversarial":
+        from atomics.eval.adversarial import ALL_FIXTURES as ADV_ALL
+        from atomics.eval.adversarial import GROUP_ALIASES as ADV_ALIASES
+        from atomics.eval.adversarial import select_fixtures as select_adversarial
+
+        valid = set(ADV_ALIASES) | {f.category for f in ADV_ALL}
+        return list(select_adversarial(parts)), valid
+    if suite == "toolcall":
+        from atomics.eval.toolcall.fixtures import (
+            ALL_FIXTURES as TC_ALL,
+        )
+        from atomics.eval.toolcall.fixtures import (
+            GROUP_ALIASES as TC_ALIASES,
+        )
+        from atomics.eval.toolcall.fixtures import (
+            fixtures_for_category,
+        )
+
+        valid = set(TC_ALIASES) | {f.category for f in TC_ALL}
+        return list(fixtures_for_category(parts)), valid
+    if suite == "redblue":
+        from atomics.eval.redblue.fixtures import ALL_FIXTURES as RB_ALL
+
+        valid = {"red", "blue", "all"} | {f.category for f in RB_ALL}
+        wanted = set(parts)
+        if "all" in wanted:
+            return list(RB_ALL), valid
+        return [f for f in RB_ALL if f.team in wanted or f.category in wanted], valid
+    return [], set()
+
+
+def _full_catalog_for_suite(suite: str) -> Sequence[CategoryFixture]:
+    if suite == "eval":
+        return EVAL_FIXTURES
+    if suite == "adversarial":
+        from atomics.eval.adversarial import ALL_FIXTURES as ADV_ALL
+
+        return ADV_ALL
+    if suite == "redblue":
+        from atomics.eval.redblue.fixtures import ALL_FIXTURES as RB_ALL
+
+        return RB_ALL
+    if suite == "refusal":
+        from atomics.eval.refusal.fixtures import REFUSAL_FIXTURES
+
+        return REFUSAL_FIXTURES
+    if suite == "toolcall":
+        from atomics.eval.toolcall.fixtures import ALL_FIXTURES as TC_ALL
+
+        return TC_ALL
+    if suite == "codereview":
+        from atomics.eval.codereview.fixtures import SECURE_CODE_FIXTURES
+
+        return SECURE_CODE_FIXTURES
+    raise ValueError(f"unknown suite: {suite}")
+
+
+def _subset_by_ids(catalog: Sequence[_F], fixture_ids: Sequence[str] | None) -> list[_F]:
+    if fixture_ids is None:
+        return list(catalog)
+    cleaned = [fid.strip() for fid in fixture_ids if fid.strip()]
+    if not cleaned:
+        raise ValueError("fixtures must not be empty")
+    by_id = {f.id: f for f in catalog}
+    matched = [by_id[fid] for fid in cleaned if fid in by_id]
+    if not matched:
+        raise ValueError(f"unknown fixture IDs: {', '.join(cleaned)}")
+    return matched
+
+
+def validate_sweep_subset(
+    suites: Sequence[str],
+    *,
+    category: str | None = None,
+    fixture_ids: Sequence[str] | None = None,
+) -> tuple[str | None, list[str] | None]:
+    """Validate and normalize sweep ``category`` and ``fixture_ids`` across ``suites``."""
+    parts: list[str] = []
+    category_norm: str | None = None
+    if category is not None:
+        for suite in suites:
+            if suite not in CATEGORY_SUITES:
+                raise ValueError(
+                    f"category is only valid for {sorted(CATEGORY_SUITES)}; "
+                    f"{suite} does not support category filtering"
+                )
+        parts = [part.strip() for part in category.split(",") if part.strip()]
+        if not parts:
+            raise ValueError("category must not be empty")
+        for suite in suites:
+            _, valid = category_catalog_for_suite(suite, parts)
+            unknown = [part for part in parts if part not in valid]
+            if unknown:
+                raise ValueError(
+                    f"unknown {suite} category: {', '.join(unknown)}. "
+                    f"Valid: {', '.join(sorted(valid))}"
+                )
+        category_norm = ",".join(parts)
+
+    cleaned_ids: list[str] | None = None
+    if fixture_ids is not None:
+        cleaned_ids = [fid.strip() for fid in fixture_ids if fid.strip()]
+        if not cleaned_ids:
+            raise ValueError("fixtures must not be empty")
+        by_suite: dict[str, set[str]] = {}
+        for suite in suites:
+            cat_rows = (
+                category_catalog_for_suite(suite, parts)[0]
+                if category_norm is not None
+                else _full_catalog_for_suite(suite)
+            )
+            by_suite[suite] = {f.id for f in cat_rows}
+        union_ids: set[str] = set().union(*by_suite.values())
+        outside = [fid for fid in cleaned_ids if fid not in union_ids]
+        if outside:
+            if category_norm is not None:
+                raise ValueError(
+                    f"fixture IDs outside category {category_norm!r}: {', '.join(outside)}"
+                )
+            raise ValueError(f"unknown fixture IDs: {', '.join(outside)}")
+        for suite in suites:
+            if not any(fid in by_suite[suite] for fid in cleaned_ids):
+                raise ValueError(f"no requested fixture IDs belong to suite {suite!r}")
+
+    return category_norm, cleaned_ids
+
 
 RunSuite = Callable[..., Awaitable["SuiteJobResult"]]
 Persist = Callable[[str, str, str, object], None]
@@ -80,14 +223,6 @@ def _representative_error(summary: EvalRunSummary) -> str | None:
     if not msgs:
         return None
     return Counter(msgs).most_common(1)[0][0][:200]
-
-
-def _filter_fixtures(fixture_ids: list[str] | None) -> list[EvalFixture]:
-    """Return fixtures matching the given IDs, or all if None."""
-    if fixture_ids is None:
-        return list(EVAL_FIXTURES)
-    id_set = set(fixture_ids)
-    return [f for f in EVAL_FIXTURES if f.id in id_set]
 
 
 class _RunScored(Protocol):
@@ -365,6 +500,7 @@ def make_suite_runner(
     thinking_budget: int | None,
     temperature: float | None = None,
     fixture_ids: list[str] | None = None,
+    category: str | None = None,
     effort: str | None = None,
     reasoning_mode: str | None = None,
     persist: Persist | None = None,
@@ -395,6 +531,7 @@ def make_suite_runner(
                 thinking_budget=thinking_budget,
                 temperature=temperature,
                 fixture_ids=fixture_ids,
+                category=category,
                 effort=effort,
                 reasoning_mode=reasoning_mode,
                 skip_incapable=skip_incapable,
@@ -476,11 +613,17 @@ async def _dispatch_suite(
     thinking_budget: int | None,
     fixture_ids: list[str] | None,
     skip_incapable: bool,
+    category: str | None = None,
     temperature: float | None = None,
     effort: str | None = None,
     reasoning_mode: str | None = None,
     on_fixture_done: Callable[..., object] | None = None,
 ) -> tuple[SuiteJobResult, object | None]:
+    cat_parts = (
+        [part.strip() for part in category.split(",") if part.strip()]
+        if category is not None
+        else []
+    )
     if suite == "eval":
         from atomics.eval.runner import run_eval
 
@@ -494,7 +637,7 @@ async def _dispatch_suite(
             temperature=temperature,
             effort=effort,
             reasoning_mode=reasoning_mode,
-            fixtures=_filter_fixtures(fixture_ids),
+            fixtures=_subset_by_ids(EVAL_FIXTURES, fixture_ids),
             on_fixture_done=on_fixture_done,
         )
         return SuiteJobResult(
@@ -510,10 +653,14 @@ async def _dispatch_suite(
             fixture_scores=_fixture_scores(eval_summary),
         ), eval_summary
     if suite == "adversarial":
+        from atomics.eval.adversarial import ALL_FIXTURES as ADV_ALL
         from atomics.eval.adversarial import select_fixtures as select_adversarial
         from atomics.eval.adversarial.runner import run_adversarial
 
-        adv_fixtures = select_adversarial(ids=fixture_ids) if fixture_ids else None
+        adv_fixtures = None
+        if cat_parts or fixture_ids is not None:
+            adv_base = select_adversarial(cat_parts) if cat_parts else ADV_ALL
+            adv_fixtures = _subset_by_ids(adv_base, fixture_ids)
         adv_summary = await run_adversarial(
             provider,
             judge_provider=judge_provider,
@@ -535,13 +682,30 @@ async def _dispatch_suite(
             stdev=adv_summary.overall_resilience_stdev,
         ), adv_summary
     if suite == "redblue":
-        from atomics.eval.redblue.fixtures import select_fixtures as select_redblue
+        from atomics.eval.redblue.fixtures import ALL_FIXTURES as RB_ALL
         from atomics.eval.redblue.runner import run_redblue
 
-        rb_fixtures = select_redblue(ids=fixture_ids) if fixture_ids else None
+        rb_mode = (
+            cat_parts[0]
+            if len(cat_parts) == 1 and cat_parts[0] in {"red", "blue", "all"}
+            else "all"
+        )
+        rb_fixtures = None
+        if cat_parts or fixture_ids is not None:
+            if cat_parts:
+                wanted = set(cat_parts)
+                rb_base = (
+                    list(RB_ALL)
+                    if "all" in wanted
+                    else [f for f in RB_ALL if f.team in wanted or f.category in wanted]
+                )
+            else:
+                rb_base = list(RB_ALL)
+            rb_fixtures = _subset_by_ids(rb_base, fixture_ids)
         redblue_summary = await run_redblue(
             provider,
             judge_provider=judge_provider,
+            mode=rb_mode,
             model=model,
             judge_model=judge_model,
             fixtures=rb_fixtures,
@@ -561,9 +725,11 @@ async def _dispatch_suite(
         ), redblue_summary
     if suite == "refusal":
         from atomics.eval.refusal import run_refusal
-        from atomics.eval.refusal.fixtures import select_fixtures as select_refusal
+        from atomics.eval.refusal.fixtures import REFUSAL_FIXTURES
 
-        ref_fixtures = select_refusal(ids=fixture_ids) if fixture_ids else None
+        ref_fixtures = (
+            _subset_by_ids(REFUSAL_FIXTURES, fixture_ids) if fixture_ids is not None else None
+        )
         refusal_summary = await run_refusal(
             provider,
             judge_provider=judge_provider,
@@ -585,11 +751,14 @@ async def _dispatch_suite(
             stdev=run_mean_stdev(refusal_summary),
         ), refusal_summary
     if suite == "toolcall":
-        from atomics.eval.toolcall.fixtures import ALL_FIXTURES
-        from atomics.eval.toolcall.fixtures import select_fixtures as select_toolcall
+        from atomics.eval.toolcall.fixtures import ALL_FIXTURES as TC_ALL
+        from atomics.eval.toolcall.fixtures import fixtures_for_category
         from atomics.eval.toolcall.runner import run_toolcall_suite
 
-        tc_fixtures = select_toolcall(ids=fixture_ids) if fixture_ids else ALL_FIXTURES
+        tc_base = fixtures_for_category(cat_parts) if cat_parts else TC_ALL
+        tc_fixtures = (
+            tuple(_subset_by_ids(tc_base, fixture_ids)) if fixture_ids is not None else tc_base
+        )
         toolcall_summary = await run_toolcall_suite(
             provider=provider,
             model=model,
@@ -652,9 +821,11 @@ async def _dispatch_suite(
         ), toolcall_summary
     if suite == "codereview":
         from atomics.eval.codereview import run_codereview
-        from atomics.eval.codereview.fixtures import select_fixtures as select_codereview
+        from atomics.eval.codereview.fixtures import SECURE_CODE_FIXTURES
 
-        cr_fixtures = select_codereview(ids=fixture_ids) if fixture_ids else None
+        cr_fixtures = (
+            _subset_by_ids(SECURE_CODE_FIXTURES, fixture_ids) if fixture_ids is not None else None
+        )
         review_summary = await run_codereview(
             provider,
             judge_provider=judge_provider,

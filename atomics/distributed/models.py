@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from atomics.validation import validate_endpoint_url
 
@@ -15,12 +15,26 @@ MAX_DISTRIBUTED_ITERATIONS = 1000
 MAX_DISTRIBUTED_INTERVAL_SECONDS = 3600
 MAX_DISTRIBUTED_TIMEOUT_SECONDS = 86_400
 MAX_DISTRIBUTED_RETRIES = 10
+MAX_DISTRIBUTED_BUDGET_USD = 1000.0
+MAX_DISTRIBUTED_THINKING_BUDGET = 131_072
 MAX_WORKER_LABELS = 32
 MAX_WORKER_LABEL_LEN = 128
 MAX_WORKER_CAPABILITIES = 32
 MAX_WORKER_CAPABILITY_LEN = 64
 MAX_RESULT_JSON_CHARS = 2_000_000
 MAX_WORKER_ERROR_CHARS = 4_096
+
+
+def _validate_label_map(value: dict[str, str], *, field_name: str) -> dict[str, str]:
+    if len(value) > MAX_WORKER_LABELS:
+        raise ValueError(f"{field_name} cannot exceed {MAX_WORKER_LABELS} entries")
+    for key, val in value.items():
+        if not key or len(key) > MAX_WORKER_LABEL_LEN or len(val) > MAX_WORKER_LABEL_LEN:
+            raise ValueError(
+                f"{field_name} keys must be 1..{MAX_WORKER_LABEL_LEN} chars and values "
+                f"<= {MAX_WORKER_LABEL_LEN} chars"
+            )
+    return value
 
 
 class WorkerStatus(StrEnum):
@@ -61,6 +75,8 @@ class Worker(BaseModel):
 
 
 class WorkerRegisterRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     labels: dict[str, str] = Field(default_factory=dict)
     capabilities: list[str] = Field(default_factory=list)
     endpoint: str | None = None
@@ -68,15 +84,7 @@ class WorkerRegisterRequest(BaseModel):
     @field_validator("labels")
     @classmethod
     def _bounded_labels(cls, value: dict[str, str]) -> dict[str, str]:
-        if len(value) > MAX_WORKER_LABELS:
-            raise ValueError(f"labels cannot exceed {MAX_WORKER_LABELS} entries")
-        for key, val in value.items():
-            if not key or len(key) > MAX_WORKER_LABEL_LEN or len(val) > MAX_WORKER_LABEL_LEN:
-                raise ValueError(
-                    f"label keys must be 1..{MAX_WORKER_LABEL_LEN} chars and values "
-                    f"<= {MAX_WORKER_LABEL_LEN} chars"
-                )
-        return value
+        return _validate_label_map(value, field_name="labels")
 
     @field_validator("capabilities")
     @classmethod
@@ -101,6 +109,8 @@ class WorkerRegisterResponse(BaseModel):
 
 
 class DistributedRunRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     mode: JobMode = JobMode.SPLIT
     run_request: dict[str, Any] | None = None
     eval_request: dict[str, Any] | None = None
@@ -110,13 +120,26 @@ class DistributedRunRequest(BaseModel):
     timeout_seconds: int = Field(default=600, ge=1, le=MAX_DISTRIBUTED_TIMEOUT_SECONDS)
     max_retries: int = Field(default=2, ge=0, le=MAX_DISTRIBUTED_RETRIES)
 
+    @field_validator("worker_selector")
+    @classmethod
+    def _bounded_selector(cls, value: dict[str, str] | None) -> dict[str, str] | None:
+        if value is None:
+            return None
+        return _validate_label_map(value, field_name="worker_selector")
+
     @field_validator("run_request")
     @classmethod
     def _bounded_run_request(cls, value: dict[str, Any] | None) -> dict[str, Any] | None:
         if value is None:
             return None
-        if "iterations" in value and value["iterations"] is not None:
-            it = value["iterations"]
+        out = dict(value)
+        if "provider" in out and out["provider"] is not None:
+            raw_prov = out["provider"]
+            if not isinstance(raw_prov, str) or not raw_prov.strip():
+                raise ValueError("run_request.provider must be a non-empty string")
+            out["provider"] = raw_prov.strip().lower()
+        if "iterations" in out and out["iterations"] is not None:
+            it = out["iterations"]
             if (
                 isinstance(it, bool)
                 or not isinstance(it, int)
@@ -125,8 +148,8 @@ class DistributedRunRequest(BaseModel):
                 raise ValueError(
                     f"run_request.iterations must be an integer in 1..{MAX_DISTRIBUTED_ITERATIONS}"
                 )
-        if "interval" in value and value["interval"] is not None:
-            iv = value["interval"]
+        if "interval" in out and out["interval"] is not None:
+            iv = out["interval"]
             if (
                 isinstance(iv, bool)
                 or not isinstance(iv, int)
@@ -136,7 +159,44 @@ class DistributedRunRequest(BaseModel):
                     "run_request.interval must be an integer in "
                     f"0..{MAX_DISTRIBUTED_INTERVAL_SECONDS}"
                 )
-        return value
+        if "budget" in out and out["budget"] is not None:
+            b = out["budget"]
+            if (
+                isinstance(b, bool)
+                or not isinstance(b, int | float)
+                or not (0 < float(b) <= MAX_DISTRIBUTED_BUDGET_USD)
+            ):
+                raise ValueError(
+                    f"run_request.budget must be a number in (0, {MAX_DISTRIBUTED_BUDGET_USD}]"
+                )
+        if "thinking_budget" in out and out["thinking_budget"] is not None:
+            tb = out["thinking_budget"]
+            if (
+                isinstance(tb, bool)
+                or not isinstance(tb, int)
+                or not (1 <= tb <= MAX_DISTRIBUTED_THINKING_BUDGET)
+            ):
+                raise ValueError(
+                    "run_request.thinking_budget must be an integer in "
+                    f"1..{MAX_DISTRIBUTED_THINKING_BUDGET}"
+                )
+        from atomics.providers.effort import EffortError, normalize_effort, normalize_reasoning_mode
+
+        if "effort" in out and out["effort"] is not None:
+            if not isinstance(out["effort"], str):
+                raise ValueError("run_request.effort must be a string")
+            try:
+                out["effort"] = normalize_effort(out["effort"])
+            except EffortError as exc:
+                raise ValueError(str(exc)) from exc
+        if "reasoning_mode" in out and out["reasoning_mode"] is not None:
+            if not isinstance(out["reasoning_mode"], str):
+                raise ValueError("run_request.reasoning_mode must be a string")
+            try:
+                out["reasoning_mode"] = normalize_reasoning_mode(out["reasoning_mode"])
+            except EffortError as exc:
+                raise ValueError(str(exc)) from exc
+        return out
 
 
 class DistributedJob(BaseModel):
@@ -168,6 +228,8 @@ class TaskAssignment(BaseModel):
 
 
 class TaskResultSubmission(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     status: AssignmentStatus
     result_json: str | None = Field(default=None, max_length=MAX_RESULT_JSON_CHARS)
     error: str | None = Field(default=None, max_length=MAX_WORKER_ERROR_CHARS)

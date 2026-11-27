@@ -3,9 +3,22 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from atomics.eval.gauntlet import (
+    CATEGORY_SUITES as EVAL_CATEGORY_SUITES,
+)
+from atomics.eval.gauntlet import (
+    CategoryFixture as CategoryFixture,
+)
+from atomics.eval.gauntlet import (
+    category_catalog_for_suite as category_catalog_for_suite,
+)
+from atomics.eval.gauntlet import (
+    validate_sweep_subset,
+)
 
 # Upper bounds exist so one authenticated request cannot pin the server or run
 # up an unbounded provider bill. They are deliberately generous: the CLI is the
@@ -33,8 +46,6 @@ EVAL_RUNS_SUITES = frozenset({"adversarial", "redblue", "refusal", "codereview",
 EVAL_TEMPERATURE_SUITES = frozenset(
     {"accuracy", "adversarial", "redblue", "refusal", "codereview", "toolcall"}
 )
-# Suites with CLI --category / --mode subsetting.
-EVAL_CATEGORY_SUITES = frozenset({"adversarial", "toolcall", "redblue"})
 EVAL_CHANNELS = frozenset({"both", "tools", "prose"})
 
 # Load tests. The CLI can soak for hours at c=8; a remote caller cannot.
@@ -43,6 +54,13 @@ MAX_STRESS_PHASE_SECONDS = 15.0
 MAX_SOAK_DURATION_SECONDS = 300
 MAX_SOAK_CONCURRENCY = 4
 MAX_LOAD_PREDICT = 256
+
+
+def _normalize_provider_field(value: str) -> str:
+    cleaned = value.strip().lower()
+    if not cleaned:
+        raise ValueError("provider must not be empty")
+    return cleaned
 
 
 def _normalize_effort_field(value: str | None) -> str | None:
@@ -66,6 +84,8 @@ def _normalize_reasoning_mode_field(value: str | None) -> str | None:
 class RunRequest(BaseModel):
     """Request body to start a benchmark run."""
 
+    model_config = ConfigDict(extra="forbid")
+
     provider: str
     model: str | None = None
     tier: str = "ez"
@@ -78,6 +98,11 @@ class RunRequest(BaseModel):
     reasoning_mode: str | None = None
     host: str | None = None
 
+    @field_validator("provider")
+    @classmethod
+    def _normalize_provider(cls, value: str) -> str:
+        return _normalize_provider_field(value)
+
     @field_validator("effort")
     @classmethod
     def _known_effort(cls, value: str | None) -> str | None:
@@ -87,48 +112,6 @@ class RunRequest(BaseModel):
     @classmethod
     def _known_reasoning_mode(cls, value: str | None) -> str | None:
         return _normalize_reasoning_mode_field(value)
-
-
-class CategoryFixture(Protocol):
-    """Fixture row exposing an ``id`` string for category subsetting."""
-
-    @property
-    def id(self) -> str: ...
-
-
-def category_catalog_for_suite(
-    suite: str, parts: list[str]
-) -> tuple[list[CategoryFixture], set[str]]:
-    """Return ``(matching_fixtures, valid_category_tokens)`` for a suite."""
-    if suite == "adversarial":
-        from atomics.eval.adversarial import ALL_FIXTURES as ADV_ALL
-        from atomics.eval.adversarial import GROUP_ALIASES as ADV_ALIASES
-        from atomics.eval.adversarial import select_fixtures as select_adversarial
-
-        valid = set(ADV_ALIASES) | {f.category for f in ADV_ALL}
-        return list(select_adversarial(parts)), valid
-    if suite == "toolcall":
-        from atomics.eval.toolcall.fixtures import (
-            ALL_FIXTURES as TC_ALL,
-        )
-        from atomics.eval.toolcall.fixtures import (
-            GROUP_ALIASES as TC_ALIASES,
-        )
-        from atomics.eval.toolcall.fixtures import (
-            fixtures_for_category,
-        )
-
-        valid = set(TC_ALIASES) | {f.category for f in TC_ALL}
-        return list(fixtures_for_category(parts)), valid
-    if suite == "redblue":
-        from atomics.eval.redblue.fixtures import ALL_FIXTURES as RB_ALL
-
-        valid = {"red", "blue", "all"} | {f.category for f in RB_ALL}
-        wanted = set(parts)
-        if "all" in wanted:
-            return list(RB_ALL), valid
-        return [f for f in RB_ALL if f.team in wanted or f.category in wanted], valid
-    return [], set()
 
 
 class EvalRequest(BaseModel):
@@ -154,6 +137,11 @@ class EvalRequest(BaseModel):
     channel: str | None = None
     temperature: float | None = Field(default=None, ge=0.0, le=2.0)
     profile: str | None = None
+
+    @field_validator("provider")
+    @classmethod
+    def _normalize_provider(cls, value: str) -> str:
+        return _normalize_provider_field(value)
 
     @field_validator("suite")
     @classmethod
@@ -255,6 +243,8 @@ class SweepRequest(BaseModel):
     provider: str
     models: list[str] = Field(min_length=1, max_length=MAX_SWEEP_MODELS)
     suites: list[str] = Field(min_length=1)
+    fixtures: list[str] | None = Field(default=None, max_length=MAX_FIXTURES)
+    category: str | None = Field(default=None, max_length=MAX_CATEGORY_LENGTH)
     judge_model: str | None = None
     runs: int = Field(default=1, ge=1, le=MAX_SWEEP_RUNS)
     thinking: bool | None = None
@@ -264,6 +254,11 @@ class SweepRequest(BaseModel):
     host: str | None = None
     judge_host: str | None = None
     temperature: float | None = Field(default=None, ge=0.0, le=2.0)
+
+    @field_validator("provider")
+    @classmethod
+    def _normalize_provider(cls, value: str) -> str:
+        return _normalize_provider_field(value)
 
     @field_validator("effort")
     @classmethod
@@ -289,6 +284,13 @@ class SweepRequest(BaseModel):
         from atomics.eval.gauntlet import parse_suites
 
         return parse_suites(",".join(value))
+
+    @model_validator(mode="after")
+    def _validate_subset(self) -> SweepRequest:
+        self.category, self.fixtures = validate_sweep_subset(
+            self.suites, category=self.category, fixture_ids=self.fixtures
+        )
+        return self
 
 
 class BatteryRequest(BaseModel):
@@ -342,16 +344,22 @@ class BatteryRequest(BaseModel):
     def _known_reasoning_mode(cls, value: str | None) -> str | None:
         return _normalize_reasoning_mode_field(value)
 
+    @field_validator("provider")
+    @classmethod
+    def _normalize_provider(cls, value: str) -> str:
+        return _normalize_provider_field(value)
+
     @field_validator("name")
     @classmethod
     def _known_battery(cls, value: str) -> str:
         from atomics.eval.batteries import get_battery
 
+        cleaned = value.strip().lower()
         try:
-            get_battery(value)
+            get_battery(cleaned)
         except KeyError as exc:
             raise ValueError(str(exc)) from exc
-        return value
+        return cleaned
 
 
 class StressRequest(BaseModel):
@@ -365,6 +373,11 @@ class StressRequest(BaseModel):
     max_concurrency: int = Field(default=4, ge=1, le=MAX_STRESS_CONCURRENCY)
     phase_seconds: float = Field(default=10.0, gt=0, le=MAX_STRESS_PHASE_SECONDS)
     host: str | None = None
+
+    @field_validator("provider")
+    @classmethod
+    def _normalize_provider(cls, value: str) -> str:
+        return _normalize_provider_field(value)
 
     @field_validator("model")
     @classmethod
@@ -387,6 +400,11 @@ class SoakRequest(BaseModel):
     concurrency: int = Field(default=2, ge=1, le=MAX_SOAK_CONCURRENCY)
     sample_interval: int = Field(default=15, ge=10, le=60)
     host: str | None = None
+
+    @field_validator("provider")
+    @classmethod
+    def _normalize_provider(cls, value: str) -> str:
+        return _normalize_provider_field(value)
 
     @field_validator("model")
     @classmethod
@@ -499,6 +517,11 @@ class ProviderTestRequest(BaseModel):
     thinking: bool | None = None
     effort: str | None = None
     reasoning_mode: str | None = None
+
+    @field_validator("provider")
+    @classmethod
+    def _normalize_provider(cls, value: str) -> str:
+        return _normalize_provider_field(value)
 
     @field_validator("effort")
     @classmethod

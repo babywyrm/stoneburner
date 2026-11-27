@@ -180,6 +180,16 @@ async def execute_assignment(
         assignment.job_id,
         task.name,
     )
+    raw_thinking = assignment.task_spec.get("thinking")
+    thinking = raw_thinking if isinstance(raw_thinking, bool) else None
+    raw_tb = assignment.task_spec.get("thinking_budget")
+    thinking_budget = raw_tb if isinstance(raw_tb, int) and not isinstance(raw_tb, bool) else None
+    from atomics.providers.effort import normalize_effort, normalize_reasoning_mode
+
+    raw_effort = assignment.task_spec.get("effort")
+    effort = normalize_effort(raw_effort) if isinstance(raw_effort, str) else None
+    raw_mode = assignment.task_spec.get("reasoning_mode")
+    reasoning_mode = normalize_reasoning_mode(raw_mode) if isinstance(raw_mode, str) else None
     try:
         result = await execute_task(
             task,
@@ -187,6 +197,10 @@ async def execute_assignment(
             provider=provider,
             run_id=assignment.job_id,
             model=model,
+            thinking=thinking,
+            thinking_budget=thinking_budget,
+            effort=effort,
+            reasoning_mode=reasoning_mode,
         )
     finally:
         await aclose_providers(provider)
@@ -258,15 +272,22 @@ async def execute_full_run(
             _check_worker_outbound(prof_url, label="profile", compiled_allowed=compiled_allowed)
         if compiled_allowed is not None:
             app_settings = settings or load_settings()
-            eff_eval_host = resolve_provider_endpoint(
-                eval_req.provider, eval_req.host, app_settings, host_label="host"
-            )
-            _check_worker_outbound(eff_eval_host, label="host", compiled_allowed=compiled_allowed)
+            if eval_req.profile is None:
+                eff_eval_host = resolve_provider_endpoint(
+                    eval_req.provider, eval_req.host, app_settings, host_label="host"
+                )
+                _check_worker_outbound(
+                    eff_eval_host, label="host", compiled_allowed=compiled_allowed
+                )
             if eval_req.suite != "codegen":
                 eff_judge_in = (
                     eval_req.judge_host
                     if eval_req.judge_host is not None
-                    else (eval_req.host if eval_req.provider == "ollama" else None)
+                    else (
+                        eval_req.host
+                        if eval_req.profile is None and eval_req.provider == "ollama"
+                        else None
+                    )
                 )
                 eff_judge = resolve_provider_endpoint(
                     "ollama", eff_judge_in, app_settings, host_label="judge_host"
@@ -316,6 +337,12 @@ async def execute_full_run(
     interval = run_request.get("interval")
     thinking = run_request.get("thinking")
     thinking_budget = run_request.get("thinking_budget")
+    from atomics.providers.effort import normalize_effort, normalize_reasoning_mode
+
+    raw_effort = run_request.get("effort")
+    effort = normalize_effort(raw_effort) if isinstance(raw_effort, str) else None
+    raw_mode = run_request.get("reasoning_mode")
+    reasoning_mode = normalize_reasoning_mode(raw_mode) if isinstance(raw_mode, str) else None
 
     with tempfile.TemporaryDirectory(prefix="atomics-full-") as scratch:
         db_path = Path(scratch) / "run.db"
@@ -331,7 +358,13 @@ async def execute_full_run(
                 model_override=effective_model,
                 trigger="distributed",
                 thinking=thinking if isinstance(thinking, bool) else None,
-                thinking_budget=thinking_budget if isinstance(thinking_budget, int) else None,
+                thinking_budget=(
+                    thinking_budget
+                    if isinstance(thinking_budget, int) and not isinstance(thinking_budget, bool)
+                    else None
+                ),
+                effort=effort,
+                reasoning_mode=reasoning_mode,
             )
             summary = await engine.run(max_iterations=iterations)
             if summary is None:

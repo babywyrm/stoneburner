@@ -10,7 +10,7 @@ from rich.console import Console
 from rich.markup import escape
 from rich.table import Table
 
-from atomics.commands.common import PROVIDER_CHOICES
+from atomics.commands.common import PROVIDER_CHOICES, effort_options, temperature_option
 from atomics.mcp.client import AtomicsApiClient, AtomicsApiError
 from atomics.validation import validate_endpoint_url
 
@@ -98,12 +98,31 @@ def distributed() -> None:
     help="Comma-separated fixture IDs for --suite.",
 )
 @click.option(
+    "--category",
+    type=str,
+    default=None,
+    help="Comma-separated category or group alias filter for --suite.",
+)
+@click.option(
+    "--profile",
+    type=str,
+    default=None,
+    help="Relative profiles/... YAML path for --suite (adversarial, refusal, redblue).",
+)
+@click.option(
     "--channel",
     type=click.Choice(["both", "tools", "prose"], case_sensitive=False),
     default=None,
     help="Channel for --suite toolcall.",
 )
-@click.option("--temperature", type=float, default=None, help="Sampling temperature for --suite.")
+@click.option(
+    "--thinking/--no-thinking",
+    "thinking_flag",
+    default=None,
+    help="Enable or disable thinking/reasoning mode.",
+)
+@temperature_option
+@effort_options
 def run(
     coordinator: str,
     api_key: str,
@@ -121,8 +140,13 @@ def run(
     runs: int | None,
     budget_usd: float | None,
     fixtures_filter: str | None,
+    category: str | None,
+    profile: str | None,
     channel: str | None,
+    thinking_flag: bool | None,
     temperature: float | None,
+    effort: str | None,
+    reasoning_mode: str | None,
 ) -> None:
     """Submit a distributed run to the coordinator."""
     if not api_key:
@@ -131,6 +155,23 @@ def run(
         coordinator = validate_endpoint_url(coordinator, label="--coordinator")
     except ValueError as exc:
         raise click.BadParameter(str(exc), param_hint="--coordinator") from exc
+    if suite is None:
+        suite_only = [
+            flag
+            for flag, val in (
+                ("--category", category),
+                ("--profile", profile),
+                ("--judge-model", judge_model),
+                ("--judge-host", judge_host),
+                ("--runs", runs),
+                ("--fixtures", fixtures_filter),
+                ("--channel", channel),
+                ("--temperature", temperature),
+            )
+            if val is not None
+        ]
+        if suite_only:
+            raise click.UsageError(f"{', '.join(suite_only)} requires --suite")
     if suite is not None and mode not in ("fleet", "full"):
         raise click.UsageError(
             "--suite requires --mode full or --mode fleet; split mode only dispatches "
@@ -171,16 +212,36 @@ def run(
             if not parsed_ids:
                 raise click.BadParameter("no fixture IDs", param_hint="--fixtures")
             eval_request["fixtures"] = parsed_ids
+        if category is not None:
+            eval_request["category"] = category
+        if profile is not None:
+            eval_request["profile"] = profile
         if channel is not None:
             eval_request["channel"] = channel.lower()
+        if thinking_flag is not None:
+            eval_request["thinking"] = thinking_flag
         if temperature is not None:
             eval_request["temperature"] = temperature
+        if effort is not None:
+            eval_request["effort"] = effort
+        if reasoning_mode is not None:
+            eval_request["reasoning_mode"] = reasoning_mode
     else:
         run_request = {"tier": tier, "iterations": iterations, "runtime": runtime}
         if provider:
             run_request["provider"] = provider
         if model:
             run_request["model"] = model
+        if host:
+            run_request["host"] = host
+        if budget_usd is not None:
+            run_request["budget"] = budget_usd
+        if thinking_flag is not None:
+            run_request["thinking"] = thinking_flag
+        if effort is not None:
+            run_request["effort"] = effort
+        if reasoning_mode is not None:
+            run_request["reasoning_mode"] = reasoning_mode
     try:
         with AtomicsApiClient(coordinator, api_key) as client:
             data = client.submit_distributed_run(

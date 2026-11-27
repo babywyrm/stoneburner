@@ -230,6 +230,8 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
         models: list[str],
         suites: list[str],
         budget_usd: float,
+        fixtures: list[str] | None = None,
+        category: str | None = None,
         judge_model: str | None = None,
         runs: int = 1,
         thinking: bool | None = None,
@@ -243,7 +245,10 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
 
         Spends tokens. `budget_usd` is required. Name the models — there is no
         discover-everything flag; call `list_models` first. `suites` is a list
-        from `eval`, `adversarial`, `redblue`, `refusal`, `toolcall`, `codereview`. `runs` is
+        from `eval`, `adversarial`, `redblue`, `refusal`, `toolcall`, `codereview`.
+        Optional `category` filters `adversarial`, `toolcall`, or `redblue` by
+        comma-separated category or group alias; optional `fixtures` subsets
+        fixture IDs across the requested suites. `runs` is
         1–3. `host` is the inference endpoint (same meaning as `submit_eval`).
         `judge_host` is the judge endpoint when it differs from `host`.
         `temperature` (0–2) pins every model under test; judges stay at 0.
@@ -254,6 +259,8 @@ def build_server(client: AtomicsApiClient | None = None) -> MCPServer:
             models=models,
             suites=suites,
             budget_usd=budget_usd,
+            fixtures=fixtures,
+            category=category,
             judge_model=judge_model,
             runs=runs,
             thinking=thinking,

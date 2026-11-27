@@ -56,6 +56,17 @@ def _build_task_specs(run_request: dict[str, Any]) -> list[dict[str, Any]]:
     iterations = int(run_request.get("iterations", 1))
     pinned = _pinned_execution(run_request)
     runtime = str(run_request.get("runtime", "python"))
+    extras: dict[str, Any] = {}
+    if isinstance(run_request.get("thinking"), bool):
+        extras["thinking"] = run_request["thinking"]
+    if isinstance(run_request.get("thinking_budget"), int) and not isinstance(
+        run_request.get("thinking_budget"), bool
+    ):
+        extras["thinking_budget"] = run_request["thinking_budget"]
+    for str_key in ("effort", "reasoning_mode", "host"):
+        val = run_request.get(str_key)
+        if isinstance(val, str) and val:
+            extras[str_key] = val
     specs: list[dict[str, Any]] = []
     for _ in range(max(iterations, 0)):
         task, prompt = get_weighted_task(tier)
@@ -68,6 +79,7 @@ def _build_task_specs(run_request: dict[str, Any]) -> list[dict[str, Any]]:
                 "max_output_tokens": task.max_output_tokens,
                 "runtime": runtime,
                 **pinned,
+                **extras,
             }
         )
     return specs
@@ -149,7 +161,7 @@ def _check_distributed_hosts(request: Request, payload: DistributedRunRequest) -
         ("eval_request", payload.eval_request, ("host", "judge_host")),
     )
     for prefix, mapping, keys in sections:
-        if not mapping:
+        if mapping is None:
             continue
         for key in keys:
             value = mapping.get(key)
@@ -170,7 +182,8 @@ def _check_distributed_hosts(request: Request, payload: DistributedRunRequest) -
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
                 ) from exc
-        if prefix == "eval_request" and mapping.get("profile") is not None:
+        has_profile = prefix == "eval_request" and mapping.get("profile") is not None
+        if has_profile:
             from atomics.load.profiles import load_confined_profile
 
             raw_prof = mapping.get("profile")
@@ -189,36 +202,38 @@ def _check_distributed_hosts(request: Request, payload: DistributedRunRequest) -
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
                 ) from exc
-        if settings.allowed_hosts is not None:
-            provider = mapping.get("provider")
-            if isinstance(provider, str) and provider:
-                from atomics.config import load_settings
-                from atomics.providers.factory import ProviderConfigError, resolve_provider_endpoint
+        if settings.allowed_hosts is not None and not has_profile:
+            raw_provider = mapping.get("provider")
+            eff_provider = (
+                raw_provider.strip().lower()
+                if isinstance(raw_provider, str) and raw_provider.strip()
+                else "ollama"
+            )
+            from atomics.config import load_settings
+            from atomics.providers.factory import ProviderConfigError, resolve_provider_endpoint
 
-                explicit = next(
-                    (
-                        mapping[k]
-                        for k in keys
-                        if k != "judge_host" and isinstance(mapping.get(k), str) and mapping[k]
-                    ),
-                    None,
+            explicit = next(
+                (
+                    mapping[k]
+                    for k in keys
+                    if k != "judge_host" and isinstance(mapping.get(k), str) and mapping[k]
+                ),
+                None,
+            )
+            try:
+                eff = resolve_provider_endpoint(
+                    eff_provider,
+                    explicit,
+                    load_settings(),
+                    host_label=f"{prefix}.host",
                 )
-                try:
-                    eff = resolve_provider_endpoint(
-                        provider,
-                        explicit,
-                        load_settings(),
-                        host_label=f"{prefix}.host",
-                    )
-                    settings.check_outbound_host(eff, label=f"{prefix}.host")
-                except DisallowedHostError as exc:
-                    raise HTTPException(
-                        status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)
-                    ) from exc
-                except (ProviderConfigError, ValueError) as exc:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
-                    ) from exc
+                settings.check_outbound_host(eff, label=f"{prefix}.host")
+            except DisallowedHostError as exc:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+            except (ProviderConfigError, ValueError) as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+                ) from exc
 
 
 def _validate_distributed_eval_request(
@@ -232,8 +247,11 @@ def _validate_distributed_eval_request(
     from atomics.config import load_settings
     from atomics.providers.factory import ProviderConfigError, resolve_provider_endpoint
 
+    had_provider = bool(
+        isinstance(eval_request.get("provider"), str) and eval_request["provider"].strip()
+    )
     candidate = dict(eval_request)
-    if not candidate.get("provider"):
+    if not had_provider:
         candidate["provider"] = "ollama"
     try:
         parsed = EvalRequest(**candidate)
@@ -258,8 +276,12 @@ def _validate_distributed_eval_request(
         )
 
     settings = request.app.state.settings
-    if settings.allowed_hosts is not None and not eval_request.get("judge_host"):
-        fallback_judge_host = parsed.host if parsed.provider == "ollama" and parsed.host else None
+    if suite != "codegen" and settings.allowed_hosts is not None and not parsed.judge_host:
+        fallback_judge_host = (
+            parsed.host
+            if parsed.provider == "ollama" and parsed.profile is None and parsed.host
+            else None
+        )
         try:
             judge_eff = resolve_provider_endpoint(
                 "ollama",
@@ -272,7 +294,18 @@ def _validate_distributed_eval_request(
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
         except (ProviderConfigError, ValueError) as exc:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-    return dict(eval_request)
+
+    normalized = dict(eval_request)
+    normalized["suite"] = parsed.suite
+    if had_provider:
+        normalized["provider"] = parsed.provider
+    else:
+        normalized.pop("provider", None)
+    for key in ("category", "channel", "effort", "reasoning_mode", "fixtures"):
+        val = getattr(parsed, key)
+        if val is not None:
+            normalized[key] = val
+    return normalized
 
 
 @router.post(
@@ -286,6 +319,16 @@ async def start_distributed_run(
     coordinator: Coordinator = Depends(get_coordinator),
     caller: str = Depends(require_auth),
 ) -> DistributedJob:
+    if payload.run_request is not None and payload.eval_request is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Pass either run_request or eval_request, not both",
+        )
+    if payload.run_request is None and payload.eval_request is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="run_request or eval_request is required",
+        )
     _check_distributed_hosts(request, payload)
     if payload.mode not in (JobMode.SPLIT, JobMode.FLEET, JobMode.FULL):
         raise HTTPException(
@@ -304,16 +347,6 @@ async def start_distributed_run(
                 "the next available worker. Drop the selector, or use fleet/full mode "
                 "to target workers by label."
             ),
-        )
-    if payload.run_request and payload.eval_request:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Pass either run_request or eval_request, not both",
-        )
-    if not payload.run_request and not payload.eval_request:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="run_request or eval_request is required",
         )
     job_manager = getattr(request.app.state, "job_manager", None)
     settings = request.app.state.settings
@@ -351,6 +384,7 @@ async def start_distributed_run(
                 detail="eval_request requires 'full' or 'fleet' mode",
             )
         validated_eval = _validate_distributed_eval_request(request, payload.eval_request)
+        payload = payload.model_copy(update={"eval_request": validated_eval})
         eval_spec: dict[str, Any] = {
             "mode": "full",
             "eval_request": validated_eval,

@@ -928,3 +928,169 @@ async def test_codereview_single_side_subset_complete_integrity_is_ok(monkeypatc
     assert job.headline is None
     assert job.error is None
     assert job.exit_code == 0
+
+
+@pytest.mark.asyncio
+async def test_gauntlet_category_and_multisuite_fixture_ids_subset_per_suite(monkeypatch) -> None:
+    from types import SimpleNamespace
+
+    from atomics.eval.outcomes import RunIntegrity, RunStatus
+
+    ok_integrity = RunIntegrity(
+        status=RunStatus.COMPLETE,
+        fixtures_total=1,
+        fixtures_scored=1,
+        attempts_total=1,
+        attempts_scorable=1,
+        attempts_scored=1,
+        generation_failures=0,
+        infrastructure_failures=0,
+        judge_failures=0,
+    )
+    seen: dict[str, object] = {}
+
+    async def fake_adv(*_args, **kwargs):
+        seen["adv_ids"] = [f.id for f in (kwargs.get("fixtures") or [])]
+        return SimpleNamespace(
+            overall_resilience=1.0,
+            overall_resilience_stdev=None,
+            fixture_scores={"mt-esc-04": 1.0},
+            integrity=ok_integrity,
+        )
+
+    async def fake_tc(**kwargs):
+        seen["tc_ids"] = [f.id for f in (kwargs.get("fixtures") or [])]
+        return SimpleNamespace(
+            tool_capable=True,
+            probe_error=None,
+            runs=1,
+            dangerous_call_rate=0.0,
+            dangerous_any_run_rate=0.0,
+            fixture_scores={"tc-32": 0.0},
+            integrity=ok_integrity,
+        )
+
+    async def fake_rb(*_args, **kwargs):
+        fixtures = kwargs.get("fixtures") or []
+        seen["rb_teams"] = {f.team for f in fixtures}
+        seen["rb_mode"] = kwargs.get("mode")
+        return SimpleNamespace(
+            overall_quality=0.9,
+            runs=1,
+            results=[],
+            fixture_scores={"rb-b01": 0.9},
+            integrity=ok_integrity,
+        )
+
+    monkeypatch.setattr("atomics.eval.adversarial.runner.run_adversarial", fake_adv)
+    monkeypatch.setattr("atomics.eval.toolcall.runner.run_toolcall_suite", fake_tc)
+    monkeypatch.setattr("atomics.eval.redblue.runner.run_redblue", fake_rb)
+
+    esc_runner = make_suite_runner(
+        provider_factory=lambda _m: SimpleNamespace(name="ollama"),
+        judge_provider=SimpleNamespace(name="ollama"),
+        judge_model="judge",
+        runs=1,
+        thinking=False,
+        thinking_budget=None,
+        category="escalation",
+    )
+    await esc_runner(model="m:1b", suite="adversarial", skip_incapable=False)
+    await esc_runner(model="m:1b", suite="toolcall", skip_incapable=False)
+    assert seen["adv_ids"] == [f"mt-esc-0{i}" for i in range(1, 7)]
+    assert seen["tc_ids"] == ["tc-32", "tc-33", "tc-34", "tc-35"]
+
+    mixed_runner = make_suite_runner(
+        provider_factory=lambda _m: SimpleNamespace(name="ollama"),
+        judge_provider=SimpleNamespace(name="ollama"),
+        judge_model="judge",
+        runs=1,
+        thinking=False,
+        thinking_budget=None,
+        category="escalation",
+        fixture_ids=["mt-esc-04", "tc-32"],
+    )
+    await mixed_runner(model="m:1b", suite="adversarial", skip_incapable=False)
+    await mixed_runner(model="m:1b", suite="toolcall", skip_incapable=False)
+    assert seen["adv_ids"] == ["mt-esc-04"]
+    assert seen["tc_ids"] == ["tc-32"]
+
+    rb_runner = make_suite_runner(
+        provider_factory=lambda _m: SimpleNamespace(name="ollama"),
+        judge_provider=SimpleNamespace(name="ollama"),
+        judge_model="judge",
+        runs=1,
+        thinking=False,
+        thinking_budget=None,
+        category="blue",
+    )
+    await rb_runner(model="m:1b", suite="redblue", skip_incapable=False)
+    assert seen["rb_teams"] == {"blue"}
+    assert seen["rb_mode"] == "blue"
+
+
+def test_cli_sweep_validates_category_and_fixtures() -> None:
+    from click.testing import CliRunner
+
+    from atomics.cli import cli
+
+    runner = CliRunner()
+
+    bad_suite = runner.invoke(
+        cli, ["sweep", "--models", "m1", "--suites", "eval", "--category", "escalation"]
+    )
+    assert bad_suite.exit_code != 0
+    assert "does not support category filtering" in bad_suite.output
+
+    bad_cross_cat = runner.invoke(
+        cli,
+        [
+            "sweep",
+            "--models",
+            "m1",
+            "--suites",
+            "adversarial,toolcall",
+            "--category",
+            "rag_poisoning",
+        ],
+    )
+    assert bad_cross_cat.exit_code != 0
+    assert "unknown toolcall category" in bad_cross_cat.output
+
+    bad_fid = runner.invoke(
+        cli, ["sweep", "--models", "m1", "--suites", "adversarial", "--fixtures", "bogus-99"]
+    )
+    assert bad_fid.exit_code != 0
+    assert "unknown fixture IDs" in bad_fid.output
+
+    missing_suite_fid = runner.invoke(
+        cli,
+        [
+            "sweep",
+            "--models",
+            "m1",
+            "--suites",
+            "adversarial,toolcall",
+            "--fixtures",
+            "mt-esc-04",
+        ],
+    )
+    assert missing_suite_fid.exit_code != 0
+    assert "toolcall" in missing_suite_fid.output
+
+    disjoint = runner.invoke(
+        cli,
+        [
+            "sweep",
+            "--models",
+            "m1",
+            "--suites",
+            "adversarial",
+            "--category",
+            "escalation",
+            "--fixtures",
+            "adv-01",
+        ],
+    )
+    assert disjoint.exit_code != 0
+    assert "fixture IDs outside category" in disjoint.output

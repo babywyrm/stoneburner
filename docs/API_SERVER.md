@@ -326,7 +326,10 @@ Unlike a single eval, **`budget_usd` has no default** — omit it and the
 request is `422`. Name the models; there is no `--all-local` / discover-
 everything flag (call `GET /models` first). Caps: 8 models, 3 runs, suites
 from `eval`, `adversarial`, `redblue`, `refusal`, `toolcall`, `codereview`
-(note `eval`, not `accuracy`). Optional `host` and `judge_host` have the same meaning
+(note `eval`, not `accuracy`). Optional `host`, `judge_host`, `category`
+(comma-separated categories or group aliases when every requested suite is in
+`adversarial`, `toolcall`, `redblue`), and `fixtures` (fixture ID subset; every
+requested suite must match at least one ID) have the same meaning
 as `POST /evals`.
 While it runs, `progress.total` is models × suites,
 `in_flight` is `{model, suite}`, that dict is appended to

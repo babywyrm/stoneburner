@@ -740,3 +740,147 @@ def test_distributed_run_suite_dispatches_eval_request_and_renders_eval_status(m
     assert status_out.exit_code == 0, status_out.output
     assert "0.917" in status_out.output
     assert "complete" in status_out.output
+
+
+def test_distributed_run_forwards_category_profile_thinking_and_effort(monkeypatch):
+    from click.testing import CliRunner
+
+    from atomics.commands.distributed import distributed
+
+    captured = _capture_run_payload(monkeypatch)
+    res_suite = CliRunner().invoke(
+        distributed,
+        [
+            "run",
+            "--api-key",
+            "k",
+            "--mode",
+            "fleet",
+            "--suite",
+            "adversarial",
+            "--category",
+            "escalation",
+            "--profile",
+            "profiles/examples/http-gate.yaml",
+            "--no-thinking",
+            "--effort",
+            "xl",
+            "--reasoning-mode",
+            "pro",
+        ],
+    )
+    assert res_suite.exit_code == 0, res_suite.output
+    assert captured["eval_request"] == {
+        "suite": "adversarial",
+        "category": "escalation",
+        "profile": "profiles/examples/http-gate.yaml",
+        "thinking": False,
+        "effort": "xhigh",
+        "reasoning_mode": "pro",
+    }
+
+    captured_burn = _capture_run_payload(monkeypatch)
+    res_burn = CliRunner().invoke(
+        distributed,
+        [
+            "run",
+            "--api-key",
+            "k",
+            "--thinking",
+            "--effort",
+            "low",
+            "--reasoning-mode",
+            "standard",
+        ],
+    )
+    assert res_burn.exit_code == 0, res_burn.output
+    assert captured_burn["run_request"]["thinking"] is True
+    assert captured_burn["run_request"]["effort"] == "low"
+    assert captured_burn["run_request"]["reasoning_mode"] == "standard"
+
+    captured_bad = _capture_run_payload(monkeypatch)
+    for flag, val in (
+        ("--category", "escalation"),
+        ("--profile", "profiles/examples/http-gate.yaml"),
+    ):
+        bad = CliRunner().invoke(distributed, ["run", "--api-key", "k", flag, val])
+        assert bad.exit_code != 0
+        assert "--suite" in bad.output
+        assert captured_bad == {}
+
+
+@pytest.mark.asyncio
+async def test_distributed_task_specs_and_worker_forward_thinking_and_effort(monkeypatch):
+    from types import SimpleNamespace
+
+    from atomics.distributed.models import TaskAssignment
+    from atomics.distributed.routes import _build_task_specs
+    from atomics.distributed.worker_runner import execute_assignment, execute_full_run
+
+    specs = _build_task_specs(
+        {
+            "tier": "ez",
+            "iterations": 1,
+            "provider": "ollama",
+            "thinking": False,
+            "effort": "low",
+            "reasoning_mode": "standard",
+        }
+    )
+    assert specs[0]["thinking"] is False
+    assert specs[0]["effort"] == "low"
+    assert specs[0]["reasoning_mode"] == "standard"
+
+    seen_exec: dict[str, object] = {}
+
+    async def fake_execute_task(_task, _prompt, **kwargs):
+        seen_exec.update(kwargs)
+        return {"ok": True}
+
+    monkeypatch.setattr(
+        "atomics.distributed.worker_runner.make_provider",
+        lambda *_a, **_kw: SimpleNamespace(name="ollama"),
+    )
+    monkeypatch.setattr("atomics.distributed.worker_runner.execute_task", fake_execute_task)
+
+    assignment = TaskAssignment(
+        assignment_id="a1",
+        job_id="j1",
+        task_spec=specs[0],
+    )
+    await execute_assignment(assignment)
+    assert seen_exec["thinking"] is False
+    assert seen_exec["effort"] == "low"
+    assert seen_exec["reasoning_mode"] == "standard"
+
+    seen_engine: dict[str, object] = {}
+
+    class FakeEngine:
+        def __init__(self, *_args, **kwargs):
+            seen_engine.update(kwargs)
+
+        async def run(self, max_iterations: int = 1):
+            return SimpleNamespace(
+                run_id="r1",
+                model_dump=lambda mode="json": {"run_id": "r1", "max_iterations": max_iterations},
+            )
+
+    monkeypatch.setattr("atomics.distributed.worker_runner.LoopEngine", FakeEngine)
+    full_assignment = TaskAssignment(
+        assignment_id="a2",
+        job_id="j2",
+        task_spec={
+            "mode": "full",
+            "run_request": {
+                "tier": "ez",
+                "iterations": 1,
+                "thinking": True,
+                "effort": "high",
+                "reasoning_mode": "pro",
+            },
+        },
+    )
+    await execute_full_run(full_assignment)
+    assert seen_engine["thinking"] is True
+    assert seen_engine["effort"] == "high"
+    assert seen_engine["reasoning_mode"] == "pro"

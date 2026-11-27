@@ -144,6 +144,8 @@ _VERBS: dict[str, tuple[str, frozenset[str], str | None]] = {
                 "provider",
                 "models",
                 "suites",
+                "fixtures",
+                "category",
                 "budget_usd",
                 "judge_model",
                 "runs",

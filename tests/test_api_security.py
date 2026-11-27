@@ -1037,3 +1037,223 @@ class TestRemoteCodegenAndDefaultMetadataSsrf:
         )
         with pytest.raises(PermissionError, match="--allow-codegen"):
             await execute_full_run(assignment, allow_codegen=False)
+
+    def test_distributed_allowed_hosts_enforced_when_provider_omitted_and_codegen_skips_judge(
+        self, tmp_path
+    ) -> None:
+        import json
+
+        from atomics.distributed.models import WorkerRegisterRequest
+
+        approved = "http://approved-host:11434"
+        app = create_app(
+            ServerSettings(
+                api_keys={"k"},
+                worker_api_keys={"wk"},
+                db_path=tmp_path / "dist-allow.db",
+                allowed_hosts={approved},
+                allow_codegen=True,
+            )
+        )
+        headers = {"X-API-Key": "k"}
+        with TestClient(app, base_url="http://127.0.0.1") as tc:
+            worker = app.state.coordinator.register_worker(
+                WorkerRegisterRequest(capabilities=["python"])
+            )
+            # Omitted run_request.provider defaults to unapproved localhost:11434 -> 403
+            res_run_omit = tc.post(
+                "/api/v1/distributed/runs",
+                json={"mode": "full", "run_request": {"iterations": 1}},
+                headers=headers,
+            )
+            assert res_run_omit.status_code == 403
+
+            # Omitted eval_request.provider + explicit approved judge_host still uses
+            # unapproved default localhost:11434 for subject inference -> 403
+            res_eval_omit = tc.post(
+                "/api/v1/distributed/runs",
+                json={
+                    "mode": "full",
+                    "eval_request": {"suite": "refusal", "judge_host": approved},
+                },
+                headers=headers,
+            )
+            assert res_eval_omit.status_code == 403
+
+            # codegen has no judge -> vllm on approved host must pass without judge_host
+            res_cg = tc.post(
+                "/api/v1/distributed/runs",
+                json={
+                    "mode": "full",
+                    "eval_request": {
+                        "suite": "codegen",
+                        "provider": "vllm",
+                        "host": approved,
+                    },
+                },
+                headers=headers,
+            )
+            assert res_cg.status_code == 202
+            cg_claim = app.state.coordinator.claim_assignment(worker.worker_id)
+            assert cg_claim is not None
+
+            # Case/padded eval_request fields persist normalized into worker assignment
+            res_norm = tc.post(
+                "/api/v1/distributed/runs",
+                json={
+                    "mode": "full",
+                    "eval_request": {
+                        "suite": " TOOLCALL ",
+                        "provider": " OLLAMA ",
+                        "host": approved,
+                        "category": " direct, escalation ",
+                        "channel": " TOOLS ",
+                        "effort": " XL ",
+                    },
+                },
+                headers=headers,
+            )
+            assert res_norm.status_code == 202
+            norm_claim = app.state.coordinator.claim_assignment(worker.worker_id)
+            assert norm_claim is not None
+            dispatched = norm_claim.task_spec["eval_request"]
+            assert dispatched["suite"] == "toolcall"
+            assert dispatched["provider"] == "ollama"
+            assert dispatched["category"] == "direct,escalation"
+            assert dispatched["channel"] == "tools"
+            assert dispatched["effort"] == "xhigh"
+            saved_req = json.loads(res_norm.json()["request_json"])["eval_request"]
+            assert saved_req["suite"] == "toolcall"
+
+    def test_distributed_empty_dict_mutual_exclusion_extra_forbid_and_bounds(
+        self, tmp_path
+    ) -> None:
+        from pydantic import ValidationError
+
+        from atomics.distributed.models import (
+            MAX_WORKER_LABEL_LEN,
+            MAX_WORKER_LABELS,
+            DistributedRunRequest,
+            TaskResultSubmission,
+            WorkerRegisterRequest,
+        )
+
+        app = create_app(
+            ServerSettings(
+                api_keys={"k"},
+                worker_api_keys={"wk"},
+                db_path=tmp_path / "dist-bounds.db",
+            )
+        )
+        headers = {"X-API-Key": "k"}
+        with TestClient(app, base_url="http://127.0.0.1") as tc:
+            app.state.coordinator.register_worker(WorkerRegisterRequest(capabilities=["python"]))
+            # Empty eval_request={} alongside run_request must still be rejected as "not both"
+            both = tc.post(
+                "/api/v1/distributed/runs",
+                json={
+                    "mode": "full",
+                    "run_request": {"iterations": 1},
+                    "eval_request": {},
+                },
+                headers=headers,
+            )
+            assert both.status_code == 400
+            assert "not both" in both.text
+
+            # Empty run_request={} uses default tier/iterations and succeeds in split mode
+            empty_run = tc.post(
+                "/api/v1/distributed/runs",
+                json={"mode": "split", "run_request": {}},
+                headers=headers,
+            )
+            assert empty_run.status_code == 202
+
+        with pytest.raises(ValidationError):
+            DistributedRunRequest.model_validate({"mode": "split", "unexpected": 1})
+        with pytest.raises(ValidationError):
+            WorkerRegisterRequest.model_validate({"unknown_key": True})
+        with pytest.raises(ValidationError):
+            TaskResultSubmission.model_validate({"status": "completed", "extra_field": 1})
+        with pytest.raises(ValidationError, match="worker_selector"):
+            DistributedRunRequest(
+                mode="fleet",
+                worker_selector={f"k{i}": "v" for i in range(MAX_WORKER_LABELS + 1)},
+            )
+        with pytest.raises(ValidationError, match="worker_selector"):
+            DistributedRunRequest(
+                mode="fleet",
+                worker_selector={"k": "x" * (MAX_WORKER_LABEL_LEN + 1)},
+            )
+        with pytest.raises(ValidationError, match="unknown effort"):
+            DistributedRunRequest(mode="split", run_request={"effort": "ludicrous"})
+        with pytest.raises(ValidationError, match="budget"):
+            DistributedRunRequest(mode="full", run_request={"budget": -1.0})
+
+    @pytest.mark.asyncio
+    async def test_profile_eval_allowed_hosts_checks_profile_and_judge_not_unused_default_ollama(
+        self, tmp_path, jobs_never_run
+    ) -> None:
+        from pathlib import Path
+        from unittest.mock import AsyncMock, patch
+
+        from atomics.distributed.models import TaskAssignment
+        from atomics.distributed.worker_runner import execute_full_run
+
+        gate_url = "http://approved-gate:8080/ask"
+        judge_url = "http://approved-judge:11434"
+        local_profiles = Path("profiles") / "local"
+        local_profiles.mkdir(parents=True, exist_ok=True)
+        prof_file = local_profiles / "_test_allowed_gate_tmp.yaml"
+        prof_rel = str(prof_file)
+        try:
+            prof_file.write_text(
+                f"name: gate\ntype: http\nhttp:\n  url: {gate_url}\n  method: POST\n"
+                "  body:\n    prompt: '{{prompt}}'\n  response_path: answer\n"
+                "prompts:\n  - hello\n",
+                encoding="utf-8",
+            )
+            app = create_app(
+                ServerSettings(
+                    api_keys={"k"},
+                    db_path=tmp_path / "prof-allow.db",
+                    allowed_hosts={"http://approved-gate:8080", judge_url},
+                )
+            )
+            with TestClient(app, base_url="http://127.0.0.1") as tc:
+                res = tc.post(
+                    "/api/v1/evals",
+                    json={
+                        "suite": "refusal",
+                        "provider": "ollama",
+                        "profile": prof_rel,
+                        "judge_host": judge_url,
+                    },
+                    headers={"X-API-Key": "k"},
+                )
+                assert res.status_code == 202, res.text
+
+            assignment = TaskAssignment(
+                assignment_id="a-prof",
+                job_id="j-prof",
+                worker_id="w-1",
+                task_spec={
+                    "eval_request": {
+                        "suite": "refusal",
+                        "provider": "ollama",
+                        "profile": prof_rel,
+                        "judge_host": judge_url,
+                    }
+                },
+            )
+            with patch(
+                "atomics.api._runners.run_eval_suite",
+                new=AsyncMock(return_value={"suite": "refusal", "overall_score": 1.0}),
+            ):
+                out = await execute_full_run(
+                    assignment,
+                    allowed_hosts={"http://approved-gate:8080", judge_url},
+                )
+            assert out["suite"] == "refusal"
+        finally:
+            prof_file.unlink(missing_ok=True)

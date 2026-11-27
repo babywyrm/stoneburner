@@ -187,6 +187,23 @@ major tag moved by the publish workflow.
       `ornith-1.5:35b`, `nemotron-3.5-lightning:30b`, and
       `north-mini-code-1.0:latest`.
 
+## 0.45.0 — Sweep subset parity, distributed CLI controls, and allowlist hardening
+
+- [x] Add `--category` to `atomics sweep` plus `category` and `fixtures` to
+      `POST /api/v1/sweeps` (`SweepRequest`), `AtomicsApiClient.submit_sweep`,
+      `atomics mcp` `submit_sweep`, and `atomics repl` `submit_sweep`, with
+      upfront cross-suite subset validation (`validate_sweep_subset()`).
+- [x] Wire `--category`, `--profile`, `--thinking/--no-thinking`, `--effort`,
+      and `--reasoning-mode` into `atomics distributed run`, forwarding
+      reasoning controls through `_build_task_specs()`,
+      `execute_assignment()`, and `execute_full_run()`.
+- [x] Close `--allowed-hosts` omission bypass on `POST /api/v1/distributed/runs`
+      when `provider` is omitted (`CWE-863` / `CWE-918`), skip unused default
+      subject-host checks on `--profile` evals, enforce `extra="forbid"` and
+      bounds on `RunRequest` and distributed request models, and normalize
+      `provider` and `BatteryRequest.name` across API models and
+      `providers.factory`.
+
 ## Empirical Baselines
 
 - **Reference judge (`gemma4:26b`).** A red/blue study on six local models

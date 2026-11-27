@@ -80,6 +80,8 @@ async def run_sweep_from_request(
             runs=payload.runs,
             thinking=payload.thinking,
             thinking_budget=None,
+            fixture_ids=payload.fixtures,
+            category=payload.category,
             effort=payload.effort,
             reasoning_mode=payload.reasoning_mode,
             temperature=payload.temperature,
@@ -109,7 +111,7 @@ async def run_sweep_from_request(
         await aclose_providers(judge_provider, *created)
 
     jobs = [asdict(row) for row in results]
-    return {
+    out: dict[str, Any] = {
         "provider": payload.provider,
         "models": list(payload.models),
         "suites": list(payload.suites),
@@ -122,3 +124,8 @@ async def run_sweep_from_request(
         "fail": sum(1 for row in results if not row.ok),
         "jobs": jobs,
     }
+    if payload.category is not None:
+        out["category"] = payload.category
+    if payload.fixtures is not None:
+        out["fixtures"] = list(payload.fixtures)
+    return out

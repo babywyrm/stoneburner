@@ -79,6 +79,7 @@ def resolve_provider_endpoint(
     """Return the validated outbound HTTP(S) base URL ``make_provider`` targets."""
     from atomics.inference import load_control_file, overlay_provider_defaults
 
+    name = name.strip().lower()
     name, _, host, vllm_host = overlay_provider_defaults(
         name=name,
         model=None,
@@ -151,6 +152,7 @@ def make_provider(
     """
     from atomics.inference import load_control_file, overlay_provider_defaults
 
+    name = name.strip().lower()
     name, model, host, vllm_host = overlay_provider_defaults(
         name=name,
         model=model,

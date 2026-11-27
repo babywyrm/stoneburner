@@ -171,6 +171,12 @@ def suite_persister(db_path: Path) -> Callable[[str, str, str, object], None]:
 @click.option(
     "--fixtures", type=str, default=None, help="Comma-separated fixture IDs (default: all)"
 )
+@click.option(
+    "--category",
+    type=str,
+    default=None,
+    help="Comma-separated category or group alias filter (adversarial, toolcall, redblue).",
+)
 @click.option("--thinking/--no-thinking", "thinking_flag", default=None)
 @click.option("--thinking-budget", type=int, default=None)
 @temperature_option
@@ -242,6 +248,7 @@ def sweep(
     judge_model: str | None,
     judge_host: str | None,
     fixtures: str | None,
+    category: str | None,
     thinking_flag: bool | None,
     thinking_budget: int | None,
     temperature: float | None,
@@ -284,6 +291,7 @@ def sweep(
         parse_suites,
         run_gauntlet,
         run_model_sweep,
+        validate_sweep_subset,
     )
 
     if resume and not status_path:
@@ -294,6 +302,12 @@ def sweep(
     effective_host = ollama_host or settings.ollama_host
     try:
         suite_list = parse_suites(suites)
+        raw_fixture_ids = (
+            [f.strip() for f in fixtures.split(",") if f.strip()] if fixtures is not None else None
+        )
+        category_norm, fixture_ids = validate_sweep_subset(
+            suite_list, category=category, fixture_ids=raw_fixture_ids
+        )
     except ValueError as exc:
         raise click.ClickException(str(exc)) from exc
     if models_from == "ollama":
@@ -322,7 +336,6 @@ def sweep(
         console.print("[red]Specify --models or --all-local[/red]")
         raise SystemExit(1)
 
-    fixture_ids = [f.strip() for f in fixtures.split(",") if f.strip()] if fixtures else None
     if temperature is not None:
         console.print(f"[dim]temperature={temperature} for every model; judges at 0[/dim]")
     ollama_hosts: list[str] = []
@@ -392,6 +405,7 @@ def sweep(
                         thinking_budget=thinking_budget,
                         temperature=temperature,
                         fixture_ids=fixture_ids,
+                        category=category_norm,
                         effort=effort,
                         reasoning_mode=reasoning_mode,
                         persist=suite_persister(settings.db_path) if save_results else None,

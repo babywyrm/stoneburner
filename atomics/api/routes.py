@@ -119,6 +119,7 @@ def _check_provider_hosts(
     provider: str,
     host: str | None,
     *,
+    include_subject: bool = True,
     include_judge: bool = False,
     judge_host: str | None = None,
 ) -> None:
@@ -129,15 +130,18 @@ def _check_provider_hosts(
     from atomics.providers.factory import ProviderConfigError, resolve_provider_endpoint
 
     app_settings = load_settings()
-    try:
-        eff_host = resolve_provider_endpoint(provider, host, app_settings, host_label="host")
-    except ProviderConfigError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-    _check_payload_hosts(request, ("host", eff_host))
+    if include_subject:
+        try:
+            eff_host = resolve_provider_endpoint(provider, host, app_settings, host_label="host")
+        except ProviderConfigError as exc:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        _check_payload_hosts(request, ("host", eff_host))
 
     if include_judge:
         eff_judge_in = (
-            judge_host if judge_host is not None else (host if provider == "ollama" else None)
+            judge_host
+            if judge_host is not None
+            else (host if include_subject and provider == "ollama" else None)
         )
         try:
             eff_judge = resolve_provider_endpoint(
@@ -209,6 +213,7 @@ async def start_eval(
         request,
         payload.provider,
         payload.host,
+        include_subject=payload.profile is None,
         include_judge=suite != "codegen",
         judge_host=payload.judge_host,
     )
@@ -322,6 +327,7 @@ async def start_battery(
         request,
         payload.provider,
         payload.host,
+        include_subject=payload.profile is None,
         include_judge=needs_judge,
         judge_host=payload.judge_host,
     )

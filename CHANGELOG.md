@@ -3,6 +3,16 @@
 ## Unreleased
 
 ### Added
+- `--category` on `atomics sweep` plus `category` and `fixtures` on
+  `POST /api/v1/sweeps` (`SweepRequest`), `AtomicsApiClient.submit_sweep`,
+  `atomics mcp` `submit_sweep`, and `atomics repl` `submit_sweep`, validating
+  category tokens and multi-suite fixture ID subsets upfront via
+  `validate_sweep_subset()` and routing matching IDs per suite.
+- `--category`, `--profile`, `--thinking/--no-thinking`, `--effort`, and
+  `--reasoning-mode` on `atomics distributed run` (`--suite` and burn-loop
+  modes), forwarding `thinking`, `thinking_budget`, `effort`, and
+  `reasoning_mode` across `_build_task_specs()`, `execute_assignment()`, and
+  `execute_full_run()`.
 - `adversarial` in `atomics sweep --suites`, `POST /api/v1/sweeps`,
   `atomics mcp` `submit_sweep`, and `atomics repl` `submit_sweep` (including
   `AdversarialSummary.fixture_scores` for `vs_best` intervals,
@@ -129,6 +139,18 @@
   retired legacy post-split helper/command re-exports from `atomics/cli.py`.
 
 ### Fixed
+- `POST /api/v1/distributed/runs` now enforces `--allowed-hosts` against the
+  default `"ollama"` inference endpoint even when `run_request` or
+  `eval_request` omits `"provider"` (`CWE-863` / `CWE-918`), skips unused
+  default subject-provider checks when `profile` is set on `POST /api/v1/evals`,
+  `POST /api/v1/batteries`, and distributed `eval_request` jobs, skips judge
+  host checks on judge-free `codegen` distributed jobs, persists normalized
+  `eval_request` fields into dispatched worker assignments, checks `is None`
+  instead of dict truthiness on `run_request` / `eval_request` mutual exclusion,
+  enforces `ConfigDict(extra="forbid")` and label/budget bounds on
+  `RunRequest`, `DistributedRunRequest`, `WorkerRegisterRequest`, and
+  `TaskResultSubmission`, and normalizes `provider` / `BatteryRequest.name`
+  case and whitespace across all API request models and `providers.factory`.
 - `EvalRequest` now normalizes `suite` (`strip().lower()`) at Pydantic
   validation time (preventing uppercase/padded `"CODEGEN"` payloads from
   bypassing `atomics worker`'s `--allow-codegen` gate, `CWE-178`), bounds

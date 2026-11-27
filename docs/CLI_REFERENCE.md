@@ -175,6 +175,7 @@ one backend that reports its window size.
 | `atomics rag --json-out rag.json` | Write results as JSON |
 | `atomics sweep` | Multi-model eval sweep with ranked comparison |
 | `atomics sweep --verbose` | Print the full prompt, model reply, thinking, and judge rationale per fixture |
+| `atomics sweep --models a,b --suites adversarial,toolcall --category escalation --fixtures mt-esc-01,tc-32` | Restrict a sweep to matching categories (`adversarial`, `toolcall`, `redblue`) and/or fixture IDs across suites |
 | `atomics sweep --models a,b,c --temperature 0` | Pin every model under test (0–2) so the ranking is not run-to-run noise. Judges stay at 0. Applies to `eval` and every `--suites` entry |
 | `atomics sweep --suites adversarial,redblue,refusal,toolcall,codereview --runs 3 --no-thinking --models-from ollama --status sweep.status.json --log sweep.log` | Overnight multi-suite driver: status file + detachable log. Toolcall uses `--no-skip-incapable`. A `vs best` column marks each job `best`, `tied`, or `behind` the suite leader ([COMPARING.md](COMPARING.md#intervals)). |
 | `atomics sweep ... --status sweep.status.json --resume` | Same command after a stop. Keeps jobs the status file records as ok; re-runs failed, crashed, and unfinished ones. A partial suite is not ok. A dead provider stops the sweep. |
@@ -391,6 +392,11 @@ Submit and inspect distributed benchmark runs. Three modes:
 | `-n INTEGER` | Tasks per worker in fleet mode; tasks in total in split mode (default: 1) |
 | `--label KEY=VALUE` | Worker selector, repeatable. Fleet and full mode only; **rejected for `split`**, which assigns each task to the next available worker |
 | `--runtime [python\|node]` | Runtime for generated tasks. `node` routes tasks to npm workers via the bridge (default: `python`) |
+| `--suite SUITE` | Dispatch an `eval_request` suite (`accuracy`, `rag`, `multiturn`, `adversarial`, `codegen`, `refusal`, `redblue`, `toolcall`, `codereview`) in `fleet` or `full` mode |
+| `--category TEXT` / `--fixtures TEXT` / `--profile PATH` | Category filter, fixture ID subset, or `profiles/...` YAML target for `--suite` |
+| `--host URL` / `--judge-model TEXT` / `--judge-host URL` | Inference host, judge model, and judge host overrides (`--host` also applies to burn-loop runs) |
+| `--runs INT` / `--budget FLOAT` / `--channel CHOICE` / `--temperature FLOAT` | Per-worker suite pass count, USD ceiling, `toolcall` channel, and subject temperature |
+| `--thinking / --no-thinking`, `--effort LEVEL`, `--reasoning-mode MODE` | Shared thinking and reasoning-effort controls forwarded to worker tasks and `--suite` runs |
 
 Reads the client key from `ATOMICS_API_KEY`; pass `--api-key` to override.
 

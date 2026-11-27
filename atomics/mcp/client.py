@@ -242,6 +242,8 @@ class AtomicsApiClient:
         models: list[str],
         suites: list[str],
         budget_usd: float,
+        fixtures: list[str] | None = None,
+        category: str | None = None,
         judge_model: str | None = None,
         runs: int = 1,
         thinking: bool | None = None,
@@ -258,6 +260,10 @@ class AtomicsApiClient:
             "budget_usd": budget_usd,
             "runs": runs,
         }
+        if fixtures is not None:
+            payload["fixtures"] = fixtures
+        if category is not None:
+            payload["category"] = category
         if temperature is not None:
             payload["temperature"] = temperature
         if judge_model is not None:
